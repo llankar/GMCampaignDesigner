@@ -1,3 +1,5 @@
+"""Utilities for graph tabs importer."""
+
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
@@ -19,6 +21,7 @@ def merge_graph_into(
     nodes_collapsed: bool,
     shape_counter: int,
 ) -> GraphImportResult:
+    """Merge graph into."""
     if not isinstance(imported_graph, dict):
         raise ValueError("Selected file does not contain a valid graph.")
 
@@ -37,6 +40,7 @@ def merge_graph_into(
     normalized_nodes: List[Dict] = []
 
     for node in imported_nodes:
+        # Process each node from imported_nodes.
         if not isinstance(node, dict):
             continue
         entity_type, entity_name = _normalize_entity(node)
@@ -56,6 +60,7 @@ def merge_graph_into(
 
     normalized_links: List[Dict] = []
     for link in imported_links:
+        # Process each link from imported_links.
         if not isinstance(link, dict):
             continue
         node1_tag, node2_tag = _normalize_link_tags(link, imported_entities)
@@ -74,14 +79,17 @@ def merge_graph_into(
 
     normalized_shapes: List[Dict] = []
     for shape in imported_shapes:
+        # Process each shape from imported_shapes.
         if not isinstance(shape, dict):
             continue
         shape.pop("canvas_id", None)
         shape.pop("resize_handle", None)
         tag = shape.get("tag")
         if not tag or tag in existing_shape_tags:
+            # Handle the branch where tag is unavailable or tag is in existing shape tags.
             tag = f"shape_{shape_counter}"
             while tag in existing_shape_tags:
+                # Keep looping while tag is in existing_shape_tags.
                 shape_counter += 1
                 tag = f"shape_{shape_counter}"
             shape_counter += 1
@@ -101,8 +109,10 @@ def merge_graph_into(
 
 
 def _normalize_entity(node: Dict) -> Tuple[str, str]:
+    """Normalize entity."""
     if "entity_type" not in node or "entity_name" not in node:
         if "npc_name" in node:
+            # Handle the branch where 'npc_name' is in node.
             node["entity_type"] = "npc"
             node["entity_name"] = node.pop("npc_name")
         elif "pc_name" in node:
@@ -114,10 +124,12 @@ def _normalize_entity(node: Dict) -> Tuple[str, str]:
 
 
 def _normalize_link_tags(link: Dict, imported_entities: Dict[Tuple[str, str], str]) -> Tuple[Optional[str], Optional[str]]:
+    """Normalize link tags."""
     node1_tag = link.get("node1_tag")
     node2_tag = link.get("node2_tag")
     if not node1_tag or not node2_tag:
         if "npc_name1" in link and "npc_name2" in link:
+            # Handle the branch where 'npc_name1' is in link and 'npc_name2' is in link.
             node1_tag = imported_entities.get(("npc", link.get("npc_name1")))
             node2_tag = imported_entities.get(("npc", link.get("npc_name2")))
         elif "pc_name1" in link and "pc_name2" in link:
@@ -127,10 +139,13 @@ def _normalize_link_tags(link: Dict, imported_entities: Dict[Tuple[str, str], st
 
 
 def _unique_tag(base: str, original: str, existing_tags) -> str:
+    """Internal helper for unique tag."""
     tag = original
     if tag in existing_tags:
+        # Handle the branch where tag is in existing tags.
         i = 1
         while f"{base}_{i}" in existing_tags:
+            # Keep looping while f'{base}_{i}' is in existing_tags.
             i += 1
         tag = f"{base}_{i}"
     return tag

@@ -11,11 +11,14 @@ class CharacterDraftRepository:
     TABLE_NAME = "character_creation_drafts"
 
     def __init__(self):
+        """Initialize the CharacterDraftRepository instance."""
         self._ensure_table()
 
     def _ensure_table(self) -> None:
+        """Ensure table."""
         conn = get_connection()
         try:
+            # Keep table resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"""
@@ -31,8 +34,10 @@ class CharacterDraftRepository:
             conn.close()
 
     def list_names(self) -> list[str]:
+        """Handle list names."""
         conn = get_connection()
         try:
+            # Keep list names resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(f"SELECT name FROM {self.TABLE_NAME} ORDER BY name COLLATE NOCASE")
             return [row[0] for row in cursor.fetchall()]
@@ -40,8 +45,10 @@ class CharacterDraftRepository:
             conn.close()
 
     def save(self, name: str, payload: dict) -> None:
+        """Save the operation."""
         conn = get_connection()
         try:
+            # Keep save resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"""
@@ -58,8 +65,10 @@ class CharacterDraftRepository:
             conn.close()
 
     def load(self, name: str) -> dict | None:
+        """Load the operation."""
         conn = get_connection()
         try:
+            # Keep load resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(f"SELECT payload_json FROM {self.TABLE_NAME} WHERE name = ?", (name,))
             row = cursor.fetchone()

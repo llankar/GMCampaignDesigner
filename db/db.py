@@ -1,3 +1,5 @@
+"""Database connection and persistence helpers."""
+
 # db.py
 import json
 import sqlite3
@@ -34,6 +36,7 @@ def load_schema_from_json(entity_name):
     tmpl = load_template(entity_name)
     schema = []
     for field in tmpl.get("fields", []):
+        # Process each field from tmpl.get('fields', []).
         name = field.get("name")
         jtype = field.get("type", "text")
         if not name:
@@ -53,6 +56,7 @@ def _ensure_campaign_templates():
         pass
 
     for entity in list_known_entities():
+        # Process each entity from list_known_entities().
         default_tpl = os.path.join("modules", entity, f"{entity}_template.json")
         if not os.path.exists(default_tpl):
             continue
@@ -64,6 +68,7 @@ def _ensure_campaign_templates():
 
 
 def _ensure_schema_for_entity(cursor, entity):
+    """Ensure schema for entity."""
     schema = load_schema_from_json(entity)
     if not schema:
         return
@@ -87,6 +92,7 @@ def _ensure_schema_for_entity(cursor, entity):
     rows = cursor.fetchall()
     existing = {row[1] for row in rows}
     for col, typ in schema:
+        # Process each (col, typ) from schema.
         if col in existing:
             continue
         cursor.execute(
@@ -182,10 +188,12 @@ def _ensure_default_systems(cursor):
         )
 
 def get_connection():
+    """Return connection."""
     raw_db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db").strip()
     is_windows_style_path = re.match(r"^[a-zA-Z]:[\\/\\]", raw_db_path)
 
     if platform.system() != "Windows" and is_windows_style_path:
+        # Continue with this path when platform.system() != 'Windows' and is windows style path is set.
         drive_letter = raw_db_path[0].upper()
         subpath = raw_db_path[2:].lstrip("/\\").replace("\\", "/")
         if subpath.lower().startswith("synologydrive/"):
@@ -198,6 +206,7 @@ def get_connection():
     return sqlite3.connect(DB_PATH)
 
 def initialize_db():
+    """Handle initialize DB."""
     _ensure_campaign_templates()
     conn   = get_connection()
     cursor = conn.cursor()
@@ -238,6 +247,7 @@ def ensure_entity_schema(entity: str):
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # Keep entity schema resilient if this step fails.
         _ensure_campaign_templates()
         _ensure_schema_for_entity(cursor, entity)
         conn.commit()
@@ -251,6 +261,7 @@ def get_campaign_setting(key: str, default: Optional[str] = None) -> Optional[st
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # Keep campaign setting resilient if this step fails.
         cursor.execute(
             "SELECT value FROM campaign_settings WHERE key = ?",
             (key,),
@@ -267,6 +278,7 @@ def set_campaign_setting(key: str, value: Optional[str]) -> None:
     conn = get_connection()
     cursor = conn.cursor()
     try:
+        # Keep campaign setting resilient if this step fails.
         cursor.execute(
             "INSERT OR REPLACE INTO campaign_settings (key, value) VALUES (?, ?)",
             (key, value),

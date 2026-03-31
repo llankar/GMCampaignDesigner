@@ -1,10 +1,15 @@
+"""Utilities for timer time format."""
+
 from __future__ import annotations
 
 
 def parse_time_to_seconds(text: str, fallback: float = 300.0) -> float:
+    """Parse time to seconds."""
     value = (text or "").strip()
     try:
+        # Keep time to seconds resilient if this step fails.
         if ":" in value:
+            # Handle the branch where ':' is in value.
             parts = [int(part) for part in value.split(":")]
             if len(parts) == 2:
                 minutes, seconds = parts
@@ -18,6 +23,7 @@ def parse_time_to_seconds(text: str, fallback: float = 300.0) -> float:
 
 
 def format_seconds(seconds: float) -> str:
+    """Format seconds."""
     total = max(0, int(seconds))
     hours, rem = divmod(total, 3600)
     minutes, sec = divmod(rem, 60)

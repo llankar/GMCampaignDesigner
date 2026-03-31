@@ -13,6 +13,7 @@ class RandomTableImportDialog(ctk.CTkToplevel):
     """Collect raw text rows and convert them into random table entries."""
 
     def __init__(self, master=None):
+        """Initialize the RandomTableImportDialog instance."""
         super().__init__(master)
         self.title("Import Random Table Entries")
         self.geometry("540x360")
@@ -24,6 +25,7 @@ class RandomTableImportDialog(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_ui(self):
+        """Build UI."""
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
 
@@ -42,6 +44,7 @@ class RandomTableImportDialog(ctk.CTkToplevel):
         ctk.CTkButton(actions, text="Cancel", command=self.destroy).pack(side="right")
 
     def _import(self):
+        """Import the operation."""
         raw_text = self.text_box.get("1.0", "end")
         try:
             self.result_entries = parse_random_table_text(raw_text)

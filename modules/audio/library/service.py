@@ -1,3 +1,5 @@
+"""Service helpers for library."""
+
 from __future__ import annotations
 
 import os
@@ -13,28 +15,34 @@ class AudioLibraryService:
     """Business API over the persisted audio library catalog."""
 
     def __init__(self, path: str = "config/audio_library.json", repository: Optional[AudioLibraryRepository] = None) -> None:
+        """Initialize the AudioLibraryService instance."""
         self.repository = repository or AudioLibraryRepository(path)
         self.path = path
         self.data: Dict[str, Dict[str, Any]] = self.repository.load()
 
     def load(self) -> None:
+        """Load the operation."""
         self.data = self.repository.load()
 
     def save(self) -> None:
+        """Save the operation."""
         self.repository.save(self.data)
 
     def get_categories(self, section: str) -> List[str]:
+        """Return categories."""
         categories = list(self._get_categories_dict(section).keys())
         categories.sort(key=str.lower)
         return categories
 
     def get_moods(self, section: str, category: str) -> List[str]:
+        """Return moods."""
         payload = self._get_category(section, category)
         moods = list(payload.get("moods", {}).keys())
         moods.sort(key=str.lower)
         return moods
 
     def list_tracks(self, section: str, category: str, mood: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Handle list tracks."""
         payload = self._get_category(section, category)
         moods = payload.get("moods", {})
         if mood is not None:
@@ -48,6 +56,7 @@ class AudioLibraryService:
         if isinstance(moods, dict):
             for bucket in moods.values():
                 if isinstance(bucket, dict):
+                    # Handle the branch where isinstance(bucket, dict).
                     bucket_tracks = bucket.get("tracks", [])
                     if isinstance(bucket_tracks, list):
                         merged.extend(bucket_tracks)
@@ -55,6 +64,7 @@ class AudioLibraryService:
         return merged
 
     def add_mood(self, section: str, category: str, mood: str) -> None:
+        """Handle add mood."""
         mood_key = self.repository.sanitize_mood(mood)
         payload = self._get_category(section, category)
         moods = payload.setdefault("moods", {})
@@ -64,6 +74,7 @@ class AudioLibraryService:
         self.save()
 
     def rename_mood(self, section: str, category: str, old: str, new: str) -> None:
+        """Handle rename mood."""
         old_key = self.repository.sanitize_mood(old)
         new_key = self.repository.sanitize_mood(new)
         payload = self._get_category(section, category)
@@ -83,6 +94,7 @@ class AudioLibraryService:
         self.save()
 
     def remove_mood(self, section: str, category: str, mood: str) -> None:
+        """Remove mood."""
         mood_key = self.repository.sanitize_mood(mood)
         payload = self._get_category(section, category)
         moods = payload.setdefault("moods", {})
@@ -95,12 +107,14 @@ class AudioLibraryService:
 
     # legacy compatibility helpers
     def get_moods_for_section(self, section: str) -> List[str]:
+        """Return moods for section."""
         moods: set[str] = set()
         for category in self.get_categories(section):
             moods.update(self.get_moods(section, category))
         return sorted(moods, key=str.lower)
 
     def list_tracks_by_mood(self, section: str, mood: str) -> List[Dict[str, Any]]:
+        """Handle list tracks by mood."""
         mood_key = self.repository.sanitize_mood(mood)
         items: List[Dict[str, Any]] = []
         for category in self.get_categories(section):
@@ -109,6 +123,7 @@ class AudioLibraryService:
         return items
 
     def add_category(self, section: str, name: str) -> None:
+        """Handle add category."""
         category = name.strip()
         if not category:
             raise ValueError("Category name cannot be empty.")
@@ -119,6 +134,7 @@ class AudioLibraryService:
         self.save()
 
     def remove_category(self, section: str, name: str) -> None:
+        """Remove category."""
         categories = self._get_categories_dict(section)
         if name not in categories:
             raise KeyError(f"Unknown category '{name}'.")
@@ -126,6 +142,7 @@ class AudioLibraryService:
         self.save()
 
     def rename_category(self, section: str, old_name: str, new_name: str) -> None:
+        """Handle rename category."""
         new_name = new_name.strip()
         categories = self._get_categories_dict(section)
         if old_name not in categories:
@@ -145,6 +162,7 @@ class AudioLibraryService:
         self.save()
 
     def get_directories(self, section: str, category: str) -> List[str]:
+        """Return directories."""
         payload = self._get_category(section, category)
         return list(payload.get("directories", []))
 
@@ -157,6 +175,7 @@ class AudioLibraryService:
         *,
         recursive: bool = True,
     ) -> List[Dict[str, Any]]:
+        """Handle add directory."""
         normalized = self.repository.normalize_path(directory)
         if not os.path.isdir(normalized):
             raise ValueError(f"Directory '{directory}' does not exist.")
@@ -174,6 +193,7 @@ class AudioLibraryService:
         return added
 
     def rescan_mood(self, section: str, category: str, mood: str) -> Dict[str, List[Dict[str, Any]]]:
+        """Handle rescan mood."""
         payload = self._get_category(section, category)
         mood_key = self.repository.sanitize_mood(mood)
         moods = payload.get("moods", {})
@@ -197,6 +217,7 @@ class AudioLibraryService:
         return {"added": added, "removed": removed}
 
     def rescan_category(self, section: str, category: str) -> Dict[str, List[Dict[str, Any]]]:
+        """Handle rescan category."""
         all_added: List[Dict[str, Any]] = []
         all_removed: List[Dict[str, Any]] = []
         for mood in self.get_moods(section, category):
@@ -212,6 +233,7 @@ class AudioLibraryService:
         mood: str,
         paths: Iterable[str],
     ) -> List[Dict[str, Any]]:
+        """Handle add tracks."""
         payload = self._get_category(section, category)
         moods = payload.setdefault("moods", {})
         mood_key = self.repository.sanitize_mood(mood)
@@ -226,6 +248,7 @@ class AudioLibraryService:
 
         added: List[Dict[str, Any]] = []
         for raw_path in paths:
+            # Process each raw_path from paths.
             normalized = self.repository.normalize_path(raw_path)
             extension = os.path.splitext(normalized)[1].lower()
             if extension not in AUDIO_EXTENSIONS:
@@ -248,6 +271,7 @@ class AudioLibraryService:
             existing_paths.add(normalized)
 
         if added:
+            # Continue with this path when added is set.
             for bucket in moods.values():
                 bucket["tracks"].sort(key=lambda item: item["name"].lower())
             self.save()
@@ -257,12 +281,15 @@ class AudioLibraryService:
         return added
 
     def classify_section_moods(self, section: str) -> Dict[str, int]:
+        """Handle classify section moods."""
         categories = self._get_categories_dict(section)
         updated = 0
         for category_name, payload in categories.items():
+            # Process each (category_name, payload) from categories.items().
             all_tracks = self.list_tracks(section, category_name)
             new_moods: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
             for track in all_tracks:
+                # Process each track from all_tracks.
                 track_name = str(track.get("name", ""))
                 mood = classify_track_mood(track_name)
                 if track.get("mood") != mood:
@@ -278,6 +305,7 @@ class AudioLibraryService:
         return {"updated": updated}
 
     def remove_track(self, section: str, category: str, mood: str, track_id: str) -> Optional[Dict[str, Any]]:
+        """Remove track."""
         payload = self._get_category(section, category)
         mood_key = self.repository.sanitize_mood(mood)
         moods = payload.get("moods", {})
@@ -291,28 +319,34 @@ class AudioLibraryService:
         return None
 
     def get_setting(self, section: str, key: str, default: Any = None) -> Any:
+        """Return setting."""
         section_data = self._get_section(section)
         return section_data.get("settings", {}).get(key, default)
 
     def set_setting(self, section: str, key: str, value: Any) -> None:
+        """Set setting."""
         section_data = self._get_section(section)
         section_data.setdefault("settings", {})[key] = value
         self.save()
 
     def get_compatibility_category(self, section: str, category: str) -> Dict[str, Any]:
+        """Return compatibility category."""
         return self.repository.compatibility_category_view(self.data, section, category)
 
     def _get_section(self, section: str) -> Dict[str, Any]:
+        """Return section."""
         if section not in self.data:
             raise KeyError(f"Unknown section '{section}'.")
         return self.data[section]
 
     def _get_categories_dict(self, section: str) -> Dict[str, Dict[str, Any]]:
+        """Return categories dict."""
         section_data = self._get_section(section)
         categories = section_data.setdefault("categories", {})
         return categories  # type: ignore[return-value]
 
     def _get_category(self, section: str, category: str) -> Dict[str, Any]:
+        """Return category."""
         categories = self._get_categories_dict(section)
         if category not in categories:
             raise KeyError(f"Unknown category '{category}' in section '{section}'.")

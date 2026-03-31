@@ -1,3 +1,5 @@
+"""Regression tests for update helper launch."""
+
 import subprocess
 import sys
 import types
@@ -10,12 +12,15 @@ if "requests" not in sys.modules:
 
     class _Session:
         def __init__(self, *args, **kwargs):
+            """Initialize the _Session instance."""
             self.headers = {}
 
         def get(self, *args, **kwargs):
+            """Return the operation."""
             return None
 
         def close(self):
+            """Close the operation."""
             pass
 
     requests_stub.Session = _Session
@@ -30,6 +35,7 @@ class _DummyProcess:
 
 
 def test_launch_installer_uses_helper_script_when_not_frozen(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify that launch installer uses helper script when not frozen."""
     helper = tmp_path / "apply_update.py"
     helper.write_text("print('ok')", encoding="utf-8")
 
@@ -39,6 +45,7 @@ def test_launch_installer_uses_helper_script_when_not_frozen(monkeypatch: pytest
     captured: dict[str, list[str]] = {}
 
     def _fake_popen(args, close_fds=False):
+        """Internal helper for fake popen."""
         captured["args"] = list(args)
         return _DummyProcess()
 
@@ -57,6 +64,7 @@ def test_launch_installer_uses_helper_script_when_not_frozen(monkeypatch: pytest
 def test_launch_installer_copies_helper_when_frozen(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Verify that launch installer copies helper when frozen."""
     helper_dir = tmp_path / "frozen"
     helper_dir.mkdir()
     helper = helper_dir / update_helper._FROZEN_INSTALL_HELPER_NAME
@@ -71,6 +79,7 @@ def test_launch_installer_copies_helper_when_frozen(
     temp_dirs: list[Path] = []
 
     def _fake_mkdtemp(prefix="", dir=None):  # noqa: ANN001
+        """Internal helper for fake mkdtemp."""
         path = tmp_path / f"temp-{len(temp_dirs)}"
         path.mkdir()
         temp_dirs.append(path)
@@ -81,6 +90,7 @@ def test_launch_installer_copies_helper_when_frozen(
     captured: dict[str, list[str]] = {}
 
     def _fake_popen(args, close_fds=False):
+        """Internal helper for fake popen."""
         captured["args"] = list(args)
         return _DummyProcess()
 

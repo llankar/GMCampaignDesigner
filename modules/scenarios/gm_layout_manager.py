@@ -1,3 +1,5 @@
+"""Management helpers for scenario GM layout."""
+
 import json
 import os
 from typing import Dict, Any, Optional
@@ -12,6 +14,7 @@ class GMScreenLayoutManager:
     FILE_NAME = "gm_layouts.json"
 
     def __init__(self):
+        """Initialize the GMScreenLayoutManager instance."""
         self.path = os.path.join(ConfigHelper.get_campaign_dir(), self.FILE_NAME)
         self.data: Dict[str, Any] = {
             "layouts": {},
@@ -25,10 +28,12 @@ class GMScreenLayoutManager:
     # Basic persistence helpers
     # ------------------------------------------------------------------
     def _load(self) -> None:
+        """Load the operation."""
         if not os.path.exists(self.path):
             log_info(f"No layout file found at {self.path}; starting fresh.", func_name="GMScreenLayoutManager._load")
             return
         try:
+            # Keep load resilient if this step fails.
             with open(self.path, "r", encoding="utf-8") as fh:
                 raw = json.load(fh) or {}
             layouts = raw.get("layouts") or {}
@@ -60,6 +65,7 @@ class GMScreenLayoutManager:
             }
 
     def _write(self) -> None:
+        """Internal helper for write."""
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
         with open(self.path, "w", encoding="utf-8") as fh:
             json.dump(self.data, fh, indent=2)
@@ -72,9 +78,11 @@ class GMScreenLayoutManager:
     # Layout operations
     # ------------------------------------------------------------------
     def list_layouts(self) -> Dict[str, Any]:
+        """Handle list layouts."""
         return dict(self.data.get("layouts", {}))
 
     def get_layout(self, name: str) -> Optional[Dict[str, Any]]:
+        """Return layout."""
         layouts = self.data.get("layouts", {})
         layout = layouts.get(name)
         if layout is None:
@@ -82,6 +90,7 @@ class GMScreenLayoutManager:
         return json.loads(json.dumps(layout))  # deep copy to avoid accidental mutation
 
     def save_layout(self, name: str, layout: Dict[str, Any]) -> None:
+        """Save layout."""
         self.data.setdefault("layouts", {})[name] = layout
         self._write()
 
@@ -89,11 +98,13 @@ class GMScreenLayoutManager:
     # Scenario defaults
     # ------------------------------------------------------------------
     def get_scenario_default(self, scenario_title: str) -> Optional[str]:
+        """Return scenario default."""
         if not scenario_title:
             return None
         return self.data.get("scenario_defaults", {}).get(scenario_title)
 
     def set_scenario_default(self, scenario_title: str, layout_name: Optional[str]) -> None:
+        """Set scenario default."""
         defaults = self.data.setdefault("scenario_defaults", {})
         if not scenario_title:
             return
@@ -107,6 +118,7 @@ class GMScreenLayoutManager:
     # Scenario state (notes, scene completion)
     # ------------------------------------------------------------------
     def get_scenario_state(self, scenario_title: str) -> Dict[str, Any]:
+        """Return scenario state."""
         if not scenario_title:
             return {}
         state = self.data.get("scenario_state", {}).get(scenario_title)
@@ -115,6 +127,7 @@ class GMScreenLayoutManager:
         return json.loads(json.dumps(state))
 
     def get_scene_view_mode(self, scenario_title: str) -> Optional[str]:
+        """Return scene view mode."""
         state = self.get_scenario_state(scenario_title)
         mode = state.get("scene_view_mode")
         if mode in {"List", "Scene Flow"}:
@@ -122,6 +135,7 @@ class GMScreenLayoutManager:
         return None
 
     def get_scene_list_density(self, scenario_title: str) -> Optional[str]:
+        """Return scene list density."""
         state = self.get_scenario_state(scenario_title)
         density = state.get("scene_list_density")
         if density in {"Compact", "Normal", "Focus"}:
@@ -137,12 +151,14 @@ class GMScreenLayoutManager:
         scene_view_mode: Optional[str] = None,
         scene_list_density: Optional[str] = None,
     ) -> None:
+        """Update scenario state."""
         if not scenario_title:
             return
         store = self.data.setdefault("scenario_state", {})
         entry: Dict[str, Any] = store.setdefault(scenario_title, {})
 
         if scenes is not None:
+            # Handle the branch where scenes is available.
             normalized = {key: bool(value) for key, value in (scenes or {}).items() if bool(value)}
             if normalized:
                 entry["scenes"] = normalized
@@ -173,6 +189,7 @@ class GMScreenLayoutManager:
         self._write()
 
     def set_scene_view_mode(self, scenario_title: str, mode: Optional[str]) -> None:
+        """Set scene view mode."""
         normalized_mode = mode if mode in {"List", "Scene Flow"} else None
         self.update_scenario_state(scenario_title, scene_view_mode=normalized_mode)
 
@@ -180,6 +197,7 @@ class GMScreenLayoutManager:
     # Session settings (plot twist scheduler hours)
     # ------------------------------------------------------------------
     def get_session_hours(self, scenario_title: str) -> Dict[str, float]:
+        """Return session hours."""
         if not scenario_title:
             return {}
         raw = self.data.get("session_settings", {}).get(scenario_title) or {}
@@ -188,6 +206,7 @@ class GMScreenLayoutManager:
         return json.loads(json.dumps(raw))
 
     def set_session_hours(self, scenario_title: str, mid_hours: Optional[float], end_hours: Optional[float]) -> None:
+        """Set session hours."""
         if not scenario_title:
             return
         store = self.data.setdefault("session_settings", {})

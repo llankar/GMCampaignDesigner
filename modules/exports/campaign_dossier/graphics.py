@@ -1,3 +1,4 @@
+"""Graphics helpers for campaign dossier."""
 from __future__ import annotations
 
 import os
@@ -14,18 +15,22 @@ SECTION_DIVIDER_ASSET = os.path.join("images", "Dossier_Chapter.png")
 
 
 def _repo_root() -> str:
+    """Internal helper for repo root."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 
 def _asset_path(relative_path: str) -> str:
+    """Internal helper for asset path."""
     return os.path.join(_repo_root(), "assets", relative_path)
 
 
 def _apply_font_size(run, size_pt: float) -> None:
+    """Apply font size."""
     run.font.size = Pt(max(size_pt, MIN_FONT_SIZE_PT))
 
 
 def _add_picture(document, asset_path: str, width, alignment) -> bool:
+    """Internal helper for add picture."""
     if not os.path.exists(asset_path):
         return False
     document.add_picture(asset_path, width=width)
@@ -34,6 +39,7 @@ def _add_picture(document, asset_path: str, width, alignment) -> bool:
 
 
 def _apply_cell_shading(cell, color_rgb) -> None:
+    """Apply cell shading."""
     shading = OxmlElement("w:shd")
     fill = "{:02X}{:02X}{:02X}".format(color_rgb[0], color_rgb[1], color_rgb[2])
     shading.set(qn("w:fill"), fill)
@@ -41,6 +47,7 @@ def _apply_cell_shading(cell, color_rgb) -> None:
 
 
 def add_confidential_header(document, theme_meta: dict) -> None:
+    """Handle add confidential header."""
     header = document.sections[0].header
     paragraph = header.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -51,6 +58,7 @@ def add_confidential_header(document, theme_meta: dict) -> None:
 
 
 def add_cover_page(document, theme_meta: dict, campaign_name: str) -> None:
+    """Handle add cover page."""
     section = document.sections[0]
     available_width = section.page_width - section.left_margin - section.right_margin
     stamp_path = _asset_path(COVER_STAMP_ASSET)
@@ -89,6 +97,7 @@ def add_cover_page(document, theme_meta: dict, campaign_name: str) -> None:
 
 
 def add_section_divider(document) -> None:
+    """Handle add section divider."""
     section = document.sections[0]
     available_width = section.page_width - section.left_margin - section.right_margin
     divider_path = _asset_path(SECTION_DIVIDER_ASSET)

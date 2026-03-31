@@ -1,3 +1,5 @@
+"""Utilities for scenario entities grid."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -33,6 +35,7 @@ def create_entities_groups_grid(
         cards.append(card)
 
     def _apply_layout(_event=None):
+        """Apply layout."""
         if not cards_grid.winfo_exists():
             return
         try:

@@ -1,3 +1,4 @@
+"""Assignment helpers for story forge scene entity."""
 from __future__ import annotations
 
 import re
@@ -27,11 +28,13 @@ def assign_unused_entities_to_scenes(
     assignments: list[dict[str, Any]] = []
 
     for entity_type in _SCENE_ENTITY_KEYS:
+        # Process each entity_type from _SCENE_ENTITY_KEYS.
         top_level_entities = entities.get(entity_type) or []
         if not isinstance(top_level_entities, list):
             continue
 
         for entity_name in top_level_entities:
+            # Process each entity_name from top_level_entities.
             name = str(entity_name).strip()
             if not name:
                 continue
@@ -73,15 +76,19 @@ def assign_unused_entities_to_scenes(
 
 
 def _build_usage_map(scenes: list[dict[str, Any]]) -> dict[str, set[str]]:
+    """Build usage map."""
     usage_map: dict[str, set[str]] = {key: set() for key in _SCENE_ENTITY_KEYS}
     for scene in scenes:
+        # Process each scene from scenes.
         if not isinstance(scene, dict):
             continue
         for entity_type in _SCENE_ENTITY_KEYS:
+            # Process each entity_type from _SCENE_ENTITY_KEYS.
             raw_values = scene.get(entity_type)
             if not isinstance(raw_values, list):
                 continue
             for raw in raw_values:
+                # Process each raw from raw_values.
                 value = str(raw).strip()
                 if value:
                     usage_map[entity_type].add(value.casefold())
@@ -89,10 +96,12 @@ def _build_usage_map(scenes: list[dict[str, Any]]) -> dict[str, set[str]]:
 
 
 def _find_best_scene_index(scenes: list[dict[str, Any]], entity_name: str, fallback_scene_index: int) -> tuple[int, int]:
+    """Find best scene index."""
     best_index = fallback_scene_index
     best_score = -1
 
     for index, scene in enumerate(scenes):
+        # Process each (index, scene) from enumerate(scenes).
         score = _score_scene(scene, entity_name)
         if score > best_score:
             best_score = score
@@ -104,6 +113,7 @@ def _find_best_scene_index(scenes: list[dict[str, Any]], entity_name: str, fallb
 
 
 def _score_scene(scene: dict[str, Any], entity_name: str) -> int:
+    """Internal helper for score scene."""
     scene_text = " ".join(
         [
             str(scene.get("Title") or "").casefold(),
@@ -129,8 +139,10 @@ def _score_scene(scene: dict[str, Any], entity_name: str) -> int:
 
 
 def _select_fallback_scene_index(scenes: list[dict[str, Any]]) -> int:
+    """Select fallback scene index."""
     for preferred in ("setup", "investigation"):
         for index, scene in enumerate(scenes):
+            # Process each (index, scene) from enumerate(scenes).
             scene_type = str(scene.get("SceneType") or scene.get("type") or "").strip().casefold()
             if preferred in scene_type:
                 return index
@@ -138,9 +150,11 @@ def _select_fallback_scene_index(scenes: list[dict[str, Any]]) -> int:
 
 
 def _dedupe_preserve_order(values: list[str]) -> list[str]:
+    """Internal helper for dedupe preserve order."""
     seen: set[str] = set()
     output: list[str] = []
     for value in values:
+        # Process each value from values.
         key = str(value).strip().casefold()
         if not key or key in seen:
             continue

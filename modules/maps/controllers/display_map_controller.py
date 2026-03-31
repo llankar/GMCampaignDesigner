@@ -1,3 +1,5 @@
+﻿"""Controller for display map."""
+
 import os
 import json
 import copy
@@ -118,6 +120,7 @@ LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>]+", re.IGNORECASE)
 
 class DisplayMapController:
     def __init__(self, parent, maps_wrapper, map_template, *, root_app=None):
+        """Initialize the DisplayMapController instance."""
         self.parent = parent
         self.maps = maps_wrapper
         self.map_template = map_template
@@ -265,6 +268,7 @@ class DisplayMapController:
     # Fit-to-view behaviour
     # ------------------------------------------------------------------
     def _on_fit_mode_change(self, value):
+        """Handle fit mode change."""
         mode = str(value or "").strip().title()
         if mode not in ("Contain", "Width", "Height"):
             mode = "Contain"
@@ -273,11 +277,13 @@ class DisplayMapController:
         self._apply_fit_mode()
 
     def _apply_fit_mode(self, *, defer: bool = False):
+        """Apply fit mode."""
         canvas = getattr(self, "canvas", None)
         base = getattr(self, "base_img", None)
         if canvas is None or base is None:
             return
         try:
+            # Keep fit mode resilient if this step fails.
             if defer:
                 # Defer to allow geometry to settle
                 self.parent.after(10, lambda: self._apply_fit_mode(defer=False))
@@ -396,6 +402,7 @@ class DisplayMapController:
             return
 
         if rotation % 90 == 0:
+            # Handle the branch where rotation % 90 == 0.
             steps = int((rotation // 90) % 4)
             for _ in range(steps):
                 base_image = base_image.transpose(Image.Transpose.ROTATE_270)
@@ -424,20 +431,24 @@ class DisplayMapController:
         self._update_selection_indicators()
 
     def _clear_selection(self):
+        """Clear selection."""
         if not self.selected_items and not self.selected_token:
             return
         self._set_selection([])
 
     def _is_shift_pressed(self, event):
+        """Return whether shift pressed."""
         state = getattr(event, "state", 0)
         return bool(state & 0x0001)  # Tk shift mask
 
     def _is_ctrl_pressed(self, event):
+        """Return whether ctrl pressed."""
         state = getattr(event, "state", 0)
         # Control mask works for Windows/Linux; on macOS Command also maps to 0x0004 in Tk
         return bool(state & 0x0004)
 
     def _update_selection_state(self, item, event=None):
+        """Update selection state."""
         if not item:
             self._clear_selection()
             return False
@@ -473,10 +484,12 @@ class DisplayMapController:
         return item_active and item in self.selected_items
 
     def _prepare_item_selection(self, item, event=None):
+        """Internal helper for prepare item selection."""
         if self._active_resize_handle_info:
             return False
 
         if self._graphical_edit_mode_item and self._graphical_edit_mode_item != item:
+            # Handle the branch where graphical edit mode item is set and _graphical_edit_mode_item != item.
             self._remove_resize_handles()
             self._graphical_edit_mode_item = None
         elif not self._graphical_edit_mode_item and self._resize_handles:
@@ -485,6 +498,7 @@ class DisplayMapController:
         return self._update_selection_state(item, event)
 
     def _start_drag_selection(self, event, existing_selection=None):
+        """Start drag selection."""
         self._drag_select_start = (event.x, event.y)
         self._drag_select_rect_id = None
         self._drag_select_active = False
@@ -497,6 +511,7 @@ class DisplayMapController:
         self._pre_drag_selection = list(existing_selection)
 
     def _rectangles_overlap(self, a, b):
+        """Internal helper for rectangles overlap."""
         if not a or not b:
             return False
         ax1, ay1, ax2, ay2 = a
@@ -504,6 +519,7 @@ class DisplayMapController:
         return not (ax2 < bx1 or bx2 < ax1 or ay2 < by1 or by2 < ay1)
 
     def _collect_items_in_rect(self, x1, y1, x2, y2):
+        """Collect items in rect."""
         if x1 > x2:
             x1, x2 = x2, x1
         if y1 > y2:
@@ -511,17 +527,20 @@ class DisplayMapController:
         rect = (x1, y1, x2, y2)
         items = []
         for item in self.tokens:
+            # Process each item from tokens.
             bbox = self._calculate_item_bbox(item)
             if bbox and self._rectangles_overlap(rect, bbox):
                 items.append(item)
         return items
 
     def _merge_drag_selection(self, items_in_rect):
+        """Merge drag selection."""
         base = list(self._pre_drag_selection)
         ctrl = self._drag_select_modifiers.get("ctrl")
         shift = self._drag_select_modifiers.get("shift")
 
         if ctrl:
+            # Continue with this path when ctrl is set.
             selection = [
                 existing for existing in base
                 if not any(existing is candidate for candidate in items_in_rect)
@@ -532,6 +551,7 @@ class DisplayMapController:
             return selection
 
         if shift:
+            # Continue with this path when shift is set.
             selection = list(base)
             for candidate in items_in_rect:
                 if not any(existing is candidate for existing in selection):
@@ -541,6 +561,7 @@ class DisplayMapController:
         return list(items_in_rect)
 
     def _update_drag_selection(self, event):
+        """Update drag selection."""
         if not self._drag_select_start or not getattr(self, "canvas", None):
             return
 
@@ -549,10 +570,12 @@ class DisplayMapController:
         dy = event.y - start_y
 
         if not self._drag_select_active:
+            # Handle the branch where drag select active is unavailable.
             if abs(dx) < 4 and abs(dy) < 4:
                 return
             self._drag_select_active = True
             try:
+                # Keep drag selection resilient if this step fails.
                 self._drag_select_rect_id = self.canvas.create_rectangle(
                     start_x,
                     start_y,
@@ -584,6 +607,7 @@ class DisplayMapController:
         self._set_selection(selection)
 
     def _cleanup_drag_selection(self):
+        """Internal helper for cleanup drag selection."""
         if self._drag_select_rect_id and getattr(self, "canvas", None):
             try:
                 self.canvas.delete(self._drag_select_rect_id)
@@ -596,11 +620,13 @@ class DisplayMapController:
         self._drag_select_modifiers = {"shift": False, "ctrl": False}
 
     def _finalize_drag_selection(self, event):
+        """Internal helper for finalize drag selection."""
         if not self._drag_select_start:
             return False
 
         handled = self._drag_select_active
         if self._drag_select_active:
+            # Continue with this path when drag select active is set.
             start_x, start_y = self._drag_select_start
             end_x, end_y = event.x, event.y
             items_in_rect = self._collect_items_in_rect(start_x, start_y, end_x, end_y)
@@ -616,6 +642,7 @@ class DisplayMapController:
         return handled
 
     def _get_item_category(self, item):
+        """Return item category."""
         if not isinstance(item, dict):
             return None
         item_type = item.get("type")
@@ -624,6 +651,7 @@ class DisplayMapController:
         return item_type
 
     def _ensure_selection_for_context_menu(self, item):
+        """Ensure selection for context menu."""
         if not item:
             return False
 
@@ -633,6 +661,7 @@ class DisplayMapController:
         return item in self.selected_items
 
     def _get_selection_icon_image(self, width, height):
+        """Return selection icon image."""
         width = max(1, int(width))
         height = max(1, int(height))
         key = (width, height)
@@ -672,6 +701,7 @@ class DisplayMapController:
         return tk_image, key
 
     def _calculate_item_bbox(self, item):
+        """Internal helper for calculate item bbox."""
         if not item or not getattr(self, "canvas", None):
             return None
 
@@ -684,6 +714,7 @@ class DisplayMapController:
         preferred_ids.extend(canvas_ids)
 
         if item_type == "token":
+            # Handle the branch where item_type == 'token'.
             extra = []
             if item.get("hp_canvas_ids"):
                 extra.extend([cid for cid in item["hp_canvas_ids"] if cid])
@@ -702,6 +733,7 @@ class DisplayMapController:
             )
 
         for cid in preferred_ids:
+            # Process each cid from preferred_ids.
             if not cid:
                 continue
             try:
@@ -713,6 +745,7 @@ class DisplayMapController:
         return None
 
     def _remove_selection_overlay(self, item=None, key=None):
+        """Remove selection overlay."""
         dict_key = key if key is not None else (id(item) if item is not None else None)
         if dict_key is None:
             return
@@ -724,16 +757,19 @@ class DisplayMapController:
                 pass
 
     def _update_selection_indicators(self):
+        """Update selection indicators."""
         if not getattr(self, "canvas", None):
             return
 
         active_ids = {id(item) for item in self.selected_items}
         for key, entry in list(self._selection_overlays.items()):
+            # Process each (key, entry) from list(_selection_overlays.items()).
             item_ref = entry.get("item")
             if id(item_ref) not in active_ids:
                 self._remove_selection_overlay(item_ref, key=key)
 
         for item in self.selected_items:
+            # Process each item from selected_items.
             bbox = self._calculate_item_bbox(item)
             if not bbox:
                 continue
@@ -746,8 +782,10 @@ class DisplayMapController:
 
             existing = self._selection_overlays.get(id(item))
             if existing:
+                # Continue with this path when existing is set.
                 canvas_id = existing.get("canvas_id")
                 try:
+                    # Keep selection indicators resilient if this step fails.
                     self.canvas.coords(canvas_id, cx, cy)
                     if existing.get("cache_key") != cache_key:
                         self.canvas.itemconfig(canvas_id, image=icon_image)
@@ -775,6 +813,7 @@ class DisplayMapController:
             }
 
     def open_map_by_name(self, map_name, *, apply_fit=True):
+        """Open map by name."""
         target = (map_name or "").strip()
         if not target:
             log_warning(
@@ -813,6 +852,7 @@ class DisplayMapController:
         # initial zoom based on an undersized canvas.
         if apply_fit:
             try:
+                # Keep map by name resilient if this step fails.
                 for delay in (30, 120, 300):
                     self.parent.after(delay, lambda: self._apply_fit_mode(defer=True))
             except Exception:
@@ -820,6 +860,7 @@ class DisplayMapController:
         return True
 
     def open_global_search(self, event=None):
+        """Open global search."""
         if self.drawing_mode != "token":
             print("Please switch to 'Token' drawing mode to add entities.")
             return
@@ -832,9 +873,11 @@ class DisplayMapController:
         listbox.pack(fill="both", expand=True, padx=10, pady=(0,10))
         search_map = []
         def populate(initial=False, query=""):
+            """Handle populate."""
             listbox.delete(0, "end"); search_map.clear(); q = query.lower()
             for etype, wrapper in self._model_wrappers.items():
                 for item in wrapper.load_items():
+                    # Process each item from wrapper.load_items().
                     name = item.get("Name", "")
                     if initial or q in name.lower():
                         listbox.insert("end", f"{etype}: {name}"); search_map.append((etype, name, item))
@@ -843,6 +886,7 @@ class DisplayMapController:
         entry.bind("<KeyRelease>", lambda e: populate(False, entry.get().strip()))
         entry.bind("<Down>", lambda e: (listbox.focus_set(), "break"))
         def on_select(evt=None):
+            """Handle select."""
             if not search_map: return
             idx = listbox.curselection()[0]; etype, name, record = search_map[idx]
             portrait = record.get("Portrait", "")
@@ -853,11 +897,13 @@ class DisplayMapController:
         listbox.bind("<Double-Button-1>", on_select)
 
     def open_chatbot_assistant(self, event=None):
+        """Open chatbot assistant."""
         try:
             host = self.parent.winfo_toplevel()
         except Exception:
             host = self.parent
         try:
+            # Keep chatbot assistant resilient if this step fails.
             open_chatbot_dialog(
                 host,
                 wrappers=self._chatbot_wrappers,
@@ -871,6 +917,7 @@ class DisplayMapController:
         return "break" if event else None
 
     def add_marker(self):
+        """Handle add marker."""
         if not getattr(self, "canvas", None):
             return
         try:
@@ -905,6 +952,7 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _on_marker_text_change(self, marker, persist=False):
+        """Handle marker text change."""
         entry = marker.get("entry_widget")
         if entry and entry.winfo_exists():
             text = entry.get()
@@ -913,6 +961,7 @@ class DisplayMapController:
 
         previous_text = marker.get("text", "") or ""
         if previous_text != text:
+            # Handle the branch where previous_text != text.
             marker["text"] = text
             self._update_marker_entry_dimensions(marker, expand=True)
             if persist:
@@ -921,23 +970,27 @@ class DisplayMapController:
             self._persist_tokens()
 
     def _on_marker_entry_return(self, event, marker):
+        """Handle marker entry return."""
         self._on_marker_text_change(marker, persist=True)
         self._show_marker_description(marker)
         return "break"
 
     def _on_marker_description_change(self, marker, new_text=None, persist=False):
+        """Handle marker description change."""
         if not marker:
             return
         if new_text is None:
             new_text = marker.get("description", "")
         new_text = (new_text or "").rstrip()
         if marker.get("description") != new_text:
+            # Handle the branch where marker.get('description') != new_text.
             marker["description"] = new_text
             if persist:
                 self._persist_tokens()
         self._refresh_marker_description_popup(marker)
 
     def _update_marker_entry_dimensions(self, marker, expand=False):
+        """Update marker entry dimensions."""
         entry = marker.get("entry_widget")
         if not entry or not entry.winfo_exists():
             return
@@ -963,9 +1016,11 @@ class DisplayMapController:
         self._refresh_marker_description_popup(marker)
 
     def _expand_marker_entry(self, marker):
+        """Internal helper for expand marker entry."""
         self._update_marker_entry_dimensions(marker, expand=True)
 
     def _collapse_marker_entry(self, marker):
+        """Collapse marker entry."""
         entry = marker.get("entry_widget")
         base = marker.get("entry_width")
         if entry and entry.winfo_exists() and base:
@@ -973,18 +1028,22 @@ class DisplayMapController:
         self._refresh_marker_description_popup(marker)
 
     def _on_marker_entry_focus_in(self, marker):
+        """Handle marker entry focus in."""
         self._refresh_marker_description_popup(marker)
 
     def _on_marker_entry_focus_out(self, marker):
+        """Handle marker entry focus out."""
         self._on_marker_text_change(marker, persist=True)
         self._collapse_marker_entry(marker)
 
     def _on_marker_entry_press(self, event, marker):
+        """Handle marker entry press."""
         item_active = self._prepare_item_selection(marker, event)
         if not item_active:
             marker.pop("drag_data", None)
 
     def _on_marker_entry_click(self, event, marker):
+        """Handle marker entry click."""
         marker.pop("drag_data", None)
         widget = getattr(event, "widget", None)
         already_focused = widget is not None and widget.focus_get() is widget
@@ -993,6 +1052,7 @@ class DisplayMapController:
         self._handle_item_click(event, marker)
 
     def _show_marker_description(self, marker):
+        """Show marker description."""
         canvas = getattr(self, "canvas", None)
         if not canvas:
             return
@@ -1008,6 +1068,7 @@ class DisplayMapController:
         self._hovered_marker = marker
 
     def _hide_marker_description(self, marker):
+        """Hide marker description."""
         canvas = getattr(self, "canvas", None)
         popup = marker.get("description_popup")
         marker["description_visible"] = False
@@ -1017,24 +1078,30 @@ class DisplayMapController:
             self._hovered_marker = None
 
     def _hide_all_marker_descriptions(self):
+        """Hide all marker descriptions."""
         for item in getattr(self, "tokens", []):
             if isinstance(item, dict) and item.get("type") == "marker":
                 self._hide_marker_description(item)
 
     def _hide_other_marker_descriptions(self, active_marker):
+        """Hide other marker descriptions."""
         for item in getattr(self, "tokens", []):
+            # Process each item from getattr(self, 'tokens', []).
             if item is active_marker:
                 continue
             if isinstance(item, dict) and item.get("type") == "marker" and item.get("description_visible"):
                 self._hide_marker_description(item)
 
     def _hide_all_token_hovers(self):
+        """Hide all token hovers."""
         for token in getattr(self, "tokens", []):
             if isinstance(token, dict) and token.get("hover_visible"):
                 self._hide_token_hover(token)
 
     def _hide_other_token_hovers(self, active_token):
+        """Hide other token hovers."""
         for token in getattr(self, "tokens", []):
+            # Process each token from getattr(self, 'tokens', []).
             if token is active_token:
                 continue
             if isinstance(token, dict) and token.get("hover_visible"):
@@ -1052,9 +1119,11 @@ class DisplayMapController:
             return
 
         def _collect_focus_candidates():
+            """Collect focus candidates."""
             candidates = []
 
             if event is not None:
+                # Handle the branch where event is available.
                 related = getattr(event, "related_widget", None)
                 if related is not None:
                     candidates.append(related)
@@ -1062,6 +1131,7 @@ class DisplayMapController:
                 widget = getattr(event, "widget", None)
                 if widget is not None:
                     try:
+                        # Keep focus candidates resilient if this step fails.
                         focus_widget = widget.focus_get()
                     except Exception:
                         focus_widget = None
@@ -1070,6 +1140,7 @@ class DisplayMapController:
                             candidates.append(focus_widget)
 
             try:
+                # Keep focus candidates resilient if this step fails.
                 focus_widget = canvas.focus_get()
             except Exception:
                 focus_widget = None
@@ -1093,6 +1164,7 @@ class DisplayMapController:
             # info window to be dismissed when clicking inline dice buttons.
             popups = getattr(self, "_active_hover_popups", set())
             for popup in list(popups):
+                # Process each popup from list(popups).
                 try:
                     focus_widget = popup.focus_get()
                 except Exception:
@@ -1102,6 +1174,7 @@ class DisplayMapController:
 
                 if pointer_coords is not None:
                     try:
+                        # Keep focus candidates resilient if this step fails.
                         popup_pointer_widget = popup.winfo_containing(*pointer_coords)
                     except tk.TclError:
                         popup_pointer_widget = None
@@ -1112,6 +1185,7 @@ class DisplayMapController:
             return candidates
 
         def _evaluate_focus_change():
+            """Internal helper for evaluate focus change."""
             candidates = _collect_focus_candidates()
             if any(self._widget_is_within_hover_popup(widget) for widget in candidates if widget is not None):
                 return
@@ -1141,6 +1215,7 @@ class DisplayMapController:
         # recognise those widgets as part of the popup even if traversing the
         # ``master`` chain fails.
         try:
+            # Keep widget is within hover popup resilient if this step fails.
             toplevel = widget.winfo_toplevel()
         except Exception:
             toplevel = None
@@ -1152,6 +1227,7 @@ class DisplayMapController:
         current = widget
 
         while current is not None and current not in visited:
+            # Keep looping while current is available and current is not in visited.
             visited.add(current)
             if current in popups:
                 return True
@@ -1168,6 +1244,7 @@ class DisplayMapController:
         # info card remained). This guarantees that pressing the toolbar button
         # truly clears every hover window from the screen.
         for popup in list(self._active_hover_popups):
+            # Process each popup from list(_active_hover_popups).
             try:
                 exists = popup.winfo_exists()
             except tk.TclError:
@@ -1176,12 +1253,14 @@ class DisplayMapController:
                 popup.withdraw()
 
     def _on_application_focus_out(self, event=None):
+        """Handle application focus out."""
         if getattr(self, "_hover_auto_hide_suppressed", 0):
             return
         self._hide_all_marker_descriptions()
         self._hide_all_token_hovers()
 
     def _show_marker_menu(self, event, markers):
+        """Show marker menu."""
         valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
         if not valid_markers:
             return
@@ -1195,6 +1274,7 @@ class DisplayMapController:
         single_marker = valid_markers[0] if len(valid_markers) == 1 else None
 
         if single_marker:
+            # Continue with this path when single marker is set.
             linked_name = (single_marker.get("linked_map") or "").strip()
             menu.add_command(
                 label="Open Linked Map",
@@ -1257,6 +1337,7 @@ class DisplayMapController:
             pass
 
     def _open_marker_linked_map(self, marker, silent=False):
+        """Open marker linked map."""
         if not marker or marker.get("type") != "marker":
             return False
         target = (marker.get("linked_map") or "").strip()
@@ -1277,6 +1358,7 @@ class DisplayMapController:
             func_name="DisplayMapController._open_marker_linked_map",
         )
         if not target:
+            # Handle the branch where target is unavailable.
             if not silent:
                 messagebox.showinfo("Linked Map", "No linked map is assigned to this marker.")
             log_warning(
@@ -1292,6 +1374,7 @@ class DisplayMapController:
         return success
 
     def _choose_marker_linked_map(self, marker):
+        """Internal helper for choose marker linked map."""
         if not marker or marker.get("type") != "marker":
             return
         map_names = sorted(self._maps.keys(), key=lambda name: name.lower())
@@ -1324,6 +1407,7 @@ class DisplayMapController:
         filtered_names = []
 
         def refresh_list():
+            """Refresh list."""
             query = (search_var.get() or "").strip().lower()
             filtered_names.clear()
             for name in map_names:
@@ -1340,9 +1424,11 @@ class DisplayMapController:
                 listbox.activate(pos)
 
         def on_confirm(event=None):
+            """Handle confirm."""
             if not filtered_names:
                 return
             try:
+                # Keep on confirm resilient if this step fails.
                 selection = listbox.curselection()
                 if not selection:
                     return
@@ -1353,10 +1439,12 @@ class DisplayMapController:
             dialog.destroy()
 
         def on_clear():
+            """Handle clear."""
             result["value"] = "__CLEAR__"
             dialog.destroy()
 
         def on_cancel():
+            """Handle cancel."""
             result["value"] = None
             dialog.destroy()
 
@@ -1389,6 +1477,7 @@ class DisplayMapController:
             self._persist_tokens()
 
     def _clear_marker_link(self, marker):
+        """Clear marker link."""
         if not marker or marker.get("type") != "marker":
             return
         if marker.get("linked_map"):
@@ -1396,6 +1485,7 @@ class DisplayMapController:
             self._persist_tokens()
 
     def _change_markers_border_color(self, markers):
+        """Internal helper for change markers border color."""
         valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
         if not valid_markers:
             return
@@ -1406,17 +1496,20 @@ class DisplayMapController:
             title="Choose Marker Border Color",
         )
         if result and result[1]:
+            # Handle the branch where result is set and result[1].
             for marker in valid_markers:
                 marker["border_color"] = result[1]
             self._update_canvas_images()
             self._persist_tokens()
 
     def _change_marker_border_color(self, marker):
+        """Internal helper for change marker border color."""
         if not marker:
             return
         self._change_markers_border_color([marker])
 
     def _attach_video_to_markers(self, markers):
+        """Internal helper for attach video to markers."""
         valid_markers = [m for m in markers if isinstance(m, dict) and m.get("type") == "marker"]
         if not valid_markers:
             return
@@ -1455,6 +1548,7 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _clear_marker_videos(self, markers):
+        """Clear marker videos."""
         changed = False
         for marker in markers:
             if isinstance(marker, dict) and marker.get("type") == "marker" and marker.get("video_path"):
@@ -1464,6 +1558,7 @@ class DisplayMapController:
             self._persist_tokens()
 
     def _play_marker_video(self, marker):
+        """Internal helper for play marker video."""
         if not marker or marker.get("type") != "marker":
             return
 
@@ -1484,9 +1579,11 @@ class DisplayMapController:
             messagebox.showerror("Marker Video", f"Unable to play the video:\n{exc}")
 
     def _edit_marker_description(self, marker):
+        """Internal helper for edit marker description."""
         self._open_marker_description_editor(marker)
 
     def _ensure_marker_description_popup(self, marker):
+        """Ensure marker description popup."""
         if not marker:
             return None
         popup = marker.get("description_popup")
@@ -1520,6 +1617,7 @@ class DisplayMapController:
         )
         text_label.pack(fill="both", expand=True, padx=12, pady=10)
         def _on_description_double_click(event, m=marker):
+            """Handle description double click."""
             self._open_marker_description_editor(m)
             return "break"
 
@@ -1531,6 +1629,7 @@ class DisplayMapController:
         return toplevel
 
     def _refresh_marker_description_popup(self, marker):
+        """Refresh marker description popup."""
         popup = marker.get("description_popup")
         label = marker.get("description_label")
         canvas = getattr(self, "canvas", None)
@@ -1555,6 +1654,7 @@ class DisplayMapController:
         entry_id = marker.get("entry_canvas_id")
         sx = sy = None
         if entry_id:
+            # Continue with this path when entry ID is set.
             try:
                 coords = canvas.coords(entry_id)
             except tk.TclError:
@@ -1579,6 +1679,7 @@ class DisplayMapController:
         popup.geometry(f"{int(width)}x{int(height)}+{screen_x}+{screen_y}")
 
     def _on_hover_font_size_change(self, value):
+        """Handle hover font size change."""
         try:
             size = int(value)
         except (TypeError, ValueError):
@@ -1591,6 +1692,7 @@ class DisplayMapController:
             self.hover_font_size_options = sorted(set(self.hover_font_size_options))
         hover_font = getattr(self, "hover_font", None)
         if hover_font is None:
+            # Handle the branch where hover font is missing.
             self.hover_font = ctk.CTkFont(size=size)
             hover_font = self.hover_font
         else:
@@ -1601,6 +1703,7 @@ class DisplayMapController:
                 hover_font = self.hover_font
 
         for item in getattr(self, "tokens", []):
+            # Process each item from getattr(self, 'tokens', []).
             if not isinstance(item, dict):
                 continue
             label = item.get("hover_label")
@@ -1611,6 +1714,7 @@ class DisplayMapController:
                 except tk.TclError:
                     pass
             if item.get("type") == "marker":
+                # Handle the branch where item.get('type') == 'marker'.
                 desc_label = item.get("description_label")
                 if desc_label and desc_label.winfo_exists():
                     try:
@@ -1636,6 +1740,7 @@ class DisplayMapController:
 
     @staticmethod
     def _extract_longtext_text(value):
+        """Extract longtext text."""
         if isinstance(value, dict):
             return str(value.get("text", "") or "")
         if value is None:
@@ -1643,18 +1748,22 @@ class DisplayMapController:
         return str(value)
 
     def _resolve_dice_bar_window(self) -> "DiceBarWindow | None":
+        """Resolve dice bar window."""
         candidates: list[object] = []
         seen: set[object] = set()
 
         def _register_candidate(obj):
+            """Register candidate."""
             if obj is None or obj in seen:
                 return
             seen.add(obj)
             candidates.append(obj)
 
         def _register_widget_chain(widget):
+            """Register widget chain."""
             current = widget
             while current is not None and current not in seen:
+                # Keep looping while current is available and current is not in seen.
                 _register_candidate(current)
                 current = getattr(current, "master", None)
 
@@ -1664,6 +1773,7 @@ class DisplayMapController:
 
         parent = getattr(self, "parent", None)
         if parent is not None:
+            # Handle the branch where parent is available.
             _register_widget_chain(parent)
             try:
                 toplevel = parent.winfo_toplevel()
@@ -1675,11 +1785,13 @@ class DisplayMapController:
             toplevel = None
 
         if toplevel is not None:
+            # Handle the branch where toplevel is available.
             main_app = getattr(toplevel, "master", None)
             if main_app is not None:
                 _register_widget_chain(main_app)
 
         for candidate in candidates:
+            # Process each candidate from candidates.
             open_method = getattr(candidate, "open_dice_bar", None)
             if callable(open_method):
                 try:
@@ -1697,12 +1809,14 @@ class DisplayMapController:
         return None
 
     def _get_token_hover_text(self, token):
+        """Return token hover text."""
         record = token.get("entity_record") or {}
         entity_type = token.get("entity_type")
 
         defense_label = str(token.get("defense_label") or "").strip()
         defense_value = token.get("defense_value")
         if defense_value is None:
+            # Handle the branch where defense value is missing.
             defense_info = _extract_entity_defense_value(entity_type, record)
             if defense_info:
                 defense_label, defense_value = defense_info
@@ -1739,6 +1853,7 @@ class DisplayMapController:
             display_stats_text = "(No details available)"
 
         if defense_value is not None:
+            # Handle the branch where defense value is available.
             label = defense_label or "Defense"
             header_line = f"{label}: {defense_value}"
             if display_stats_text:
@@ -1749,6 +1864,7 @@ class DisplayMapController:
 
     @staticmethod
     def _format_action_header(action: dict) -> str:
+        """Format action header."""
         if not isinstance(action, dict):
             return "Action"
         label = str(action.get("label") or "Action")
@@ -1759,6 +1875,7 @@ class DisplayMapController:
 
     @staticmethod
     def _format_attack_button_text(action: dict) -> str:
+        """Format attack button text."""
         formula = str(action.get("attack_roll_formula") or "").strip()
         if not formula:
             bonus = str(action.get("attack_bonus") or "").strip()
@@ -1767,6 +1884,7 @@ class DisplayMapController:
 
     @staticmethod
     def _format_damage_button_text(action: dict) -> str:
+        """Format damage button text."""
         formula = str(action.get("damage_formula") or "").strip()
         if not formula:
             return "Damage"
@@ -1780,11 +1898,13 @@ class DisplayMapController:
         self._hover_auto_hide_suppressed = getattr(self, "_hover_auto_hide_suppressed", 0) + 1
 
         def _release_suppression():
+            """Internal helper for release suppression."""
             current = getattr(self, "_hover_auto_hide_suppressed", 0)
             if current > 0:
                 self._hover_auto_hide_suppressed = current - 1
 
         try:
+            # Keep execute token hover action resilient if this step fails.
             self._roll_token_action(token, action, roll_type)
         finally:
             canvas = getattr(self, "canvas", None)
@@ -1799,12 +1919,14 @@ class DisplayMapController:
             _release_suppression()
 
     def _roll_token_action(self, token: dict, action: dict, roll_type: str) -> None:
+        """Internal helper for roll token action."""
         if not isinstance(action, dict):
             return
 
         was_visible = bool(token.get("hover_visible"))
 
         def _restore_hover():
+            """Restore hover."""
             if was_visible:
                 try:
                     self._show_token_hover(token)
@@ -1819,6 +1941,7 @@ class DisplayMapController:
         descriptor_with_notes: str
 
         if roll_type == "difficulty":
+            # Handle the branch where roll_type == 'difficulty'.
             difficulty_info = action.get("_difficulty") or {}
             formula = str(difficulty_info.get("formula") or "").strip()
             difficulty_label = str(difficulty_info.get("label") or "").strip()
@@ -1828,6 +1951,7 @@ class DisplayMapController:
                 notes = difficulty_notes
             descriptor_with_notes = descriptor_base
             if difficulty_label:
+                # Continue with this path when difficulty label is set.
                 if base_label:
                     display_label = f"{base_label} – {difficulty_label}"
                 else:
@@ -1846,6 +1970,7 @@ class DisplayMapController:
                 descriptor_with_notes = f"{descriptor} ({notes})"
 
         def _register_formula_candidate(value: str, *, fallback: bool, container: list[tuple[str, bool]]) -> None:
+            """Register formula candidate."""
             text = str(value or "").strip()
             if not text:
                 return
@@ -1862,6 +1987,7 @@ class DisplayMapController:
         base_formula = formula
 
         if roll_type == "attack":
+            # Handle the branch where roll_type == 'attack'.
             attack_bonus_text = str(action.get("attack_bonus") or "").strip()
             if attack_bonus_text:
                 fallback_formula = dice_preferences.make_attack_roll_formula(attack_bonus_text)
@@ -1869,7 +1995,9 @@ class DisplayMapController:
                 _register_formula_candidate(fallback_formula, fallback=True, container=candidate_formulas)
 
         if not candidate_formulas:
+            # Handle the branch where candidate formulas is unavailable.
             try:
+                # Keep roll token action resilient if this step fails.
                 messagebox.showinfo(
                     "Dice Roll",
                     f"No {descriptor.lower()} formula configured for {display_label}.",
@@ -1882,6 +2010,7 @@ class DisplayMapController:
         explode = False
         separate = False
         if dice_window is not None:
+            # Handle the branch where dice window is available.
             try:
                 explode = bool(dice_window.exploding_var.get())
             except Exception:
@@ -1907,6 +2036,7 @@ class DisplayMapController:
         last_error: dice_engine.DiceEngineError | None = None
 
         for candidate, is_fallback in candidate_formulas:
+            # Process each (candidate, is_fallback) from candidate_formulas.
             try:
                 attempt = dice_engine.roll_formula(
                     candidate,
@@ -1923,8 +2053,10 @@ class DisplayMapController:
             break
 
         if result is None or used_formula is None:
+            # Handle the branch where result is missing or used formula is missing.
             error_message = last_error or dice_engine.FormulaError("Unable to parse roll formula.")
             try:
+                # Keep roll token action resilient if this step fails.
                 messagebox.showerror("Dice Roll Failed", f"{display_label}: {error_message}")
             finally:
                 _restore_hover()
@@ -1935,6 +2067,7 @@ class DisplayMapController:
         if roll_type == "difficulty":
             difficulty_info["formula"] = formula
         elif roll_type in {"attack", "damage"}:
+            # Handle the branch where roll type is in {'attack', 'damage'}.
             roll_key = "attack_roll_formula" if roll_type == "attack" else "damage_formula"
             try:
                 action[roll_key] = formula
@@ -1953,8 +2086,10 @@ class DisplayMapController:
             )
 
         try:
+            # Keep roll token action resilient if this step fails.
             if dice_window is not None and TextSegmentCls is not None:
                 try:
+                    # Keep roll token action resilient if this step fails.
                     formatted = dice_window._format_roll_output(result, separate)
                     prefix = TextSegmentCls(f"{display_label} – {descriptor_with_notes}: ")
                     dice_window.formula_var.set(result.canonical())
@@ -1979,8 +2114,10 @@ class DisplayMapController:
 
     @staticmethod
     def _format_roll_summary(kind: str, formula: str, result) -> str:
+        """Format roll summary."""
         parts: list[str] = []
         for summary in getattr(result, "face_summaries", () ):
+            # Process each summary from getattr(result, 'face_summaries', ()).
             values = getattr(summary, "display_values", ())
             base_count = getattr(summary, "base_count", 0)
             faces = getattr(summary, "faces", None)
@@ -1996,6 +2133,7 @@ class DisplayMapController:
         return f"{kind}: {formula} = {result.total}"
 
     def _ensure_token_hover_popup(self, token):
+        """Ensure token hover popup."""
         popup = token.get("hover_popup")
         label = token.get("hover_label")
         frame = token.get("hover_frame")
@@ -2003,11 +2141,14 @@ class DisplayMapController:
         actions_frame = token.get("hover_actions_frame")
         canvas = getattr(self, "canvas", None)
         if popup and popup.winfo_exists() and label and label.winfo_exists():
+            # Handle the branch where popup is set and popup.winfo_exists() and label is set and label.winfo_exists().
             if not frame or not frame.winfo_exists():
+                # Handle the branch where frame is unavailable or not frame.winfo_exists().
                 frame = label.master
                 if frame and frame.winfo_exists():
                     token["hover_frame"] = frame
             if frame and frame.winfo_exists():
+                # Handle the branch where frame is set and frame.winfo_exists().
                 if not links_frame or not links_frame.winfo_exists():
                     links_frame = ctk.CTkFrame(frame, fg_color="transparent")
                     token["hover_links_frame"] = links_frame
@@ -2058,11 +2199,13 @@ class DisplayMapController:
         self._active_hover_popups.add(popup)
 
         def _on_destroy(event, pop=popup):
+            """Handle destroy."""
             self._active_hover_popups.discard(pop)
 
         popup.bind("<Destroy>", _on_destroy, add="+")
 
     def _refresh_token_hover_popup(self, token):
+        """Refresh token hover popup."""
         popup = token.get("hover_popup")
         label = token.get("hover_label")
         canvas = getattr(self, "canvas", None)
@@ -2083,6 +2226,7 @@ class DisplayMapController:
         errors = token.get("action_errors") or []
         actions_frame = token.get("hover_actions_frame")
         if actions_frame and actions_frame.winfo_exists():
+            # Handle the branch where actions frame is set and actions_frame.winfo_exists().
             for child in list(actions_frame.winfo_children()):
                 try:
                     child.destroy()
@@ -2090,13 +2234,16 @@ class DisplayMapController:
                     pass
 
             if actions or errors:
+                # Continue with this path when actions is set or errors is set.
                 if not actions_frame.winfo_ismapped():
                     actions_frame.pack(fill="x", padx=12, pady=(0, 10))
 
                 if actions:
+                    # Continue with this path when actions is set.
                     header_font = ctk.CTkFont(size=max(12, self.hover_font_size - 1), weight="bold")
                     ctk.CTkLabel(actions_frame, text="Actions", anchor="w", font=header_font).pack(anchor="w", pady=(0, 6))
                     for action in actions:
+                        # Process each action from actions.
                         action_container = ctk.CTkFrame(actions_frame, fg_color="transparent")
                         action_container.pack(fill="x", pady=(0, 6))
 
@@ -2155,6 +2302,7 @@ class DisplayMapController:
                             buttons_row.pack_forget()
 
                 if errors:
+                    # Continue with this path when errors is set.
                     error_color = "#f87171"
                     ctk.CTkLabel(
                         actions_frame,
@@ -2185,10 +2333,12 @@ class DisplayMapController:
         bbox = token.get("hover_bbox")
         sx = sy = None
         if bbox:
+            # Continue with this path when bbox is set.
             sx, sy = bbox[0], bbox[3]
         else:
             main_id = token.get("canvas_ids", (None,))[0]
             if main_id:
+                # Continue with this path when main ID is set.
                 try:
                     mbbox = canvas.bbox(main_id)
                 except tk.TclError:
@@ -2204,6 +2354,7 @@ class DisplayMapController:
         popup.geometry(f"{int(width)}x{int(height)}+{screen_x}+{screen_y}")
 
     def _populate_token_links(self, token: dict, display_text: str) -> None:
+        """Internal helper for populate token links."""
         links_frame = token.get("hover_links_frame")
         if not links_frame or not links_frame.winfo_exists():
             return
@@ -2222,6 +2373,7 @@ class DisplayMapController:
 
         links = self._extract_links_from_sources(link_sources)
         if not links:
+            # Handle the branch where links is unavailable.
             if links_frame.winfo_ismapped():
                 links_frame.pack_forget()
             return
@@ -2233,6 +2385,7 @@ class DisplayMapController:
         ctk.CTkLabel(links_frame, text="Links", anchor="w", font=header_font).pack(anchor="w", pady=(0, 4))
 
         for url in links:
+            # Process each url from links.
             link_label = ctk.CTkLabel(
                 links_frame,
                 text=url,
@@ -2253,6 +2406,7 @@ class DisplayMapController:
 
     @staticmethod
     def _iter_text_fragments(value):
+        """Internal helper for iter text fragments."""
         if value is None:
             return
 
@@ -2261,16 +2415,19 @@ class DisplayMapController:
             return
 
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             for item in value.values():
                 yield from DisplayMapController._iter_text_fragments(item)
             return
 
         if isinstance(value, (list, tuple, set)):
+            # Handle the branch where isinstance(value, (list, tuple, set)).
             for item in value:
                 yield from DisplayMapController._iter_text_fragments(item)
             return
 
         try:
+            # Keep iter text fragments resilient if this step fails.
             text = str(value)
         except Exception:
             return
@@ -2280,6 +2437,7 @@ class DisplayMapController:
 
     @classmethod
     def _extract_links_from_sources(cls, sources) -> list[str]:
+        """Extract links from sources."""
         if not sources:
             return []
 
@@ -2287,6 +2445,7 @@ class DisplayMapController:
         results: list[str] = []
         for source in sources:
             for fragment in cls._iter_text_fragments(source):
+                # Process each fragment from _iter_text_fragments(source).
                 if not fragment:
                     continue
                 fragment = fragment.strip()
@@ -2300,6 +2459,7 @@ class DisplayMapController:
 
     @staticmethod
     def _extract_links_from_text(text: str) -> list[str]:
+        """Extract links from text."""
         if not text:
             return []
 
@@ -2308,6 +2468,7 @@ class DisplayMapController:
         results: list[str] = []
         seen: set[str] = set()
         for match in LINK_PATTERN.finditer(text):
+            # Process each match from LINK_PATTERN.finditer(text).
             raw_url = match.group(0)
             trimmed = raw_url.rstrip('.,!?:;)"]')
             if trimmed.lower().startswith("www."):
@@ -2319,6 +2480,7 @@ class DisplayMapController:
 
     @staticmethod
     def _open_external_link(url: str) -> None:
+        """Open external link."""
         try:
             webbrowser.open(url, new=2)
         except Exception as exc:
@@ -2328,6 +2490,7 @@ class DisplayMapController:
             )
 
     def _show_token_hover(self, token):
+        """Show token hover."""
         canvas = getattr(self, "canvas", None)
         if not canvas:
             return
@@ -2341,6 +2504,7 @@ class DisplayMapController:
         token["hover_visible"] = True
 
     def _hide_token_hover(self, token):
+        """Hide token hover."""
         canvas = getattr(self, "canvas", None)
         popup = token.get("hover_popup")
         token["hover_visible"] = False
@@ -2348,6 +2512,7 @@ class DisplayMapController:
             popup.withdraw()
 
     def _open_marker_description_editor(self, marker):
+        """Open marker description editor."""
         if not marker:
             return
         canvas = getattr(self, "canvas", None)
@@ -2371,12 +2536,14 @@ class DisplayMapController:
         button_frame.pack(fill="x", padx=12, pady=(0, 12))
 
         def on_save():
+            """Handle save."""
             new_text = textbox.get("1.0", "end").rstrip()
             self._on_marker_description_change(marker, new_text=new_text, persist=True)
             marker["description_editor"] = None
             editor.destroy()
 
         def on_cancel():
+            """Handle cancel."""
             marker["description_editor"] = None
             editor.destroy()
 
@@ -2391,6 +2558,7 @@ class DisplayMapController:
         textbox.focus_set()
 
     def _widget_event_to_canvas_event(self, event):
+        """Internal helper for widget event to canvas event."""
         canvas = getattr(self, "canvas", None)
         if not canvas:
             return None
@@ -2403,24 +2571,28 @@ class DisplayMapController:
         return SimpleNamespace(x=x, y=y, state=state)
 
     def _on_marker_handle_press(self, event, marker):
+        """Handle marker handle press."""
         converted = self._widget_event_to_canvas_event(event)
         if converted:
             self._on_item_press(converted, marker)
         return "break"
 
     def _on_marker_handle_drag(self, event, marker):
+        """Handle marker handle drag."""
         converted = self._widget_event_to_canvas_event(event)
         if converted:
             self._on_item_move(converted, marker)
         return "break"
 
     def _on_marker_handle_release(self, event, marker):
+        """Handle marker handle release."""
         converted = self._widget_event_to_canvas_event(event)
         if converted:
             self._on_item_release(converted, marker)
         return "break"
 
     def _push_fog_history(self):
+        """Internal helper for push fog history."""
         if self.mask_img is None:
             return
 
@@ -2440,10 +2612,12 @@ class DisplayMapController:
 
         max_budget = self._fog_history_budget_bytes()
         while self.fog_history and self._fog_history_bytes > max_budget:
+            # Keep looping while fog_history and _fog_history_bytes > max_budget.
             dropped = self.fog_history.pop(0)
             self._fog_history_bytes -= len(dropped)
 
     def _fog_history_budget_bytes(self):
+        """Internal helper for fog history budget bytes."""
         if self.mask_img is None:
             return 0
 
@@ -2454,6 +2628,7 @@ class DisplayMapController:
         return max(min_budget, min(max_budget, estimated))
 
     def undo_fog(self, event=None):
+        """Handle undo fog."""
         if not self.fog_history:
             return
 
@@ -2462,6 +2637,7 @@ class DisplayMapController:
         self._fog_history_bytes = max(0, self._fog_history_bytes)
 
         try:
+            # Keep undo fog resilient if this step fails.
             with Image.open(io.BytesIO(payload)) as restored:
                 self.mask_img = restored.convert("RGBA")
         except Exception as exc:
@@ -2473,6 +2649,7 @@ class DisplayMapController:
     # _bind_token is now _bind_item_events
 
     def _on_token_right_click(self, event, tokens, clicked_token):
+        """Handle token right click."""
         valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
         if not valid_tokens:
             return
@@ -2484,9 +2661,11 @@ class DisplayMapController:
             and "hp_canvas_ids" in primary
             and primary["hp_canvas_ids"]
         ):
+            # Prefer the floating HP editor when the click resolves to a single token health bar.
             hp_cid, _ = primary["hp_canvas_ids"]
             if hp_cid:
                 try:
+                    # Keep on token right click resilient if this step fails.
                     x1, y1, x2, y2 = self.canvas.coords(hp_cid)
                 except tk.TclError:
                     x1 = y1 = x2 = y2 = None
@@ -2502,6 +2681,7 @@ class DisplayMapController:
         return self._show_token_menu(event, valid_tokens)
     
     def _on_token_double_click(self, event, token):
+        """Handle token double click."""
         print(f"Token double click on: {token.get('entity_id', 'Unknown Token')}")
         if token.get("type") != "token" or "hp_canvas_ids" not in token or not token["hp_canvas_ids"]: return
         hp_cid, _ = token["hp_canvas_ids"]
@@ -2511,6 +2691,7 @@ class DisplayMapController:
             self._on_hp_double_click(event, token)
                                      
     def _create_marker(self):
+        """Create marker."""
         # Create a pulsating circle that animates while the user holds the click
         if not self._marker_start:
             return
@@ -2530,6 +2711,7 @@ class DisplayMapController:
         if not self._marker_id:
             self._marker_id = self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, outline='red', width=2)
         if self.fs_canvas:
+            # Continue with this path when fs canvas is set.
             if self._fs_marker_id:
                 try:
                     self.fs_canvas.coords(self._fs_marker_id, sx - r, sy - r, sx + r, sy + r)
@@ -2542,6 +2724,7 @@ class DisplayMapController:
         self._schedule_marker_animation()
 
     def _schedule_marker_animation(self):
+        """Schedule marker animation."""
         # Schedule next frame of the pulsating animation
         if not self._marker_start:
             return
@@ -2554,6 +2737,7 @@ class DisplayMapController:
         self._marker_anim_after_id = self.canvas.after(40, self._animate_marker)
 
     def _animate_marker(self):
+        """Internal helper for animate marker."""
         # If mouse released or marker removed, stop animation
         if not self._marker_start or not self._marker_id:
             return
@@ -2561,6 +2745,7 @@ class DisplayMapController:
         step = 2
         self._marker_radius += step * self._marker_anim_dir
         if self._marker_radius >= self._marker_max_r:
+            # Handle the branch where _marker_radius >= _marker_max_r.
             self._marker_radius = self._marker_max_r
             self._marker_anim_dir = -1
         elif self._marker_radius <= self._marker_min_r:
@@ -2585,6 +2770,7 @@ class DisplayMapController:
         self._schedule_marker_animation()
 
     def _on_middle_click(self, event):
+        """Handle middle click."""
         # Start panning mode: remember starting mouse position and pan
         self._panning = True
         self._last_mouse = (event.x, event.y)
@@ -2595,6 +2781,7 @@ class DisplayMapController:
             pass
 
     def _on_middle_drag(self, event):
+        """Handle middle drag."""
         # While middle button held, pan by mouse delta
         if not self._panning:
             return
@@ -2607,8 +2794,10 @@ class DisplayMapController:
         self._nudge_canvas(dx, dy)
 
     def _on_middle_release(self, event):
+        """Handle middle release."""
         # End panning mode
         if self._panning:
+            # Continue with this path when panning is set.
             self._panning = False
             try:
                 self.canvas.configure(cursor="")
@@ -2616,6 +2805,7 @@ class DisplayMapController:
                 pass
             # Snap to full redraw once released; also sync mirrors
             try:
+                # Keep on middle release resilient if this step fails.
                 self._update_canvas_images(resample=self._fast_resample)
                 if getattr(self, 'fs_canvas', None):
                     self._update_fullscreen_map()
@@ -2627,16 +2817,19 @@ class DisplayMapController:
     def _nudge_canvas(self, dx, dy):
         """Move all visible canvas items by dx,dy without recomputing images."""
         try:
+            # Keep nudge canvas resilient if this step fails.
             if self.base_id:
                 self.canvas.move(self.base_id, dx, dy)
             if self.mask_id:
                 self.canvas.move(self.mask_id, dx, dy)
             # Move tokens and shapes
             for item in self.tokens:
+                # Process each item from tokens.
                 for cid in item.get("canvas_ids", []):
                     if cid:
                         self.canvas.move(cid, dx, dy)
                 if item.get("type", "token") == "token":
+                    # Handle the branch where item.get('type', 'token') == 'token'.
                     if item.get("name_id"):
                         self.canvas.move(item["name_id"], dx, dy)
                     if item.get("hp_canvas_ids"):
@@ -2670,6 +2863,7 @@ class DisplayMapController:
             self._update_canvas_images(resample=self._fast_resample)
 
     def _on_mouse_down(self, event):
+        """Handle mouse down."""
         # Check if a resize handle was clicked first
         # print(f"[DEBUG] _on_mouse_down: Raw click at ({event.x}, {event.y})")
         current_ids_under_cursor = self.canvas.find_withtag("current")
@@ -2696,6 +2890,7 @@ class DisplayMapController:
             return # A handle was pressed, resize logic takes over
 
         if self.drawing_mode == "eraser":
+            # Handle the branch where drawing_mode == 'eraser'.
             world_x = (event.x - self.pan_x) / self.zoom
             world_y = (event.y - self.pan_y) / self.zoom
             self._eraser_active = True
@@ -2704,6 +2899,7 @@ class DisplayMapController:
             self._hide_all_token_hovers()
             self._hide_all_marker_descriptions()
             if self._marker_after_id:
+                # Continue with this path when marker after ID is set.
                 try:
                     self.canvas.after_cancel(self._marker_after_id)
                 except Exception:
@@ -2716,8 +2912,10 @@ class DisplayMapController:
         current_ids = self.canvas.find_withtag("current")
         clicked_an_item = False
         if current_ids:
+            # Continue with this path when current ids is set.
             clicked_item_id = current_ids[0]
             for item_iter in self.tokens:
+                # Process each item_iter from tokens.
                 item_canvas_ids = item_iter.get("canvas_ids")
                 if item_canvas_ids and clicked_item_id in item_canvas_ids:
                     print(f"[DEBUG] _on_mouse_down: Matched clicked canvas ID {clicked_item_id} to item: {item_iter.get('type')} - {item_iter.get('entity_id', 'Shape')}")
@@ -2728,6 +2926,7 @@ class DisplayMapController:
                     break
         
         if not clicked_an_item: # Clicked on empty canvas space
+            # Handle the branch where clicked an item is unavailable.
             self._hide_all_token_hovers()
             self._hide_all_marker_descriptions()
             if self._graphical_edit_mode_item: # If graphical edit was active, deactivate it
@@ -2736,6 +2935,7 @@ class DisplayMapController:
             existing_selection = list(self.selected_items)
 
             if self.drawing_mode == "whiteboard":
+                # Handle the branch where drawing_mode == 'whiteboard'.
                 world_x = (event.x - self.pan_x) / self.zoom
                 world_y = (event.y - self.pan_y) / self.zoom
                 self._active_whiteboard_points = [(world_x, world_y)]
@@ -2769,6 +2969,7 @@ class DisplayMapController:
                 self.tokens.append(new_shape); self._update_canvas_images(); self._persist_tokens()
                 return # New shape created, done with this click.
             if self.fog_mode in ("add_rect", "rem_rect"):
+                # Handle the branch where fog mode is in ('add_rect', 'rem_rect').
                 self._clear_fog_rectangle_preview()
                 start_world_x = (event.x - self.pan_x) / self.zoom
                 start_world_y = (event.y - self.pan_y) / self.zoom
@@ -2790,16 +2991,20 @@ class DisplayMapController:
         self._marker_after_id = self.canvas.after(500, self._create_marker)
 
     def _on_mouse_move(self, event):
+        """Handle mouse move."""
         if self._marker_after_id and self._marker_start:
+            # Continue with this path when marker after ID is set and marker start is set.
             dx = event.x - self._marker_start[0]; dy = event.y - self._marker_start[1]
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         if self.drawing_mode == "eraser" and self._eraser_active:
+            # Continue with this path when drawing_mode == 'eraser' and eraser active is set.
             world_x = (event.x - self.pan_x) / self.zoom
             world_y = (event.y - self.pan_y) / self.zoom
             if self._erase_whiteboard_at(world_x, world_y):
                 self._mark_eraser_dirty()
             return
         if self.drawing_mode == "whiteboard" and self._active_whiteboard_points:
+            # Continue with this path when drawing_mode == 'whiteboard' and active whiteboard points is set.
             world_x = (event.x - self.pan_x) / self.zoom
             world_y = (event.y - self.pan_y) / self.zoom
             last_point = self._active_whiteboard_points[-1]
@@ -2817,7 +3022,9 @@ class DisplayMapController:
             self._update_fog_rectangle_preview(event)
 
     def _on_mouse_up(self, event):
+        """Handle mouse up."""
         if self.drawing_mode == "eraser":
+            # Handle the branch where drawing_mode == 'eraser'.
             if self._eraser_active and self._eraser_dirty:
                 self._commit_eraser_changes()
             self._eraser_active = False
@@ -2829,6 +3036,7 @@ class DisplayMapController:
         self._finalize_drag_selection(event)
         if self._marker_after_id: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
         if self._marker_anim_after_id:
+            # Continue with this path when marker anim after ID is set.
             try:
                 self.canvas.after_cancel(self._marker_anim_after_id)
             except Exception:
@@ -2841,6 +3049,7 @@ class DisplayMapController:
             and self._fog_rect_start_world is not None
             and self.mask_img is not None
         ):
+            # Convert the drag endpoints into a clamped world-space rectangle for the fog preview.
             end_world_x = (event.x - self.pan_x) / self.zoom
             end_world_y = (event.y - self.pan_y) / self.zoom
             start_world_x, start_world_y = self._fog_rect_start_world
@@ -2852,6 +3061,7 @@ class DisplayMapController:
 
             width, height = self.mask_img.size
             if width > 0 and height > 0:
+                # Handle the branch where width > 0 and height > 0.
                 left = int(max(0, min(width - 1, left)))
                 right = int(max(0, min(width - 1, right)))
                 top = int(max(0, min(height - 1, top)))
@@ -2871,23 +3081,28 @@ class DisplayMapController:
 
         self._fog_rect_start_world = None
         if self._fog_action_active:
+            # Continue with this path when fog action active is set.
             self._fog_action_active = False
             self._clear_fog_rectangle_preview()
             if self.base_img and self.mask_img:
+                # Continue with this path when base img is set and mask img is set.
                 w, h = self.base_img.size; sw, sh = int(w*self.zoom), int(h*self.zoom)
                 if sw > 0 and sh > 0:
+                    # Handle the branch where sw > 0 and sh > 0.
                     mask_resized = self.mask_img.resize((sw, sh), resample=Image.LANCZOS)
                     self.mask_tk = ImageTk.PhotoImage(mask_resized)
                     if self.mask_id: self.canvas.itemconfig(self.mask_id, image=self.mask_tk); self.canvas.coords(self.mask_id, self.pan_x, self.pan_y)
                     fs_canvas = getattr(self, "fs_canvas", None)
                     if fs_canvas:
                         try:
+                            # Keep on mouse up resilient if this step fails.
                             if fs_canvas.winfo_exists():
                                 self._update_fullscreen_map()
                         except tk.TclError:
                             pass
 
     def _clear_whiteboard_preview(self):
+        """Clear whiteboard preview."""
         canvas = getattr(self, "canvas", None)
         if canvas and self._whiteboard_preview_id:
             try:
@@ -2897,6 +3112,7 @@ class DisplayMapController:
         self._whiteboard_preview_id = None
 
     def _update_whiteboard_preview(self):
+        """Update whiteboard preview."""
         canvas = getattr(self, "canvas", None)
         if not canvas or len(self._active_whiteboard_points) < 2:
             return
@@ -2904,7 +3120,9 @@ class DisplayMapController:
         for xw, yw in self._active_whiteboard_points:
             screen_points.extend([self.pan_x + xw * self.zoom, self.pan_y + yw * self.zoom])
         try:
+            # Keep whiteboard preview resilient if this step fails.
             if self._whiteboard_preview_id and canvas.type(self._whiteboard_preview_id):
+                # Handle the branch where whiteboard preview ID is set and canvas.type(_whiteboard_preview_id).
                 canvas.coords(self._whiteboard_preview_id, *screen_points)
                 canvas.itemconfig(
                     self._whiteboard_preview_id,
@@ -2929,10 +3147,12 @@ class DisplayMapController:
             self._whiteboard_preview_id = None
 
     def _simplify_polyline(self, points, tolerance=1.5):
+        """Internal helper for simplify polyline."""
         if len(points) < 3:
             return list(points)
 
         def _distance(p1, p2):
+            """Internal helper for distance."""
             dx = p1[0] - p2[0]
             dy = p1[1] - p2[1]
             return math.sqrt(dx * dx + dy * dy)
@@ -2945,6 +3165,7 @@ class DisplayMapController:
         return simplified
 
     def _finalize_whiteboard_stroke(self):
+        """Internal helper for finalize whiteboard stroke."""
         points = self._simplify_polyline(self._active_whiteboard_points)
         self._active_whiteboard_points = []
         self._clear_whiteboard_preview()
@@ -2963,6 +3184,7 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _create_text_at(self, world_x: float, world_y: float):
+        """Create text at."""
         text = prompt_for_text(self.canvas, title="Add Text", prompt="Enter text:")
         if text is None:
             return
@@ -2977,8 +3199,10 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _mark_eraser_dirty(self):
+        """Internal helper for mark eraser dirty."""
         self._eraser_dirty = True
         if not self._eraser_repaint_scheduled:
+            # Handle the branch where eraser repaint scheduled is unavailable.
             self._eraser_repaint_scheduled = True
             try:
                 self.parent.after(0, self._perform_eraser_repaint)
@@ -2986,6 +3210,7 @@ class DisplayMapController:
                 self._perform_eraser_repaint()
 
     def _perform_eraser_repaint(self):
+        """Internal helper for perform eraser repaint."""
         self._eraser_repaint_scheduled = False
         try:
             self._update_canvas_images(resample=self._fast_resample)
@@ -2993,6 +3218,7 @@ class DisplayMapController:
             pass
 
     def _point_to_segment_distance(self, point, start, end):
+        """Internal helper for point to segment distance."""
         px, py = point
         x1, y1 = start
         x2, y2 = end
@@ -3007,6 +3233,7 @@ class DisplayMapController:
         return math.hypot(px - proj_x, py - proj_y)
 
     def _polyline_hits_point(self, points, point, radius):
+        """Internal helper for polyline hits point."""
         if len(points) < 2:
             return False
         for start, end in zip(points, points[1:]):
@@ -3015,6 +3242,7 @@ class DisplayMapController:
         return False
 
     def _erase_whiteboard_at(self, world_x: float, world_y: float) -> bool:
+        """Internal helper for erase whiteboard at."""
         canvas = getattr(self, "canvas", None)
         changed = False
         remaining_tokens = []
@@ -3023,8 +3251,10 @@ class DisplayMapController:
         screen_point = (self.pan_x + world_x * self.zoom, self.pan_y + world_y * self.zoom)
         radius_screen = radius * self.zoom
         for item in self.tokens:
+            # Process each item from tokens.
             if item.get("type") == "text":
                 if text_hit_test(canvas, item, screen_point=screen_point, radius=radius_screen, zoom=self.zoom, pan=(self.pan_x, self.pan_y)):
+                    # Remove every canvas artifact tied to the text token before dropping it from the scene.
                     for cid in item.get("canvas_ids") or []:
                         if canvas:
                             try:
@@ -3084,23 +3314,27 @@ class DisplayMapController:
         return changed
 
     def _commit_eraser_changes(self):
+        """Internal helper for commit eraser changes."""
         try:
             self._update_canvas_images(resample=self._fast_resample)
         except Exception:
             pass
         self._persist_tokens()
         try:
+            # Keep commit eraser changes resilient if this step fails.
             if getattr(self, 'fs', None) and self.fs.winfo_exists() and getattr(self, 'fs_canvas', None):
                 self.parent.after(0, self._update_fullscreen_map)
         except tk.TclError:
             pass
         try:
+            # Keep commit eraser changes resilient if this step fails.
             if getattr(self, '_web_server_thread', None):
                 self.parent.after(0, self._update_web_display_map)
         except Exception:
             pass
 
     def _update_fog_rectangle_preview(self, event):
+        """Update fog rectangle preview."""
         if self._fog_rect_start_world is None or self.zoom == 0:
             return
 
@@ -3125,7 +3359,9 @@ class DisplayMapController:
         outline_color = "#d7263d" if self.fog_mode == "add_rect" else "#00a2ff"
 
         try:
+            # Keep fog rectangle preview resilient if this step fails.
             if self._fog_rect_preview_id and canvas.type(self._fog_rect_preview_id):
+                # Handle the branch where fog rect preview ID is set and canvas.type(_fog_rect_preview_id).
                 canvas.coords(self._fog_rect_preview_id, screen_left, screen_top, screen_right, screen_bottom)
                 canvas.itemconfig(self._fog_rect_preview_id, outline=outline_color)
             else:
@@ -3147,6 +3383,7 @@ class DisplayMapController:
         fs_canvas = getattr(self, "fs_canvas", None)
         if fs_canvas:
             try:
+                # Keep fog rectangle preview resilient if this step fails.
                 if not fs_canvas.winfo_exists():
                     fs_canvas = None
             except tk.TclError:
@@ -3154,7 +3391,9 @@ class DisplayMapController:
 
         if fs_canvas:
             try:
+                # Keep fog rectangle preview resilient if this step fails.
                 if self._fog_rect_fs_preview_id and fs_canvas.type(self._fog_rect_fs_preview_id):
+                    # Handle the branch where fog rect fs preview ID is set and fs_canvas.type(_fog_rect_fs_preview_id).
                     fs_canvas.coords(
                         self._fog_rect_fs_preview_id,
                         screen_left,
@@ -3180,6 +3419,7 @@ class DisplayMapController:
                 self._fog_rect_fs_preview_id = None
 
     def _clear_fog_rectangle_preview(self):
+        """Clear fog rectangle preview."""
         canvas = getattr(self, "canvas", None)
         if canvas:
             try:
@@ -3190,6 +3430,7 @@ class DisplayMapController:
         fs_canvas = getattr(self, "fs_canvas", None)
         if fs_canvas:
             try:
+                # Keep fog rectangle preview resilient if this step fails.
                 if fs_canvas.winfo_exists():
                     fs_canvas.delete("fog_preview")
             except tk.TclError:
@@ -3199,17 +3440,20 @@ class DisplayMapController:
         self._fog_rect_fs_preview_id = None
 
     def _perform_zoom(self, final: bool):
+        """Internal helper for perform zoom."""
         attr = "_zoom_final_after_id" if final else "_zoom_after_id"
         setattr(self, attr, None)
         resample = Image.LANCZOS if final else self._fast_resample; self._update_canvas_images(resample=resample)
 
     def _update_canvas_images(self, resample=Image.LANCZOS):
+        """Update canvas images."""
         if not self.base_img: return
         debug_payload = getattr(self, "_pending_render_debug_dump", None)
         if debug_payload is not None:
             debug_payload.setdefault("rendered_items", [])
 
         def _safe_canvas_coords(cid):
+            """Internal helper for safe canvas coords."""
             if not cid:
                 return None
             try:
@@ -3219,6 +3463,7 @@ class DisplayMapController:
             if not coords:
                 return None
             try:
+                # Keep safe canvas coords resilient if this step fails.
                 converted = []
                 for value in coords:
                     if isinstance(value, (int, float)):
@@ -3230,6 +3475,7 @@ class DisplayMapController:
                 return tuple(coords)
 
         def _primary_screen_from_coords(coords):
+            """Internal helper for primary screen from coords."""
             if not coords:
                 return None
             if len(coords) >= 2:
@@ -3255,12 +3501,15 @@ class DisplayMapController:
         if self.base_id: self.canvas.itemconfig(self.base_id, image=self.base_tk); self.canvas.coords(self.base_id, x0, y0)
         else: self.base_id = self.canvas.create_image(x0, y0, image=self.base_tk, anchor='nw')
         if self.mask_img:
+            # Continue with this path when mask img is set.
             mask_resized = self.mask_img.resize((sw,sh), resample=resample); self.mask_tk = ImageTk.PhotoImage(mask_resized)
             if self.mask_id: self.canvas.itemconfig(self.mask_id, image=self.mask_tk); self.canvas.coords(self.mask_id, x0, y0)
             else: self.mask_id = self.canvas.create_image(x0, y0, image=self.mask_tk, anchor='nw')
         for item in self.tokens:
+            # Process each item from tokens.
             item_type = item.get("type", "token"); xw, yw = item['position']
             if item_type == "token":
+                # Handle the branch where item_type == 'token'.
                 source = item.get('source_image')
                 pil = item.get('pil_image')
                 size_px = item.get('size')
@@ -3277,6 +3526,7 @@ class DisplayMapController:
                     size_px = max(1, int(self.token_size))
 
                 if source is not None:
+                    # Handle the branch where source is available.
                     nw = nh = max(1, int(size_px * self.zoom))
                     if nw <= 0 or nh <= 0:
                         continue
@@ -3302,6 +3552,7 @@ class DisplayMapController:
                         "border_color": item.get("border_color"),
                     }
                 if item.get('canvas_ids'):
+                    # Handle the branch where item.get('canvas_ids').
                     b_id, i_id = item['canvas_ids']
                     self.canvas.itemconfig(b_id, outline=item.get('border_color','#0000ff'))
                     self.canvas.coords(b_id, sx-3, sy-3, sx+nw+3, sy+nh+3); self.canvas.coords(i_id, sx, sy)
@@ -3315,6 +3566,7 @@ class DisplayMapController:
                         self.canvas.coords(tid, cx + circle_diam // 2, cy + circle_diam // 2); self.canvas.itemconfig(tid, text=str(hp))
                     defense_value = item.get("defense_value")
                     if defense_value is None:
+                        # Handle the branch where defense value is missing.
                         defense_info = _extract_entity_defense_value(item.get("entity_type"), item.get("entity_record"))
                         if defense_info:
                             defense_label, defense_value = defense_info
@@ -3323,8 +3575,10 @@ class DisplayMapController:
                     defense_color = "#2563eb"
                     defense_coords = (sx - 4, sy - 4)
                     if defense_value is not None:
+                        # Handle the branch where defense value is available.
                         dcx, dcy = defense_coords
                         if item.get("defense_canvas_ids"):
+                            # Handle the branch where item.get('defense_canvas_ids').
                             dcid, dtid = item["defense_canvas_ids"]
                             if dcid:
                                 self.canvas.coords(dcid, dcx, dcy, dcx + circle_diam, dcy + circle_diam)
@@ -3351,6 +3605,7 @@ class DisplayMapController:
                             )
                             item["defense_canvas_ids"] = (dcid, dtid)
                     elif item.get("defense_canvas_ids"):
+                        # Handle the branch where item.get('defense_canvas_ids').
                         for dcid in item["defense_canvas_ids"]:
                             if dcid:
                                 self.canvas.delete(dcid)
@@ -3376,6 +3631,7 @@ class DisplayMapController:
                         self.canvas.tag_bind(item_id_hp, "<Button-3>", lambda e, t=item: self._on_max_hp_menu_click(e, t))
                     defense_value = item.get("defense_value")
                     if defense_value is None:
+                        # Handle the branch where defense value is missing.
                         defense_info = _extract_entity_defense_value(item.get("entity_type"), item.get("entity_record"))
                         if defense_info:
                             defense_label, defense_value = defense_info
@@ -3383,6 +3639,7 @@ class DisplayMapController:
                             item["defense_value"] = defense_value
                     defense_color = "#2563eb"
                     if defense_value is not None:
+                        # Handle the branch where defense value is available.
                         dcx, dcy = sx - 4, sy - 4
                         dcid = self.canvas.create_oval(
                             dcx,
@@ -3402,6 +3659,7 @@ class DisplayMapController:
                         )
                         item["defense_canvas_ids"] = (dcid, dtid)
                     elif item.get("defense_canvas_ids"):
+                        # Handle the branch where item.get('defense_canvas_ids').
                         for dcid in item["defense_canvas_ids"]:
                             if dcid:
                                 self.canvas.delete(dcid)
@@ -3411,6 +3669,7 @@ class DisplayMapController:
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                     self._refresh_token_hover_popup(item)
                 if debug_entry is not None:
+                    # Handle the branch where debug entry is available.
                     canvas_ids = item.get('canvas_ids') or ()
                     border_id = canvas_ids[0] if len(canvas_ids) >= 1 else None
                     image_id = canvas_ids[1] if len(canvas_ids) >= 2 else (canvas_ids[0] if len(canvas_ids) == 1 else None)
@@ -3427,6 +3686,7 @@ class DisplayMapController:
                     })
                     debug_payload["rendered_items"].append(debug_entry)
             elif item_type == "marker":
+                # Handle the branch where item_type == 'marker'.
                 item.setdefault("entry_width", 180)
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
                 item.setdefault("description_visible", False)
@@ -3445,6 +3705,7 @@ class DisplayMapController:
                 entry = item.get("entry_widget")
                 desired_text = item.get("text", "")
                 if not entry or not entry.winfo_exists():
+                    # Handle the branch where entry is unavailable or not entry.winfo_exists().
                     entry = ctk.CTkEntry(self.canvas, width=item.get("entry_width", 180))
                     entry.insert(0, desired_text)
                     entry.bind("<KeyRelease>", lambda e, i=item: self._on_marker_text_change(i, persist=False))
@@ -3477,6 +3738,7 @@ class DisplayMapController:
                 handle_x = sx - handle_width - 6
                 handle_widget = item.get("handle_widget")
                 if not handle_widget or not handle_widget.winfo_exists():
+                    # Handle the branch where handle widget is unavailable or not handle_widget.winfo_exists().
                     handle_widget = ctk.CTkLabel(self.canvas, text="≡", width=handle_width, fg_color="#2f2f2f")
                     handle_widget.configure(cursor="fleur")
                     handle_widget.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_handle_press(e, i))
@@ -3517,6 +3779,7 @@ class DisplayMapController:
                     ys.extend([handle_bbox[1], handle_bbox[3]])
                 border_margin = item.get("border_margin", 4)
                 if xs and ys:
+                    # Continue with this path when xs is set and ys is set.
                     bx1 = min(xs) - border_margin
                     by1 = min(ys) - border_margin
                     bx2 = max(xs) + border_margin
@@ -3530,7 +3793,9 @@ class DisplayMapController:
                         )
                         item["border_canvas_id"] = border_id
                     if border_id:
+                        # Continue with this path when border ID is set.
                         try:
+                            # Keep canvas images resilient if this step fails.
                             self.canvas.tag_lower(border_id)
                             if self.base_id:
                                 self.canvas.lift(border_id, self.base_id)
@@ -3579,6 +3844,7 @@ class DisplayMapController:
                     })
                     debug_payload["rendered_items"].append(debug_entry)
             elif item_type in ["rectangle", "oval"]:
+                # Handle the branch where item type is in ['rectangle', 'oval'].
                 shape_width_unscaled = item.get("width", DEFAULT_SHAPE_WIDTH); shape_height_unscaled = item.get("height", DEFAULT_SHAPE_HEIGHT)
                 shape_width = shape_width_unscaled * self.zoom; shape_height = shape_height_unscaled * self.zoom
                 if shape_width <=0 or shape_height <=0: continue
@@ -3595,6 +3861,7 @@ class DisplayMapController:
                     }
                 fill_color = item.get("fill_color", "") if item.get("is_filled") else ""; border_color = item.get("border_color", "#000000")
                 if item.get('canvas_ids') and item['canvas_ids'][0] is not None:
+                    # Handle the branch where item.get('canvas_ids') and item['canvas_ids'][0] is available.
                     shape_id = item['canvas_ids'][0]
                     if item_type == "rectangle": self.canvas.coords(shape_id, sx, sy, sx + shape_width, sy + shape_height)
                     elif item_type == "oval": self.canvas.coords(shape_id, sx, sy, sx + shape_width, sy + shape_height)
@@ -3616,6 +3883,7 @@ class DisplayMapController:
                     })
                     debug_payload["rendered_items"].append(debug_entry)
             elif item_type == "whiteboard":
+                # Handle the branch where item_type == 'whiteboard'.
                 points = item.get("points") or []
                 if not points or len(points) < 2:
                     continue
@@ -3635,8 +3903,10 @@ class DisplayMapController:
                         "width": width,
                     }
                 if item.get("canvas_ids"):
+                    # Handle the branch where item.get('canvas_ids').
                     line_id = item["canvas_ids"][0]
                     try:
+                        # Keep canvas images resilient if this step fails.
                         self.canvas.coords(line_id, *screen_coords)
                         self.canvas.itemconfig(
                             line_id,
@@ -3653,6 +3923,7 @@ class DisplayMapController:
                     line_id = None
                 if not line_id:
                     try:
+                        # Keep canvas images resilient if this step fails.
                         line_id = self.canvas.create_line(
                             *screen_coords,
                             fill=color,
@@ -3673,6 +3944,7 @@ class DisplayMapController:
                     })
                     debug_payload["rendered_items"].append(debug_entry)
             elif item_type == "text":
+                # Handle the branch where item_type == 'text'.
                 text_value = item.get("text", "")
                 color = item.get("color", self.whiteboard_color)
                 size = int(item.get("text_size", getattr(self, "text_size", 24)))
@@ -3691,6 +3963,7 @@ class DisplayMapController:
                     }
                 text_id = None
                 if item.get("canvas_ids"):
+                    # Handle the branch where item.get('canvas_ids').
                     text_id = item["canvas_ids"][0]
                     try:
                         self.canvas.coords(text_id, sx, sy)
@@ -3713,6 +3986,7 @@ class DisplayMapController:
                     })
                     debug_payload["rendered_items"].append(debug_entry)
         if debug_payload is not None:
+            # Handle the branch where debug payload is available.
             expected = debug_payload.get("expected_items", [])
             rendered = debug_payload.get("rendered_items", [])
             map_name = debug_payload.get("map_name", "<unknown>")
@@ -3731,17 +4005,20 @@ class DisplayMapController:
                     func_name="DisplayMapController._update_canvas_images",
                 )
             def _key_entry(entry):
+                """Internal helper for key entry."""
                 item_type = entry.get("type")
                 if item_type == "token":
                     return (item_type, entry.get("entity_id"))
                 if item_type == "marker":
                     return (item_type, entry.get("text"), entry.get("linked_map"))
                 if item_type in ("rectangle", "oval"):
+                    # Handle the branch where item type is in ('rectangle', 'oval').
                     world = entry.get("world_position")
                     if isinstance(world, (list, tuple)):
                         world = tuple(world)
                     return (item_type, world)
                 if item_type == "whiteboard":
+                    # Handle the branch where item_type == 'whiteboard'.
                     world = entry.get("world_position")
                     if isinstance(world, (list, tuple)):
                         world = tuple(world)
@@ -3749,6 +4026,7 @@ class DisplayMapController:
                 return None
 
             def _compute_screen(world_pos):
+                """Internal helper for compute screen."""
                 if isinstance(world_pos, (list, tuple)) and len(world_pos) >= 2:
                     try:
                         return (
@@ -3760,8 +4038,10 @@ class DisplayMapController:
                 return None
 
             def _index_entries(entries, *, compute_screen=False):
+                """Internal helper for index entries."""
                 index = {}
                 for entry in entries:
+                    # Process each entry from entries.
                     key = _key_entry(entry)
                     if key is None:
                         continue
@@ -3787,11 +4067,13 @@ class DisplayMapController:
             rendered_index = _index_entries(rendered, compute_screen=False)
 
             def _identifier_details(item_type, entry):
+                """Internal helper for identifier details."""
                 if item_type == "token":
                     return f"entity_type={entry.get('entity_type')}, entity_id={entry.get('entity_id')}"
                 if item_type == "marker":
                     return f"text={entry.get('text')!r}, linked_map={entry.get('linked_map')!r}"
                 if item_type in ("rectangle", "oval"):
+                    # Handle the branch where item type is in ('rectangle', 'oval').
                     width = entry.get("width")
                     height = entry.get("height")
                     if width is not None or height is not None:
@@ -3826,10 +4108,12 @@ class DisplayMapController:
                     )
 
             for common_key in expected_keys & rendered_keys:
+                # Process each common_key from expected_keys & rendered_keys.
                 expected_entries = expected_index.get(common_key, [])
                 rendered_entries = rendered_index.get(common_key, [])
                 pair_count = min(len(expected_entries), len(rendered_entries))
                 for idx in range(pair_count):
+                    # Process each idx from range(pair_count).
                     exp_info = expected_entries[idx]
                     ren_info = rendered_entries[idx]
                     exp_entry = exp_info["entry"]
@@ -3875,6 +4159,7 @@ class DisplayMapController:
                     func_name="DisplayMapController._update_canvas_images",
                 )
             if debug_payload is not None:
+                # Handle the branch where debug payload is available.
                 try:
                     stack_snapshot = tuple(reversed(self.canvas.find_all()))  # topmost first
                 except tk.TclError:
@@ -3889,6 +4174,7 @@ class DisplayMapController:
         fs_canvas = getattr(self, "fs_canvas", None)
         if fs_canvas:
             try:
+                # Keep canvas images resilient if this step fails.
                 if fs_canvas.winfo_exists():
                     self._update_fullscreen_map()
             except tk.TclError:
@@ -3897,12 +4183,14 @@ class DisplayMapController:
             self._update_web_display_map()
 
     def _bind_item_events(self, item):
+        """Bind item events."""
         if item.get("type") == "whiteboard":
             return
         if not item.get('canvas_ids'): return
         ids_to_bind = item['canvas_ids']
         existing_ids = set(self.canvas.find_all())
         for cid in ids_to_bind:
+            # Process each cid from ids_to_bind.
             if not cid:
                 continue
             if cid not in existing_ids:
@@ -3910,6 +4198,7 @@ class DisplayMapController:
             if item.get("type") == "marker" and cid == item.get("entry_canvas_id"):
                 continue
             try:
+                # Keep item events resilient if this step fails.
                 self.canvas.tag_bind(cid, "<ButtonPress-1>", lambda e, i=item: self._on_item_press(e, i))
                 self.canvas.tag_bind(cid, "<B1-Motion>", lambda e, i=item: (self._on_item_move(e, i), "break")) # 'break' prevents event propagation
                 self.canvas.tag_bind(cid, "<ButtonRelease-1>", lambda e, i=item: self._on_item_release(e, i))
@@ -3929,6 +4218,7 @@ class DisplayMapController:
             pass
 
     def _on_item_press(self, event, item):
+        """Handle item press."""
         print(f"[DEBUG] _on_item_press: Item type: {item.get('type')}, ID/Name: {item.get('entity_id', item.get('canvas_ids'))}")
         if self._active_resize_handle_info: # If a resize drag is active, do nothing
             print("[DEBUG] _on_item_press: Active resize handle info exists, returning.")
@@ -3944,6 +4234,7 @@ class DisplayMapController:
         # Handles are only drawn if "Edit Shape" is chosen from context menu.
 
     def _on_item_move(self, event, item):
+        """Handle item move."""
         if self._active_resize_handle_info and self._active_resize_handle_info.get('item') == item:
             # If currently resizing this item, let the handle move logic take over.
             return
@@ -3956,6 +4247,7 @@ class DisplayMapController:
         movement_started = abs(dx) > 2 or abs(dy) > 2
         targets = self._get_drag_targets(item)
         for target in targets:
+            # Process each target from targets.
             drag_info = target.setdefault("drag_data", {"x": event.x, "y": event.y, "moved": False})
             if movement_started and not drag_info.get("moved"):
                 drag_info["moved"] = True
@@ -3967,6 +4259,7 @@ class DisplayMapController:
 
 
     def _on_item_release(self, event, item):
+        """Handle item release."""
         # If a resize operation was active for this item, it's handled by _on_resize_handle_release
         if self._active_resize_handle_info and self._active_resize_handle_info.get('item') == item:
             # The actual release logic is in _on_resize_handle_release
@@ -3985,16 +4278,19 @@ class DisplayMapController:
         self._update_selection_indicators()
 
     def _get_drag_targets(self, primary_item):
+        """Return drag targets."""
         selection = [entry for entry in self.selected_items if entry]
         if selection and primary_item in selection:
             return selection
         return [primary_item]
 
     def _apply_drag_delta_to_item(self, item, dx, dy):
+        """Apply drag delta to item."""
         if not dx and not dy:
             return
 
         for cid in item.get("canvas_ids", []) or []:
+            # Process each cid from item.get('canvas_ids', []) or [].
             if not cid:
                 continue
             try:
@@ -4005,6 +4301,7 @@ class DisplayMapController:
         item_type = item.get("type", "token")
 
         if item_type == "token":
+            # Handle the branch where item_type == 'token'.
             name_id = item.get("name_id")
             if name_id:
                 try:
@@ -4013,6 +4310,7 @@ class DisplayMapController:
                     pass
             if item.get("hp_canvas_ids"):
                 for hp_cid in item["hp_canvas_ids"]:
+                    # Process each hp_cid from item['hp_canvas_ids'].
                     if not hp_cid:
                         continue
                     try:
@@ -4021,6 +4319,7 @@ class DisplayMapController:
                         continue
             if item.get("defense_canvas_ids"):
                 for def_cid in item["defense_canvas_ids"]:
+                    # Process each def_cid from item['defense_canvas_ids'].
                     if not def_cid:
                         continue
                     try:
@@ -4057,6 +4356,7 @@ class DisplayMapController:
             self._draw_resize_handles(item)
 
     def _handle_item_click(self, event, item):
+        """Internal helper for handle item click."""
         item_type = item.get("type", "token")
         if item_type == "token":
             if item.get("hover_visible"):
@@ -4074,11 +4374,13 @@ class DisplayMapController:
                 self._show_marker_description(item)
 
     def _on_marker_double_click(self, event, marker):
+        """Handle marker double click."""
         if self._open_marker_linked_map(marker, silent=True):
             return "break"
         return None
 
     def _on_text_double_click(self, event, text_item):
+        """Handle text double click."""
         current_text = text_item.get("text", "")
         updated = prompt_for_text(self.canvas, title="Edit Text", prompt="Update text:", initial=current_text)
         if updated is None or updated == current_text:
@@ -4089,6 +4391,7 @@ class DisplayMapController:
         return "break"
 
     def _on_item_right_click(self, event, item):
+        """Handle item right click."""
         if not self._ensure_selection_for_context_menu(item):
             return
         selection = list(self.selected_items) or ([])
@@ -4113,6 +4416,7 @@ class DisplayMapController:
             return self._show_marker_menu(event, markers)
 
     def _show_shape_menu(self, event, shapes):
+        """Show shape menu."""
         valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
         if not valid_shapes:
             return
@@ -4157,6 +4461,7 @@ class DisplayMapController:
         menu.tk_popup(event.x_root, event.y_root)
 
     def _edit_shapes_color(self, shapes):
+        """Internal helper for edit shapes color."""
         valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
         if not valid_shapes:
             return
@@ -4189,6 +4494,7 @@ class DisplayMapController:
             self._persist_tokens()
 
     def _resize_shapes_dialog(self, shapes):
+        """Internal helper for resize shapes dialog."""
         valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
         if not valid_shapes:
             return
@@ -4225,6 +4531,7 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _toggle_shapes_fill(self, shapes):
+        """Toggle shapes fill."""
         valid_shapes = [s for s in shapes if isinstance(s, dict) and s.get("type") in ("rectangle", "oval")]
         if not valid_shapes:
             return
@@ -4234,14 +4541,17 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _edit_shape_color_dialog(self, shape):
+        """Internal helper for edit shape color dialog."""
         self._edit_shapes_color([shape])
 
     def _resize_shape_dialog(self, shape):
+        """Internal helper for resize shape dialog."""
         self._resize_shapes_dialog([shape])
 
     # _adjust_shape_size_relative method is removed as per request.
 
     def _resize_tokens(self, tokens):
+        """Internal helper for resize tokens."""
         valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
         if not valid_tokens:
             return
@@ -4250,6 +4560,7 @@ class DisplayMapController:
         current_size = reference.get("size", self.token_size)
 
         try:
+            # Keep resize tokens resilient if this step fails.
             import tkinter.simpledialog as simpledialog
             new_size = simpledialog.askinteger(
                 "Resize Token",
@@ -4271,12 +4582,15 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _apply_token_size(self, token, new_size):
+        """Apply token size."""
         token["size"] = new_size
         source_img = token.get("source_image")
 
         if "image_path" in token and token["image_path"]:
+            # Handle the branch where 'image_path' is in token and token['image_path'].
             resolved_path = _resolve_campaign_path(token["image_path"])
             try:
+                # Keep token size resilient if this step fails.
                 if source_img is None and resolved_path:
                     source_img = Image.open(resolved_path).convert("RGBA")
                 if source_img is not None:
@@ -4290,15 +4604,18 @@ class DisplayMapController:
             token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
 
     def _resize_token_dialog(self, token):
+        """Internal helper for resize token dialog."""
         if not token or token.get("type") != "token":
             return
         self._resize_tokens([token])
 
     def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
+        """Load portrait menu image."""
         resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
         if not resolved:
             return None
         try:
+            # Keep portrait menu image resilient if this step fails.
             img = Image.open(resolved)
             img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
             photo = ImageTk.PhotoImage(img)
@@ -4312,6 +4629,7 @@ class DisplayMapController:
             return None
 
     def _get_token_portrait_paths(self, token: dict) -> list[str]:
+        """Return token portrait paths."""
         entity_record = token.get("entity_record") or {}
         portrait_value = entity_record.get("Portrait", "")
         return [
@@ -4321,6 +4639,7 @@ class DisplayMapController:
         ]
 
     def _get_token_portrait_title(self, token: dict) -> str:
+        """Return token portrait title."""
         entity_record = token.get("entity_record") or {}
         return (
             entity_record.get("Name")
@@ -4330,6 +4649,7 @@ class DisplayMapController:
         )
 
     def _show_token_menu(self, event, tokens):
+        """Show token menu."""
         valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
         if not valid_tokens:
             return
@@ -4371,10 +4691,13 @@ class DisplayMapController:
         )
 
         if count == 1:
+            # Handle the branch where count == 1.
             portrait_paths = self._get_token_portrait_paths(valid_tokens[0])
             if portrait_paths:
+                # Continue with this path when portrait paths is set.
                 title = self._get_token_portrait_title(valid_tokens[0])
                 if len(portrait_paths) == 1:
+                    # Handle the branch where len(portrait_paths) == 1.
                     menu.add_command(
                         label="Show Portrait",
                         command=lambda p=portrait_paths[0]: show_portrait(p, title),
@@ -4382,6 +4705,7 @@ class DisplayMapController:
                 else:
                     portrait_menu = tk.Menu(menu, tearoff=0)
                     for index, path in enumerate(portrait_paths, start=1):
+                        # Process each (index, path) from enumerate(portrait_paths, start=1).
                         portrait_image = self._load_portrait_menu_image(path)
                         if portrait_image:
                             portrait_menu.add_command(
@@ -4416,8 +4740,10 @@ class DisplayMapController:
             print(f"Error displaying token menu: {e}")
 
     def _toggle_tokens_player_visibility(self, tokens):
+        """Toggle tokens player visibility."""
         changed = False
         for token in tokens:
+            # Process each token from tokens.
             if not isinstance(token, dict) or token.get("type") != "token":
                 continue
             token["player_visible"] = not bool(token.get("player_visible", True))
@@ -4432,17 +4758,21 @@ class DisplayMapController:
         self._persist_tokens()
 
     def _show_portraits_for_tokens(self, tokens):
+        """Show portraits for tokens."""
         for token in tokens:
+            # Process each token from tokens.
             portrait_paths = self._get_token_portrait_paths(token)
             title = self._get_token_portrait_title(token)
             for path in portrait_paths:
                 show_portrait(path, title)
 
     def _play_audio_for_tokens(self, tokens):
+        """Internal helper for play audio for tokens."""
         for token in tokens:
             self._play_token_audio(token)
 
     def _get_token_audio_value(self, token):
+        """Return token audio value."""
         value = get_entity_audio_value(token.get("entity_record"))
         if value:
             return value
@@ -4452,8 +4782,10 @@ class DisplayMapController:
         if not wrapper or not entity_id:
             return ""
         try:
+            # Keep token audio value resilient if this step fails.
             for item in wrapper.load_items():
                 if item.get("Name") == entity_id:
+                    # Handle the branch where item.get('Name') == entity_id.
                     raw_value = get_entity_audio_value(item)
                     if raw_value:
                         return raw_value
@@ -4462,6 +4794,7 @@ class DisplayMapController:
         return ""
 
     def _play_token_audio(self, token):
+        """Internal helper for play token audio."""
         audio_value = self._get_token_audio_value(token)
         if not audio_value:
             messagebox.showinfo("Audio", "No audio file configured for this token.")
@@ -4471,6 +4804,7 @@ class DisplayMapController:
             messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
     def _prompt_change_token_border_color(self, tokens):
+        """Internal helper for prompt change token border color."""
         valid_tokens = [t for t in tokens if isinstance(t, dict) and t.get("type") == "token"]
         if not valid_tokens:
             return
@@ -4492,21 +4826,26 @@ class DisplayMapController:
         self._update_canvas_images()
         self._persist_tokens()
     def _toggle_shape_fill(self, shape):
+        """Toggle shape fill."""
         self._toggle_shapes_fill([shape])
 
     def _delete_items(self, items):
+        """Delete items."""
         for item in list(items):
             self._delete_item(item)
 
     def _bring_items_to_front(self, items):
+        """Internal helper for bring items to front."""
         for item in items:
             self._bring_item_to_front(item)
 
     def _send_items_to_back(self, items):
+        """Internal helper for send items to back."""
         for item in items:
             self._send_item_to_back(item)
 
     def _copy_item(self, item_to_copy=None):
+        """Copy item."""
         if isinstance(item_to_copy, (list, tuple, set)):
             candidates = [itm for itm in item_to_copy if isinstance(itm, dict)]
         elif item_to_copy is not None:
@@ -4524,6 +4863,7 @@ class DisplayMapController:
 
         reference_position = None
         for item in candidates:
+            # Process each item from candidates.
             pos = item.get("position") if isinstance(item, dict) else None
             if pos:
                 reference_position = pos
@@ -4533,6 +4873,7 @@ class DisplayMapController:
 
         clipboard_entries = []
         for item in candidates:
+            # Process each item from candidates.
             clone = self._clone_item_for_clipboard(item, reference_position)
             if clone:
                 clipboard_entries.append(clone)
@@ -4540,6 +4881,7 @@ class DisplayMapController:
         self.clipboard_token = clipboard_entries if clipboard_entries else None
 
     def _clipboard_value_should_skip(self, value):
+        """Internal helper for clipboard value should skip."""
         if value is None:
             return False
 
@@ -4554,6 +4896,7 @@ class DisplayMapController:
             return True
 
         try:
+            # Keep clipboard value should skip resilient if this step fails.
             if isinstance(value, ImageTk.PhotoImage):
                 return True
         except Exception:
@@ -4562,6 +4905,7 @@ class DisplayMapController:
         return False
 
     def _sanitize_clipboard_structure(self, value, memo=None):
+        """Internal helper for sanitize clipboard structure."""
         if memo is None:
             memo = {}
 
@@ -4573,9 +4917,11 @@ class DisplayMapController:
             return CLIPBOARD_SKIP
 
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             sanitized_dict = {}
             memo[obj_id] = sanitized_dict
             for key, item in value.items():
+                # Process each (key, item) from value.items().
                 sanitized_key = self._sanitize_clipboard_structure(key, memo)
                 sanitized_value = self._sanitize_clipboard_structure(item, memo)
                 if sanitized_key is CLIPBOARD_SKIP or sanitized_value is CLIPBOARD_SKIP:
@@ -4584,9 +4930,11 @@ class DisplayMapController:
             return sanitized_dict
 
         if isinstance(value, list):
+            # Handle the branch where isinstance(value, list).
             sanitized_list = []
             memo[obj_id] = sanitized_list
             for item in value:
+                # Process each item from value.
                 sanitized_item = self._sanitize_clipboard_structure(item, memo)
                 if sanitized_item is CLIPBOARD_SKIP:
                     continue
@@ -4594,9 +4942,11 @@ class DisplayMapController:
             return sanitized_list
 
         if isinstance(value, tuple):
+            # Handle the branch where isinstance(value, tuple).
             sanitized_tuple_items = []
             memo[obj_id] = sanitized_tuple_items
             for item in value:
+                # Process each item from value.
                 sanitized_item = self._sanitize_clipboard_structure(item, memo)
                 if sanitized_item is CLIPBOARD_SKIP:
                     continue
@@ -4606,9 +4956,11 @@ class DisplayMapController:
             return sanitized_tuple
 
         if isinstance(value, set):
+            # Handle the branch where isinstance(value, set).
             sanitized_set = set()
             memo[obj_id] = sanitized_set
             for item in value:
+                # Process each item from value.
                 sanitized_item = self._sanitize_clipboard_structure(item, memo)
                 if sanitized_item is CLIPBOARD_SKIP:
                     continue
@@ -4627,6 +4979,7 @@ class DisplayMapController:
         return sanitized_value
 
     def _clone_item_for_clipboard(self, item, reference_position):
+        """Clone item for clipboard."""
         if not isinstance(item, dict):
             return None
 
@@ -4681,6 +5034,7 @@ class DisplayMapController:
         return clone
 
     def _paste_item(self, event=None):
+        """Internal helper for paste item."""
         if not self.clipboard_token:
             return
 
@@ -4694,10 +5048,12 @@ class DisplayMapController:
 
         vcx, vcy = 100, 100
         if self.canvas:
+            # Continue with this path when canvas is set.
             vcx = (self.canvas.winfo_width() // 2 - self.pan_x) / self.zoom
             vcy = (self.canvas.winfo_height() // 2 - self.pan_y) / self.zoom
 
             try:
+                # Keep paste item resilient if this step fails.
                 pointer_x = self.canvas.winfo_pointerx() - self.canvas.winfo_rootx()
                 pointer_y = self.canvas.winfo_pointery() - self.canvas.winfo_rooty()
             except tk.TclError:
@@ -4715,6 +5071,7 @@ class DisplayMapController:
 
         pasted_items = []
         for entry in clipboard_items:
+            # Process each entry from clipboard_items.
             if not isinstance(entry, dict):
                 continue
             new_item_data = self._sanitize_clipboard_structure(entry)
@@ -4732,9 +5089,12 @@ class DisplayMapController:
             item_type = new_item_data.get("type", "token")
 
             if item_type == "token":
+                # Handle the branch where item_type == 'token'.
                 image_path = new_item_data.get("image_path")
                 if image_path:
+                    # Continue with this path when image path is set.
                     try:
+                        # Keep paste item resilient if this step fails.
                         resolved_path = _resolve_campaign_path(image_path)
                         if not resolved_path or not os.path.exists(resolved_path):
                             raise FileNotFoundError(resolved_path or image_path)
@@ -4754,6 +5114,7 @@ class DisplayMapController:
                 new_item_data.pop("hover_label", None)
                 new_item_data.pop("hover_bbox", None)
             elif item_type == "marker":
+                # Handle the branch where item_type == 'marker'.
                 new_item_data.setdefault("text", "New Marker")
                 new_item_data.setdefault("description", "Marker description")
                 new_item_data.setdefault("border_color", "#00ff00")
@@ -4788,11 +5149,13 @@ class DisplayMapController:
         self._set_selection(pasted_items)
 
     def _delete_item(self, item_to_delete):
+        """Delete item."""
         if not item_to_delete: return
         if item_to_delete.get("canvas_ids"):
             for cid in item_to_delete["canvas_ids"]:
                 if cid: self.canvas.delete(cid)
         if item_to_delete.get("type", "token") == "token":
+            # Handle the branch where item_to_delete.get('type', 'token') == 'token'.
             if item_to_delete.get("name_id"): self.canvas.delete(item_to_delete["name_id"])
             if item_to_delete.get("hp_canvas_ids"):
                 for hp_cid in item_to_delete["hp_canvas_ids"]:
@@ -4808,6 +5171,7 @@ class DisplayMapController:
             item_to_delete["hover_visible"] = False
             item_to_delete.pop("hover_bbox", None)
         elif item_to_delete.get("type") == "marker":
+            # Remove any transient marker editors before dropping the marker entry itself.
             entry_widget = item_to_delete.get("entry_widget")
             if entry_widget and entry_widget.winfo_exists():
                 entry_widget.destroy()
@@ -4822,7 +5186,9 @@ class DisplayMapController:
                 handle_widget.destroy()
         # Clean up fullscreen canvas artifacts if present
         if getattr(self, "fs_canvas", None):
+            # Mirror the deletion on the fullscreen canvas so both map views stay consistent.
             if item_to_delete.get("fs_canvas_ids"):
+                # Remove the fullscreen primitives that represent this item.
                 for fs_id in item_to_delete["fs_canvas_ids"]:
                     if fs_id:
                         try:
@@ -4831,6 +5197,7 @@ class DisplayMapController:
                             pass
                 del item_to_delete["fs_canvas_ids"]
             if item_to_delete.get("fs_cross_ids"):
+                # Clear any fullscreen crosshair overlays tied to the same marker.
                 for fs_id in item_to_delete["fs_cross_ids"]:
                     if fs_id:
                         try:
@@ -4846,6 +5213,7 @@ class DisplayMapController:
             self._hovered_marker = None
         self._persist_tokens(); self._update_canvas_images()
         try:
+            # Refresh mirrored views after the local token list changes.
             if getattr(self, 'fs_canvas', None) and self.fs_canvas.winfo_exists():
                 self._update_fullscreen_map()
             if getattr(self, '_web_server_thread', None):
@@ -4854,12 +5222,15 @@ class DisplayMapController:
             pass
 
     def _bring_item_to_front(self, item):
+        """Internal helper for bring item to front."""
         if item in self.tokens:
+            # Reorder the backing list first so later redraws preserve the new z-order.
             self.tokens.remove(item); self.tokens.append(item)
             if item.get('canvas_ids'):
                 for cid_lift in item['canvas_ids']:
                     if cid_lift: self.canvas.lift(cid_lift)
             if item.get("type", "token") == "token":
+                # Lift token labels and combat overlays after the sprite itself.
                 if item.get('name_id'): self.canvas.lift(item['name_id'])
                 if item.get('hp_canvas_ids'):
                     for hp_cid_lift in item['hp_canvas_ids']:
@@ -4868,13 +5239,16 @@ class DisplayMapController:
                     for def_cid_lift in item['defense_canvas_ids']:
                         if def_cid_lift: self.canvas.lift(def_cid_lift)
             elif item.get("type") == "marker":
+                # Keep the marker popup above the canvas after the z-order change.
                 popup = item.get("description_popup")
                 if popup and popup.winfo_exists():
                     popup.lift()
             self._update_canvas_images(); self._persist_tokens()
 
     def _send_item_to_back(self, item):
+        """Internal helper for send item to back."""
         if item in self.tokens:
+            # Move the item to the back of the logical z-order before repainting the canvas.
             item_description = f"{item.get('type')} - {item.get('entity_id', item.get('canvas_ids'))}"
             print(f"[DEBUG] _send_item_to_back: Sending item to back: {item_description}")
             self.tokens.remove(item)
@@ -4885,6 +5259,7 @@ class DisplayMapController:
                 canvas_ids_to_manage.extend(c_id for c_id in item['canvas_ids'] if c_id)
             
             if item.get("type", "token"): # Tokens have additional elements
+                # Tokens carry overlay items that need to travel with the base sprite.
                 if item.get('name_id'):
                     canvas_ids_to_manage.append(item['name_id'])
                 if item.get('hp_canvas_ids'):
@@ -4896,6 +5271,7 @@ class DisplayMapController:
 
             for c_id in canvas_ids_to_manage:
                 if c_id:
+                    # Lower each canvas item first, then lift it above the base map image.
                     self.canvas.lower(c_id) # Send to absolute bottom first
                     if self.base_id: # If map base image exists
                         self.canvas.lift(c_id, self.base_id) # Then lift it just above the map base image
@@ -4904,7 +5280,9 @@ class DisplayMapController:
             self._persist_tokens()
             
     def _on_max_hp_menu_click(self, event, token):
+        """Handle max hp menu click."""
         if "max_hp_entry_widget" in token:
+            # Handle the branch where 'max_hp_entry_widget' is in token.
             self.canvas.delete(token["max_hp_entry_widget_id"])
             if hasattr(token["max_hp_entry_widget"], 'destroy'): token["max_hp_entry_widget"].destroy()
             del token["max_hp_entry_widget"], token["max_hp_entry_widget_id"]
@@ -4925,6 +5303,7 @@ class DisplayMapController:
         entry.bind("<Return>", lambda e: self._on_max_hp_entry_commit(e, token))
 
     def _on_max_hp_entry_commit(self, event, token):
+        """Handle max hp entry commit."""
         entry = token.get("max_hp_entry_widget"); entry_id = token.get("max_hp_entry_widget_id")
         if not entry: return
         raw = entry.get().strip()
@@ -4942,18 +5321,22 @@ class DisplayMapController:
         self.canvas.itemconfigure(tid, state="normal", text=f"{new_max}")
         
     def _on_hp_double_click(self, event, token):
+        """Handle hp double click."""
         for attr in ("_zoom_after_id", "_zoom_final_after_id"):
+            # Process each attr from ('_zoom_after_id', '_zoom_final_after_id').
             zid = getattr(self, attr, None)
             if not zid:
                 setattr(self, attr, None)
                 continue
             try:
+                # Keep on hp double click resilient if this step fails.
                 self.canvas.after_cancel(zid)
             except tk.TclError:
                 pass
             finally:
                 setattr(self, attr, None)
         if "hp_entry_widget" in token:
+            # Handle the branch where 'hp_entry_widget' is in token.
             self.canvas.delete(token["hp_entry_widget_id"])
             if hasattr(token["hp_entry_widget"], 'destroy'): token["hp_entry_widget"].destroy()
             del token["hp_entry_widget"], token["hp_entry_widget_id"]
@@ -4979,10 +5362,12 @@ class DisplayMapController:
         entry.bind("<Return>", lambda e: self._on_hp_entry_commit(e, token))
 
     def _on_hp_entry_commit(self, event, token):
+        """Handle hp entry commit."""
         entry = token.get("hp_entry_widget"); entry_id = token.get("hp_entry_widget_id")
         if not entry: return
         raw = entry.get().strip()
         try:
+            # Keep on hp entry commit resilient if this step fails.
             if raw.startswith(("+", "-")): new_hp = token["hp"] + int(raw)
             else: new_hp = int(raw)
         except ValueError: new_hp = token["hp"]
@@ -4998,9 +5383,12 @@ class DisplayMapController:
         fill_color_hp = 'red' if new_hp/max_hp < 0.25 else 'green'
         self.canvas.itemconfig(cid, fill=fill_color_hp)
         
-    def on_resize(self): self._update_canvas_images()
+    def on_resize(self):
+        """Refresh the canvas images after the view size changes."""
+        self._update_canvas_images()
 
     def on_zoom(self, event):
+        """Handle zoom."""
         xw = (event.x - self.pan_x) / self.zoom; yw = (event.y - self.pan_y) / self.zoom
         delta = event.delta / 120; zoom_factor = 1 + (ZOOM_STEP * delta if ZOOM_STEP > 0 else 0.1 * delta)
         self.zoom = max(MIN_ZOOM, min(MAX_ZOOM, self.zoom * zoom_factor))
@@ -5008,6 +5396,7 @@ class DisplayMapController:
         zid = getattr(self, "_zoom_after_id", None)
         if zid:
             try:
+                # Keep on zoom resilient if this step fails.
                 self.canvas.after_cancel(zid)
             except tk.TclError:
                 pass
@@ -5019,6 +5408,7 @@ class DisplayMapController:
         final_zid = getattr(self, "_zoom_final_after_id", None)
         if final_zid:
             try:
+                # Keep on zoom resilient if this step fails.
                 self.canvas.after_cancel(final_zid)
             except tk.TclError:
                 pass
@@ -5029,6 +5419,7 @@ class DisplayMapController:
         self._zoom_final_after_id = self.canvas.after(300, lambda: self._perform_zoom(final=True))
 
     def save_map(self):
+        """Save map."""
         abs_masks_dir = Path(MASKS_DIR).resolve(); abs_masks_dir.mkdir(parents=True, exist_ok=True)
         if not self.current_map or "Image" not in self.current_map: print("Error: Current map or map image not set. Cannot save mask."); return
         img_name = os.path.basename(self.current_map["Image"]); base, _ = os.path.splitext(img_name)
@@ -5048,6 +5439,7 @@ class DisplayMapController:
         })
         all_maps = list(self._maps.values()); self.maps.save_items(all_maps)
         try:
+            # Keep map resilient if this step fails.
             if getattr(self, 'fs', None) and self.fs.winfo_exists() and \
                getattr(self, 'fs_canvas', None) and self.fs_canvas.winfo_exists(): self._update_fullscreen_map()
             if getattr(self, '_web_server_thread', None):
@@ -5055,11 +5447,13 @@ class DisplayMapController:
         except tk.TclError: pass
             
     def _on_drawing_tool_change(self, selected_tool: str):
+        """Handle drawing tool change."""
         self.drawing_mode = selected_tool.lower()
         print(f"Drawing mode changed to: {self.drawing_mode}")
         menu = getattr(self, "drawing_tool_menu", None)
         if menu:
             try:
+                # Keep on drawing tool change resilient if this step fails.
                 if menu.get() != selected_tool:
                     menu.set(selected_tool)
             except tk.TclError:
@@ -5073,28 +5467,34 @@ class DisplayMapController:
         self._update_shape_controls_visibility()
 
     def _on_shape_fill_mode_change(self, selected_mode: str):
+        """Handle shape fill mode change."""
         self.shape_is_filled = (selected_mode == "Filled")
         print(f"Shape fill mode changed to: {'Filled' if self.shape_is_filled else 'Border Only'}")
 
     def _on_pick_shape_fill_color(self):
+        """Handle pick shape fill color."""
         if not hasattr(self, 'current_shape_fill_color'): self.current_shape_fill_color = "#CCCCCC"
         # Pass self.canvas as parent
         result = colorchooser.askcolor(parent=self.canvas, color=self.current_shape_fill_color, title="Choose Shape Fill Color")
         if result and result[1]: self.current_shape_fill_color = result[1]; print(f"Shape fill color: {self.current_shape_fill_color}")
 
     def _on_pick_shape_border_color(self):
+        """Handle pick shape border color."""
         if not hasattr(self, 'current_shape_border_color'): self.current_shape_border_color = "#000000"
         # Pass self.canvas as parent
         result = colorchooser.askcolor(parent=self.canvas, color=self.current_shape_border_color, title="Choose Shape Border Color")
         if result and result[1]: self.current_shape_border_color = result[1]; print(f"Shape border color: {self.current_shape_border_color}")
 
     def _on_pick_whiteboard_color(self):
+        """Handle pick whiteboard color."""
         current_color = getattr(self, "whiteboard_color", "#FF0000")
         result = colorchooser.askcolor(parent=self.canvas, color=current_color, title="Choose Whiteboard Color")
         if result and result[1]:
+            # Handle the branch where result is set and result[1].
             self.whiteboard_color = result[1]
             ConfigHelper.set("Drawing", "whiteboard_color", self.whiteboard_color)
             try:
+                # Keep on pick whiteboard color resilient if this step fails.
                 if getattr(self, "whiteboard_color_button", None):
                     self.whiteboard_color_button.configure(fg_color=self.whiteboard_color)
                 if getattr(self, "text_color_button", None):
@@ -5103,6 +5503,7 @@ class DisplayMapController:
                 pass
 
     def _on_whiteboard_width_change(self, value):
+        """Handle whiteboard width change."""
         try:
             width_val = float(value)
         except Exception:
@@ -5117,6 +5518,7 @@ class DisplayMapController:
                 pass
 
     def _on_text_size_change(self, value):
+        """Handle text size change."""
         try:
             size_val = int(value)
         except Exception:
@@ -5125,6 +5527,7 @@ class DisplayMapController:
         ConfigHelper.set("Drawing", "text_size", self.text_size)
         options = list(getattr(self, "text_size_options", []))
         if self.text_size not in options:
+            # Handle the branch where text size is not in options.
             options.append(self.text_size)
             options = sorted(set(options))
             self.text_size_options = list(options)
@@ -5136,6 +5539,7 @@ class DisplayMapController:
                     pass
 
     def _on_eraser_radius_change(self, value):
+        """Handle eraser radius change."""
         try:
             radius = float(value)
         except Exception:
@@ -5150,11 +5554,13 @@ class DisplayMapController:
                 pass
 
     def _update_shape_controls_visibility(self):
+        """Update shape controls visibility."""
         shape_tool_active = self.drawing_mode in ["rectangle", "oval"]
         whiteboard_active = self.drawing_mode == "whiteboard"
         eraser_active = self.drawing_mode == "eraser"
         text_active = self.drawing_mode == "text"
         try:
+            # Keep shape controls visibility resilient if this step fails.
             shape_fill_label = getattr(self, 'shape_fill_label', None)
             shape_fill_mode_menu = getattr(self, 'shape_fill_mode_menu', None)
             shape_fill_color_button = getattr(self, 'shape_fill_color_button', None)
@@ -5205,6 +5611,7 @@ class DisplayMapController:
                 if shape_fill_color_button: shape_fill_color_button.pack(side="left", padx=(10,2), pady=8)
                 if shape_border_color_button: shape_border_color_button.pack(side="left", padx=2, pady=8)
             elif whiteboard_active:
+                # Continue with this path when whiteboard active is set.
                 shape_controls_row = getattr(self, "shape_controls_row", None)
                 if shape_controls_row:
                     shape_controls_row.pack_forget()
@@ -5235,6 +5642,7 @@ class DisplayMapController:
                 if eraser_controls_frame:
                     eraser_controls_frame.pack_forget()
             elif eraser_active:
+                # Continue with this path when eraser active is set.
                 shape_controls_row = getattr(self, "shape_controls_row", None)
                 if shape_controls_row:
                     shape_controls_row.pack_forget()
@@ -5265,6 +5673,7 @@ class DisplayMapController:
                     except Exception:
                         pass
             elif text_active:
+                # Continue with this path when text active is set.
                 shape_controls_row = getattr(self, "shape_controls_row", None)
                 if shape_controls_row:
                     shape_controls_row.pack_forget()
@@ -5367,8 +5776,10 @@ class DisplayMapController:
     select_map = select_map
 
     def _activate_graphical_resize(self, shape):
+        """Internal helper for activate graphical resize."""
         print(f"[DEBUG] _activate_graphical_resize called for shape: {shape.get('canvas_ids')}")
         if shape and shape.get("type") in ["rectangle", "oval"]:
+            # Handle the branch where shape is set and shape.get('type') is in ['rectangle', 'oval'].
             self._set_selection([shape])
             # Set the item for graphical edit mode *before* drawing handles
             self._graphical_edit_mode_item = shape
@@ -5380,6 +5791,7 @@ class DisplayMapController:
 
 
     def _draw_resize_handles(self, item):
+        """Internal helper for draw resize handles."""
         if not self.canvas or not self.canvas.winfo_exists(): return
         self._remove_resize_handles()
 
@@ -5403,6 +5815,7 @@ class DisplayMapController:
         ]
 
         for cx, cy, handle_tag_suffix in handle_defs:
+            # Process each (cx, cy, handle_tag_suffix) from handle_defs.
             handle_id = self.canvas.create_rectangle(
                 cx - hs, cy - hs, cx + hs, cy + hs,
                 fill=self._handle_fill, outline=self._handle_outline,
@@ -5422,6 +5835,7 @@ class DisplayMapController:
                                  self._on_resize_handle_release)
                                  
     def _remove_resize_handles(self):
+        """Remove resize handles."""
         if not self.canvas or not self.canvas.winfo_exists(): return
         for handle_id in self._resize_handles:
             try:
@@ -5438,6 +5852,7 @@ class DisplayMapController:
 
 
     def _on_resize_handle_press(self, event, handle_type):
+        """Handle resize handle press."""
         print(f"[DEBUG] _on_resize_handle_press: Attempting press on handle '{handle_type}' at ({event.x}, {event.y})")
         if not self._graphical_edit_mode_item:
             print("[DEBUG] _on_resize_handle_press: No graphical edit item.")
@@ -5477,6 +5892,7 @@ class DisplayMapController:
 
 
     def _on_resize_handle_move(self, event):
+        """Handle resize handle move."""
         if not self._active_resize_handle_info or not self.canvas.winfo_exists():
             # print(f"[DEBUG] Handle Move: No active info or canvas gone.")
             return
@@ -5508,11 +5924,13 @@ class DisplayMapController:
             new_y_world = info['original_pos_y_world'] + delta_y_world
 
         if new_width_world < min_dim_world:
+            # Handle the branch where new_width_world < min_dim_world.
             if 'w' in handle_type:
                  new_x_world -= (min_dim_world - new_width_world)
             new_width_world = min_dim_world
             
         if new_height_world < min_dim_world:
+            # Handle the branch where new_height_world < min_dim_world.
             if 'n' in handle_type:
                 new_y_world -= (min_dim_world - new_height_world)
             new_height_world = min_dim_world
@@ -5524,6 +5942,7 @@ class DisplayMapController:
         self._update_canvas_images()
 
     def _on_resize_handle_release(self, event):
+        """Handle resize handle release."""
         if not self._active_resize_handle_info:
             # print("[DEBUG] Handle Release: No active info.")
             return
@@ -5541,7 +5960,9 @@ class DisplayMapController:
 
     # --- Remote edit handlers ---
     def _iter_pc_tokens(self):
+        """Internal helper for iter PC tokens."""
         for token in getattr(self, "tokens", []) or []:
+            # Process each token from getattr(self, 'tokens', []) or [].
             if str(token.get("type", "token")).lower() != "token":
                 continue
             if str(token.get("entity_type", "")).upper() != "PC":
@@ -5549,6 +5970,7 @@ class DisplayMapController:
             yield token
 
     def _remote_checkpoint(self):
+        """Internal helper for remote checkpoint."""
         history = getattr(self, "_history", None)
         if history and hasattr(history, "checkpoint"):
             try:
@@ -5557,6 +5979,7 @@ class DisplayMapController:
                 pass
 
     def handle_remote_token_move(self, token_id: str, position):
+        """Handle handle remote token move."""
         try:
             x, y = float(position[0]), float(position[1])
         except Exception:
@@ -5564,6 +5987,7 @@ class DisplayMapController:
 
         matched = None
         for token in self._iter_pc_tokens():
+            # Process each token from _iter_pc_tokens().
             remote_id = token.get("remote_id") or token.get("entity_id")
             if remote_id and str(remote_id) == str(token_id):
                 matched = token
@@ -5584,8 +6008,10 @@ class DisplayMapController:
             pass
 
     def handle_remote_stroke(self, *, points, color: str, width: float):
+        """Handle handle remote stroke."""
         processed = []
         for pt in points:
+            # Process each pt from points.
             try:
                 px, py = float(pt[0]), float(pt[1])
             except Exception:
@@ -5613,6 +6039,7 @@ class DisplayMapController:
             pass
 
     def handle_remote_text(self, *, text: str, position, color: str, size: float, text_id: str | None = None):
+        """Handle handle remote text."""
         try:
             x, y = float(position[0]), float(position[1])
         except Exception:

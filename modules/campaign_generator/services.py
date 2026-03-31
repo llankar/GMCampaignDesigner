@@ -1,3 +1,5 @@
+"""Service helpers for campaign generator."""
+
 from __future__ import annotations
 
 from typing import Dict, List
@@ -1290,10 +1292,12 @@ def generate_distance(setting: str) -> str:
         return random.choice(seeds_map[setting])
     # Define units per setting
     if setting == "Sci‑Fi":
+        # Handle the branch where setting == 'Sci‑Fi'.
         units = ["hexes", "sectors", "parsecs", "light years", "galactic arms", "jumps"]
         num = random.randint(1, 20)
         return f"{num} {random.choice(units)} – A journey of {num} {units[0]} across the stars."
     elif setting == "Modern":
+        # Handle the branch where setting == 'Modern'.
         units = ["blocks", "miles", "days' drive", "hours' flight", "states", "countries"]
         num = random.randint(1, 50)
         return f"{num} {random.choice(units)} – Approximately {num} {units[0]} from here."
@@ -1368,6 +1372,7 @@ def generate_quest_item(setting: str) -> str:
 
 
 def _split_legacy_label(text: str) -> str:
+    """Internal helper for split legacy label."""
     for separator in (" – ", " — ", " - ", "–", "—"):
         if separator in text:
             return text.split(separator)[0].strip()
@@ -1408,6 +1413,7 @@ def build_scenario_export_payload(campaign: Dict[str, str]) -> dict:
     for sep in [" and then ", " and "]:
         if sep in region:
             for part in region.split(sep):
+                # Process each part from region.split(sep).
                 candidate = _split_legacy_label(part)
                 if candidate and candidate not in region_parts:
                     region_parts.append(candidate)
@@ -1415,6 +1421,7 @@ def build_scenario_export_payload(campaign: Dict[str, str]) -> dict:
     places = list(dict.fromkeys([place for place in places if place]))
     npcs = []
     for field in ["Key NPC", "Quest Giver"]:
+        # Process each field from ['Key NPC', 'Quest Giver'].
         value = campaign.get(field, "")
         name = _split_legacy_label(value)
         if name and name != value.strip():
@@ -1429,8 +1436,10 @@ def build_scenario_export_payload(campaign: Dict[str, str]) -> dict:
     }
 
 def append_scenario_to_json_file(campaign: Dict[str, str], filename: str) -> None:
+    """Append scenario to JSON file."""
     scenario = build_scenario_export_payload(campaign)
     try:
+        # Keep scenario to JSON file resilient if this step fails.
         with open(filename, "r", encoding="utf-8") as handle:
             existing = json.load(handle)
         if isinstance(existing, dict):

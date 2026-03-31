@@ -1,3 +1,4 @@
+"""Payload helpers for generic scene indicator."""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -26,13 +27,16 @@ _LINK_FIELD_ALIASES: tuple[str, ...] = (
 
 
 def _flatten_strings(value: Any) -> list[str]:
+    """Internal helper for flatten strings."""
     parsed = deserialize_possible_json(value)
     if isinstance(parsed, dict):
+        # Handle the branch where isinstance(parsed, dict).
         values: list[str] = []
         for item in parsed.values():
             values.extend(_flatten_strings(item))
         return values
     if isinstance(parsed, (list, tuple, set)):
+        # Handle the branch where isinstance(parsed, (list, tuple, set)).
         values: list[str] = []
         for item in parsed:
             values.extend(_flatten_strings(item))
@@ -44,12 +48,15 @@ def _flatten_strings(value: Any) -> list[str]:
 
 
 def _normalize_names(values: Iterable[str]) -> list[str]:
+    """Normalize names."""
     normalized: list[str] = []
     seen: set[str] = set()
     for raw in values:
+        # Process each raw from values.
         parts = [part.strip() for part in str(raw).split(",") if part.strip()]
         candidates = parts or [str(raw).strip()]
         for candidate in candidates:
+            # Process each candidate from candidates.
             lowered = candidate.lower()
             if not candidate or lowered in seen:
                 continue
@@ -59,6 +66,7 @@ def _normalize_names(values: Iterable[str]) -> list[str]:
 
 
 def _collect_names(scene_dict: dict[str, Any], field_name: str) -> list[str]:
+    """Collect names."""
     aliases = _NAME_FIELD_ALIASES.get(field_name, (field_name,))
     merged: list[str] = []
     for alias in aliases:
@@ -67,17 +75,20 @@ def _collect_names(scene_dict: dict[str, Any], field_name: str) -> list[str]:
 
 
 def _coerce_links(value: Any) -> list[dict[str, Any]]:
+    """Coerce links."""
     links: list[dict[str, Any]] = []
     if value is None:
         return links
 
     parsed = deserialize_possible_json(value)
     if isinstance(parsed, list):
+        # Handle the branch where isinstance(parsed, list).
         for item in parsed:
             links.extend(_coerce_links(item))
         return links
 
     if isinstance(parsed, dict):
+        # Handle the branch where isinstance(parsed, dict).
         payload = {k: deserialize_possible_json(v) for k, v in parsed.items()}
         target = None
         text = None
@@ -122,6 +133,7 @@ def _coerce_links(value: Any) -> list[dict[str, Any]]:
 
 
 def _merge_links(scene_dict: dict[str, Any]) -> list[dict[str, Any]]:
+    """Merge links."""
     merged: list[dict[str, Any]] = []
     for alias in _LINK_FIELD_ALIASES:
         merged.extend(_coerce_links(scene_dict.get(alias)))
@@ -129,6 +141,7 @@ def _merge_links(scene_dict: dict[str, Any]) -> list[dict[str, Any]]:
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for link in merged:
+        # Process each link from merged.
         target = str(link.get("target") or "").strip()
         if not target:
             continue
@@ -142,10 +155,12 @@ def _merge_links(scene_dict: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _collect_names_from_sections(body_text: str, section_key: str) -> list[str]:
+    """Collect names from sections."""
     parsed = parse_scene_body_sections(body_text)
     sections = parsed.get("sections") or []
     collected: list[str] = []
     for section in sections:
+        # Process each section from sections.
         if str(section.get("key") or "").lower() != section_key:
             continue
         items = section.get("items") or []
@@ -154,6 +169,7 @@ def _collect_names_from_sections(body_text: str, section_key: str) -> list[str]:
 
 
 def build_scene_indicator_payload(scene_dict: dict[str, Any], body_text: str) -> dict[str, Any]:
+    """Build scene indicator payload."""
     npcs = _collect_names(scene_dict, "NPCs")
     places = _collect_names(scene_dict, "Places")
     maps = _collect_names(scene_dict, "Maps")

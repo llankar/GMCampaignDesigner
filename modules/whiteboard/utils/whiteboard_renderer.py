@@ -1,3 +1,5 @@
+"""Utilities for whiteboard renderer."""
+
 import io
 from typing import List, Dict, Tuple, Any
 
@@ -17,9 +19,11 @@ DEFAULT_SIZE: Tuple[int, int] = (1920, 1080)
 
 
 def _resolve_size(size: Tuple[int, int]) -> Tuple[int, int]:
+    """Resolve size."""
     if not size:
         return DEFAULT_SIZE
     try:
+        # Keep size resilient if this step fails.
         width, height = int(size[0]), int(size[1])
         if width <= 0 or height <= 0:
             return DEFAULT_SIZE
@@ -41,6 +45,7 @@ def render_whiteboard_image(
     for_player: bool = False,
     zoom: float = 1.0,
 ) -> Image.Image:
+    """Render whiteboard image."""
     width, height = _resolve_size(size)
     zoom = max(0.05, float(zoom))
     screen_width = max(1, int(width * zoom))
@@ -52,6 +57,7 @@ def render_whiteboard_image(
     font_cache = font_cache or TextFontCache()
 
     def _scale_point(point: Tuple[float, float]) -> Tuple[float, float]:
+        """Internal helper for scale point."""
         return point[0] * zoom, point[1] * zoom
 
     if grid_enabled:
@@ -63,10 +69,12 @@ def render_whiteboard_image(
         )
 
     for item in items:
+        # Process each item from items.
         if for_player and normalize_layer(item.get("layer")) == WhiteboardLayer.GM.value:
             continue
         item_type = item.get("type")
         if item_type == "stroke":
+            # Handle the branch where item_type == 'stroke'.
             points = item.get("points") or []
             if len(points) < 2:
                 continue
@@ -78,6 +86,7 @@ def render_whiteboard_image(
                 flattened.extend([sx, sy])
             draw.line(flattened, fill=color, width=width_px, joint="miter")
         elif item_type == "text" and include_text:
+            # Continue with this path when item_type == 'text' and include text is set.
             text_value = item.get("text", "")
             pos = item.get("position") or (0, 0)
             color = item.get("color", DEFAULT_COLOR)
@@ -96,6 +105,7 @@ def render_whiteboard_image(
             except Exception:
                 draw.text(_scale_point(pos), text_value, fill=color, font=font)
         elif item_type == "stamp":
+            # Handle the branch where item_type == 'stamp'.
             asset_path = item.get("asset")
             if not asset_path:
                 continue
@@ -108,6 +118,7 @@ def render_whiteboard_image(
             except Exception:
                 continue
         elif item_type == "image":
+            # Handle the branch where item_type == 'image'.
             asset_key = item.get("asset") or item.get("asset_key")
             if not asset_key or not resolve_uploaded_asset(asset_key):
                 continue
@@ -134,9 +145,11 @@ def render_whiteboard_image(
 
 
 def render_png_bytes(items: List[Dict[str, Any]], size: Tuple[int, int] = DEFAULT_SIZE) -> bytes:
+    """Render png bytes."""
     img = render_whiteboard_image(items, size, font_cache=None)
     buffer = io.BytesIO()
     try:
+        # Keep png bytes resilient if this step fails.
         img.save(buffer, format="PNG")
         return buffer.getvalue()
     finally:

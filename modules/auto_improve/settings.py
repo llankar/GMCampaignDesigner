@@ -1,3 +1,5 @@
+"""Utilities for auto improve settings."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,6 +16,7 @@ class AutoImproveSettings:
 
     @classmethod
     def load(cls) -> "AutoImproveSettings":
+        """Load the operation."""
         return cls(
             agent_command=ConfigHelper.get("AutoImprove", "agent_command", fallback=cls.agent_command),
             validation_command=ConfigHelper.get("AutoImprove", "validation_command", fallback=cls.validation_command),

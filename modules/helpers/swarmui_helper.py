@@ -1,3 +1,5 @@
+"""Utilities for swarmui helper."""
+
 import os
 from modules.helpers.config_helper import ConfigHelper  # avoid circular import
 from modules.helpers.logging_helper import log_function, log_info, log_warning
@@ -7,12 +9,14 @@ log_module_import(__name__)
 
 @log_function
 def get_available_models():
+    """Return available models."""
     models_path = ConfigHelper.get(
         "Paths",
         "models_path",
         fallback=r"E:\SwarmUI\SwarmUI\Models\Stable-diffusion",
     )
     try:
+        # Keep available models resilient if this step fails.
         models = sorted(
             [
                 os.path.splitext(f)[0]

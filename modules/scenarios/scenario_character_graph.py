@@ -1,3 +1,5 @@
+"""Utilities for scenario character graph."""
+
 import copy
 import json
 import os
@@ -32,6 +34,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         *args,
         **kwargs,
     ):
+        """Initialize the ScenarioCharacterGraphEditor instance."""
         self._on_entity_added = on_entity_added
         self._on_entity_removed = on_entity_removed
         graph_path = _build_temporary_graph_path()
@@ -49,16 +52,19 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         self.load_graph_data(graph_data or {})
 
     def place_pending_entity(self, event):
+        """Handle place pending entity."""
         entity = self.pending_entity
         if not entity:
             return
         super().place_pending_entity(event)
         if callable(self._on_entity_added):
+            # Handle the branch where callable(_on_entity_added).
             name_value = entity.get("record", {}).get("Name")
             if name_value:
                 self._on_entity_added(entity.get("type"), name_value)
 
     def delete_node(self):
+        """Delete node."""
         tag = self.selected_node
         entity_info = self._get_node_entity_info(tag) if tag else None
         super().delete_node()
@@ -74,6 +80,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             self._on_entity_removed(entity_type, entity_name)
 
     def init_toolbar(self):
+        """Initialize toolbar."""
         toolbar = ctk.CTkFrame(self)
         toolbar.pack(fill="x", padx=5, pady=5)
 
@@ -117,21 +124,27 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         ).pack(side="left", padx=5)
 
     def _autosave_graph(self):
+        """Internal helper for autosave graph."""
         return
 
     def save_graph(self, path=None, show_message=True):
+        """Save graph."""
         return
 
     def _persist_link_to_entities(self, link):
+        """Persist link to entities."""
         super()._persist_link_to_entities(link)
 
     def _remove_link_from_entities(self, link):
+        """Remove link from entities."""
         super()._remove_link_from_entities(link)
 
     def _rebuild_links_from_entities(self):
+        """Internal helper for rebuild links from entities."""
         super()._rebuild_links_from_entities()
 
     def create_new_entity(self, entity_type):  # pragma: no cover - UI interaction
+        """Create new entity."""
         wrapper = self.entity_wrappers.get(entity_type)
         if not wrapper:
             messagebox.showerror("Unavailable", "This entity type is not available.")
@@ -139,6 +152,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
 
         template_key = "npcs" if entity_type == "npc" else "pcs"
         try:
+            # Keep new entity resilient if this step fails.
             template = load_template(template_key)
         except Exception as exc:
             log_exception(f"Failed to load template for {entity_type}: {exc}")
@@ -159,6 +173,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             return
 
         try:
+            # Keep new entity resilient if this step fails.
             wrapper.save_item(new_item)
         except Exception as exc:
             log_exception(f"Failed to save new {entity_type}: {exc}")
@@ -181,6 +196,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         self.canvas.bind("<Button-1>", self.place_pending_entity)
 
     def load_graph_data(self, graph_data):
+        """Load graph data."""
         for item in self.canvas.find_all():
             if "background" not in self.canvas.gettags(item):
                 self.canvas.delete(item)
@@ -202,10 +218,12 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         seen = set()
         tag_mapping = {}
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             if not isinstance(node, dict):
                 continue
             if "entity_type" not in node or "entity_name" not in node:
                 if "npc_name" in node:
+                    # Handle the branch where 'npc_name' is in node.
                     node["entity_type"] = "npc"
                     node["entity_name"] = node.pop("npc_name")
                 elif "pc_name" in node:
@@ -217,8 +235,10 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             original_tag = node.get("tag", base)
             tag = original_tag
             if original_tag in seen:
+                # Handle the branch where original tag is in seen.
                 index = 1
                 while f"{base}_{index}" in seen:
+                    # Keep looping while f'{base}_{index}' is in seen.
                     index += 1
                 tag = f"{base}_{index}"
             node["tag"] = tag
@@ -236,10 +256,12 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         }
 
         for link in self.graph.get("links", []):
+            # Process each link from graph.get('links', []).
             if not isinstance(link, dict):
                 continue
             if "node1_tag" not in link or "node2_tag" not in link:
                 if "npc_name1" in link and "npc_name2" in link:
+                    # Handle the branch where 'npc_name1' is in link and 'npc_name2' is in link.
                     link["node1_tag"] = f"npc_{link['npc_name1'].replace(' ', '_')}"
                     link["node2_tag"] = f"npc_{link['npc_name2'].replace(' ', '_')}"
                     link.pop("npc_name1", None)
@@ -265,6 +287,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
 
         max_index = 0
         for shape in self.graph.get("shapes", []):
+            # Process each shape from graph.get('shapes', []).
             tag = shape.get("tag", "")
             if tag.startswith("shape_") and tag.split("_")[-1].isdigit():
                 max_index = max(max_index, int(tag.split("_")[-1]))
@@ -283,6 +306,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         self.draw_graph()
 
     def export_graph_data(self):
+        """Export graph data."""
         export_graph = copy.deepcopy(self.graph)
         export_graph.setdefault("nodes", [])
         export_graph.setdefault("links", [])
@@ -290,6 +314,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         ensure_graph_tabs(export_graph)
 
         for node in export_graph["nodes"]:
+            # Process each node from export_graph['nodes'].
             if not isinstance(node, dict):
                 continue
             tag = node.get("tag")
@@ -312,8 +337,10 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         return export_graph
 
     def _merge_links_from_entities(self):
+        """Merge links from entities."""
         tag_lookup = {}
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -334,6 +361,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
         }
         new_links = []
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -345,6 +373,7 @@ class ScenarioCharacterGraphEditor(CharacterGraphEditor):
             if not record:
                 continue
             for link in self._normalize_links_list(record):
+                # Process each link from _normalize_links_list(record).
                 if not isinstance(link, dict):
                     continue
                 target_type = link.get("target_type")
@@ -375,6 +404,7 @@ def sync_scenario_graph_to_global(
     scenario_name,
     graph_path=DEFAULT_CHARACTER_GRAPH_PATH,
 ):
+    """Synchronize scenario graph to global."""
     if not isinstance(scenario_graph, dict):
         return False
     if not scenario_graph.get("nodes"):
@@ -398,6 +428,7 @@ def sync_scenario_graph_to_global(
         None,
     )
     if scenario_tab is None:
+        # Handle the branch where scenario tab is missing.
         scenario_tab = build_default_tab()
         scenario_tab["name"] = scenario_name
         scenario_tab["subsetDefinition"] = {
@@ -429,6 +460,7 @@ def build_scenario_graph_with_links(
     scenario_pcs,
     graph_path=DEFAULT_CHARACTER_GRAPH_PATH,
 ):
+    """Build scenario graph with links."""
     # Scenario graphs are isolated from the global character graph; only scenario data applies.
     base_graph = copy.deepcopy(scenario_graph) if isinstance(scenario_graph, dict) else {}
     base_graph.setdefault("nodes", [])
@@ -452,6 +484,7 @@ def build_scenario_graph_with_links(
 
     for entity_type, names in (("npc", scenario_npcs), ("pc", scenario_pcs)):
         for name in names or []:
+            # Process each name from names or [].
             clean_name = str(name or "").strip()
             if not clean_name:
                 continue
@@ -462,6 +495,7 @@ def build_scenario_graph_with_links(
             tag = base
             index = 1
             while tag in seen_tags:
+                # Keep looping while tag is in seen_tags.
                 tag = f"{base}_{index}"
                 index += 1
             node = {
@@ -485,6 +519,7 @@ def build_scenario_graph_with_links(
     }
     filtered_links = []
     for link in base_graph.get("links", []):
+        # Process each link from base_graph.get('links', []).
         if not isinstance(link, dict):
             continue
         node1_tag, node2_tag = _normalize_link_tags(link)
@@ -501,6 +536,7 @@ def build_scenario_graph_with_links(
 
 
 def _build_temporary_graph_path():
+    """Build temporary graph path."""
     campaign_dir = ConfigHelper.get_campaign_dir() or os.getcwd()
     graph_dir = os.path.join(campaign_dir, "graphs")
     os.makedirs(graph_dir, exist_ok=True)
@@ -508,6 +544,7 @@ def _build_temporary_graph_path():
 
 
 def _layout_new_scenario_nodes(base_graph, added_nodes):
+    """Internal helper for layout new scenario nodes."""
     if not added_nodes:
         return
     spacing_x = 240
@@ -518,6 +555,7 @@ def _layout_new_scenario_nodes(base_graph, added_nodes):
 
     used_cells = set()
     for node in base_graph.get("nodes", []):
+        # Process each node from base_graph.get('nodes', []).
         if not isinstance(node, dict):
             continue
         if node in added_nodes:
@@ -532,7 +570,9 @@ def _layout_new_scenario_nodes(base_graph, added_nodes):
 
     next_index = 0
     for node in added_nodes:
+        # Process each node from added_nodes.
         while True:
+            # Keep looping while True.
             col = next_index % columns
             row = next_index // columns
             next_index += 1
@@ -544,8 +584,10 @@ def _layout_new_scenario_nodes(base_graph, added_nodes):
 
 
 def _infer_shape_counter(graph):
+    """Internal helper for infer shape counter."""
     max_index = 0
     for shape in graph.get("shapes", []):
+        # Process each shape from graph.get('shapes', []).
         if not isinstance(shape, dict):
             continue
         tag = shape.get("tag", "")
@@ -555,14 +597,17 @@ def _infer_shape_counter(graph):
 
 
 def _dedupe_links(base_graph, incoming_links):
+    """Internal helper for dedupe links."""
     existing = set()
     for link in base_graph.get("links", []):
+        # Process each link from base_graph.get('links', []).
         if not isinstance(link, dict):
             continue
         existing.add(_link_key(link))
 
     merged = []
     for link in incoming_links or []:
+        # Process each link from incoming_links or [].
         if not isinstance(link, dict):
             continue
         key = _link_key(link)
@@ -574,6 +619,7 @@ def _dedupe_links(base_graph, incoming_links):
 
 
 def _link_key(link):
+    """Internal helper for link key."""
     return (
         link.get("node1_tag"),
         link.get("node2_tag"),
@@ -583,6 +629,7 @@ def _link_key(link):
 
 
 def _entity_link_key(link):
+    """Internal helper for entity link key."""
     node1_tag = link.get("node1_tag")
     node2_tag = link.get("node2_tag")
     sorted_tags = tuple(sorted((node1_tag, node2_tag)))
@@ -595,10 +642,12 @@ def _entity_link_key(link):
 
 
 def _normalize_link_tags(link):
+    """Normalize link tags."""
     node1_tag = link.get("node1_tag")
     node2_tag = link.get("node2_tag")
     if not node1_tag or not node2_tag:
         if "npc_name1" in link and "npc_name2" in link:
+            # Handle the branch where 'npc_name1' is in link and 'npc_name2' is in link.
             node1_tag = f"npc_{link['npc_name1'].replace(' ', '_')}"
             node2_tag = f"npc_{link['npc_name2'].replace(' ', '_')}"
         elif "pc_name1" in link and "pc_name2" in link:

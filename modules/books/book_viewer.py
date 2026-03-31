@@ -30,6 +30,7 @@ class BookViewer(ctk.CTkToplevel):
     """A window capable of displaying PDF books with navigation and search."""
 
     def __init__(self, master, book_record: dict):
+        """Initialize the BookViewer instance."""
         super().__init__(master)
         self.book_record = dict(book_record or {})
         self.campaign_dir = ConfigHelper.get_campaign_dir()
@@ -52,6 +53,7 @@ class BookViewer(ctk.CTkToplevel):
         self.zoom = 1.25
 
         try:
+            # Keep init resilient if this step fails.
             self._document = open_document(self.attachment, campaign_dir=self.campaign_dir)
         except Exception as exc:
             log_warning(
@@ -83,6 +85,7 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _build_ui(self):
+        """Build UI."""
         controls = ctk.CTkFrame(self)
         controls.pack(fill="x", padx=10, pady=(10, 5))
 
@@ -142,6 +145,7 @@ class BookViewer(ctk.CTkToplevel):
         viewer_frame.grid_columnconfigure(1, weight=1)
 
         if self._signets:
+            # Continue with this path when signets is set.
             self.signet_panel = ctk.CTkFrame(viewer_frame)
             self.signet_panel.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 10))
             self.signet_panel.grid_rowconfigure(1, weight=1)
@@ -193,8 +197,11 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _collect_page_texts(self) -> list[str]:
+        """Collect page texts."""
         def normalize_page_number(value) -> int | None:
+            """Normalize page number."""
             try:
+                # Keep page number resilient if this step fails.
                 if isinstance(value, str) and not value.strip():
                     return None
                 if isinstance(value, (int, float)):
@@ -212,15 +219,18 @@ class BookViewer(ctk.CTkToplevel):
 
         if isinstance(pages_raw, list):
             for entry in pages_raw:
+                # Process each entry from pages_raw.
                 text_value: str | None = None
                 page_number: int | None = None
 
                 if isinstance(entry, str):
                     text_value = entry
                 elif isinstance(entry, dict):
+                    # Handle the branch where isinstance(entry, dict).
                     lowered_keys = {str(key).lower(): key for key in entry.keys()}
                     entry_type_key = lowered_keys.get("type")
                     if entry_type_key:
+                        # Continue with this path when entry type key is set.
                         entry_type = entry.get(entry_type_key)
                         if isinstance(entry_type, str) and entry_type.strip().lower() == "excerpt":
                             pages_marked_as_excerpt = True
@@ -234,6 +244,7 @@ class BookViewer(ctk.CTkToplevel):
 
                     for key in ("Page", "page", "PageNumber", "pagenumber", "Index", "index"):
                         if key in entry:
+                            # Handle the branch where key is in entry.
                             page_number = normalize_page_number(entry[key])
                             if page_number is not None:
                                 break
@@ -251,6 +262,7 @@ class BookViewer(ctk.CTkToplevel):
         highest_numbered_page = max(numbered_pages) if numbered_pages else 0
         record_texts: list[str] = []
         if numbered_pages:
+            # Continue with this path when numbered pages is set.
             target_count = self.page_count or highest_numbered_page
             for index in range(1, target_count + 1):
                 record_texts.append(numbered_pages.get(index, "").strip())
@@ -258,6 +270,7 @@ class BookViewer(ctk.CTkToplevel):
             record_texts = [text.strip() for text in sequential_texts]
 
         def normalize_to_page_count(texts: list[str]) -> list[str]:
+            """Normalize to page count."""
             normalized = list(texts)
             if self.page_count:
                 if len(normalized) < self.page_count:
@@ -267,10 +280,12 @@ class BookViewer(ctk.CTkToplevel):
             return normalized
 
         def covers_full_book(texts: list[str]) -> bool:
+            """Handle covers full book."""
             if not texts or pages_marked_as_excerpt:
                 return False
 
             if numbered_pages:
+                # Continue with this path when numbered pages is set.
                 required_pages = max(self.page_count or 0, highest_numbered_page)
                 if required_pages <= 0:
                     required_pages = len(numbered_pages)
@@ -303,7 +318,9 @@ class BookViewer(ctk.CTkToplevel):
         extracted = self._extract_page_texts_from_pdf()
         has_pdf_content = any(text.strip() for text in extracted)
         if has_pdf_content:
+            # Continue with this path when has PDF content is set.
             if record_texts and self.book_record.get("IndexStatus") == "indexed" and not pages_marked_as_excerpt:
+                # Handle this branch separately before continuing.
                 limit = min(len(record_texts), len(extracted))
                 for index in range(limit):
                     if record_texts[index]:
@@ -312,6 +329,7 @@ class BookViewer(ctk.CTkToplevel):
 
         transcript_pages = self._split_transcript_into_pages(self.book_record.get("ExtractedText"))
         if transcript_pages:
+            # Continue with this path when transcript pages is set.
             if self.page_count:
                 if len(transcript_pages) < self.page_count:
                     transcript_pages.extend([""] * (self.page_count - len(transcript_pages)))
@@ -325,6 +343,7 @@ class BookViewer(ctk.CTkToplevel):
         return extracted
 
     def _split_transcript_into_pages(self, transcript) -> list[str]:
+        """Internal helper for split transcript into pages."""
         if not isinstance(transcript, str):
             return []
 
@@ -337,6 +356,7 @@ class BookViewer(ctk.CTkToplevel):
                 return [part.strip() for part in cleaned.split(separator)]
 
         if self.page_count and self.page_count > 0:
+            # Handle the branch where page count is set and page_count > 0.
             approx_length = max(1, len(cleaned) // self.page_count)
             pages: list[str] = []
             start = 0
@@ -350,6 +370,7 @@ class BookViewer(ctk.CTkToplevel):
         return [cleaned]
 
     def _extract_page_texts_from_pdf(self) -> list[str]:
+        """Extract page texts from PDF."""
         texts: list[str] = []
         if not self._document:
             return texts
@@ -359,6 +380,7 @@ class BookViewer(ctk.CTkToplevel):
             return texts
 
         for index in range(total_pages):
+            # Process each index from range(total_pages).
             try:
                 page = self._document.load_page(index)
                 text = page.get_text("text") or ""
@@ -373,6 +395,7 @@ class BookViewer(ctk.CTkToplevel):
         return texts
 
     def _collect_signets(self) -> list[dict[str, int | str]]:
+        """Collect signets."""
         signets: list[dict[str, int | str]] = []
         if not self._document:
             return signets
@@ -387,6 +410,7 @@ class BookViewer(ctk.CTkToplevel):
             return signets
 
         for entry in toc:
+            # Process each entry from toc.
             if not isinstance(entry, (list, tuple)) or len(entry) < 3:
                 continue
             level, title, page = entry[:3]
@@ -412,9 +436,11 @@ class BookViewer(ctk.CTkToplevel):
         return signets
 
     def _render_current_page(self):
+        """Render current page."""
         if not self._document:
             return
         try:
+            # Keep current page resilient if this step fails.
             image = render_pdf_page_to_image(
                 self.attachment,
                 self.current_page,
@@ -446,6 +472,7 @@ class BookViewer(ctk.CTkToplevel):
         )
 
     def _center_image(self):
+        """Internal helper for center image."""
         bbox = self.canvas.bbox("page")
         if not bbox:
             return
@@ -463,14 +490,17 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _format_page_label(self) -> str:
+        """Format page label."""
         if self.page_count:
             return f"Page {self.current_page} / {self.page_count}"
         return f"Page {self.current_page}"
 
     def _format_zoom_label(self) -> str:
+        """Format zoom label."""
         return f"Zoom: {int(self.zoom * 100)}%"
 
     def go_to_page_from_entry(self):
+        """Handle go to page from entry."""
         try:
             page = int(self.page_var.get())
         except (TypeError, ValueError):
@@ -479,6 +509,7 @@ class BookViewer(ctk.CTkToplevel):
         self.go_to_page(page)
 
     def go_to_page(self, page: int):
+        """Handle go to page."""
         if page < 1:
             page = 1
         if self.page_count:
@@ -490,12 +521,15 @@ class BookViewer(ctk.CTkToplevel):
         self._render_current_page()
 
     def previous_page(self):
+        """Handle previous page."""
         self.go_to_page(self.current_page - 1)
 
     def next_page(self):
+        """Handle next page."""
         self.go_to_page(self.current_page + 1)
 
     def adjust_zoom(self, delta: float):
+        """Handle adjust zoom."""
         new_zoom = max(0.5, min(4.0, self.zoom + delta))
         if abs(new_zoom - self.zoom) < 1e-3:
             return
@@ -508,11 +542,13 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _extract_current_images(self):
+        """Extract current images."""
         if not self.attachment:
             messagebox.showwarning("Book Viewer", "This book does not have an attachment to process.")
             return
 
         try:
+            # Keep current images resilient if this step fails.
             results = extract_images_with_names(self.attachment, campaign_dir=self.campaign_dir)
         except Exception as exc:  # pragma: no cover - defensive catch
             log_warning(
@@ -541,9 +577,11 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _prepare_search_results(self, query: str):
+        """Internal helper for prepare search results."""
         stripped = query.strip()
         lowered = stripped.lower()
         if not lowered:
+            # Handle the branch where lowered is unavailable.
             self._search_cache = []
             self._search_query = ""
             self._search_query_display = ""
@@ -557,6 +595,7 @@ class BookViewer(ctk.CTkToplevel):
 
         matches: list[int] = []
         for idx, text in enumerate(self._page_texts):
+            # Process each (idx, text) from enumerate(_page_texts).
             try:
                 content = text.lower()
             except AttributeError:
@@ -578,6 +617,7 @@ class BookViewer(ctk.CTkToplevel):
         )
 
     def _advance_search(self, forward: bool):
+        """Internal helper for advance search."""
         query = self.search_var.get().strip()
         if not query:
             messagebox.showinfo("Book Viewer", "Enter text to search for.")
@@ -602,9 +642,11 @@ class BookViewer(ctk.CTkToplevel):
             self._refresh_search_highlight()
 
     def search_forward(self):
+        """Handle search forward."""
         self._advance_search(True)
 
     def search_backward(self):
+        """Handle search backward."""
         self._advance_search(False)
 
     # ------------------------------------------------------------------
@@ -612,6 +654,7 @@ class BookViewer(ctk.CTkToplevel):
     # ------------------------------------------------------------------
 
     def _format_signet_label(self, signet: dict[str, int | str]) -> str:
+        """Format signet label."""
         indent = "    " * (max(int(signet.get("level", 1)) - 1, 0))
         title = str(signet.get("title", "")).strip()
         page = signet.get("page", "")
@@ -619,6 +662,7 @@ class BookViewer(ctk.CTkToplevel):
         return f"{indent}{title}{page_display}".rstrip()
 
     def _highlight_current_signet(self):
+        """Internal helper for highlight current signet."""
         if not self._signets or not self._signet_listbox:
             return
 
@@ -633,6 +677,7 @@ class BookViewer(ctk.CTkToplevel):
 
         self._suppress_signet_events = True
         try:
+            # Keep highlight current signet resilient if this step fails.
             self._signet_listbox.selection_clear(0, "end")
             if target_index is not None:
                 self._signet_listbox.selection_set(target_index)
@@ -641,6 +686,7 @@ class BookViewer(ctk.CTkToplevel):
             self._suppress_signet_events = False
 
     def _activate_selected_signet(self):
+        """Internal helper for activate selected signet."""
         if (
             not self._signets
             or not self._signet_listbox
@@ -661,21 +707,25 @@ class BookViewer(ctk.CTkToplevel):
             self.go_to_page(page)
 
     def _on_signet_select(self, _event):
+        """Handle signet select."""
         if self._suppress_signet_events:
             return
         self._activate_selected_signet()
 
     def _on_signet_activate(self, _event=None):
+        """Handle signet activate."""
         if self._suppress_signet_events:
             return
         self._activate_selected_signet()
 
     def _on_mouse_wheel(self, event):
+        """Handle mouse wheel."""
         ctrl_mask = 0x0004
         num = getattr(event, "num", 0)
         delta = event.delta
 
         if event.state & ctrl_mask:
+            # Handle the branch where event.state & ctrl_mask.
             if delta > 0 or num == 4:
                 self.adjust_zoom(0.25)
             elif delta < 0 or num == 5:
@@ -688,11 +738,14 @@ class BookViewer(ctk.CTkToplevel):
             self.go_to_page(self.current_page + 1)
 
     def _on_shift_mouse_wheel(self, event):
+        """Handle shift mouse wheel."""
         self.canvas.xview_scroll(-1 if event.delta > 0 else 1, "units")
 
     def _on_close(self):
+        """Handle close."""
         if self._document is not None:
             try:
+                # Keep on close resilient if this step fails.
                 self._document.close()
             except Exception:
                 pass
@@ -704,10 +757,12 @@ class BookViewer(ctk.CTkToplevel):
         self.destroy()
 
     def _refresh_search_highlight(self):
+        """Refresh search highlight."""
         self._prepare_highlight_boxes_for_current_page()
         self._draw_highlight_overlays()
 
     def _prepare_highlight_boxes_for_current_page(self):
+        """Internal helper for prepare highlight boxes for current page."""
         self._highlight_boxes = []
         if not self._document:
             return
@@ -732,6 +787,7 @@ class BookViewer(ctk.CTkToplevel):
             flags |= getattr(fitz, attr, 0)
 
         try:
+            # Keep prepare highlight boxes for current page resilient if this step fails.
             results = page.search_for(self._search_query_display, flags=flags)
         except TypeError:
             results = page.search_for(self._search_query_display)
@@ -749,6 +805,7 @@ class BookViewer(ctk.CTkToplevel):
         ]
 
     def _draw_highlight_overlays(self):
+        """Internal helper for draw highlight overlays."""
         self.canvas.delete("highlight")
         if not self._highlight_boxes:
             return

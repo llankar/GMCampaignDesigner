@@ -1,3 +1,5 @@
+"""Panel for AI run window prompt response."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -12,6 +14,7 @@ from .raw_text_view import RawTextView
 
 class PromptResponsePanel(ctk.CTkFrame):
     def __init__(self, master) -> None:
+        """Initialize the PromptResponsePanel instance."""
         super().__init__(master)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -35,5 +38,6 @@ class PromptResponsePanel(ctk.CTkFrame):
         self._response_view.set_copy_label("Copy response")
 
     def render(self, state: AIRequestState) -> None:
+        """Render the operation."""
         self._prompt_view.render_text(format_ai_prompt_for_humans(state.prompt_text))
         self._response_view.render_text(format_ai_response_for_humans(state.response_text))

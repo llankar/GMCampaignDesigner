@@ -1,3 +1,5 @@
+"""Utilities for processing chunking."""
+
 from __future__ import annotations
 
 import re
@@ -16,6 +18,7 @@ class TextChunk:
 
 
 def _strip_code_fences(text: str) -> str:
+    """Internal helper for strip code fences."""
     if not text:
         return ""
     cleaned = text.strip()
@@ -26,9 +29,11 @@ def _strip_code_fences(text: str) -> str:
 
 
 def _chunk_words(words: List[str], start_offset: int, label_prefix: str, *, max_tokens: int) -> Iterable[TextChunk]:
+    """Internal helper for chunk words."""
     cursor = 0
     index = 1
     while cursor < len(words):
+        # Keep looping while cursor < len(words).
         window = words[cursor: cursor + max_tokens]
         start = start_offset + cursor
         end = start + len(window) - 1
@@ -44,6 +49,7 @@ def split_text_into_chunks(raw_text: str, *, max_tokens: int = 800, page_delimit
         return []
 
     if page_delimiter in raw_text:
+        # Handle the branch where page delimiter is in raw text.
         pages = raw_text.split(page_delimiter)
         chunks: List[TextChunk] = []
         word_offset = 0
@@ -75,6 +81,7 @@ def summarize_chunks(
     metadata: List[dict] = []
 
     for idx, chunk in enumerate(chunks, start=1):
+        # Process each (idx, chunk) from enumerate(chunks, start=1).
         log_info(
             f"Summarizing chunk {idx}/{len(chunks)} ({chunk.label})",
             func_name="scenario_chunking.summarize_chunks",
@@ -89,6 +96,7 @@ def summarize_chunks(
             f"Text:\n{chunk.text}"
         )
         try:
+            # Keep summarize chunks resilient if this step fails.
             summary = client.chat([
                 {"role": "system", "content": "Summarize RPG source text chunks succinctly. "},
                 {"role": "user", "content": prompt},

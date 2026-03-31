@@ -22,6 +22,7 @@ def bind_context_menu_recursively(root_widget, handler: ContextMenuHandler) -> N
 
     queue = deque([root_widget])
     while queue:
+        # Keep looping while queue.
         widget = queue.popleft()
         try:
             widget.bind("<Button-3>", handler, add="+")

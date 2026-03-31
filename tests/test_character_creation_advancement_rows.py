@@ -1,3 +1,5 @@
+"""Regression tests for character creation advancement rows."""
+
 import sys
 import tkinter as tk
 import types
@@ -5,21 +7,26 @@ import types
 
 class _DummyWidget:
     def __init__(self, master=None, *args, **kwargs):
+        """Initialize the _DummyWidget instance."""
         self.master = master
         self._children = []
         if hasattr(master, "_children"):
             master._children.append(self)
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def destroy(self):
+        """Handle destroy."""
         return None
 
     def winfo_children(self):
+        """Handle winfo children."""
         return list(self._children)
 
 
@@ -41,11 +48,13 @@ import modules.pcs.character_creation.view as view_module
 
 
 def test_advancement_choices_are_preserved_when_available_count_changes(monkeypatch):
+    """Verify that advancement choices are preserved when available count changes."""
     root = tk.Tcl()
 
     original_string_var = view_module.tk.StringVar
 
     def _string_var_with_tcl_master(*args, **kwargs):
+        """Internal helper for string var with tcl master."""
         kwargs.setdefault("master", root)
         return original_string_var(*args, **kwargs)
 

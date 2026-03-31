@@ -1,3 +1,5 @@
+"""Utilities for window components dynamic linked entities."""
+
 from __future__ import annotations
 
 from modules.generic.editor.window_context import load_entities_list

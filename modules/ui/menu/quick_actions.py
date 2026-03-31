@@ -1,3 +1,5 @@
+"""Utilities for menu quick actions."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -31,6 +33,7 @@ SYSTEM_ACTIONS = (
 
 
 def _bind_actions(app, items: tuple[QuickActionSpec, ...]) -> list[QuickActionSpec]:
+    """Bind actions."""
     bound: list[QuickActionSpec] = []
     for item in items:
         bound.append(
@@ -46,8 +49,10 @@ def _bind_actions(app, items: tuple[QuickActionSpec, ...]) -> list[QuickActionSp
 
 
 def build_primary_quick_actions(app) -> list[QuickActionSpec]:
+    """Build primary quick actions."""
     return _bind_actions(app, PRIMARY_ACTIONS)
 
 
 def build_system_quick_actions(app) -> list[QuickActionSpec]:
+    """Build system quick actions."""
     return _bind_actions(app, SYSTEM_ACTIONS)

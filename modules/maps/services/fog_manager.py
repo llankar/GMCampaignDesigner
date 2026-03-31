@@ -1,3 +1,5 @@
+"""Management helpers for map fog."""
+
 from PIL import ImageDraw, Image, ImageTk
 from modules.helpers.logging_helper import log_module_import
 
@@ -23,6 +25,7 @@ def _set_fog(self, mode):
         updater()
 
     if new_mode not in _RECTANGLE_FOG_MODES:
+        # Handle the branch where new mode is not in rectangle fog modes.
         reset_preview = getattr(self, "_clear_fog_rectangle_preview", None)
         if callable(reset_preview):
             reset_preview()
@@ -63,10 +66,12 @@ def apply_fog_rectangle(self, bounds, mode):
     draw.rectangle((left, top, right, bottom), fill=draw_color)
 
 def clear_fog(self):
+    """Clear fog."""
     self.mask_img = Image.new("RGBA", self.base_img.size, (0,0,0,0))
     self._update_canvas_images()
 
 def reset_fog(self):
+    """Reset fog."""
     self.mask_img = Image.new("RGBA", self.base_img.size, (0, 0, 0, 128))
     self._update_canvas_images()
 

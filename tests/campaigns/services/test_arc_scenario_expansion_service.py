@@ -1,3 +1,5 @@
+"""Regression tests for arc scenario expansion service."""
+
 import pytest
 
 from modules.campaigns.services.ai import (
@@ -9,33 +11,40 @@ from modules.campaigns.services.ai import (
 
 class _FakeAIClient:
     def __init__(self, response):
+        """Initialize the _FakeAIClient instance."""
         self.response = response
         self.messages = None
 
     def chat(self, messages):
+        """Handle chat."""
         self.messages = messages
         return self.response
 
 
 class _RetryingFakeAIClient:
     def __init__(self, responses):
+        """Initialize the _RetryingFakeAIClient instance."""
         self.responses = list(responses)
         self.calls: list[list[dict[str, str]]] = []
 
     def chat(self, messages):
+        """Handle chat."""
         self.calls.append(list(messages))
         return self.responses.pop(0)
 
 
 class _FakeScenarioWrapper:
     def __init__(self, items=None):
+        """Initialize the _FakeScenarioWrapper instance."""
         self.items = list(items or [])
         self.saved_items: list[dict] = []
 
     def load_items(self):
+        """Load items."""
         return list(self.items)
 
     def save_item(self, item, *, key_field=None, original_key_value=None):
+        """Save item."""
         self.saved_items.append(
             {
                 **dict(item),
@@ -45,10 +54,12 @@ class _FakeScenarioWrapper:
         )
 
     def save_items(self, items, *, replace=True):
+        """Save items."""
         self.saved_items = [dict(item) for item in items]
 
 
 def test_arc_scenario_expansion_accepts_structured_playable_scenes():
+    """Verify that arc scenario expansion accepts structured playable scenes."""
     ai_client = _FakeAIClient(
         """
         {
@@ -143,6 +154,7 @@ def test_arc_scenario_expansion_accepts_structured_playable_scenes():
 
 
 def test_arc_scenario_expansion_requires_linked_scenarios():
+    """Verify that arc scenario expansion requires linked scenarios."""
     service = ArcScenarioExpansionService(_FakeAIClient('{"arcs": []}'))
 
     with pytest.raises(ArcScenarioExpansionValidationError) as exc:
@@ -163,6 +175,7 @@ def test_arc_scenario_expansion_requires_linked_scenarios():
 
 
 def test_arc_scenario_expansion_generates_exactly_two_scenarios_per_arc():
+    """Verify that arc scenario expansion generates exactly two scenarios per arc."""
     ai_client = _FakeAIClient(
         """
         {
@@ -230,6 +243,7 @@ def test_arc_scenario_expansion_generates_exactly_two_scenarios_per_arc():
 
 
 def test_arc_scenario_expansion_retries_when_first_response_has_trailing_commentary():
+    """Verify that arc scenario expansion retries when first response has trailing commentary."""
     ai_client = _RetryingFakeAIClient(
         [
             """
@@ -291,6 +305,7 @@ def test_arc_scenario_expansion_retries_when_first_response_has_trailing_comment
 
 
 def test_arc_scenario_expansion_prompt_includes_existing_entity_catalog():
+    """Verify that arc scenario expansion prompt includes existing entity catalog."""
     ai_client = _FakeAIClient(
         """
         {
@@ -375,6 +390,7 @@ def test_arc_scenario_expansion_prompt_includes_existing_entity_catalog():
 
 
 def test_arc_scenario_expansion_accepts_stringified_arcs_payload():
+    """Verify that arc scenario expansion accepts stringified arcs payload."""
     ai_client = _FakeAIClient(
         """
         {
@@ -402,6 +418,7 @@ def test_arc_scenario_expansion_accepts_stringified_arcs_payload():
 
 
 def test_arc_scenario_expansion_accepts_wrapped_capitalized_arcs_payload():
+    """Verify that arc scenario expansion accepts wrapped capitalized arcs payload."""
     ai_client = _FakeAIClient(
         """
         {
@@ -461,6 +478,7 @@ def test_arc_scenario_expansion_accepts_wrapped_capitalized_arcs_payload():
 
 
 def test_arc_scenario_expansion_backfills_missing_entity_creation_records():
+    """Verify that arc scenario expansion backfills missing entity creation records."""
     ai_client = _FakeAIClient(
         """
         {
@@ -534,6 +552,7 @@ def test_arc_scenario_expansion_backfills_missing_entity_creation_records():
 
 
 def test_generated_scenario_persistence_handles_duplicate_titles_before_save():
+    """Verify that generated scenario persistence handles duplicate titles before save."""
     wrapper = _FakeScenarioWrapper(items=[{"Title": "Rainmarket Ultimatum"}])
     persistence = GeneratedScenarioPersistence(
         wrapper,
@@ -605,6 +624,7 @@ def test_generated_scenario_persistence_handles_duplicate_titles_before_save():
 
 
 def test_arc_scenario_expansion_rejects_missing_required_links():
+    """Verify that arc scenario expansion rejects missing required links."""
     ai_client = _FakeAIClient(
         """
         {
@@ -662,6 +682,7 @@ def test_arc_scenario_expansion_rejects_missing_required_links():
 
 
 def test_arc_scenario_expansion_auto_fixes_scene_entity_typos_from_db_catalog():
+    """Verify that arc scenario expansion auto fixes scene entity typos from DB catalog."""
     ai_client = _FakeAIClient(
         """
         {

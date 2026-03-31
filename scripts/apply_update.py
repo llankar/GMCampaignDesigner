@@ -1,3 +1,5 @@
+"""Script entry point for applying packaged updates."""
+
 from __future__ import annotations
 
 import argparse
@@ -14,6 +16,7 @@ ProgressCallback = Callable[[str, float], None]
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse args."""
     parser = argparse.ArgumentParser(description="Apply a staged GMCampaignDesigner update.")
     parser.add_argument("--source", required=True, help="Extracted release payload directory.")
     parser.add_argument("--target", required=True, help="Installation root to overwrite.")
@@ -31,6 +34,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def apply_update(args: argparse.Namespace, progress_cb: ProgressCallback | None = None) -> None:
+    """Apply update."""
     source = Path(args.source).resolve()
     target = Path(args.target).resolve()
     if not source.exists():
@@ -53,6 +57,7 @@ def apply_update(args: argparse.Namespace, progress_cb: ProgressCallback | None 
         shutil.rmtree(cleanup_root, ignore_errors=True)
 
     if args.restart_target:
+        # Continue with this path when restart target is set.
         _emit_progress(progress_cb, "Restarting application…", 0.97)
         try:
             subprocess.Popen([args.restart_target], close_fds=os.name != "nt")
@@ -63,6 +68,7 @@ def apply_update(args: argparse.Namespace, progress_cb: ProgressCallback | None 
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the module entry point."""
     try:
         args = parse_args(argv)
         apply_update(args, progress_cb=lambda message, fraction: print(f"[{fraction:.0%}] {message}"))
@@ -73,9 +79,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _wait_for_pid(pid: int, timeout: int, progress_cb: ProgressCallback | None = None) -> None:
+    """Internal helper for wait for pid."""
     timeout = max(timeout, 0)
     deadline = time.time() + timeout
     while time.time() < deadline:
+        # Keep looping while time.time() < deadline.
         if not _is_pid_alive(pid):
             _emit_progress(progress_cb, "Waiting for app to close…", 0.1)
             return
@@ -89,15 +97,18 @@ def _wait_for_pid(pid: int, timeout: int, progress_cb: ProgressCallback | None =
 
 
 def _is_pid_alive(pid: int) -> bool:
+    """Return whether pid alive."""
     if pid <= 0:
         return False
 
     if os.name == "nt":
+        # Handle the branch where os.name == 'nt'.
         win_status = _is_pid_alive_windows(pid)
         if win_status is not None:
             return win_status
 
     try:
+        # Keep is pid alive resilient if this step fails.
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
@@ -135,9 +146,11 @@ def _is_pid_alive_windows(pid: int) -> bool | None:
         return True
 
     if not handle:
+        # Handle the branch where handle is unavailable.
         ctypes.set_last_error(0)
         handle = kernel32.OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION, False, wintypes.DWORD(pid))
         if not handle:
+            # Handle the branch where handle is unavailable.
             last_error = ctypes.get_last_error()
             if last_error == 5:
                 return True
@@ -146,6 +159,7 @@ def _is_pid_alive_windows(pid: int) -> bool | None:
             return None
 
     try:
+        # Keep is pid alive windows resilient if this step fails.
         result = kernel32.WaitForSingleObject(handle, 0)
         if result == WAIT_TIMEOUT:
             return True
@@ -157,8 +171,10 @@ def _is_pid_alive_windows(pid: int) -> bool | None:
 
 
 def _count_files_to_copy(source: Path, preserved: Set[Tuple[str, ...]]) -> int:
+    """Internal helper for count files to copy."""
     total = 0
     for root, dirs, files in os.walk(source):
+        # Process each (root, dirs, files) from os.walk(source).
         root_path = Path(root)
         rel_root = root_path.relative_to(source)
         rel_root_parts = rel_root.parts
@@ -166,6 +182,7 @@ def _count_files_to_copy(source: Path, preserved: Set[Tuple[str, ...]]) -> int:
             dirs[:] = []
             continue
         for name in files:
+            # Process each name from files.
             rel_path = rel_root / name if rel_root_parts else Path(name)
             if _is_preserved(_normalize_parts(rel_path.parts), preserved):
                 continue
@@ -179,12 +196,14 @@ def _copy_release_tree(
     preserved: Set[Tuple[str, ...]],
     progress_cb: ProgressCallback | None = None,
 ) -> None:
+    """Copy release tree."""
     total_files = _count_files_to_copy(source, preserved)
     copied = 0
     copy_span_start = 0.1
     copy_span_size = 0.8
 
     for root, dirs, files in os.walk(source):
+        # Process each (root, dirs, files) from os.walk(source).
         root_path = Path(root)
         rel_root = root_path.relative_to(source)
         rel_root_parts = rel_root.parts
@@ -194,6 +213,7 @@ def _copy_release_tree(
         target_root = target / rel_root
         target_root.mkdir(parents=True, exist_ok=True)
         for name in files:
+            # Process each name from files.
             rel_path = rel_root / name if rel_root_parts else Path(name)
             if _is_preserved(_normalize_parts(rel_path.parts), preserved):
                 continue
@@ -226,17 +246,20 @@ def _copy_file_with_replace(src_file: Path, dest_file: Path) -> None:
 
 
 def _normalize_preserve_path(value: str) -> Tuple[str, ...]:
+    """Normalize preserve path."""
     parts = tuple(part for part in Path(value).parts if part not in (".", ""))
     return _normalize_parts(parts)
 
 
 def _normalize_parts(parts: Sequence[str]) -> Tuple[str, ...]:
+    """Normalize parts."""
     if os.name == "nt":
         return tuple(part.casefold() for part in parts)
     return tuple(parts)
 
 
 def _is_preserved(rel_parts: Sequence[str], preserved: Set[Tuple[str, ...]]) -> bool:
+    """Return whether preserved."""
     for entry in preserved:
         if rel_parts[: len(entry)] == entry:
             return True
@@ -244,9 +267,11 @@ def _is_preserved(rel_parts: Sequence[str], preserved: Set[Tuple[str, ...]]) -> 
 
 
 def _replace_with_retry(src: Path, dest: Path, attempts: int = 10, delay: float = 0.5) -> None:
+    """Internal helper for replace with retry."""
     last_exc: Exception | None = None
     for _ in range(max(1, attempts)):
         try:
+            # Keep replace with retry resilient if this step fails.
             os.replace(src, dest)
             return
         except PermissionError as exc:
@@ -265,6 +290,7 @@ def _replace_with_retry(src: Path, dest: Path, attempts: int = 10, delay: float 
 
 
 def _emit_progress(callback: ProgressCallback | None, message: str, fraction: float) -> None:
+    """Internal helper for emit progress."""
     if callback is None:
         return
     bounded = max(0.0, min(1.0, float(fraction)))

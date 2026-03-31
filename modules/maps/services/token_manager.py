@@ -1,3 +1,5 @@
+"""Management helpers for map token."""
+
 import ast
 import json
 import re
@@ -18,6 +20,7 @@ log_module_import(__name__)
 
 
 def _resolve_campaign_path(path: str) -> str:
+    """Resolve campaign path."""
     if not path:
         return ""
     normalized = str(path).strip()
@@ -29,6 +32,7 @@ def _resolve_campaign_path(path: str) -> str:
 
 
 def _campaign_relative_path(path: str) -> str:
+    """Internal helper for campaign relative path."""
     if not path:
         return ""
     if not os.path.isabs(path):
@@ -48,15 +52,18 @@ def _deserialize_tokens_field(raw_tokens: Any) -> Tuple[list, type]:
     if isinstance(raw_tokens, list):
         return raw_tokens, list
     if isinstance(raw_tokens, str):
+        # Handle the branch where isinstance(raw_tokens, str).
         trimmed = raw_tokens.strip()
         if not trimmed:
             return [], str
         try:
+            # Keep tokens field resilient if this step fails.
             parsed = json.loads(trimmed)
             if isinstance(parsed, list):
                 return parsed, str
         except json.JSONDecodeError:
             try:
+                # Keep tokens field resilient if this step fails.
                 parsed = ast.literal_eval(trimmed)
                 if isinstance(parsed, list):
                     return parsed, str
@@ -71,11 +78,14 @@ def _normalize_longtext_to_text(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
+        # Handle the branch where isinstance(value, str).
         text = value.strip()
         if not text:
             return ""
         if text.startswith("{") or text.startswith("["):
+            # Handle the branch where text.startswith('{') or text.startswith('[').
             try:
+                # Keep longtext to text resilient if this step fails.
                 parsed = json.loads(text)
                 normalized = _normalize_longtext_to_text(parsed)
                 if normalized:
@@ -83,6 +93,7 @@ def _normalize_longtext_to_text(value: Any) -> str:
             except (json.JSONDecodeError, TypeError):
                 pass
             try:
+                # Keep longtext to text resilient if this step fails.
                 parsed = ast.literal_eval(text)
                 normalized = _normalize_longtext_to_text(parsed)
                 if normalized:
@@ -91,12 +102,14 @@ def _normalize_longtext_to_text(value: Any) -> str:
                 pass
         return text
     if isinstance(value, dict):
+        # Handle the branch where isinstance(value, dict).
         candidate = value.get("text")
         normalized = _normalize_longtext_to_text(candidate)
         if normalized:
             return normalized
         parts = []
         for item in value.values():
+            # Process each item from value.values().
             part = _normalize_longtext_to_text(item)
             if part:
                 parts.append(part)
@@ -123,21 +136,26 @@ def _extract_first_integer(segment: str) -> Optional[int]:
     """Return the first integer not part of a dice expression in *segment*."""
 
     def _previous_non_space(idx: int) -> str:
+        """Internal helper for previous non space."""
         for pos in range(idx - 1, -1, -1):
+            # Process each pos from range(idx - 1, -1, -1).
             ch = segment[pos]
             if not ch.isspace():
                 return ch
         return ""
 
     def _next_non_space(idx: int) -> str:
+        """Internal helper for next non space."""
         length = len(segment)
         for pos in range(idx, length):
+            # Process each pos from range(idx, length).
             ch = segment[pos]
             if not ch.isspace():
                 return ch
         return ""
 
     for match in re.finditer(r"\d+", segment):
+        # Process each match from re.finditer('\\d+', segment).
         start, end = match.span()
         prev_ch = _previous_non_space(start)
         next_ch = _next_non_space(end)
@@ -168,15 +186,18 @@ def _extract_entity_hp_value(entity_type: str, entity_record: Any) -> Optional[i
 
     texts: List[str] = []
     for field in prioritized_fields:
+        # Process each field from prioritized_fields.
         raw_value = entity_record.get(field)
         normalized = _normalize_longtext_to_text(raw_value)
         if normalized:
             texts.append(normalized)
 
     for label in ("HP", "PV"):
+        # Process each label from ('HP', 'PV').
         pattern = _HP_LABEL_PATTERNS[label]
         for text in texts:
             for match in pattern.finditer(text):
+                # Process each match from pattern.finditer(text).
                 segment = text[match.end(): match.end() + 200]
                 value = _extract_first_integer(segment)
                 if value is not None:
@@ -204,6 +225,7 @@ def _extract_entity_defense_value(
 
     texts: List[str] = []
     for field in prioritized_fields:
+        # Process each field from prioritized_fields.
         raw_value = entity_record.get(field)
         normalized = _normalize_longtext_to_text(raw_value)
         if normalized:
@@ -212,6 +234,7 @@ def _extract_entity_defense_value(
     for label, pattern in _DEFENSE_LABEL_PATTERNS.items():
         for text in texts:
             for match in pattern.finditer(text):
+                # Process each match from pattern.finditer(text).
                 segment = text[match.end(): match.end() + 200]
                 value = _extract_first_integer(segment)
                 if value is not None:
@@ -233,6 +256,7 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
     any_updated = False
 
     for item in items:
+        # Process each item from items.
         raw_tokens = item.get("Tokens")
         tokens_list, original_type = _deserialize_tokens_field(raw_tokens)
         if not tokens_list:
@@ -241,10 +265,12 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
 
         item_updated = False
         for token in tokens_list:
+            # Process each token from tokens_list.
             if not isinstance(token, dict):
                 continue
             existing_path = token.get("image_path")
             if existing_path:
+                # Continue with this path when existing path is set.
                 resolved = _resolve_campaign_path(existing_path)
                 relative = _campaign_relative_path(resolved)
                 if relative and relative != existing_path:
@@ -252,8 +278,10 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
                     item_updated = True
 
             if token.get("type") == "marker":
+                # Handle the branch where token.get('type') == 'marker'.
                 existing_video = token.get("video_path")
                 if existing_video:
+                    # Continue with this path when existing video is set.
                     resolved_video = _resolve_campaign_path(existing_video)
                     relative_video = _campaign_relative_path(resolved_video)
                     if relative_video and relative_video != existing_video:
@@ -261,6 +289,7 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
                         item_updated = True
 
         if item_updated:
+            # Continue with this path when item updated is set.
             new_item = dict(item)
             if original_type is str:
                 new_item["Tokens"] = json.dumps(tokens_list)
@@ -280,6 +309,7 @@ def normalize_existing_token_paths(maps_wrapper) -> bool:
     return any_updated
 
 def add_token(self, path, entity_type, entity_name, entity_record=None):
+    """Handle add token."""
     img_path = _resolve_campaign_path(path)
     if not img_path or not os.path.exists(img_path):
         messagebox.showerror(
@@ -345,11 +375,13 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         self._update_web_display_map()
 
 def _on_token_press(self, event, token):
+    """Handle token press."""
     # mark this as the “selected” token for copy/paste
     self.selected_token = token
     token["drag_data"] = {"x": event.x, "y": event.y}
 
 def _on_token_move(self, event, token):
+    """Handle token move."""
     dx = event.x - token["drag_data"]["x"]
     dy = event.y - token["drag_data"]["y"]
     b_id, i_id = token["canvas_ids"]
@@ -372,6 +404,7 @@ def _on_token_move(self, event, token):
     token["position"] = ((sx - self.pan_x)/self.zoom, (sy - self.pan_y)/self.zoom)
 
 def _on_token_release(self, event, token):
+    """Handle token release."""
     token.pop("drag_data", None)
 
     # Update the hover bounding box once the drag completes so the info
@@ -383,6 +416,7 @@ def _on_token_release(self, event, token):
     except Exception:
         b_id = None
     if b_id:
+        # Continue with this path when b ID is set.
         try:
             bbox = self.canvas.bbox(b_id)
         except tk.TclError:
@@ -394,6 +428,7 @@ def _on_token_release(self, event, token):
 
     refresh = getattr(self, "_refresh_token_hover_popup", None)
     if callable(refresh) and token.get("hover_visible"):
+        # Handle the branch where callable(refresh) and token.get('hover_visible').
         refresh(token)
         show_fn = getattr(self, "_show_token_hover", None)
         if callable(show_fn):
@@ -430,6 +465,7 @@ def _copy_token(self, event=None):
     }
 
 def _paste_token(self, event=None):
+    """Internal helper for paste token."""
     c = getattr(self, "clipboard_token", None)
     if not c:
         return
@@ -448,6 +484,7 @@ def _paste_token(self, event=None):
     defense_value = c.get("defense_value")
     defense_label = c.get("defense_label", "")
     if defense_value is None and entity_record:
+        # Continue with this path when defense value is missing and entity record is set.
         defense_info = _extract_entity_defense_value(c.get("entity_type"), entity_record)
         if defense_info:
             defense_label, defense_value = defense_info
@@ -491,6 +528,7 @@ def _resize_token_dialog(self, token):
 
     # 1) update the token’s PIL image & stored size
     try:
+        # Keep resize token dialog resilient if this step fails.
         source_img = token.get("source_image")
         if source_img is None:
             resolved = _resolve_campaign_path(token.get("image_path"))
@@ -524,6 +562,7 @@ def _change_token_border_color(self, token):
     )
     # result == ( (r,g,b), "#rrggbb" ) or (None, None) if cancelled
     if result and result[1]:
+        # Handle the branch where result is set and result[1].
         new_color = result[1]
         token["border_color"] = new_color
         # update GM canvas border
@@ -549,11 +588,13 @@ def _delete_token(self, token):
 
     # 3) HP circle + text
     if "hp_canvas_ids" in token:
+        # Handle the branch where 'hp_canvas_ids' is in token.
         for cid in token["hp_canvas_ids"]:
             self.canvas.delete(cid)
         del token["hp_canvas_ids"]
 
     if "defense_canvas_ids" in token:
+        # Handle the branch where 'defense_canvas_ids' is in token.
         for cid in token["defense_canvas_ids"]:
             self.canvas.delete(cid)
         del token["defense_canvas_ids"]
@@ -583,11 +624,13 @@ def _delete_token(self, token):
     if getattr(self, "fs_canvas", None):
         # remove the border/image/Text on the second screen
         if "fs_canvas_ids" in token:
+            # Handle the branch where 'fs_canvas_ids' is in token.
             for cid in token["fs_canvas_ids"]:
                 self.fs_canvas.delete(cid)
             del token["fs_canvas_ids"]
         # **also** remove the red‐cross lines if they exist
         if "fs_cross_ids" in token:
+            # Handle the branch where 'fs_cross_ids' is in token.
             for cid in token["fs_cross_ids"]:
                 self.fs_canvas.delete(cid)
             del token["fs_cross_ids"]
@@ -606,6 +649,7 @@ def _persist_tokens(self):
 
     active_map_name = ""
     try:
+        # Keep tokens resilient if this step fails.
         if isinstance(getattr(self, "current_map", None), dict):
             active_map_name = str(self.current_map.get("Name", "")).strip()
     except Exception:
@@ -619,12 +663,14 @@ def _persist_tokens(self):
     preview_limit = 5
 
     def _format_position(x_val: Any, y_val: Any) -> str:
+        """Format position."""
         try:
             return f"({round(float(x_val), 2)}, {round(float(y_val), 2)})"
         except Exception:
             return "(<unknown>, <unknown>)"
 
     def _clean_label(raw: Any, *, default: str = "<unnamed>") -> str:
+        """Internal helper for clean label."""
         text = str(raw or "").strip()
         if not text:
             text = default
@@ -634,7 +680,9 @@ def _persist_tokens(self):
         return text
 
     try:
+        # Keep tokens resilient if this step fails.
         if isinstance(getattr(self, "current_map", None), dict):
+            # Handle the branch where isinstance(getattr(self, 'current_map', None), dict).
             hover_size = int(getattr(self, "hover_font_size", 14))
             if hover_size > 0:
                 self.current_map["hover_font_size"] = hover_size
@@ -642,6 +690,7 @@ def _persist_tokens(self):
         pass
     for t in self.tokens:
         try:
+            # Keep tokens resilient if this step fails.
             x, y = t["position"]
             item_type = t.get("type", "token")
 
@@ -652,6 +701,7 @@ def _persist_tokens(self):
             }
 
             if item_type == "token":
+                # Handle the branch where item_type == 'token'.
                 storage_path = _campaign_relative_path(t.get("image_path", ""))
                 item_data.update({
                     "entity_type":    t.get("entity_type", ""),
@@ -687,6 +737,7 @@ def _persist_tokens(self):
                     "text_size":    t.get("text_size", 24),
                 })
             elif item_type == "marker":
+                # Handle the branch where item_type == 'marker'.
                 entry_widget = t.get("entry_widget")
                 if entry_widget and entry_widget.winfo_exists():
                     t["text"] = entry_widget.get()
@@ -710,6 +761,7 @@ def _persist_tokens(self):
             counts_by_type[item_type] = counts_by_type.get(item_type, 0) + 1
 
             if item_type == "token" and len(token_preview) < preview_limit:
+                # Handle the branch where item_type == 'token' and len(token_preview) < preview_limit.
                 identifier = _clean_label(
                     item_data.get("entity_id") or item_data.get("entity_type"),
                     default="<token>",
@@ -727,6 +779,7 @@ def _persist_tokens(self):
             continue
 
     if getattr(self, "tokens", None):
+        # Handle the branch where getattr(self, 'tokens', None).
         map_label = active_map_name or "<unnamed>"
         counts_summary = {key: counts_by_type[key] for key in sorted(counts_by_type)}
         total_items = sum(counts_summary.values())
@@ -761,6 +814,7 @@ def _persist_tokens(self):
         # A background save is still running. Schedule a retry so the latest
         # state is eventually flushed instead of being silently dropped.
         try:
+            # Keep tokens resilient if this step fails.
             existing_retry = getattr(self, "_persist_retry_id", None)
             if existing_retry is not None:
                 # Replace any pending retry with the most recent state.
@@ -771,11 +825,13 @@ def _persist_tokens(self):
             pass
 
         try:
+            # Keep tokens resilient if this step fails.
             self._persist_retry_id = self.canvas.after(100, self._persist_tokens)
         except Exception:
             # Fallback: if we cannot schedule via Tk (e.g. canvas gone), try a
             # simple delayed retry in a new thread so the save still happens.
             def _delayed_retry():
+                """Internal helper for delayed retry."""
                 time.sleep(0.1)
                 try:
                     self._persist_tokens()
@@ -786,6 +842,7 @@ def _persist_tokens(self):
         return
 
     try:
+        # Keep tokens resilient if this step fails.
         maps_for_snapshot = list(self._maps.values())
     except Exception as snapshot_error:
         lock.release()
@@ -795,9 +852,12 @@ def _persist_tokens(self):
     # 2) Fire‐and‐forget the deep copy + disk write so the UI never blocks
 
     def _write_maps():
+        """Internal helper for write maps."""
         try:
+            # Keep write maps resilient if this step fails.
             all_maps_snapshot = []
             for m in maps_for_snapshot:
+                # Process each m from maps_for_snapshot.
                 try:
                     snapshot = copy.deepcopy(m)
                 except Exception:

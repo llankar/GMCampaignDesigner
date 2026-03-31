@@ -1,9 +1,11 @@
+﻿"""Form action handlers and persistence helpers for the generic editor window."""
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style
 
 
 class GenericEditorWindowFormActionsAndPersistence:
     def create_action_bar(self):
+        """Create action bar."""
         action_bar = ctk.CTkFrame(
             self.main_frame,
             fg_color=EDITOR_PALETTE["surface_alt"],
@@ -26,8 +28,10 @@ class GenericEditorWindowFormActionsAndPersistence:
         if self.model_wrapper.entity_type== 'creatures':
             ctk.CTkButton(action_bar, text='AI Generate Creature', command=self.ai_generate_full_creature, **primary_button_style()).pack(side='left', padx=8, pady=8)
     def _serialize_scene_states(self, states):
+        """Serialize scene states."""
         serialized = []
         for state in states:
+            # Process each state from states.
             if not isinstance(state, dict):
                 continue
             editor = state.get("editor")
@@ -38,6 +42,7 @@ class GenericEditorWindowFormActionsAndPersistence:
 
             title_entry = state.get("title_entry")
             if title_entry:
+                # Continue with this path when title entry is set.
                 title = title_entry.get().strip()
                 if title:
                     scene_payload["Title"] = title
@@ -53,6 +58,7 @@ class GenericEditorWindowFormActionsAndPersistence:
 
             links_payload = []
             for link_state in state.get("link_rows", []):
+                # Process each link_state from state.get('link_rows', []).
                 target_entry = link_state.get("target_entry")
                 text_entry = link_state.get("text_entry")
                 target_val = target_entry.get().strip() if target_entry else ""
@@ -71,6 +77,7 @@ class GenericEditorWindowFormActionsAndPersistence:
             serialized.append(scene_payload)
         return serialized
     def save(self):
+        """Save the operation."""
         if self.creation_mode and not self._has_required_name():
             messagebox.showerror(
                 "Missing Name",
@@ -78,12 +85,14 @@ class GenericEditorWindowFormActionsAndPersistence:
             )
             return
         for field in self.template["fields"]:
+            # Process each field from template['fields'].
             field_name = str(field.get("name", ""))
             field_type = str(field.get("type", "")).lower()
 
             if field_name in ["FogMaskPath", "Tokens", "token_size"]:
                 continue
             if field_type == "links":
+                # Handle the branch where field_type == 'links'.
                 if field_name not in self.item:
                     self.item[field_name] = []
                 continue
@@ -110,9 +119,11 @@ class GenericEditorWindowFormActionsAndPersistence:
                 else:
                     self.item[field_name] = data
             elif field_type == "list":
+                # Handle the branch where field_type == 'list'.
                 values = []
                 if isinstance(widget, list):
                     for entry in widget:
+                        # Process each entry from widget.
                         if hasattr(entry, "get"):
                             raw = entry.get()
                         else:
@@ -120,11 +131,13 @@ class GenericEditorWindowFormActionsAndPersistence:
                         if raw:
                             values.append(raw)
                 elif hasattr(widget, "get"):
+                    # Handle the branch where hasattr(widget, 'get').
                     raw = widget.get()
                     if raw:
                         values.append(raw)
 
                 if field_name == "Tags":
+                    # Handle the branch where field_name == 'Tags'.
                     tags = []
                     for value in values:
                         tags.extend(
@@ -134,13 +147,16 @@ class GenericEditorWindowFormActionsAndPersistence:
                 else:
                     self.item[field_name] = values
             elif field_type == "file":
+                # Handle the branch where field_type == 'file'.
                 file_info = self._file_field_info.get(field_name, {})
                 stored_path = file_info.get("path", "")
                 self.item[field_name] = self._campaign_relative_path(stored_path)
             elif field_type == "audio" or field_name.lower() == "audio":
+                # Handle the branch where field_type == 'audio' or field_name.lower() == 'audio'.
                 value = widget.get() if hasattr(widget, "get") else str(widget)
                 self.item[field_name] = self._campaign_relative_path(value)
             elif field_name == "Portrait":
+                # Handle the branch where field_name == 'Portrait'.
                 portrait_paths = getattr(self, "portrait_paths", [])
                 normalized = [
                     self._campaign_relative_path(path)
@@ -171,12 +187,14 @@ class GenericEditorWindowFormActionsAndPersistence:
         self.saved = True
         self.destroy()
     def _has_required_name(self):
+        """Return whether required name."""
         key_field = None
         template_fields = None
         if isinstance(self.template, dict):
             template_fields = self.template.get("fields")
         if isinstance(template_fields, list) and template_fields:
             for field in template_fields:
+                # Process each field from template_fields.
                 if not isinstance(field, dict):
                     continue
                 field_name = field.get("name")

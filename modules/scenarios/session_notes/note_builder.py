@@ -1,9 +1,12 @@
+"""Helpers for building notes."""
+
 from __future__ import annotations
 
 from datetime import datetime
 
 
 def _clean_text(value: object) -> str:
+    """Internal helper for clean text."""
     if value is None:
         return ""
     return " ".join(str(value).split())

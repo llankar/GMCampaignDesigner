@@ -1,3 +1,5 @@
+﻿"""Utilities for update helper."""
+
 from __future__ import annotations
 
 import os
@@ -55,15 +57,19 @@ _VERSION_PATTERN = re.compile(r"(\d+(?:\.\d+)+)")
 
 
 def read_installed_version(path: Path = _VERSION_FILE) -> Version:
+    """Read the installed application version from the version manifest."""
     if not path.exists():
         raise RuntimeError(f"version manifest not found: {path}")
 
     text = path.read_text(encoding="utf-8", errors="ignore")
     for line in text.splitlines():
+        # Scan the manifest until a line exposes an embedded version marker.
         line = line.strip()
         if "FileVersion" in line or "ProductVersion" in line or line.startswith("filevers="):
+            # Only parse lines that are expected to carry a product version.
             digits = _extract_version_string(line)
             if digits:
+                # Stop at the first valid semantic version we can normalize.
                 try:
                     version = Version(digits)
                 except InvalidVersion as exc:
@@ -77,10 +83,12 @@ def read_installed_version(path: Path = _VERSION_FILE) -> Version:
 
 
 def _extract_version_string(line: str) -> Optional[str]:
+    """Extract version string."""
     match = _VERSION_PATTERN.search(line)
     if match:
         return match.group(1)
     if "filevers" in line or "prodvers" in line:
+        # Fall back to the tuple-style version syntax used by some manifests.
         digits = [token.strip() for token in line.split("(")[-1].split(")")[0].split(",") if token.strip().isdigit()]
         if digits:
             return ".".join(digits)
@@ -93,6 +101,7 @@ def check_for_update(
     preferred_asset: Optional[str] = None,
     session: Optional[requests.Session] = None,
 ) -> tuple[Version, Optional[UpdateCandidate]]:
+    """Return the installed version and the first newer matching release, if any."""
     current_version = read_installed_version()
     close_session = False
     if session is None:
@@ -102,6 +111,7 @@ def check_for_update(
     session.headers.setdefault("Accept", "application/vnd.github+json")
 
     try:
+        # Centralize request failures here so callers get one consistent update error path.
         response = session.get(_RELEASES_ENDPOINT, timeout=_REQUEST_TIMEOUT)
         response.raise_for_status()
     except Exception as exc:
@@ -119,6 +129,7 @@ def check_for_update(
         raise RuntimeError("Unexpected response payload from releases API")
 
     for release in releases:
+        # Walk the published releases until a compatible downloadable asset is found.
         if not isinstance(release, dict):
             continue
         if release.get("draft"):
@@ -189,6 +200,7 @@ def download_release_asset(
     session: Optional[requests.Session] = None,
     chunk_size: int = 1 << 20,
 ) -> Path:
+    """Download the selected release asset into the staging directory."""
     root = Path(staging_root)
     root.mkdir(parents=True, exist_ok=True)
     archive_path = root / candidate.asset_name
@@ -216,6 +228,7 @@ def download_release_asset(
     downloaded = 0
     with archive_path.open("wb") as handle:
         for chunk in response.iter_content(chunk_size=chunk_size):
+            # Process each chunk from response.iter_content(chunk_size=chunk_size).
             if not chunk:
                 continue
             handle.write(chunk)
@@ -239,6 +252,7 @@ def prepare_staging_area(
     progress_callback: Optional[ProgressCallback] = None,
     session: Optional[requests.Session] = None,
 ) -> tuple[Path, Path]:
+    """Download and extract an update payload into a temporary staging area."""
     staging_root = Path(tempfile.mkdtemp(prefix="gmcampaign_stage_"))
     archive_path = download_release_asset(
         candidate,
@@ -249,6 +263,7 @@ def prepare_staging_area(
     payload_root = staging_root / "payload"
     payload_root.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive_path) as archive:
+        # Keep this resource scoped to prepare staging area.
         members = archive.infolist()
         total = len(members) or 1
         for index, member in enumerate(members, start=1):
@@ -270,6 +285,7 @@ def launch_installer(
     preserve: Optional[Sequence[str]] = None,
     cleanup_root: Optional[Path | str | Sequence[Path | str]] = None,
 ) -> subprocess.Popen:
+    """Launch installer."""
     frozen = getattr(sys, "frozen", False)
 
     install_dir = Path(install_root) if install_root is not None else _PROJECT_ROOT
@@ -280,6 +296,7 @@ def launch_installer(
         else:
             cleanup_roots.extend(str(Path(entry)) for entry in cleanup_root)
     if frozen:
+        # Copy the frozen helper out of the install tree so it can update the running app.
         helper_path = Path(sys.executable).with_name(_FROZEN_INSTALL_HELPER_NAME)
         if not helper_path.exists():
             raise FileNotFoundError(f"Expected frozen installer helper at {helper_path}")
@@ -333,6 +350,7 @@ def launch_installer(
 
 
 def _emit_progress(callback: Optional[ProgressCallback], message: str, fraction: float) -> None:
+    """Internal helper for emit progress."""
     if callback:
         try:
             callback(message, max(0.0, min(1.0, float(fraction))))
@@ -341,6 +359,7 @@ def _emit_progress(callback: Optional[ProgressCallback], message: str, fraction:
 
 
 def _normalize_tag(tag: str) -> Version:
+    """Normalize tag."""
     candidate = tag.strip()
     if not candidate:
         raise RuntimeError("Release tag is empty")
@@ -350,6 +369,7 @@ def _normalize_tag(tag: str) -> Version:
 
 
 def _select_asset(assets: Sequence[dict], preferred_asset: Optional[str]) -> Optional[dict]:
+    """Select asset."""
     if not assets:
         return None
     if preferred_asset:
@@ -357,6 +377,7 @@ def _select_asset(assets: Sequence[dict], preferred_asset: Optional[str]) -> Opt
             if asset.get("name") == preferred_asset:
                 return asset
     for asset in assets:
+        # Process each asset from assets.
         name = (asset.get("name") or "").lower()
         if name.endswith(('.zip', '.tar.gz', '.tar.xz')):
             return asset
@@ -364,6 +385,7 @@ def _select_asset(assets: Sequence[dict], preferred_asset: Optional[str]) -> Opt
 
 
 def _collapse_root(root: Path) -> Path:
+    """Collapse root."""
     entries = [child for child in root.iterdir() if not child.name.startswith("__MACOSX")]
     if len(entries) == 1 and entries[0].is_dir():
         return entries[0]
@@ -393,6 +415,7 @@ def _copy_frozen_helper_dependencies(helper_path: Path, destination_root: Path) 
     # locked on Windows and prevents launching the updater.
     sidecar_prefix = f"{helper_path.name}."
     for entry in parent.iterdir():
+        # Process each entry from parent.iterdir().
         if entry == helper_path or entry.name == "_internal" or entry.is_dir():
             continue
         if entry.name.startswith(sidecar_prefix):

@@ -1,3 +1,5 @@
+"""Utilities for GM screen dashboard presenter."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -26,14 +28,17 @@ _FOCUS_TYPES = [
 
 
 def scenario_label(item: dict[str, Any]) -> str:
+    """Handle scenario label."""
     return coerce_text(item.get("Title") or item.get("Name") or "Scenario").strip() or "Scenario"
 
 
 def build_search_index(wrappers: dict[str, Any]) -> tuple[list[dict[str, str]], dict[str, int]]:
+    """Build search index."""
     index: list[dict[str, str]] = []
     entity_counts: dict[str, int] = {}
 
     for entity_type in _FOCUS_TYPES:
+        # Process each entity_type from _FOCUS_TYPES.
         wrapper = wrappers.get(entity_type)
         if wrapper is None:
             continue
@@ -46,6 +51,7 @@ def build_search_index(wrappers: dict[str, Any]) -> tuple[list[dict[str, str]], 
         label_key = _DEFAULT_ENTITY_LABELS.get(entity_type, "Name")
         valid_count = 0
         for item in items:
+            # Process each item from items.
             label = coerce_text((item or {}).get(label_key)).strip()
             if not label:
                 continue
@@ -60,6 +66,7 @@ def build_search_index(wrappers: dict[str, Any]) -> tuple[list[dict[str, str]], 
 
 
 def build_entity_picker_data(index: list[dict[str, str]]) -> dict[str, list[str]]:
+    """Build entity picker data."""
     grouped: dict[str, list[str]] = defaultdict(list)
     for item in index:
         grouped[item["entity_type"]].append(item["label"])
@@ -68,6 +75,7 @@ def build_entity_picker_data(index: list[dict[str, str]]) -> dict[str, list[str]
 
 
 def group_results(items: list[dict[str, str]]) -> dict[str, list[dict[str, str]]]:
+    """Group results."""
     grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
     for item in items:
         grouped[item["entity_type"]].append(item)

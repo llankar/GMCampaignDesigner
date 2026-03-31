@@ -83,6 +83,7 @@ def _default_pin_image_path() -> str:
 
     campaign_dir = ConfigHelper.get_campaign_dir()
     if campaign_dir:
+        # Continue with this path when campaign dir is set.
         campaign_pin = os.path.join(campaign_dir, "assets", "pin.png")
         if os.path.exists(campaign_pin):
             return os.path.normpath(campaign_pin)
@@ -108,6 +109,7 @@ class WorldMapPanel(ctk.CTkFrame):
     ZOOM_FACTOR = 1.1
 
     def __init__(self, master=None):
+        """Initialize the WorldMapPanel instance."""
         super().__init__(master)
         self.configure(fg_color="#0C0F1A")
 
@@ -176,6 +178,7 @@ class WorldMapPanel(ctk.CTkFrame):
         )
 
         if self.map_names:
+            # Continue with this path when map names is set.
             self.map_selector.configure(values=self.map_names)
             initial_map = self._resolve_initial_map()
             if initial_map:
@@ -194,6 +197,7 @@ class WorldMapPanel(ctk.CTkFrame):
     # Layout helpers
     # ------------------------------------------------------------------
     def _build_layout(self) -> None:
+        """Build layout."""
         build_world_map_toolbar(self)
 
         workspace = ctk.CTkFrame(self, fg_color="transparent")
@@ -372,6 +376,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self._tab_frames: dict[str, ctk.CTkFrame] = {}
         for name in ("Summary", "Notes", "Characters"):
+            # Process each name from ('Summary', 'Notes', 'Characters').
             if name == "Summary":
                 frame = ctk.CTkScrollableFrame(self.tab_content_container, fg_color="transparent")
             else:
@@ -390,6 +395,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._clear_inspector()
 
     def _toggle_plot_twist_panel(self) -> None:
+        """Toggle plot twist panel."""
         if self.plot_twist_panel_container.winfo_ismapped():
             self.plot_twist_panel_container.pack_forget()
             self.plot_twist_toggle.configure(text="Show")
@@ -398,14 +404,17 @@ class WorldMapPanel(ctk.CTkFrame):
             self.plot_twist_toggle.configure(text="Hide")
 
     def _on_inspector_tab_selected(self, tab_name: str) -> None:
+        """Handle inspector tab selected."""
         if not tab_name:
             return
         self._select_inspector_tab(tab_name)
 
     def _select_inspector_tab(self, tab_name: str) -> None:
+        """Select inspector tab."""
         if tab_name not in getattr(self, "_tab_frames", {}):
             return
         if self._active_tab == tab_name:
+            # Handle the branch where _active_tab == tab_name.
             frame = self._tab_frames[tab_name]
             if not frame.winfo_ismapped():
                 frame.pack(fill="both", expand=True)
@@ -417,6 +426,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._active_tab = tab_name
 
     def _clear_tab_contents(self, tab_name: str) -> None:
+        """Clear tab contents."""
         frame = getattr(self, "_tab_frames", {}).get(tab_name)
         if not frame:
             return
@@ -424,6 +434,7 @@ class WorldMapPanel(ctk.CTkFrame):
             child.destroy()
 
     def _render_tab_message(self, tab_name: str, message: str) -> None:
+        """Render tab message."""
         frame = getattr(self, "_tab_frames", {}).get(tab_name)
         if not frame:
             return
@@ -438,9 +449,11 @@ class WorldMapPanel(ctk.CTkFrame):
         ).pack(fill="x", padx=8, pady=(0, 12), anchor="w")
 
     def _load_world_map_store(self) -> dict:
+        """Load world map store."""
         if not os.path.exists(self.world_map_file):
             return {}
         try:
+            # Keep world map store resilient if this step fails.
             with open(self.world_map_file, 'r', encoding='utf-8') as fh:
                 data = json.load(fh)
         except Exception as exc:
@@ -450,19 +463,24 @@ class WorldMapPanel(ctk.CTkFrame):
         return maps if isinstance(maps, dict) else {}
 
     def _save_world_map_store(self) -> None:
+        """Save world map store."""
         payload = {'maps': self.world_maps}
         try:
+            # Keep world map store resilient if this step fails.
             with open(self.world_map_file, 'w', encoding='utf-8') as fh:
                 json.dump(payload, fh, ensure_ascii=False, indent=2)
         except Exception as exc:
             log_error(f"Failed to save world map store: {exc}", func_name="WorldMapWindow._save_world_map_store")
 
     def _seed_world_maps(self) -> None:
+        """Seed world maps."""
         changed = False
         for name, record in self.maps_wrapper_data.items():
+            # Process each (name, record) from maps_wrapper_data.items().
             if not name:
                 continue
             if name not in self.world_maps:
+                # Handle the branch where name is not in world maps.
                 image = record.get('Image', '') if isinstance(record, dict) else ''
                 self.world_maps[name] = {'image': image, 'tokens': []}
                 changed = True
@@ -478,10 +496,12 @@ class WorldMapPanel(ctk.CTkFrame):
             self._save_world_map_store()
 
     def _ensure_world_map_entry(self, map_name: str) -> dict | None:
+        """Ensure world map entry."""
         if not map_name:
             return None
         entry = self.world_maps.get(map_name)
         if not entry:
+            # Handle the branch where entry is unavailable.
             record = self.maps_wrapper_data.get(map_name, {})
             image = record.get('Image', '') if isinstance(record, dict) else ''
             entry = {'image': image, 'tokens': []}
@@ -493,6 +513,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return entry
 
     def _show_empty_state(self) -> None:
+        """Show empty state."""
         self.canvas.delete("all")
         self.canvas.create_text(
             self.canvas.winfo_width() // 2,
@@ -506,6 +527,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._update_map_tool_button_state()
 
     def _resolve_initial_map(self) -> str | None:
+        """Resolve initial map."""
         preferred_default = self._load_default_map_name()
         if preferred_default and preferred_default in self.map_names:
             return preferred_default
@@ -519,9 +541,11 @@ class WorldMapPanel(ctk.CTkFrame):
         return fallback_map
 
     def _load_default_map_name(self) -> str | None:
+        """Load default map name."""
         preferred = None
         cfg = ConfigHelper.load_campaign_config()
         try:
+            # Keep default map name resilient if this step fails.
             if cfg and cfg.has_section("WorldMap") and cfg.has_option("WorldMap", "default_map"):
                 preferred = cfg.get("WorldMap", "default_map")
         except Exception:
@@ -532,6 +556,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return self._default_map_name
 
     def _persist_default_map(self, map_name: str | None) -> None:
+        """Persist default map."""
         self._default_map_name = map_name or None
         ConfigHelper.set(
             "WorldMap",
@@ -553,12 +578,14 @@ class WorldMapPanel(ctk.CTkFrame):
     # Map navigation
     # ------------------------------------------------------------------
     def _on_map_selected(self, selected: str) -> None:
+        """Handle map selected."""
         if self._suppress_map_change:
             return
         if selected and selected != self.current_map_name:
             self.load_map(selected)
 
     def _set_default_map(self) -> None:
+        """Set default map."""
         if not hasattr(self, "map_selector"):
             return
         selection = self.map_selector.get()
@@ -575,6 +602,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._persist_default_map(selection)
 
     def load_map(self, map_name: str, *, push_history: bool = True) -> None:
+        """Load map."""
         log_info(f"Loading world map '{map_name}'", func_name="WorldMapWindow.load_map")
         entry = self._ensure_world_map_entry(map_name)
         if entry is None:
@@ -596,6 +624,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         view_state = entry.get("view_state") if isinstance(entry, dict) else None
         if isinstance(view_state, dict):
+            # Handle the branch where isinstance(view_state, dict).
             zoom_value = view_state.get("zoom")
             if isinstance(zoom_value, (int, float)):
                 self.zoom = self._clamp_zoom(float(zoom_value))
@@ -622,6 +651,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._clear_inspector()
 
     def navigate_back(self) -> None:
+        """Handle navigate back."""
         if not self.map_stack:
             return
         parent = self.map_stack.pop()
@@ -629,6 +659,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self.load_map(parent, push_history=False)
 
     def navigate_to_map(self, child_map: str | None) -> None:
+        """Handle navigate to map."""
         if not child_map:
             return
         if child_map not in self.world_maps and child_map not in self.maps_wrapper_data:
@@ -637,12 +668,14 @@ class WorldMapPanel(ctk.CTkFrame):
         self.load_map(child_map)
 
     def _update_back_button_state(self) -> None:
+        """Update back button state."""
         if self.map_stack:
             self.back_button.configure(state=ctk.NORMAL, text=f"Back to {self.map_stack[-1]}")
         else:
             self.back_button.configure(state=ctk.DISABLED, text="Back")
 
     def _update_map_tool_button_state(self) -> None:
+        """Update map tool button state."""
         if not hasattr(self, "map_tool_button"):
             return
         state = ctk.NORMAL if self.current_map_name else ctk.DISABLED
@@ -651,6 +684,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self.player_view_button.configure(state=state)
 
     def _open_in_map_tool(self) -> None:
+        """Open in map tool."""
         target_map = None
         if self.selected_token and self.selected_token.get("type") == "map":
             target_map = self.selected_token.get("linked_map") or self.selected_token.get("entity_id")
@@ -665,6 +699,7 @@ class WorldMapPanel(ctk.CTkFrame):
         owner = getattr(self, "master", None)
         invoked = False
         while owner is not None and not invoked:
+            # Keep looping while owner is available and not invoked.
             try:
                 # Prefer GM-screen tab integration if available
                 if hasattr(owner, "open_map_tool_tab"):
@@ -672,6 +707,7 @@ class WorldMapPanel(ctk.CTkFrame):
                     invoked = True
                     break
                 if hasattr(owner, "map_tool"):
+                    # Handle the branch where hasattr(owner, 'map_tool').
                     try:
                         owner.map_tool(map_name=target_map)
                     except TypeError:
@@ -701,12 +737,14 @@ class WorldMapPanel(ctk.CTkFrame):
         )
 
     def _focus_on_selected_token(self) -> None:
+        """Internal helper for focus on selected token."""
         token = self._inspector_token or self.selected_token
         if not token:
             return
         self._focus_on_token(token)
 
     def _focus_on_token(self, token: dict) -> None:
+        """Internal helper for focus on token."""
         if not self.render_params or not self.base_image:
             return
         canvas = getattr(self, "canvas", None)
@@ -739,6 +777,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._pulse_token(token)
 
     def _open_selected_record(self) -> None:
+        """Open selected record."""
         token = self._inspector_token or self.selected_token
         if not token or token.get("type") == "map":
             return
@@ -769,6 +808,7 @@ class WorldMapPanel(ctk.CTkFrame):
             messagebox.showerror("Error", f"Unable to open {entity_type} '{entity_id}'.\n{exc}")
 
     def _open_selected_in_map_tool(self) -> None:
+        """Open selected in map tool."""
         token = self._inspector_token or self.selected_token
         if token and token is not self.selected_token:
             self.selected_token = token
@@ -778,6 +818,7 @@ class WorldMapPanel(ctk.CTkFrame):
     # Token creation & persistence
     # ------------------------------------------------------------------
     def _open_picker(self, entity_type: str) -> None:
+        """Open picker."""
         wrappers = {
             "NPC": self.npc_wrapper,
             "PC": self.pc_wrapper,
@@ -810,6 +851,7 @@ class WorldMapPanel(ctk.CTkFrame):
         picker.focus_set()
 
         def on_select(_, name):
+            """Handle select."""
             picker.destroy()
             record = next(
                 (item for item in wrapper.load_items() if item.get("Name") == name or item.get("Title") == name),
@@ -829,6 +871,7 @@ class WorldMapPanel(ctk.CTkFrame):
         ).pack(fill="both", expand=True)
 
     def _add_token(self, entity_type: str, record: dict) -> None:
+        """Internal helper for add token."""
         if not self.base_image:
             return
         token = self._build_token(entity_type, record)
@@ -841,6 +884,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self._show_entity_synthesis(token)
 
     def _build_token(self, entity_type: str, record: dict) -> dict:
+        """Build token."""
         return {
             "entity_type": entity_type,
             "entity_id": record.get("Name") or record.get("Title") or "Unnamed",
@@ -857,6 +901,7 @@ class WorldMapPanel(ctk.CTkFrame):
         }
 
     def _deserialize_tokens(self, entry: dict) -> list[dict]:
+        """Deserialize tokens."""
         raw = entry.get('tokens')
         legacy_source = False
         if raw is None:
@@ -873,6 +918,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         tokens: list[dict] = []
         for value in raw:
+            # Process each value from raw.
             if not isinstance(value, dict):
                 continue
             entity_type = value.get('entity_type') or value.get('type') or 'Entity'
@@ -906,10 +952,12 @@ class WorldMapPanel(ctk.CTkFrame):
         return tokens
 
     def _persist_tokens(self) -> None:
+        """Persist tokens."""
         if not self.current_world_map or not self.current_map_name:
             return
         serialized: list[dict] = []
         for token in self.tokens:
+            # Process each token from tokens.
             if str(token.get("entity_type", "")).lower() in {"rectangle", "oval", "circle", "shape", "line", "polygon"}:
                 continue
             serialized.append(
@@ -939,13 +987,16 @@ class WorldMapPanel(ctk.CTkFrame):
         log_debug("World map tokens saved", func_name="WorldMapWindow._persist_tokens")
 
     def _load_base_image(self) -> None:
+        """Load base image."""
         if not self.current_world_map:
             self.base_image = None
             return
         image_path = self.current_world_map.get("image", "")
         if not image_path and self.current_map_name in self.maps_wrapper_data:
+            # Handle the branch where image path is unavailable and current map name is in maps wrapper data.
             record = self.maps_wrapper_data[self.current_map_name]
             if isinstance(record, dict):
+                # Handle the branch where isinstance(record, dict).
                 image_path = record.get("Image", "")
                 if image_path:
                     self.current_world_map["image"] = image_path
@@ -962,6 +1013,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self.base_image = Image.open(full).convert("RGBA")
 
     def _draw_scene(self) -> None:
+        """Internal helper for draw scene."""
         if not self.base_image:
             return
         canvas_w = self.canvas.winfo_width()
@@ -1004,11 +1056,13 @@ class WorldMapPanel(ctk.CTkFrame):
         self._update_player_display()
 
     def _apply_pending_view_state(self, base_scale: float, base_w: int, base_h: int) -> None:
+        """Apply pending view state."""
         view_state = self._pending_view_state
         if not isinstance(view_state, dict):
             return
         pan_norm = view_state.get("pan_norm")
         if isinstance(pan_norm, (list, tuple)) and len(pan_norm) >= 2:
+            # Handle the branch where isinstance(pan_norm, (list, tuple)) and len(pan_norm) >= 2.
             try:
                 self.pan_x = float(pan_norm[0]) * base_w * base_scale
                 self.pan_y = float(pan_norm[1]) * base_h * base_scale
@@ -1028,6 +1082,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._pending_view_state = None
 
     def _capture_view_state(self) -> dict | None:
+        """Internal helper for capture view state."""
         if not self.render_params:
             return None
         scale, _, _, base_w, base_h = self.render_params
@@ -1046,12 +1101,15 @@ class WorldMapPanel(ctk.CTkFrame):
         }
 
     def _clamp_zoom(self, zoom: float) -> float:
+        """Internal helper for clamp zoom."""
         if zoom <= 0:
             return self.ZOOM_MIN
         return max(self.ZOOM_MIN, min(self.ZOOM_MAX, zoom))
 
     def _on_mouse_wheel(self, event, direction: int | None = None):
+        """Handle mouse wheel."""
         if direction is None:
+            # Handle the branch where direction is missing.
             delta = getattr(event, "delta", 0)
             if delta == 0:
                 return
@@ -1063,6 +1121,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return "break"
 
     def _adjust_zoom(self, factor: float, focus: tuple[float, float] | None = None) -> None:
+        """Internal helper for adjust zoom."""
         if not self.base_image or not self.render_params:
             return
         if factor <= 0:
@@ -1101,6 +1160,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._draw_scene()
 
     def _on_pan_start(self, event):
+        """Handle pan start."""
         if not self.base_image:
             return
         self._pan_anchor = (event.x, event.y, self.pan_x, self.pan_y)
@@ -1108,6 +1168,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return "break"
 
     def _on_pan_move(self, event):
+        """Handle pan move."""
         if not self._pan_anchor:
             return
         start_x, start_y, origin_x, origin_y = self._pan_anchor
@@ -1117,6 +1178,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return "break"
 
     def _on_pan_end(self, _event):
+        """Handle pan end."""
         if not self._pan_anchor:
             return
         self._pan_anchor = None
@@ -1124,16 +1186,19 @@ class WorldMapPanel(ctk.CTkFrame):
         return "break"
 
     def _on_save_shortcut(self, _event=None):
+        """Handle save shortcut."""
         self._persist_tokens()
         return "break"
 
     @staticmethod
     def _safe_float(value, default: float = 0.0) -> float:
+        """Internal helper for safe float."""
         try:
             return float(value)
         except (TypeError, ValueError):
             return default
     def _draw_token(self, token: dict) -> None:
+        """Internal helper for draw token."""
         if not self.render_params:
             return
         self._draw_token_on_canvas(
@@ -1153,6 +1218,7 @@ class WorldMapPanel(ctk.CTkFrame):
         interactive: bool,
         image_store: list[ImageTk.PhotoImage] | None,
     ) -> None:
+        """Internal helper for draw token on canvas."""
         if not render_params:
             return
         scale, offset_x, offset_y, base_w, base_h = render_params
@@ -1189,9 +1255,11 @@ class WorldMapPanel(ctk.CTkFrame):
         canvas_ids.extend([image_id, label_shadow_id, label_shadow_id_secondary, label_id])
 
         if not token.get("_uses_pin_image"):
+            # Handle the branch where not token.get('_uses_pin_image').
             border_color = self._resolve_token_color(token)
             border_width = max(3, int(round(size * 0.08)))
             if token.get("_has_portrait_image"):
+                # Handle the branch where token.get('_has_portrait_image').
                 half_size = size / 2
                 margin = border_width / 2
                 border_id = canvas.create_rectangle(
@@ -1223,6 +1291,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         if interactive:
             for cid in canvas_ids:
+                # Process each cid from canvas_ids.
                 canvas.tag_bind(
                     cid,
                     "<ButtonPress-1>",
@@ -1249,19 +1318,23 @@ class WorldMapPanel(ctk.CTkFrame):
                     lambda e=None, t=token: self._show_token_menu(e, t),
                 )
     def _create_token_pil_image(self, token: dict, size: int) -> Image.Image:
+        """Create token pil image."""
         token["_uses_pin_image"] = False
         token["_has_portrait_image"] = False
 
         portrait = token.get("portrait_path") or token.get("image_path")
         if portrait:
+            # Continue with this path when portrait is set.
             pil = self._load_image(portrait)
             if pil is not None:
                 token["_has_portrait_image"] = True
                 return pil.resize((size, size), Image.LANCZOS)
         pin_path = _default_pin_image_path()
         if pin_path:
+            # Continue with this path when pin path is set.
             pin_image = self._load_image(pin_path)
             if pin_image is not None:
+                # Handle the branch where pin image is available.
                 resized_pin = pin_image.resize((size, size), Image.LANCZOS)
                 color = self._resolve_token_color(token)
                 grayscale_pin = ImageOps.grayscale(resized_pin)
@@ -1290,14 +1363,17 @@ class WorldMapPanel(ctk.CTkFrame):
         return placeholder
 
     def _resolve_token_image(self, token: dict, size: int) -> ImageTk.PhotoImage:
+        """Resolve token image."""
         pil_image = self._create_token_pil_image(token, size)
         return ImageTk.PhotoImage(pil_image)
 
     def _resolve_token_ctk_image(self, token: dict, size: int) -> ctk.CTkImage:
+        """Resolve token ctk image."""
         pil_image = self._create_token_pil_image(token, size)
         return ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(size, size))
 
     def _resolve_token_color(self, token: dict) -> str:
+        """Resolve token color."""
         normalized = self._normalize_hex_color(token.get("color"))
         if normalized:
             return normalized
@@ -1306,6 +1382,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return normalized_fallback or "#FFFFFF"
 
     def _load_image(self, path: str) -> Image.Image | None:
+        """Load image."""
         if path in self.image_cache:
             return self.image_cache[path]
         candidate = path
@@ -1322,6 +1399,7 @@ class WorldMapPanel(ctk.CTkFrame):
             return None
 
     def _create_portrait_placeholder(self) -> Image.Image:
+        """Create portrait placeholder."""
         width, height = self.PORTRAIT_SIZE
         placeholder = Image.new("RGBA", (width, height), (20, 27, 48, 255))
         draw = ImageDraw.Draw(placeholder)
@@ -1342,6 +1420,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return placeholder
 
     def _set_portrait_image(self, pil_image: Image.Image | None) -> None:
+        """Set portrait image."""
         base_image = self._portrait_placeholder if pil_image is None else pil_image
         if base_image is None:
             return
@@ -1360,6 +1439,7 @@ class WorldMapPanel(ctk.CTkFrame):
     # Token interactions
     # ------------------------------------------------------------------
     def _on_token_press(self, event, token: dict) -> None:
+        """Handle token press."""
         if event is None:
             return
         if self.fog_mode:
@@ -1372,6 +1452,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self._show_entity_synthesis(token)
 
     def _on_token_drag(self, event, token: dict) -> None:
+        """Handle token drag."""
         if event is None or "drag_anchor" not in token or not self.render_params:
             return
         if self.fog_mode:
@@ -1390,18 +1471,21 @@ class WorldMapPanel(ctk.CTkFrame):
         token["x_norm"] = (x - offset_x) / (base_w * scale)
         token["y_norm"] = (y - offset_y) / (base_h * scale)
     def _on_token_release(self, _event, token: dict) -> None:
+        """Handle token release."""
         if self.fog_mode:
             return "break"
         token.pop("drag_anchor", None)
         self._persist_tokens()
 
     def _on_token_double_click(self, _event, token: dict) -> None:
+        """Handle token double click."""
         if self.fog_mode:
             return "break"
         if token.get("type") == "map":
             self.navigate_to_map(token.get("linked_map"))
 
     def _delete_selected_token(self, _event=None) -> None:
+        """Delete selected token."""
         if self.fog_mode:
             return "break"
         token = self.selected_token
@@ -1417,6 +1501,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._clear_inspector()
 
     def _show_token_menu(self, event, token: dict) -> None:
+        """Show token menu."""
         if event is None:
             return
         if self.fog_mode:
@@ -1431,18 +1516,22 @@ class WorldMapPanel(ctk.CTkFrame):
         menu.add_separator()
         menu.add_command(label="Delete", command=lambda: self._delete_token(token))
         try:
+            # Keep token menu resilient if this step fails.
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
 
     def _on_canvas_press(self, event) -> str | None:
+        """Handle canvas press."""
         if self.fog_mode in ("add", "rem"):
+            # Handle the branch where fog mode is in ('add', 'rem').
             if not self._fog_action_active:
                 push_fog_history(self)
                 self._fog_action_active = True
             paint_world_map_fog(self, event)
             return "break"
         if self.fog_mode in ("add_rect", "rem_rect"):
+            # Handle the branch where fog mode is in ('add_rect', 'rem_rect').
             if not self._fog_action_active:
                 push_fog_history(self)
                 self._fog_action_active = True
@@ -1452,6 +1541,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return None
 
     def _on_canvas_drag(self, event) -> str | None:
+        """Handle canvas drag."""
         if self.fog_mode in ("add", "rem"):
             paint_world_map_fog(self, event)
             return "break"
@@ -1461,7 +1551,9 @@ class WorldMapPanel(ctk.CTkFrame):
         return None
 
     def _on_canvas_release(self, event) -> str | None:
+        """Handle canvas release."""
         if self.fog_mode in ("add", "rem"):
+            # Handle the branch where fog mode is in ('add', 'rem').
             if self._fog_action_active:
                 self._fog_action_active = False
             return "break"
@@ -1469,6 +1561,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self.fog_mode in ("add_rect", "rem_rect")
             and self._fog_rect_start_world is not None
         ):
+            # Handle the branch where fog mode is in ('add_rect', 'rem_rect') and fog rect start world is available.
             end_world = self._fog_event_to_world(event)
             apply_world_map_fog_rectangle(self, self._fog_rect_start_world, end_world)
             self._fog_rect_start_world = None
@@ -1479,6 +1572,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return None
 
     def _fog_event_to_world(self, event):
+        """Internal helper for fog event to world."""
         if not self.render_params:
             return None
         scale, offset_x, offset_y, _, _ = self.render_params
@@ -1487,6 +1581,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return (event.x - offset_x) / scale, (event.y - offset_y) / scale
 
     def _prompt_resize(self, token: dict) -> None:
+        """Internal helper for prompt resize."""
         initial = int(token.get('size', 120))
         new_size = simpledialog.askinteger(
             "Resize Token",
@@ -1503,6 +1598,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._persist_tokens()
 
     def _delete_token(self, token: dict) -> None:
+        """Delete token."""
         if token not in self.tokens:
             return
         self.tokens = [t for t in self.tokens if t is not token]
@@ -1513,6 +1609,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._clear_inspector()
 
     def _configure_inspector_actions(self, token: dict | None) -> None:
+        """Internal helper for configure inspector actions."""
         focus_state = ctk.NORMAL if token else ctk.DISABLED
         record_state = ctk.NORMAL if token and token.get("type") != "map" else ctk.DISABLED
         map_state = ctk.DISABLED
@@ -1528,6 +1625,7 @@ class WorldMapPanel(ctk.CTkFrame):
             self.open_map_tool_button.configure(state=map_state)
 
     def _clear_inspector(self) -> None:
+        """Clear inspector."""
         self.title_label.configure(text="World Map")
         self.subtitle_label.configure(text="Select an entity to view its synthesis.")
         self._set_portrait_image(None)
@@ -1555,6 +1653,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._configure_inspector_actions(None)
 
     def _show_entity_synthesis(self, token: dict) -> None:
+        """Show entity synthesis."""
         record = token.get("record") or {}
         entity_type = token.get("entity_type", "Entity")
         name = token.get("entity_id", "Unnamed")
@@ -1578,6 +1677,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._populate_characters_tab(record)
 
     def _show_map_hint(self, token: dict) -> None:
+        """Show map hint."""
         map_name = token.get("linked_map") or token.get("entity_id") or "Nested Map"
         entry = self.world_maps.get(map_name, {})
         wrapper_record = self.maps_wrapper_data.get(map_name, {})
@@ -1603,17 +1703,20 @@ class WorldMapPanel(ctk.CTkFrame):
         self._populate_characters_tab(None)
 
     def _set_quick_actions_state(self, enabled: bool) -> None:
+        """Set quick actions state."""
         if hasattr(self, "highlight_button"):
             state = ctk.NORMAL if enabled else ctk.DISABLED
             self.highlight_button.configure(state=state)
 
     def _on_highlight_token(self) -> None:
+        """Handle highlight token."""
         token = self._inspector_token or self.selected_token
         if not token:
             return
         self._pulse_token(token)
 
     def _pulse_token(self, token: dict) -> None:
+        """Internal helper for pulse token."""
         canvas = getattr(self, "canvas", None)
         if not canvas or not canvas.winfo_exists():
             return
@@ -1622,6 +1725,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         animation = token.pop("_pulse_animation", None)
         if animation:
+            # Continue with this path when animation is set.
             for after_id in animation.get("after_ids", []):
                 try:
                     canvas.after_cancel(after_id)
@@ -1677,9 +1781,11 @@ class WorldMapPanel(ctk.CTkFrame):
         step_delay = 60
 
         def animate(index: int) -> None:
+            """Handle animate."""
             if token.get("_pulse_animation") is not animation_info:
                 return
             if index >= len(scales):
+                # Handle the branch where index >= len(scales).
                 try:
                     canvas.delete(outline_id)
                 except tk.TclError:
@@ -1700,12 +1806,14 @@ class WorldMapPanel(ctk.CTkFrame):
         animate(0)
 
     def _on_color_swatch_click(self) -> None:
+        """Handle color swatch click."""
         token = self._inspector_token or self.selected_token
         if not token:
             return
         self._prompt_token_color(token)
 
     def _update_color_swatch(self, token: dict | None) -> None:
+        """Update color swatch."""
         button = getattr(self, "color_swatch_button", None)
         if not button:
             return
@@ -1728,6 +1836,7 @@ class WorldMapPanel(ctk.CTkFrame):
         )
 
     def _update_visibility_button(self, token: dict | None) -> None:
+        """Update visibility button."""
         button = getattr(self, "toggle_visibility_button", None)
         if not button:
             return
@@ -1738,12 +1847,14 @@ class WorldMapPanel(ctk.CTkFrame):
         button.configure(state=ctk.NORMAL, text=("Hide from Players" if visible else "Show to Players"))
 
     def _toggle_selected_player_visibility(self) -> None:
+        """Toggle selected player visibility."""
         token = self._inspector_token or self.selected_token
         if not token:
             return
         self._toggle_token_player_visibility(token)
 
     def _toggle_token_player_visibility(self, token: dict) -> None:
+        """Toggle token player visibility."""
         if token not in self.tokens:
             return
         token["player_visible"] = not bool(token.get("player_visible", True))
@@ -1753,11 +1864,13 @@ class WorldMapPanel(ctk.CTkFrame):
         self._persist_tokens()
 
     def open_player_display(self) -> None:
+        """Open player display."""
         if not self.current_map_name or not self.base_image:
             return
         existing = getattr(self, "_player_view_window", None)
         if existing is not None:
             try:
+                # Keep player display resilient if this step fails.
                 if existing.winfo_exists():
                     existing.lift()
                     existing.focus_force()
@@ -1785,6 +1898,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_fog_photo = None
 
         def _on_close():
+            """Handle close."""
             self.close_player_display()
 
         win.protocol("WM_DELETE_WINDOW", _on_close)
@@ -1792,6 +1906,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._update_player_display()
 
     def close_player_display(self) -> None:
+        """Close player display."""
         window = getattr(self, "_player_view_window", None)
         self._player_view_window = None
         self._player_view_canvas = None
@@ -1799,17 +1914,20 @@ class WorldMapPanel(ctk.CTkFrame):
         self._player_view_fog_photo = None
         if window is not None:
             try:
+                # Keep player display resilient if this step fails.
                 if window.winfo_exists():
                     window.destroy()
             except tk.TclError:
                 pass
 
     def _update_player_display(self) -> None:
+        """Update player display."""
         window = getattr(self, "_player_view_window", None)
         canvas = getattr(self, "_player_view_canvas", None)
         if not window or not canvas or not self.base_image:
             return
         try:
+            # Keep player display resilient if this step fails.
             if not window.winfo_exists() or not canvas.winfo_exists():
                 return
         except tk.TclError:
@@ -1830,6 +1948,7 @@ class WorldMapPanel(ctk.CTkFrame):
         pan_x = self.pan_x
         pan_y = self.pan_y
         if view_state:
+            # Continue with this path when view state is set.
             pan_norm = view_state.get("pan_norm")
             if isinstance(pan_norm, (list, tuple)) and len(pan_norm) >= 2:
                 try:
@@ -1849,6 +1968,7 @@ class WorldMapPanel(ctk.CTkFrame):
         fog = self.mask_img or self._load_current_map_fog_mask()
         fog_mask = None
         if fog is not None:
+            # Handle the branch where fog is available.
             fog_mask = fog.resize((base_w, base_h), Image.LANCZOS)
             if fog_mask.mode != "RGBA":
                 fog_mask = fog_mask.convert("RGBA")
@@ -1869,6 +1989,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         render_params = (scale, offset_x, offset_y, base_w, base_h)
         for token in self.tokens:
+            # Process each token from tokens.
             if not bool(token.get("player_visible", True)):
                 continue
             self._draw_token_on_canvas(
@@ -1888,6 +2009,7 @@ class WorldMapPanel(ctk.CTkFrame):
             canvas.create_image(offset_x, offset_y, anchor="nw", image=self._player_view_fog_photo)
 
     def _load_current_map_fog_mask(self) -> Image.Image | None:
+        """Load current map fog mask."""
         if not self.current_map_name:
             return None
         record = self.maps_wrapper_data.get(self.current_map_name) or {}
@@ -1906,6 +2028,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return fog_img
 
     def _prompt_token_color(self, token: dict) -> None:
+        """Internal helper for prompt token color."""
         if not token:
             return
         current = token.get("color") or "#FFFFFF"
@@ -1919,6 +2042,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._persist_tokens()
 
     def _ask_token_color(self, initial: str | None = None) -> str | None:
+        """Internal helper for ask token color."""
         base_color = self._normalize_hex_color(initial) or "#FFFFFF"
         selection = None
         if _TKCOLORPICKER_ASKCOLOR is not None:
@@ -1935,9 +2059,11 @@ class WorldMapPanel(ctk.CTkFrame):
 
     @staticmethod
     def _extract_color_hex(selection) -> str | None:
+        """Extract color hex."""
         if selection is None:
             return None
         if isinstance(selection, (list, tuple)):
+            # Handle the branch where isinstance(selection, (list, tuple)).
             if len(selection) >= 2 and selection[1]:
                 return selection[1]
             if selection and isinstance(selection[0], str):
@@ -1948,6 +2074,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
     @staticmethod
     def _normalize_hex_color(value: str | None) -> str | None:
+        """Normalize hex color."""
         if not isinstance(value, str):
             return None
         candidate = value.strip()
@@ -1967,6 +2094,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
     @staticmethod
     def _calculate_swatch_border(color: str) -> str:
+        """Internal helper for calculate swatch border."""
         normalized = WorldMapPanel._normalize_hex_color(color)
         if not normalized:
             return "#4A5578"
@@ -1977,6 +2105,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return "#1B233A" if luminance > 0.65 else "#F3F5FF"
 
     def _render_badges(self, labels: list[str]) -> None:
+        """Render badges."""
         for child in self.badge_frame.winfo_children():
             child.destroy()
         for label in labels[:6]:
@@ -1991,18 +2120,22 @@ class WorldMapPanel(ctk.CTkFrame):
             ).pack(side="left", padx=4)
 
     def _clear_summary_sections(self) -> None:
+        """Clear summary sections."""
         self._clear_tab_contents("Summary")
 
     def _render_summary_message(self, message: str) -> None:
+        """Render summary message."""
         self._render_tab_message("Summary", message)
 
     def _render_summary_sections(self, sections: dict[str, list[str]]) -> None:
+        """Render summary sections."""
         if not sections:
             self._render_summary_message("No synthesis data available yet. Add notes for richer context.")
             return
         self._clear_summary_sections()
         wrap_labels = []
         for title, values in sections.items():
+            # Process each (title, values) from sections.items().
             frame = ctk.CTkFrame(self.summary_container, fg_color="#141C30", corner_radius=12)
             frame.pack(fill="x", pady=(0, 12))
             ctk.CTkLabel(
@@ -2025,6 +2158,7 @@ class WorldMapPanel(ctk.CTkFrame):
                 wrap_labels.append(label)
 
         def _update_summary_wrap(_event=None):
+            """Update summary wrap."""
             try:
                 available = max(260, self.summary_container.winfo_width() - 36)
             except Exception:
@@ -2042,9 +2176,11 @@ class WorldMapPanel(ctk.CTkFrame):
             pass
 
     def _populate_summary_tab(self, sections: dict[str, list[str]]) -> None:
+        """Internal helper for populate summary tab."""
         self._render_summary_sections(sections)
 
     def _populate_notes_tab(self, record: dict | None) -> None:
+        """Internal helper for populate notes tab."""
         self._clear_tab_contents("Notes")
         self._notes_textbox = None
         self._notes_status_label = None
@@ -2068,6 +2204,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         existing_notes = ""
         if isinstance(record, dict):
+            # Handle the branch where isinstance(record, dict).
             raw_value = record.get("Notes")
             if isinstance(raw_value, str):
                 existing_notes = raw_value
@@ -2092,6 +2229,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._notes_status_label = status_label
 
     def _populate_characters_tab(self, _record: dict | None) -> None:
+        """Internal helper for populate characters tab."""
         self._clear_tab_contents("Characters")
         self._entity_tab_images = []
 
@@ -2115,6 +2253,7 @@ class WorldMapPanel(ctk.CTkFrame):
         )
 
         for token in relevant_tokens:
+            # Process each token from relevant_tokens.
             frame = ctk.CTkFrame(self.characters_container, fg_color="#141C30", corner_radius=12)
             frame.pack(fill="x", pady=(0, 12))
 
@@ -2158,6 +2297,7 @@ class WorldMapPanel(ctk.CTkFrame):
             stats_label.grid(row=1, column=1, columnspan=2, sticky="we", padx=(12, 0), pady=(6, 0))
 
     def _on_entity_card_selected(self, token: dict) -> None:
+        """Handle entity card selected."""
         if token not in self.tokens:
             return
         self.selected_token = token
@@ -2167,6 +2307,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._select_inspector_tab("Summary")
 
     def _get_stats_preview(self, record: dict | None) -> str:
+        """Return stats preview."""
         if not isinstance(record, dict):
             return "No stats available yet."
         stats_value = record.get("Traits")
@@ -2177,8 +2318,10 @@ class WorldMapPanel(ctk.CTkFrame):
             return "No stats available yet."
 
         if isinstance(stats_value, dict):
+            # Handle the branch where isinstance(stats_value, dict).
             candidate = None
             for key in ("text", "value", "content"):
+                # Process each key from ('text', 'value', 'content').
                 value = stats_value.get(key)
                 if isinstance(value, str) and value.strip():
                     candidate = value
@@ -2197,9 +2340,11 @@ class WorldMapPanel(ctk.CTkFrame):
         return normalized if normalized else "No stats available yet."
 
     def _get_summary_preview(self, record: dict | None) -> str:
+        """Return summary preview."""
         if not isinstance(record, dict):
             return "No details available yet."
         for key in ("Summary", "Synopsis", "Description", "Background", "Notes"):
+            # Process each key while updating summary preview.
             value = record.get(key)
             if not value:
                 continue
@@ -2213,11 +2358,13 @@ class WorldMapPanel(ctk.CTkFrame):
         return "No details available yet."
 
     def _on_save_notes(self) -> None:
+        """Handle save notes."""
         token = self._inspector_token or self.selected_token
         textbox = self._notes_textbox
         if not token or not textbox:
             return
         if token.get("type") == "map":
+            # Handle the branch where token.get('type') == 'map'.
             if self._notes_status_label:
                 self._notes_status_label.configure(
                     text="Notes are not supported for maps.",
@@ -2229,6 +2376,7 @@ class WorldMapPanel(ctk.CTkFrame):
         success = self._save_entity_notes(token, notes)
 
         if success:
+            # Continue with this path when success is set.
             entity_type = token.get("entity_type", "Entity")
             entity_id = token.get("entity_id")
             updated_record = self._fetch_record(entity_type, entity_id)
@@ -2251,6 +2399,7 @@ class WorldMapPanel(ctk.CTkFrame):
                 )
 
     def _save_entity_notes(self, token: dict, notes: str) -> bool:
+        """Save entity notes."""
         entity_type = token.get("entity_type")
         table = self._get_entity_table_name(entity_type)
         if not table:
@@ -2263,6 +2412,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
         conn = get_connection()
         try:
+            # Keep entity notes resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(f"PRAGMA table_info({table})")
             columns = {row[1] for row in cursor.fetchall()}
@@ -2285,6 +2435,7 @@ class WorldMapPanel(ctk.CTkFrame):
             conn.commit()
 
             if updated == 0:
+                # Handle the branch where updated == 0.
                 cursor.execute(
                     f"SELECT 1 FROM {table} WHERE Name = ?",
                     (identifier,),
@@ -2314,6 +2465,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
     @staticmethod
     def _get_entity_table_name(entity_type: str | None) -> str | None:
+        """Return entity table name."""
         if not entity_type:
             return None
         mapping = {
@@ -2327,6 +2479,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return mapping.get(str(entity_type).upper())
 
     def _update_token_records(self, entity_type: str | None, entity_id: str | None, record: dict) -> None:
+        """Update token records."""
         if not entity_type or not entity_id:
             return
         for entry in self.tokens:
@@ -2337,11 +2490,14 @@ class WorldMapPanel(ctk.CTkFrame):
                 entry["record"] = record
 
     def _compose_summary(self, entity_type: str, record: dict) -> dict[str, list[str]]:
+        """Internal helper for compose summary."""
         sections: dict[str, list[str]] = {}
         summary = None
         for key in ("Summary", "Synopsis", "Description", "Background", "Notes"):
+            # Process each key while updating compose summary.
             value = record.get(key)
             if value:
+                # Continue with this path when value is set.
                 summary = self._normalize_text(value)
                 if summary:
                     break
@@ -2362,6 +2518,7 @@ class WorldMapPanel(ctk.CTkFrame):
         summary_keys = {"Summary", "Synopsis", "Description", "Background", "Notes"}
         general_details = []
         for key, value in record.items():
+            # Process each (key, value) from record.items().
             if key in summary_keys or key in fields:
                 continue
             if isinstance(value, (dict, set)):
@@ -2383,14 +2540,18 @@ class WorldMapPanel(ctk.CTkFrame):
         return sections
 
     def _harvest_fields(self, record: dict, fields: list[str]) -> list[str]:
+        """Internal helper for harvest fields."""
         out = []
         for field in fields:
+            # Process each field from fields.
             value = record.get(field)
             if isinstance(value, (list, tuple)):
+                # Handle the branch where isinstance(value, (list, tuple)).
                 joined = ", ".join(str(v) for v in value if v)
                 if joined:
                     out.append(f"{field}: {joined}")
             elif isinstance(value, dict):
+                # Handle the branch where isinstance(value, dict).
                 normalized = self._normalize_text(value)
                 if normalized:
                     out.append(f"{field}: {normalized}")
@@ -2399,8 +2560,10 @@ class WorldMapPanel(ctk.CTkFrame):
         return out
 
     def _collect_badges(self, entity_type: str, record: dict) -> list[str]:
+        """Collect badges."""
         badges = []
         for key in ("Role", "Type", "Alignment", "Challenge", "Faction", "Status", "Class", "Level"):
+            # Process each key while updating badges.
             value = record.get(key)
             if isinstance(value, (str, int)) and str(value).strip():
                 badges.append(str(value).strip())
@@ -2411,12 +2574,14 @@ class WorldMapPanel(ctk.CTkFrame):
             badges.insert(0, entity_type)
         seen = []
         for badge in badges:
+            # Process each badge from badges.
             badge = badge.strip()
             if badge and badge not in seen:
                 seen.append(badge)
         return seen[:5]
 
     def _summarize_map_contents(self, record: dict) -> list[str]:
+        """Internal helper for summarize map contents."""
         raw = record.get(WORLD_TOKENS_KEY) or []
         legacy_source = False
         if not raw:
@@ -2431,6 +2596,7 @@ class WorldMapPanel(ctk.CTkFrame):
             return []
         counts: dict[str, int] = {}
         for entry in raw:
+            # Process each entry from raw.
             if not isinstance(entry, dict):
                 continue
             entry_type = entry.get("entity_type") or entry.get("type")
@@ -2444,6 +2610,7 @@ class WorldMapPanel(ctk.CTkFrame):
         return [f"{label}: {count}" for label, count in counts.items() if count]
 
     def _normalize_text(self, value) -> str:
+        """Normalize text."""
         if value is None:
             return ""
         normalized = format_longtext(value)
@@ -2452,13 +2619,16 @@ class WorldMapPanel(ctk.CTkFrame):
         return str(normalized)
 
     def _resolve_portrait_path(self, record: dict) -> str | None:
+        """Resolve portrait path."""
         portrait = record.get("Portrait")
         return primary_portrait(portrait) or None
 
     def _resolve_map_image(self, record: dict) -> str | None:
+        """Resolve map image."""
         return record.get("Image")
 
     def _fetch_record(self, entity_type: str, name: str | None) -> dict | None:
+        """Internal helper for fetch record."""
         if not name:
             return None
         wrappers = {
@@ -2481,6 +2651,7 @@ class WorldMapPanel(ctk.CTkFrame):
     # Lifecycle
     # ------------------------------------------------------------------
     def _on_destroy(self, _event=None) -> None:
+        """Handle destroy."""
         for sequence, bind_id in getattr(self, "_chatbot_bindings", []):
             if bind_id:
                 try:
@@ -2492,11 +2663,13 @@ class WorldMapPanel(ctk.CTkFrame):
         return
 
     def open_chatbot(self, event=None):
+        """Open chatbot."""
         try:
             host = self.winfo_toplevel()
         except Exception:
             host = self
         try:
+            # Keep chatbot resilient if this step fails.
             open_chatbot_dialog(
                 host,
                 wrappers=self._chatbot_wrappers,
@@ -2525,6 +2698,7 @@ class WorldMapWindow(ctk.CTkToplevel):
     """Thin wrapper window that hosts a WorldMapPanel for legacy callers."""
 
     def __init__(self, master=None, initial_map: str | None = None):
+        """Initialize the WorldMapWindow instance."""
         super().__init__(master)
         self.title("World Map")
         try:
@@ -2552,7 +2726,9 @@ class WorldMapWindow(ctk.CTkToplevel):
                 pass
 
         def _on_close():
+            """Handle close."""
             try:
+                # Keep on close resilient if this step fails.
                 if getattr(self.master, "_world_map_window", None) is self:
                     self.master._world_map_window = None
             except Exception:

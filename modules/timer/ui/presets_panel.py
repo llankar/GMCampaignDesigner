@@ -1,3 +1,5 @@
+"""Panel for timer presets."""
+
 from __future__ import annotations
 
 from typing import Callable, Optional
@@ -17,6 +19,7 @@ class PresetsPanel(ctk.CTkFrame):
     ]
 
     def __init__(self, parent, timer_service: TimerService, on_apply: Callable[[TimerPreset], None]):
+        """Initialize the PresetsPanel instance."""
         super().__init__(parent)
         self._timer_service = timer_service
         self._on_apply = on_apply
@@ -54,6 +57,7 @@ class PresetsPanel(ctk.CTkFrame):
         self.refresh()
 
     def refresh(self) -> None:
+        """Refresh the operation."""
         presets = self._timer_service.list_presets()
         self._list.configure(state="normal")
         self._list.delete("1.0", "end")
@@ -66,6 +70,7 @@ class PresetsPanel(ctk.CTkFrame):
         self._list.configure(state="disabled")
 
     def _save_current(self) -> None:
+        """Save current."""
         try:
             duration = max(0.0, float(self._seconds_var.get() or 0))
         except Exception:
@@ -80,12 +85,15 @@ class PresetsPanel(ctk.CTkFrame):
         self.refresh()
 
     def _load_defaults(self) -> None:
+        """Load defaults."""
         for name, duration, mode, repeat in self.DEFAULT_PRESETS:
             self._timer_service.save_preset(name=name, mode=mode, duration=duration, repeat=repeat)
         self.refresh()
 
     def _delete_selected(self) -> None:
+        """Delete selected."""
         if not self._selected_preset_id:
+            # Handle the branch where selected preset ID is unavailable.
             presets = self._timer_service.list_presets()
             if presets:
                 self._selected_preset_id = presets[-1].id
@@ -95,6 +103,7 @@ class PresetsPanel(ctk.CTkFrame):
             self.refresh()
 
     def apply_first(self) -> None:
+        """Apply first."""
         presets = self._timer_service.list_presets()
         if not presets:
             return

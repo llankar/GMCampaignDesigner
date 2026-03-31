@@ -1,3 +1,5 @@
+"""Dialog for campaign dossier."""
+
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -10,6 +12,7 @@ from modules.helpers.theme_manager import get_theme
 
 class CampaignDossierExportDialog(ctk.CTkToplevel):
     def __init__(self, master):
+        """Initialize the CampaignDossierExportDialog instance."""
         super().__init__(master)
         self.title("Export Campaign Dossier")
         self.geometry("460x460")
@@ -115,10 +118,12 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
         self.grab_set()
 
     def _export(self):
+        """Export the operation."""
         output_mode = self.output_mode_var.get()
         output_format = self.format_var.get()
 
         if output_mode == "folder":
+            # Handle the branch where output_mode == 'folder'.
             target = filedialog.askdirectory(title="Choose export folder")
             if not target:
                 return
@@ -161,4 +166,5 @@ class CampaignDossierExportDialog(ctk.CTkToplevel):
 
 
 def open_campaign_dossier_exporter(master):
+    """Open campaign dossier exporter."""
     CampaignDossierExportDialog(master)

@@ -1,3 +1,4 @@
+"""Section definitions for menu."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -28,18 +29,22 @@ class TopLevelMenuSpec:
 
 
 def _command(label: str, command: Callable[[], None], *, shortcut: str = "", icon_key: str | None = None) -> MenuCommandSpec:
+    """Internal helper for command."""
     return MenuCommandSpec(label=label, command=command, shortcut=shortcut, icon_key=icon_key)
 
 
 def _shortcut_text(shortcut: str) -> str:
+    """Internal helper for shortcut text."""
     return f"\t {shortcut}" if shortcut else ""
 
 
 def format_menu_label(item: MenuCommandSpec) -> str:
+    """Format menu label."""
     return f"{item.label}{_shortcut_text(item.shortcut)}"
 
 
 def build_menu_specs(app) -> list[TopLevelMenuSpec]:
+    """Build menu specs."""
     entity_items: list[MenuCommandSpec] = []
     for slug, meta in getattr(app, "entity_definitions", {}).items():
         label = meta.get("label") or slug.replace("_", " ").title()

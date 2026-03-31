@@ -1,3 +1,5 @@
+"""Utilities for automation auto generation service."""
+
 import json
 import json
 from typing import Any, Dict, List
@@ -12,6 +14,7 @@ log_module_import(__name__)
 
 class AutoGenerationService:
     def __init__(self, *, db_path: str | None = None):
+        """Initialize the AutoGenerationService instance."""
         self._generator = EntityAutoGenerator(db_path=db_path)
         self._db_path = db_path
 
@@ -23,6 +26,7 @@ class AutoGenerationService:
         *,
         include_linked: bool = True,
     ) -> List[Dict[str, Any]]:
+        """Handle generate and save."""
         items = self._generator.generate(entity_slug, count, user_prompt)
         self._generator.save(entity_slug, items)
 
@@ -38,6 +42,7 @@ class AutoGenerationService:
         *,
         include_linked: bool = True,
     ) -> List[Dict[str, Any]]:
+        """Handle generate story arc and save."""
         arc = self._generator.generate_story_arc(scenario_count, user_prompt)
         items = self._generator.save_story_arc(arc)
         if include_linked:
@@ -46,6 +51,7 @@ class AutoGenerationService:
         return items
 
     def _generate_linked_entities(self, entity_slug: str, item: Dict[str, Any], user_prompt: str) -> None:
+        """Internal helper for generate linked entities."""
         template = load_template(entity_slug)
         fields = template.get("fields", [])
         linked_fields = [
@@ -58,6 +64,7 @@ class AutoGenerationService:
         parent_context = self._build_parent_context(entity_slug, item)
 
         for field in linked_fields:
+            # Process each field from linked_fields.
             field_name = field.get("name")
             linked_type = field.get("linked_type")
             if not field_name or not linked_type:
@@ -86,15 +93,18 @@ class AutoGenerationService:
                 )
 
     def _extract_names(self, value: Any) -> List[str]:
+        """Extract names."""
         if not value:
             return []
         if isinstance(value, list):
             return [str(v).strip() for v in value if str(v).strip()]
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             raw = value.strip()
             if not raw:
                 return []
             try:
+                # Keep names resilient if this step fails.
                 parsed = json.loads(raw)
                 if isinstance(parsed, list):
                     return [str(v).strip() for v in parsed if str(v).strip()]
@@ -104,6 +114,7 @@ class AutoGenerationService:
         return []
 
     def _build_parent_context(self, entity_slug: str, item: Dict[str, Any]) -> str:
+        """Build parent context."""
         key_field = "Title" if entity_slug in {"scenarios", "books"} else "Name"
         title = item.get(key_field, "")
         summary = item.get("Summary", "") or item.get("Description", "")
@@ -113,6 +124,7 @@ class AutoGenerationService:
 
         template = load_template(entity_slug)
         for field in template.get("fields", []):
+            # Process each field from template.get('fields', []).
             name = field.get("name")
             field_type = field.get("type")
             if not name or name in {key_field, "Summary", "Description"}:
@@ -121,6 +133,7 @@ class AutoGenerationService:
             if not value:
                 continue
             if isinstance(value, list):
+                # Handle the branch where isinstance(value, list).
                 joined = ", ".join(str(entry).strip() for entry in value if str(entry).strip())
                 if joined:
                     context_lines.append(f"{name}: {joined}")
@@ -131,4 +144,5 @@ class AutoGenerationService:
         return "\n".join(context_lines).strip()
 
     def _slugify(self, label: str) -> str:
+        """Internal helper for slugify."""
         return label.strip().lower().replace(" ", "_")

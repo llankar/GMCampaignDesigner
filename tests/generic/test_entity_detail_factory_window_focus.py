@@ -1,3 +1,5 @@
+"""Regression tests for entity detail factory window focus."""
+
 import importlib.util
 import sys
 import types
@@ -9,9 +11,11 @@ MODULE_PATH = Path("modules/generic/entity_detail_factory.py")
 
 class _DummyFrame:
     def __init__(self, *args, **kwargs):
+        """Initialize the _DummyFrame instance."""
         self.pack_calls = []
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         self.pack_calls.append((args, kwargs))
 
 
@@ -19,57 +23,73 @@ class _DummyWindow:
     instances = []
 
     def __init__(self, parent=None, *args, **kwargs):
+        """Initialize the _DummyWindow instance."""
         self.parent = parent
         self.calls = []
         self._exists = True
         _DummyWindow.instances.append(self)
 
     def title(self, value):
+        """Handle title."""
         self.calls.append(("title", value))
 
     def geometry(self, value):
+        """Handle geometry."""
         self.calls.append(("geometry", value))
 
     def minsize(self, width, height):
+        """Handle minsize."""
         self.calls.append(("minsize", width, height))
 
     def configure(self, **kwargs):
+        """Handle configure."""
         self.calls.append(("configure", kwargs))
 
     def transient(self, parent):
+        """Handle transient."""
         self.calls.append(("transient", parent))
 
     def deiconify(self):
+        """Handle deiconify."""
         self.calls.append(("deiconify",))
 
     def lift(self):
+        """Handle lift."""
         self.calls.append(("lift",))
 
     def focus_force(self):
+        """Handle focus force."""
         self.calls.append(("focus_force",))
 
     def attributes(self, name, value):
+        """Handle attributes."""
         self.calls.append(("attributes", name, value))
 
     def after_idle(self, callback, *args, **kwargs):
+        """Handle after idle."""
         self.calls.append(("after_idle",))
         callback(*args, **kwargs)
 
     def protocol(self, name, callback):
+        """Handle protocol."""
         self.calls.append(("protocol", name))
         self._close_callback = callback
 
     def destroy(self):
+        """Handle destroy."""
         self.calls.append(("destroy",))
         self._exists = False
 
     def winfo_exists(self):
+        """Handle winfo exists."""
         return self._exists
 
     def winfo_screenwidth(self):
+        """Handle winfo screenwidth."""
         return 1920
 
     def winfo_screenheight(self):
+        """Handle winfo screenheight."""
         return 1080
 
 
@@ -79,23 +99,28 @@ class _DummyScrollableFrame(_DummyFrame):
 
 class _Wrapper:
     def load_item_by_key(self, name, key_field="Name"):
+        """Load item by key."""
         return {key_field: name, "Name": name}
 
 
 class _Master:
     def __init__(self):
+        """Initialize the _Master instance."""
         self.top = object()
 
     def winfo_toplevel(self):
+        """Handle winfo toplevel."""
         return self.top
 
 
 class _MessageBox:
     def showerror(self, *args, **kwargs):
+        """Handle showerror."""
         raise AssertionError(f"Unexpected error dialog: {args!r} {kwargs!r}")
 
 
 def _stub_module(name: str, **attrs):
+    """Internal helper for stub module."""
     module = types.ModuleType(name)
     for key, value in attrs.items():
         setattr(module, key, value)
@@ -103,6 +128,7 @@ def _stub_module(name: str, **attrs):
 
 
 def _load_module():
+    """Load module."""
     _DummyWindow.instances.clear()
     ctk_module = types.ModuleType("customtkinter")
     ctk_module.CTkToplevel = _DummyWindow
@@ -178,6 +204,7 @@ def _load_module():
 
 
 def test_open_entity_tab_makes_new_window_topmost_relative_to_master():
+    """Verify that open entity tab makes new window topmost relative to master."""
     module = _load_module()
     master = _Master()
 
@@ -195,6 +222,7 @@ def test_open_entity_tab_makes_new_window_topmost_relative_to_master():
 
 
 def test_open_entity_tab_refocuses_existing_window_instead_of_creating_a_second_one():
+    """Verify that open entity tab refocuses existing window instead of creating a second one."""
     module = _load_module()
     master = _Master()
 
@@ -214,6 +242,7 @@ def test_open_entity_tab_refocuses_existing_window_instead_of_creating_a_second_
 
 
 def test_compute_wraplength_from_widths_uses_the_narrowest_container():
+    """Verify that compute wraplength from widths uses the narrowest container."""
     module = _load_module()
 
     # The label's own natural width must not drive the wrap width, or the
@@ -222,13 +251,16 @@ def test_compute_wraplength_from_widths_uses_the_narrowest_container():
 
 
 def test_configure_wraplength_if_changed_skips_duplicate_relayout():
+    """Verify that configure wraplength if changed skips duplicate relayout."""
     module = _load_module()
 
     class _DummyLabel:
         def __init__(self):
+            """Initialize the _DummyLabel instance."""
             self.calls = []
 
         def configure(self, **kwargs):
+            """Handle configure."""
             self.calls.append(kwargs)
 
     label = _DummyLabel()

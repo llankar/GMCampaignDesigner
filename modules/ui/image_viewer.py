@@ -1,3 +1,4 @@
+"""Viewer for image."""
 # modules/ui/image_viewer.py
 import os, ctypes
 from modules.helpers.config_helper import ConfigHelper
@@ -23,6 +24,7 @@ def _get_monitors():
     """Return list of (x, y, width, height)."""
     monitors = []
     def _enum(hMonitor, hdcMonitor, lprcMonitor, dwData):
+        """Internal helper for enum."""
         rect = lprcMonitor.contents
         monitors.append((rect.left, rect.top,
                         rect.right - rect.left,
@@ -37,6 +39,7 @@ def _get_monitors():
 
 @log_function
 def show_portrait(path, title=None):
+    """Show portrait."""
     log_info(f"Showing portrait: {path}", func_name="show_portrait")
     """
     Display a full‑screen CTkToplevel showing the image at `path`.
@@ -49,6 +52,7 @@ def show_portrait(path, title=None):
         return
 
     try:
+        # Keep portrait resilient if this step fails.
         img = Image.open(resolved)
     except Exception as e:
         log_warning(f"Failed to load portrait {resolved}: {e}", func_name="show_portrait")

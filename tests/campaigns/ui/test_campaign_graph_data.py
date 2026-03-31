@@ -1,3 +1,5 @@
+"""Regression tests for campaign graph data."""
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -15,6 +17,7 @@ build_campaign_option_index = module.build_campaign_option_index
 
 
 def test_build_campaign_option_index_ignores_blank_names():
+    """Verify that build campaign option index ignores blank names."""
     options, index = build_campaign_option_index([
         {"Name": ""},
         {"Name": "Duskfall"},
@@ -27,6 +30,7 @@ def test_build_campaign_option_index_ignores_blank_names():
 
 
 def test_build_campaign_graph_payload_includes_loose_threads(monkeypatch):
+    """Verify that build campaign graph payload includes loose threads."""
     monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [("NPCs", "NPCs"), ("Places", "Places")])
 
     campaign = {

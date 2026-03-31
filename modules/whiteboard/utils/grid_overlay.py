@@ -1,3 +1,5 @@
+"""Utilities for whiteboard grid overlay."""
+
 import math
 from typing import Tuple
 
@@ -8,6 +10,7 @@ GRID_TAG = "whiteboard_grid"
 
 class GridOverlay:
     def __init__(self, *, line_color: str = "#e0e0e0"):
+        """Initialize the GridOverlay instance."""
         self.line_color = line_color
 
     def draw_on_canvas(
@@ -20,6 +23,7 @@ class GridOverlay:
         pan: Tuple[float, float] = (0.0, 0.0),
         origin: Tuple[float, float] = (0.0, 0.0),
     ) -> None:
+        """Handle draw on canvas."""
         try:
             canvas.delete(GRID_TAG)
         except Exception:
@@ -39,6 +43,7 @@ class GridOverlay:
         end_x = math.ceil(max(origin_x + width, view_right) / step) * step
         x = start_x
         while x <= end_x + step:
+            # Keep looping while x <= end_x + step.
             screen_x = pan_x + x * zoom
             canvas.create_line(screen_x, 0, screen_x, height, fill=self.line_color, tags=(GRID_TAG,))
             x += step
@@ -47,6 +52,7 @@ class GridOverlay:
         end_y = math.ceil(max(origin_y + height, view_bottom) / step) * step
         y = start_y
         while y <= end_y + step:
+            # Keep looping while y <= end_y + step.
             screen_y = pan_y + y * zoom
             canvas.create_line(pan_x - width, screen_y, pan_x + width * 2, screen_y, fill=self.line_color, tags=(GRID_TAG,))
             y += step
@@ -60,6 +66,7 @@ def draw_grid_on_image(
     origin: Tuple[float, float] = (0.0, 0.0),
     zoom: float = 1.0,
 ) -> Image.Image:
+    """Handle draw grid on image."""
     width, height = img.size
     draw = ImageDraw.Draw(img)
     zoom = max(0.05, float(zoom))
@@ -69,6 +76,7 @@ def draw_grid_on_image(
     end_x = origin_x + width / zoom
     x = start_x
     while x <= end_x + grid_size:
+        # Keep looping while x <= end_x + grid_size.
         screen_x = int(round((x - origin_x) * zoom))
         draw.line([(screen_x, 0), (screen_x, height)], fill=line_color, width=1)
         x += grid_size
@@ -76,6 +84,7 @@ def draw_grid_on_image(
     end_y = origin_y + height / zoom
     y = start_y
     while y <= end_y + grid_size:
+        # Keep looping while y <= end_y + grid_size.
         screen_y = int(round((y - origin_y) * zoom))
         draw.line([(0, screen_y), (width, screen_y)], fill=line_color, width=1)
         y += grid_size

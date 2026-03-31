@@ -1,3 +1,5 @@
+"""Utilities for event entity link service."""
+
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 
 
@@ -19,10 +21,12 @@ class EntityLinkService:
     )
 
     def __init__(self, wrappers=None):
+        """Initialize the EntityLinkService instance."""
         self._wrappers = wrappers if isinstance(wrappers, dict) else {}
         self._entities_cache = {}
 
     def list_entities(self, entity_type, force_refresh=False):
+        """Handle list entities."""
         if not force_refresh and entity_type in self._entities_cache:
             return list(self._entities_cache[entity_type])
 
@@ -33,6 +37,7 @@ class EntityLinkService:
         key_field = self._key_field(entity_type)
         entities = []
         for item in wrapper.load_items():
+            # Process each item from wrapper.load_items().
             value = item.get(key_field)
             if isinstance(value, str) and value.strip():
                 entities.append(value.strip())
@@ -42,6 +47,7 @@ class EntityLinkService:
         return list(values)
 
     def search_entities(self, entity_type, query):
+        """Handle search entities."""
         values = self.list_entities(entity_type)
         text = str(query or "").strip().lower()
         if not text:
@@ -49,12 +55,14 @@ class EntityLinkService:
         return [name for name in values if text in name.lower()]
 
     def invalidate_cache(self, entity_type=None):
+        """Invalidate cache."""
         if entity_type:
             self._entities_cache.pop(entity_type, None)
             return
         self._entities_cache.clear()
 
     def _resolve_wrapper(self, entity_type):
+        """Resolve wrapper."""
         slug = self._slug_for(entity_type)
         if not slug:
             return None
@@ -67,6 +75,7 @@ class EntityLinkService:
 
     @staticmethod
     def _slug_for(entity_type):
+        """Internal helper for slug for."""
         mapping = {
             "Places": "places",
             "NPCs": "npcs",
@@ -84,6 +93,7 @@ class EntityLinkService:
 
     @staticmethod
     def _key_field(entity_type):
+        """Internal helper for key field."""
         if entity_type in ("Scenarios", "Informations"):
             return "Title"
         return "Name"

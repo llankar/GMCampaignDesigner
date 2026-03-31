@@ -1,7 +1,10 @@
+"""Regression tests for template loader entities."""
+
 from modules.helpers import template_loader
 
 
 def test_list_known_entity_labels_returns_sorted_display_labels(monkeypatch):
+    """Verify that list known entity labels returns sorted display labels."""
     defs = {
         "zeta": {"label": "Zeta"},
         "alpha": {"label": "Alpha"},

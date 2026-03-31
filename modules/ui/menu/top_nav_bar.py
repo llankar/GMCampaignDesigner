@@ -1,3 +1,5 @@
+"""Utilities for menu top nav bar."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -26,6 +28,7 @@ class AppMenuBar:
 
     @staticmethod
     def _normalize_hex(color: str | None, fallback: str) -> str:
+        """Normalize hex."""
         value = (color or "").strip()
         if value.startswith("#") and len(value) == 7:
             return value
@@ -33,11 +36,13 @@ class AppMenuBar:
 
     @classmethod
     def _mix_colors(cls, first: str | None, second: str | None, ratio: float, *, fallback: str) -> str:
+        """Internal helper for mix colors."""
         start = cls._normalize_hex(first, fallback)
         end = cls._normalize_hex(second, fallback)
         weight = max(0.0, min(1.0, ratio))
 
         def _to_rgb(hex_color: str) -> tuple[int, int, int]:
+            """Internal helper for to RGB."""
             return tuple(int(hex_color[index:index + 2], 16) for index in (1, 3, 5))
 
         rgb_a = _to_rgb(start)
@@ -49,6 +54,7 @@ class AppMenuBar:
         return "#{:02x}{:02x}{:02x}".format(*blended)
 
     def __init__(self, app):
+        """Initialize the AppMenuBar instance."""
         self.app = app
         self._root_menu = tk.Menu(app)
         self._submenus: list[tk.Menu] = []
@@ -83,6 +89,7 @@ class AppMenuBar:
         self.refresh_theme()
 
     def _apply_menu_theme(self, menu_widget: tk.Menu):
+        """Apply menu theme."""
         tokens = theme_manager.get_tokens()
         menu_fg = "#E8EEF6"
         menu_bg = tokens.get("sidebar_header_bg", tokens.get("panel_alt_bg", "#132133"))
@@ -109,6 +116,7 @@ class AppMenuBar:
         )
 
     def _clear_widgets(self):
+        """Clear widgets."""
         for button in [*self._menu_buttons, *self._action_buttons, *self._primary_quick_buttons, *self._system_quick_buttons]:
             try:
                 button.destroy()
@@ -123,6 +131,7 @@ class AppMenuBar:
         self._system_quick_buttons.clear()
 
     def _build(self):
+        """Build the operation."""
         self._clear_widgets()
         for menu_spec in build_menu_specs(self.app):
             submenu = self._new_submenu()
@@ -131,20 +140,25 @@ class AppMenuBar:
         self._build_quick_actions()
 
     def rebuild(self):
+        """Handle rebuild."""
         self._build()
         self.refresh_theme()
 
     def _new_submenu(self) -> tk.Menu:
+        """Internal helper for new submenu."""
         submenu = tk.Menu(self._root_menu, tearoff=0)
         self._apply_menu_theme(submenu)
         self._submenus.append(submenu)
         return submenu
 
     def _populate_submenu(self, submenu: tk.Menu, menu_spec):
+        """Internal helper for populate submenu."""
         for group_index, group in enumerate(menu_spec.groups):
+            # Process each (group_index, group) from enumerate(menu_spec.groups).
             submenu.add_command(label=group.title.upper(), state="disabled")
             submenu.add_command(label=f"  {group.helper}", state="disabled")
             for item in group.items:
+                # Process each item from group.items.
                 kwargs = {
                     "label": format_menu_label(item),
                     "command": item.command,
@@ -160,6 +174,7 @@ class AppMenuBar:
                 submenu.add_separator()
 
     def _popup_menu(self, menu: tk.Menu, button: ctk.CTkButton):
+        """Internal helper for popup menu."""
         if self._open_menu is not None:
             try:
                 self._open_menu.unpost()
@@ -168,12 +183,14 @@ class AppMenuBar:
         x = button.winfo_rootx()
         y = button.winfo_rooty() + button.winfo_height()
         try:
+            # Keep popup menu resilient if this step fails.
             menu.post(x, y)
             self._open_menu = menu
         finally:
             menu.grab_release()
 
     def _on_root_click(self, event):
+        """Handle root click."""
         if self._open_menu is None:
             return
         widget = event.widget
@@ -187,6 +204,7 @@ class AppMenuBar:
         self._open_menu = None
 
     def _add_menu_button(self, label: str, menu: tk.Menu):
+        """Internal helper for add menu button."""
         button = ctk.CTkButton(
             self.menu_frame,
             text=label,
@@ -202,6 +220,7 @@ class AppMenuBar:
         self._button_menus.append((button, menu))
 
     def _build_quick_actions(self):
+        """Build quick actions."""
         for action in build_primary_quick_actions(self.app):
             button = self._create_quick_action_button(self.quick_actions_inner, action)
             button.pack(side="left", padx=4)
@@ -212,6 +231,7 @@ class AppMenuBar:
             self._system_quick_buttons.append(button)
 
     def _create_quick_action_button(self, parent, action_spec):
+        """Create quick action button."""
         icon = resize_ctk_icon(self._get_icon(action_spec.icon_key), self.QUICK_ICON_SIZE)
         button = ctk.CTkButton(
             parent,
@@ -230,14 +250,17 @@ class AppMenuBar:
         return button
 
     def _get_icon(self, icon_key: str | None):
+        """Return icon."""
         return getattr(self.app, "icons", {}).get(icon_key) if icon_key else None
 
     def attach(self):
+        """Handle attach."""
         self.app.configure(menu="")
         self.frame.pack(side="top", fill="x", before=getattr(self.app, "main_frame", None))
         self.app.bind_all("<Button-1>", self._on_root_click, add="+")
 
     def create_action_button(self, **kwargs) -> ctk.CTkButton:
+        """Create action button."""
         kwargs.setdefault("font", self.BUTTON_FONT)
         button = ctk.CTkButton(self.utility_actions_frame, height=16, corner_radius=8, **kwargs)
         button.pack(side="right", padx=(6, 0))
@@ -245,6 +268,7 @@ class AppMenuBar:
         return button
 
     def refresh_theme(self):
+        """Refresh theme."""
         tokens = theme_manager.get_tokens()
         menu_bg = tokens.get("sidebar_header_bg", tokens.get("panel_alt_bg", "#132133"))
         button_fg = tokens.get("button_fg", "#0077CC")
@@ -261,6 +285,7 @@ class AppMenuBar:
 
         for button in self._menu_buttons:
             try:
+                # Keep theme resilient if this step fails.
                 button.configure(
                     fg_color=menu_bg,
                     hover_color=button_fg,
@@ -284,6 +309,7 @@ class AppMenuBar:
 
         for button in self._action_buttons:
             try:
+                # Keep theme resilient if this step fails.
                 if button.cget("fg_color") in ("", "transparent"):
                     button.configure(fg_color=menu_bg)
                 if button.cget("hover_color") in ("", "transparent"):
@@ -294,6 +320,7 @@ class AppMenuBar:
                 pass
 
     def _style_quick_button(self, button, *, menu_bg: str, button_fg: str, panel_bg: str, muted_fg: str):
+        """Internal helper for style quick button."""
         accent_fg = theme_manager.get_tokens().get("accent_button_fg", button_fg)
         accent_hover = theme_manager.get_tokens().get("accent_button_hover", button_fg)
         subtle_fg = self._mix_colors(menu_bg, panel_bg, 0.25, fallback=menu_bg)
@@ -325,6 +352,7 @@ class AppMenuBar:
         }
         colors = palette.get(getattr(button, "_menu_style", "primary"), palette["primary"])
         try:
+            # Keep style quick button resilient if this step fails.
             button.configure(
                 fg_color=colors["fg_color"],
                 hover_color=colors["hover_color"],

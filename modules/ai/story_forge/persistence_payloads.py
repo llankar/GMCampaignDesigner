@@ -1,3 +1,4 @@
+"""Payload helpers for story forge persistence."""
 from __future__ import annotations
 
 from modules.ai.story_forge.contracts import StoryForgeResponse

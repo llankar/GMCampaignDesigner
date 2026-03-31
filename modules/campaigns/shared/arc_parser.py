@@ -1,3 +1,5 @@
+"""Parsing helpers for campaign arc."""
+
 from __future__ import annotations
 
 import ast
@@ -8,13 +10,16 @@ from modules.campaigns.shared.arc_status import canonicalize_arc_status
 
 
 def normalize_arc_status(arc: dict[str, Any]) -> dict[str, Any]:
+    """Normalize arc status."""
     normalized = dict(arc)
     normalized["status"] = canonicalize_arc_status(normalized.get("status"))
     return normalized
 
 
 def coerce_arc_list(raw_value: Any) -> list[dict[str, Any]]:
+    """Coerce arc list."""
     def _from_dict(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """Internal helper for from dict."""
         arcs_value = payload.get("arcs")
         if isinstance(arcs_value, list):
             return [normalize_arc_status(arc) for arc in arcs_value if isinstance(arc, dict)]
@@ -36,6 +41,7 @@ def coerce_arc_list(raw_value: Any) -> list[dict[str, Any]]:
         return _from_dict(raw_value)
 
     if isinstance(raw_value, str):
+        # Handle the branch where isinstance(raw_value, str).
         parsed: Any = None
         try:
             parsed = json.loads(raw_value)

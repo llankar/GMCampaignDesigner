@@ -1,13 +1,17 @@
+"""Utilities for entities linking."""
+
 from __future__ import annotations
 
 from modules.helpers.template_loader import load_entity_definitions
 
 
 def _tokenize(value: str) -> str:
+    """Internal helper for tokenize."""
     return "".join(ch for ch in str(value or "").strip().lower() if ch.isalnum())
 
 
 def _singularize(label: str) -> str:
+    """Internal helper for singularize."""
     text = str(label or "").strip()
     if text.endswith("ies") and len(text) > 3:
         return text[:-3] + "y"
@@ -19,6 +23,7 @@ def _singularize(label: str) -> str:
 
 
 def entity_label_map() -> dict[str, str]:
+    """Handle entity label map."""
     definitions = load_entity_definitions()
     labels: dict[str, str] = {}
     for slug, meta in definitions.items():
@@ -28,6 +33,7 @@ def entity_label_map() -> dict[str, str]:
 
 
 def resolve_entity_slug(value: str | None) -> str | None:
+    """Resolve entity slug."""
     raw = str(value or "").strip()
     if not raw:
         return None
@@ -36,6 +42,7 @@ def resolve_entity_slug(value: str | None) -> str | None:
     token = _tokenize(raw)
 
     for slug, label in labels.items():
+        # Process each (slug, label) from labels.items().
         candidates = {
             _tokenize(slug),
             _tokenize(label),
@@ -50,6 +57,7 @@ def resolve_entity_slug(value: str | None) -> str | None:
         return fallback
 
     if fallback.endswith("s"):
+        # Handle the branch where fallback.endswith('s').
         singular_fallback = fallback[:-1]
         if singular_fallback in labels:
             return singular_fallback
@@ -58,6 +66,7 @@ def resolve_entity_slug(value: str | None) -> str | None:
 
 
 def resolve_entity_label(value: str | None) -> str:
+    """Resolve entity label."""
     slug = resolve_entity_slug(value)
     if slug:
         return entity_label_map().get(slug, slug.replace("_", " ").title())

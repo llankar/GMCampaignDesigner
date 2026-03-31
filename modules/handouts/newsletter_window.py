@@ -1,3 +1,5 @@
+"""Window for handouts newsletter."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -28,6 +30,7 @@ class NewsletterWindow(ctk.CTkToplevel):
         style: str | None = None,
         title: str = "Newsletter",
     ) -> None:
+        """Initialize the NewsletterWindow instance."""
         super().__init__(parent)
         self.title(title)
         self.geometry("900x650")
@@ -46,6 +49,7 @@ class NewsletterWindow(ctk.CTkToplevel):
         self._render_content()
 
     def _build_ui(self) -> None:
+        """Build UI."""
         header = ctk.CTkLabel(self, text="Newsletter (RTF)", font=("Arial", 18, "bold"))
         header.pack(fill="x", padx=15, pady=(15, 5))
 
@@ -76,6 +80,7 @@ class NewsletterWindow(ctk.CTkToplevel):
         copy_rtf.grid(row=0, column=1, padx=5, sticky="ew")
 
     def _render_content(self) -> None:
+        """Render content."""
         if self._ai_text:
             self._rtf_json = build_newsletter_rtf_json_from_ai_text(self._ai_text)
             self._rtf_string = build_newsletter_rtf_from_ai_text(self._ai_text)
@@ -92,6 +97,7 @@ class NewsletterWindow(ctk.CTkToplevel):
             )
 
         try:
+            # Keep content resilient if this step fails.
             render_rtf_to_text_widget(self.textbox, self._rtf_json)
             self.status_var.set("RTF loaded.")
         except Exception as exc:
@@ -106,11 +112,13 @@ class NewsletterWindow(ctk.CTkToplevel):
             self.status_var.set("Displayed as plain text (RTF not compatible).")
 
     def _copy_plain_text(self) -> None:
+        """Copy plain text."""
         text = str(self._rtf_json.get("text", ""))
         if not text.strip():
             messagebox.showinfo("Newsletter", "No text to copy.")
             return
         try:
+            # Keep plain text resilient if this step fails.
             self.clipboard_clear()
             self.clipboard_append(text)
             self.status_var.set("Text copied to clipboard.")
@@ -122,10 +130,12 @@ class NewsletterWindow(ctk.CTkToplevel):
             messagebox.showwarning("Newsletter", "Unable to copy the text.")
 
     def _copy_rtf(self) -> None:
+        """Copy RTF."""
         if not self._rtf_string.strip():
             messagebox.showinfo("Newsletter", "No RTF to copy.")
             return
         try:
+            # Keep RTF resilient if this step fails.
             self.clipboard_clear()
             self.clipboard_append(self._rtf_string)
             self.status_var.set("RTF copied to clipboard.")

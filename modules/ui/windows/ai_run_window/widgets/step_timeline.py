@@ -1,3 +1,5 @@
+"""Utilities for AI run window step timeline."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -5,12 +7,15 @@ import customtkinter as ctk
 
 class StepTimeline(ctk.CTkTextbox):
     def __init__(self, master, **kwargs):
+        """Initialize the StepTimeline instance."""
         super().__init__(master, **kwargs)
         self.configure(state="disabled")
 
     def render_items(self, items: list[dict]) -> None:
+        """Render items."""
         lines = []
         for item in items:
+            # Process each item from items.
             status = item.get("status", "pending")
             icon = "○"
             if status == "done":

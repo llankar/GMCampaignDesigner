@@ -1,3 +1,5 @@
+"""Panel for scenario plot twist."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -22,9 +24,11 @@ class PlotTwistResult:
 
     @property
     def timestamp_label(self) -> str:
+        """Handle timestamp label."""
         return self.timestamp.strftime("%Y-%m-%d %H:%M:%S")
 
     def to_payload(self) -> dict:
+        """Handle to payload."""
         return {
             "table": self.table,
             "roll": self.roll,
@@ -39,6 +43,7 @@ _table_cache: Optional[dict] = None
 
 
 def _load_plot_twist_table() -> Optional[dict]:
+    """Load plot twist table."""
     global _table_cache
     if _table_cache:
         return _table_cache
@@ -48,6 +53,7 @@ def _load_plot_twist_table() -> Optional[dict]:
 
 
 def _match_entry(table: dict, value: int) -> dict:
+    """Internal helper for match entry."""
     for entry in table.get("entries", []):
         if entry.get("min", 0) <= value <= entry.get("max", 0):
             return entry
@@ -55,12 +61,14 @@ def _match_entry(table: dict, value: int) -> dict:
 
 
 def add_plot_twist_listener(listener: Callable[[PlotTwistResult], None]) -> None:
+    """Handle add plot twist listener."""
     if listener in _listeners:
         return
     _listeners.append(listener)
 
 
 def remove_plot_twist_listener(listener: Callable[[PlotTwistResult], None]) -> None:
+    """Remove plot twist listener."""
     try:
         _listeners.remove(listener)
     except ValueError:
@@ -68,6 +76,7 @@ def remove_plot_twist_listener(listener: Callable[[PlotTwistResult], None]) -> N
 
 
 def _notify_listeners(result: PlotTwistResult) -> None:
+    """Notify listeners."""
     for listener in list(_listeners):
         try:
             listener(result)
@@ -76,10 +85,12 @@ def _notify_listeners(result: PlotTwistResult) -> None:
 
 
 def get_latest_plot_twist() -> Optional[PlotTwistResult]:
+    """Return latest plot twist."""
     return _latest_result
 
 
 def roll_plot_twist() -> PlotTwistResult:
+    """Handle roll plot twist."""
     global _latest_result
     table = _load_plot_twist_table() or {}
     try:
@@ -112,6 +123,7 @@ class PlotTwistPanel(ctk.CTkFrame):
         layout: str = "default",
         **kwargs,
     ):
+        """Initialize the PlotTwistPanel instance."""
         super().__init__(master, **kwargs)
         self._compact = compact
         self._layout = layout
@@ -143,6 +155,7 @@ class PlotTwistPanel(ctk.CTkFrame):
         self.meta_var = None
         self.meta_label = None
         if is_toolbar:
+            # Continue with this path when is toolbar is set.
             self.columnconfigure(1, weight=0)
             self.result_label.grid(row=row_offset, column=0, sticky="ew", padx=(6, 4), pady=(0, 4))
             self.roll_button = ctk.CTkButton(self, text="Roll", width=64, command=self.roll_another)
@@ -165,14 +178,17 @@ class PlotTwistPanel(ctk.CTkFrame):
         self._sync_latest()
 
     def _on_destroy(self, _event=None) -> None:
+        """Handle destroy."""
         remove_plot_twist_listener(self._on_plot_twist_update)
 
     def _sync_latest(self) -> None:
+        """Synchronize latest."""
         result = get_latest_plot_twist()
         if result:
             self._apply_result(result)
 
     def _apply_result(self, result: PlotTwistResult) -> None:
+        """Apply result."""
         self.result_var.set(self._format_result(result))
         if self._layout == "toolbar":
             wraplength = (
@@ -185,13 +201,16 @@ class PlotTwistPanel(ctk.CTkFrame):
             self.meta_var.set(f"{result.table} · Roll {result.roll} · {result.timestamp_label}")
 
     def _on_plot_twist_update(self, result: PlotTwistResult) -> None:
+        """Handle plot twist update."""
         self._apply_result(result)
 
     def roll_another(self) -> None:
+        """Handle roll another."""
         result = roll_plot_twist()
         self._apply_result(result)
 
     def _format_result(self, result: PlotTwistResult) -> str:
+        """Format result."""
         if self._layout != "toolbar":
             return result.result
         return " ".join(result.result.split())

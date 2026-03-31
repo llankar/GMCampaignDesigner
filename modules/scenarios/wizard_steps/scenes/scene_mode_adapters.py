@@ -1,3 +1,5 @@
+"""Utilities for scenes scene mode adapters."""
+
 import copy
 
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
@@ -19,15 +21,18 @@ LEGACY_GUIDED_FLOW = (
 
 
 def _split_to_list(value):
+    """Internal helper for split to list."""
     return normalise_entity_list(value)
 
 
 def normalise_scene_links(scene):
+    """Handle normalise scene links."""
     links_data = []
     raw_links = (scene or {}).get("LinkData") or (scene or {}).get("Links")
     if isinstance(raw_links, list):
         for item in raw_links:
             if isinstance(item, dict):
+                # Handle the branch where isinstance(item, dict).
                 target = str(item.get("target") or item.get("Scene") or item.get("Next") or "").strip()
                 if not target:
                     continue
@@ -41,6 +46,7 @@ def normalise_scene_links(scene):
     deduped = []
     seen = set()
     for link in links_data:
+        # Process each link from links_data.
         key = (link["target"].casefold(), (link.get("text") or "").casefold())
         if key in seen:
             continue
@@ -50,6 +56,7 @@ def normalise_scene_links(scene):
 
 
 def canonicalise_scene(scene, *, index=0):
+    """Handle canonicalise scene."""
     if not isinstance(scene, dict):
         return {
             "Title": f"Scene {index + 1}",
@@ -84,6 +91,7 @@ def canonicalise_scene(scene, *, index=0):
 
 
 def scenes_to_guided_cards(scenes):
+    """Handle scenes to guided cards."""
     canonical = [canonicalise_scene(scene, index=i) for i, scene in enumerate(scenes or [])]
     legacy_four_scene_payload = len(canonical) == len(LEGACY_GUIDED_FLOW)
     if not canonical:
@@ -96,14 +104,17 @@ def scenes_to_guided_cards(scenes):
 
     cards = []
     for idx, scene in enumerate(canonical):
+        # Process each (idx, scene) from enumerate(canonical).
         is_first = idx == 0
         is_last = idx == len(canonical) - 1
         stage = ""
         default_type = ""
         if is_first:
+            # Continue with this path when is first is set.
             stage = first_stage
             default_type = first_type
         elif is_last:
+            # Continue with this path when is last is set.
             stage = last_stage
             default_type = last_type
         else:
@@ -130,6 +141,7 @@ def scenes_to_guided_cards(scenes):
 
 
 def guided_cards_to_scenes(cards):
+    """Handle guided cards to scenes."""
     raw_cards = [card for card in (cards or []) if isinstance(card, dict)]
     if not raw_cards:
         raw_cards = [{}, {}]
@@ -139,6 +151,7 @@ def guided_cards_to_scenes(cards):
     prepared = []
     last_index = len(raw_cards) - 1
     for idx, card in enumerate(raw_cards):
+        # Process each (idx, card) from enumerate(raw_cards).
         is_first = idx == 0
         is_last = idx == last_index
         stage = ""

@@ -35,6 +35,7 @@ BONUS_DAMAGE_MODES = ("Contact", "Distance")
 
 
 def option_uses_variable_points(option_name: str) -> bool:
+    """Handle option uses variable points."""
     return PROWESS_OPTION_BY_NAME.get(option_name, PROWESS_OPTIONS[0]).variable_points
 
 
@@ -43,6 +44,7 @@ def parse_variable_points(option_detail: str) -> int:
 
     for token in (option_detail or "").replace("pt", " ").split():
         if token.isdigit():
+            # Handle the branch where token.isdigit().
             numeric = int(token)
             if 1 <= numeric <= 3:
                 return numeric
@@ -56,6 +58,7 @@ def parse_bonus_damage_detail(option_detail: str) -> tuple[str, int]:
     mode = BONUS_DAMAGE_MODES[0]
 
     if "," in detail:
+        # Handle the branch where ',' is in detail.
         first, _ = detail.split(",", 1)
         first = first.strip()
         if first in BONUS_DAMAGE_MODES:

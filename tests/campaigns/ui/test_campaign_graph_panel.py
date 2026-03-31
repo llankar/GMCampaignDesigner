@@ -1,3 +1,5 @@
+"""Regression tests for campaign graph panel."""
+
 import importlib.util
 import sys
 import types
@@ -6,39 +8,51 @@ from pathlib import Path
 
 class _DummyWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _DummyWidget instance."""
         self._children = []
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         return None
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         return None
 
     def place(self, *args, **kwargs):
+        """Handle place."""
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def grid_rowconfigure(self, *args, **kwargs):
+        """Handle grid rowconfigure."""
         return None
 
     def grid_propagate(self, *args, **kwargs):
+        """Handle grid propagate."""
         return None
 
     def configure(self, *args, **kwargs):
+        """Handle configure."""
         return None
 
     def bind(self, *args, **kwargs):
+        """Bind the operation."""
         return None
 
     def after(self, *args, **kwargs):
+        """Handle after."""
         return None
 
     def after_idle(self, callback, *args, **kwargs):
+        """Handle after idle."""
         return callback(*args, **kwargs)
 
     def winfo_children(self):
+        """Handle winfo children."""
         return list(self._children)
 
 
@@ -130,27 +144,33 @@ CampaignGraphPanel = module.CampaignGraphPanel
 
 class _CanvasStub:
     def __init__(self, fraction=0.0):
+        """Initialize the _CanvasStub instance."""
         self.fraction = fraction
         self.update_calls = 0
         self.moveto_calls = []
 
     def yview(self):
+        """Handle yview."""
         return (self.fraction, min(self.fraction + 0.2, 1.0))
 
     def update_idletasks(self):
+        """Update idletasks."""
         self.update_calls += 1
 
     def yview_moveto(self, value):
+        """Handle yview moveto."""
         self.moveto_calls.append(value)
         self.fraction = value
 
 
 class _ScrollStub:
     def __init__(self, canvas):
+        """Initialize the _ScrollStub instance."""
         self._parent_canvas = canvas
 
 
 def _make_panel(canvas=None):
+    """Internal helper for make panel."""
     panel = CampaignGraphPanel.__new__(CampaignGraphPanel)
     panel.scroll = _ScrollStub(canvas) if canvas is not None else None
     panel.after_idle = lambda callback, *args, **kwargs: callback(*args, **kwargs)
@@ -158,6 +178,7 @@ def _make_panel(canvas=None):
 
 
 def test_preserve_scroll_position_restores_canvas_fraction():
+    """Verify that preserve scroll position restores canvas fraction."""
     canvas = _CanvasStub(fraction=0.62)
     panel = _make_panel(canvas)
     callback_calls = []
@@ -170,6 +191,7 @@ def test_preserve_scroll_position_restores_canvas_fraction():
 
 
 def test_scroll_to_top_moves_canvas_to_origin():
+    """Verify that scroll to top moves canvas to origin."""
     canvas = _CanvasStub(fraction=0.48)
     panel = _make_panel(canvas)
 
@@ -180,6 +202,7 @@ def test_scroll_to_top_moves_canvas_to_origin():
 
 
 def test_get_scroll_fraction_returns_none_without_canvas():
+    """Verify that get scroll fraction returns none without canvas."""
     panel = _make_panel()
 
     assert panel._get_scroll_fraction() is None
@@ -187,13 +210,16 @@ def test_get_scroll_fraction_returns_none_without_canvas():
 
 class _HostApp:
     def __init__(self):
+        """Initialize the _HostApp instance."""
         self.calls = []
 
     def open_gm_screen(self, **kwargs):
+        """Open GM screen."""
         self.calls.append(kwargs)
 
 
 def test_open_scenario_gm_screen_prefers_embedded_host(monkeypatch):
+    """Verify that open scenario GM screen prefers embedded host."""
     panel = CampaignGraphPanel.__new__(CampaignGraphPanel)
     panel._scenario_items = [{"Title": "Night Run"}]
     host = _HostApp()

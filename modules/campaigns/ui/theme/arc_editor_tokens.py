@@ -1,3 +1,5 @@
+"""Design tokens for theme arc editor."""
+
 from __future__ import annotations
 
 from .arc_editor_palette import ARC_EDITOR_PALETTE, ArcEditorPalette, get_arc_editor_palette

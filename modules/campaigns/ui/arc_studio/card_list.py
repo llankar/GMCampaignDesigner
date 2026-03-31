@@ -1,3 +1,5 @@
+"""Utilities for arc studio card list."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -10,11 +12,13 @@ class ArcCardList(ctk.CTkScrollableFrame):
     """Scrollable arc cards with selection callback."""
 
     def __init__(self, master, on_select):
+        """Initialize the ArcCardList instance."""
         super().__init__(master, fg_color=EDITOR_PALETTE["surface_soft"])
         self._on_select = on_select
         self._cards: list[ctk.CTkFrame] = []
 
     def render(self, arcs: list[dict], selected_index: int | None, search_text: str = ""):
+        """Render the operation."""
         for child in self.winfo_children():
             child.destroy()
         self._cards = []
@@ -22,6 +26,7 @@ class ArcCardList(ctk.CTkScrollableFrame):
         lowered_search = (search_text or "").strip().casefold()
         visible_count = 0
         for index, arc in enumerate(arcs):
+            # Process each (index, arc) from enumerate(arcs).
             name = str(arc.get("name") or f"Arc {index + 1}").strip()
             summary = str(arc.get("objective") or arc.get("summary") or "").strip()
             thread = str(arc.get("thread") or "").strip()
@@ -77,6 +82,7 @@ class ArcCardList(ctk.CTkScrollableFrame):
             ctk.CTkLabel(self, text="No arcs match this filter.", text_color=EDITOR_PALETTE["muted_text"]).pack(anchor="w", padx=10, pady=10)
 
     def _bind_click(self, root: ctk.CTkBaseClass, index: int):
+        """Bind click."""
         root.bind("<Button-1>", lambda _e, i=index: self._on_select(i))
         for child in root.winfo_children():
             self._bind_click(child, index)

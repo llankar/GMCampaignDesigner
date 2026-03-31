@@ -1,3 +1,5 @@
+"""Repository helpers for whiteboard."""
+
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -13,6 +15,7 @@ _TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 
 def _now_iso() -> str:
+    """Internal helper for now iso."""
     return datetime.now(timezone.utc).strftime(_TIMESTAMP_FMT)
 
 
@@ -29,10 +32,13 @@ class WhiteboardRepository:
     _TABLE = "whiteboard_states"
 
     def __init__(self) -> None:
+        """Initialize the WhiteboardRepository instance."""
         self._ensure_table()
 
     def _ensure_table(self) -> None:
+        """Ensure table."""
         try:
+            # Keep table resilient if this step fails.
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute(
@@ -58,12 +64,14 @@ class WhiteboardRepository:
                 pass
 
     def save_snapshot(self, scenario_title: str, state: WhiteboardState) -> Tuple[int, str]:
+        """Save snapshot."""
         title = scenario_title or "Unassigned"
         saved_at = _now_iso()
         payload = json.dumps(state.to_dict(), ensure_ascii=False)
         conn = get_connection()
         conn.execute("PRAGMA busy_timeout = 5000")
         try:
+            # Keep snapshot resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"INSERT INTO {self._TABLE} (scenario_title, payload_json, saved_at) VALUES (?, ?, ?)",
@@ -75,10 +83,12 @@ class WhiteboardRepository:
             conn.close()
 
     def load_latest_state(self, scenario_title: str) -> Tuple[Optional[WhiteboardState], Optional[str]]:
+        """Load latest state."""
         title = scenario_title or "Unassigned"
         conn = get_connection()
         conn.row_factory = None
         try:
+            # Keep latest state resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"""
@@ -103,10 +113,12 @@ class WhiteboardRepository:
             conn.close()
 
     def list_history(self, scenario_title: str, limit: int = 15) -> List[WhiteboardSnapshot]:
+        """Handle list history."""
         title = scenario_title or "Unassigned"
         conn = get_connection()
         conn.row_factory = None
         try:
+            # Keep list history resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"""
@@ -124,9 +136,11 @@ class WhiteboardRepository:
             conn.close()
 
     def load_snapshot(self, snapshot_id: int) -> Optional[WhiteboardState]:
+        """Load snapshot."""
         conn = get_connection()
         conn.row_factory = None
         try:
+            # Keep snapshot resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT payload_json FROM {self._TABLE} WHERE id = ?",

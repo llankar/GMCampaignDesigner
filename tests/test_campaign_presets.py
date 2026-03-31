@@ -1,7 +1,10 @@
+"""Regression tests for campaign presets."""
+
 from modules.campaigns.services.campaign_presets import list_campaign_presets
 
 
 def test_list_campaign_presets_loads_json_files():
+    """Verify that list campaign presets loads JSON files."""
     presets = list_campaign_presets()
 
     assert len(presets) >= 12

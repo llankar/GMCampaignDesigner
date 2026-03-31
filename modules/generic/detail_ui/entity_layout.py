@@ -1,3 +1,4 @@
+"""Layout helpers for detail UI entity."""
 from __future__ import annotations
 
 import math
@@ -41,6 +42,7 @@ def create_detail_split_layout(parent, *, sidebar_width: int = 380):
     layout_probe = {"width": None}
 
     def _stack_layout():
+        """Internal helper for stack layout."""
         if not shell.winfo_exists():
             return
         try:
@@ -55,6 +57,7 @@ def create_detail_split_layout(parent, *, sidebar_width: int = 380):
             side_column.grid_configure(row=0, column=1, columnspan=1, sticky="nsew")
 
     def _layout_ready():
+        """Internal helper for layout ready."""
         try:
             width = int(shell.winfo_width())
         except Exception:
@@ -86,6 +89,7 @@ def create_spotlight_panel(
     fallback_text: str = "No portrait linked yet.",
     accent_lines: Iterable[str] | None = None,
 ):
+    """Create spotlight panel."""
     palette = get_detail_palette()
     card = ctk.CTkFrame(
         parent,
@@ -130,6 +134,7 @@ def create_spotlight_panel(
 
     rendered_portrait = portrait_widget or (portrait_builder(portrait_shell) if portrait_builder is not None else None)
     if rendered_portrait is not None:
+        # Handle the branch where rendered portrait is available.
         rendered_portrait.pack(fill="both", expand=True, padx=10, pady=10)
     else:
         empty = ctk.CTkFrame(portrait_shell, fg_color="transparent")
@@ -158,9 +163,11 @@ def create_spotlight_panel(
         ).pack()
 
     if accent_lines:
+        # Continue with this path when accent lines is set.
         footer = ctk.CTkFrame(card, fg_color="transparent")
         footer.pack(fill="x", padx=18, pady=(0, 18))
         for line in accent_lines:
+            # Process each line from accent_lines.
             if not str(line).strip():
                 continue
             ctk.CTkLabel(
@@ -176,11 +183,13 @@ def create_spotlight_panel(
 
 
 def create_highlight_card(parent, title: str, lines: Iterable[str], *, empty_state: str = "No highlights yet."):
+    """Create highlight card."""
     card, body = create_section_card(parent, title, "Quick-read beats to anchor the scene.", compact=True)
     card.pack(fill="x", pady=(0, 14))
     palette = get_detail_palette()
     added = False
     for line in lines:
+        # Process each line from lines.
         text = str(line or "").strip()
         if not text:
             continue
@@ -211,6 +220,7 @@ def create_highlight_card(parent, title: str, lines: Iterable[str], *, empty_sta
 
 
 def estimate_field_height(field_type: str, value) -> int:
+    """Handle estimate field height."""
     if field_type == "longtext":
         text = str(value or "")
         return 3 + math.ceil(len(text) / 320)

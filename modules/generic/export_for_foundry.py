@@ -1,3 +1,5 @@
+"""Utilities for generic export for foundry."""
+
 import json
 import os
 import shutil
@@ -60,11 +62,13 @@ def preview_and_export_foundry(self):
 
     # Process NPCs to update their portrait paths:
     for npc in npc_list:
+        # Process each npc from npc_list.
         portrait = primary_portrait(npc.get("Portrait", ""))
         if portrait:
             # Normalize path separators.
             portrait = portrait.replace("\\", "/")
             if not os.path.isabs(portrait):
+                # Handle the branch where not os.path.isabs(portrait).
                 abs_portrait = os.path.join(ConfigHelper.get_campaign_dir(), portrait)
                 if os.path.exists(abs_portrait):
                     portrait = abs_portrait
@@ -81,6 +85,7 @@ def preview_and_export_foundry(self):
     # Build Foundry scenes from scenarios.
     foundry_scenes = []
     for scenario in scenarios:
+        # Process each scenario from scenarios.
         scene = {}
         scene["title"] = scenario.get("Title", "Untitled Scenario")
         
@@ -94,8 +99,10 @@ def preview_and_export_foundry(self):
         # Create NPC tokens for the scenario.
         tokens = []
         for idx, npc_name in enumerate(scenario.get("NPCs", [])):
+            # Process each (idx, npc_name) from enumerate(scenario.get('NPCs', [])).
             npc = npc_items.get(npc_name)
             if npc:
+                # Continue with this path when NPC is set.
                 token = {}
                 token["name"] = npc.get("Name", "Unnamed NPC")
                 token["role"] = npc.get("Role", "")
@@ -115,8 +122,10 @@ def preview_and_export_foundry(self):
         # Create clickable markers for places referenced in the scenario.
         markers = []
         for idx, place_name in enumerate(scenario.get("Places", [])):
+            # Process each (idx, place_name) from enumerate(scenario.get('Places', [])).
             place = place_items.get(place_name)
             if place:
+                # Continue with this path when place is set.
                 marker = {}
                 marker["name"] = place.get("Name", "Unnamed Place")
                 marker["description"] = place.get("Description", "")

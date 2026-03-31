@@ -1,3 +1,4 @@
+"""Preset definitions for campaign."""
 from __future__ import annotations
 
 import json
@@ -19,6 +20,7 @@ def list_campaign_presets() -> list[dict]:
 
     presets: list[dict] = []
     for path in sorted(PRESETS_DIR.glob("*.json"), key=lambda candidate: candidate.name.casefold()):
+        # Process each path while updating list campaign presets.
         preset = _load_preset_file(path)
         if preset:
             presets.append(preset)
@@ -26,6 +28,7 @@ def list_campaign_presets() -> list[dict]:
 
 
 def _load_preset_file(path: Path) -> dict | None:
+    """Load preset file."""
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -55,10 +58,12 @@ def _load_preset_file(path: Path) -> dict | None:
 
 
 def _extract_string_dict(raw: object, allowed_keys: set[str]) -> dict[str, str]:
+    """Extract string dict."""
     if not isinstance(raw, dict):
         return {}
     result: dict[str, str] = {}
     for key in allowed_keys:
+        # Process each key from allowed_keys.
         value = raw.get(key)
         if value is None:
             continue
@@ -67,18 +72,22 @@ def _extract_string_dict(raw: object, allowed_keys: set[str]) -> dict[str, str]:
 
 
 def _extract_arcs(raw: object) -> list[dict]:
+    """Extract arcs."""
     if not isinstance(raw, list):
         return []
 
     arcs: list[dict] = []
     for item in raw:
+        # Process each item from raw.
         if not isinstance(item, dict):
             continue
         arc: dict = {}
         for key in ARC_KEYS:
+            # Process each key from ARC_KEYS.
             if key not in item:
                 continue
             if key == "scenarios":
+                # Handle the branch where key == 'scenarios'.
                 scenarios = item.get("scenarios")
                 if isinstance(scenarios, list):
                     arc[key] = [str(entry).strip() for entry in scenarios if str(entry).strip()]
@@ -87,6 +96,7 @@ def _extract_arcs(raw: object) -> list[dict]:
                 continue
             arc[key] = str(item.get(key) or "").strip()
         if arc:
+            # Continue with this path when arc is set.
             if "status" not in arc:
                 arc["status"] = "Planned"
             if "scenarios" not in arc:

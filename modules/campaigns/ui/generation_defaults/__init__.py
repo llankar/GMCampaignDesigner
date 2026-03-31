@@ -1,3 +1,5 @@
+"""Campaign package."""
+
 from .dialog import CampaignGenerationDefaultsDialog
 from .mapper import (
     DEFAULT_GENERATION_DEFAULTS_STATE,

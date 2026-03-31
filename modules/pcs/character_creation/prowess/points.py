@@ -11,6 +11,7 @@ _OPTION_COST_PATTERN = re.compile(r"^\s*(\d+)\s*pt", flags=re.IGNORECASE)
 
 
 def _split_option_value(raw_value: str) -> tuple[str, str]:
+    """Internal helper for split option value."""
     if ":" not in raw_value:
         return raw_value.strip(), ""
     option_name, option_detail = raw_value.split(":", 1)
@@ -18,10 +19,12 @@ def _split_option_value(raw_value: str) -> tuple[str, str]:
 
 
 def _option_name_from_label_or_name(option_raw_name: str) -> str:
+    """Internal helper for option name from label or name."""
     return PROWESS_OPTION_BY_LABEL.get(option_raw_name, option_raw_name or DEFAULT_OPTION_NAME)
 
 
 def _option_cost_from_string(option_value: str) -> int:
+    """Internal helper for option cost from string."""
     option_raw_name, option_detail = _split_option_value(option_value)
     option_name = _option_name_from_label_or_name(option_raw_name)
 
@@ -30,6 +33,7 @@ def _option_cost_from_string(option_value: str) -> int:
 
     parsed_points_match = _OPTION_COST_PATTERN.match(option_detail)
     if parsed_points_match:
+        # Continue with this path when parsed points match is set.
         parsed_points = int(parsed_points_match.group(1))
         if 1 <= parsed_points <= 3:
             return parsed_points

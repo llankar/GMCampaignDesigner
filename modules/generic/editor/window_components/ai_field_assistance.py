@@ -1,20 +1,25 @@
+"""Utilities for window components AI field assistance."""
+
 from modules.generic.editor.window_context import *
 from modules.campaigns.services.tone_contract import format_tone_contract_guidance, load_campaign_tone_contract
 
 
 class GenericEditorWindowAIFieldAssistance:
     def _tone_contract_guidance(self):
+        """Internal helper for tone contract guidance."""
         contract = load_campaign_tone_contract()
         if not contract:
             return ""
         return format_tone_contract_guidance(contract)
 
     def _field_text(self, field_name):
+        """Internal helper for field text."""
         widget = self.field_widgets.get(field_name)
         if hasattr(widget, "text_widget"):
             return widget.text_widget.get("1.0", "end").strip()
         return str(self.item.get(field_name, ""))
     def _set_field_text(self, field_name, text):
+        """Set field text."""
         widget = self.field_widgets.get(field_name)
         if hasattr(widget, "text_widget"):
             # Try to interpret AI markdown-like formatting into RTF-JSON
@@ -32,7 +37,9 @@ class GenericEditorWindowAIFieldAssistance:
             except Exception:
                 self.item[field_name] = text
     def ai_improve_field(self, field_name):
+        """Handle AI improve field."""
         try:
+            # Keep AI improve field resilient if this step fails.
             current = self._field_text(field_name)
             context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
             # Load templates from config with sensible fallbacks
@@ -82,11 +89,14 @@ class GenericEditorWindowAIFieldAssistance:
         except Exception as e:
             messagebox.showerror("AI Error", f"Failed to improve {field_name}: {e}")
     def ai_draft_field(self, field_name):
+        """Handle AI draft field."""
         try:
+            # Keep AI draft field resilient if this step fails.
             context_name = self.item.get("Name") or self.item.get("Title") or self.model_wrapper.entity_type
             # Build a lightweight context from common fields if present
             hints = []
             for key in ("NPCs", "Villains", "Places", "Creatures", "Factions", "Objects", "Genre", "Tags", "Objectives"):
+                # Process each key while updating AI draft field.
                 val = self.item.get(key)
                 if val:
                     hints.append(f"{key}: {val}")
@@ -155,6 +165,7 @@ class GenericEditorWindowAIFieldAssistance:
         corpus = []
         for it in items or []:
             for f in text_fields_priority:
+                # Process each f from text_fields_priority.
                 v = it.get(f)
                 if not v:
                     continue

@@ -1,3 +1,5 @@
+"""Utilities for portrait helper."""
+
 from __future__ import annotations
 
 import json
@@ -9,7 +11,9 @@ from modules.helpers.config_helper import ConfigHelper
 
 
 def _extract_dict_value(value: dict) -> str:
+    """Extract dict value."""
     for key in ("path", "Path", "text", "Text", "value", "Value", "file", "File"):
+        # Process each key while updating dict value.
         candidate = value.get(key)
         if isinstance(candidate, str) and candidate.strip():
             return candidate.strip()
@@ -17,6 +21,7 @@ def _extract_dict_value(value: dict) -> str:
 
 
 def _flatten_portrait_values(values: Iterable) -> List[str]:
+    """Internal helper for flatten portrait values."""
     flattened: List[str] = []
     for entry in values:
         flattened.extend(parse_portrait_value(entry))
@@ -24,6 +29,7 @@ def _flatten_portrait_values(values: Iterable) -> List[str]:
 
 
 def parse_portrait_value(value) -> List[str]:
+    """Parse portrait value."""
     if value is None:
         return []
     if isinstance(value, dict):
@@ -32,10 +38,12 @@ def parse_portrait_value(value) -> List[str]:
     if isinstance(value, (list, tuple, set)):
         return _flatten_portrait_values(value)
     if isinstance(value, str):
+        # Handle the branch where isinstance(value, str).
         stripped = value.strip()
         if not stripped:
             return []
         if stripped.startswith("[") and stripped.endswith("]"):
+            # Handle the branch where stripped.startswith('[') and stripped.endswith(']').
             try:
                 parsed = json.loads(stripped)
             except json.JSONDecodeError:
@@ -53,20 +61,24 @@ def parse_portrait_value(value) -> List[str]:
 
 
 def serialize_portrait_value(values: Iterable[str]) -> str:
+    """Serialize portrait value."""
     paths = [str(value).strip() for value in values if str(value).strip()]
     return "\n".join(paths)
 
 
 def primary_portrait(value) -> str:
+    """Handle primary portrait."""
     portraits = parse_portrait_value(value)
     return portraits[0] if portraits else ""
 
 
 def normalize_portrait_path(path: str) -> str:
+    """Normalize portrait path."""
     return str(path or "").strip().replace("\\", "/")
 
 
 def resolve_portrait_candidate(path: str, campaign_dir: Optional[str] = None) -> Optional[str]:
+    """Resolve portrait candidate."""
     if not path:
         return None
     base_dir = Path(campaign_dir or ConfigHelper.get_campaign_dir())
@@ -93,6 +105,7 @@ def resolve_portrait_candidate(path: str, campaign_dir: Optional[str] = None) ->
 
     seen = set()
     for variant in candidate_variants:
+        # Process each variant from candidate_variants.
         variant_key = str(variant)
         if not variant_key or variant_key in seen:
             continue
@@ -103,11 +116,13 @@ def resolve_portrait_candidate(path: str, campaign_dir: Optional[str] = None) ->
 
 
 def resolve_portrait_path(value, campaign_dir: Optional[str] = None) -> Optional[str]:
+    """Resolve portrait path."""
     path = primary_portrait(value)
     return resolve_portrait_candidate(path, campaign_dir)
 
 
 def portrait_menu_label(path: str, index: int) -> str:
+    """Handle portrait menu label."""
     base = os.path.basename(str(path)) if path else ""
     if base:
         return f"{index}. {base}"

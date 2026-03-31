@@ -1,7 +1,10 @@
+"""Regression tests for character creation dynamic draft persistence."""
+
 from modules.pcs.character_creation.storage.payload_normalizer import normalize_draft_payload_for_form
 
 
 def test_normalizer_preserves_dynamic_object_keys_for_equipment_and_purchases():
+    """Verify that normalizer preserves dynamic object keys for equipment and purchases."""
     payload = {
         "name": "Ayla",
         "equipment": {

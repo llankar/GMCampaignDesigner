@@ -1,3 +1,5 @@
+"""AI package."""
+
 from .events import (
     AIPipelineEvent,
     EVENT_AI_PIPELINE_COMPLETED,

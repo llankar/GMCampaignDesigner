@@ -1,3 +1,5 @@
+"""Regression tests for dice preferences."""
+
 from contextlib import closing
 
 import os
@@ -13,6 +15,7 @@ from modules.helpers.system_config import SystemConfigManager, set_current_syste
 
 
 def _reset_manager_state() -> None:
+    """Reset manager state."""
     SystemConfigManager._cached_config = None
     SystemConfigManager._cached_slug = None
     SystemConfigManager._cached_signature = None
@@ -21,11 +24,13 @@ def _reset_manager_state() -> None:
 
 @pytest.fixture
 def campaign_db(monkeypatch, tmp_path):
+    """Handle campaign DB."""
     db_path = tmp_path / "campaign.db"
 
     original_get = ConfigHelper.get
 
     def fake_get(cls, section, key, fallback=None):
+        """Handle fake get."""
         if (section, key) == ("Database", "path"):
             return str(db_path)
         return original_get(section, key, fallback=fallback)
@@ -35,6 +40,7 @@ def campaign_db(monkeypatch, tmp_path):
     db_module.initialize_db()
     _reset_manager_state()
     try:
+        # Keep campaign DB resilient if this step fails.
         yield db_path
     finally:
         _reset_manager_state()
@@ -42,6 +48,7 @@ def campaign_db(monkeypatch, tmp_path):
 
 @pytest.mark.usefixtures("campaign_db")
 def test_rollable_default_formula_uses_system_overrides():
+    """Verify that rollable default formula uses system overrides."""
     set_current_system("d20")
     assert dice_preferences.get_rollable_default_formula() == "1d20"
 
@@ -54,6 +61,7 @@ def test_rollable_default_formula_uses_system_overrides():
 
 @pytest.mark.usefixtures("campaign_db")
 def test_rollable_default_formula_ignores_configured_variants(campaign_db):
+    """Verify that rollable default formula ignores configured variants."""
     with closing(sqlite3.connect(str(campaign_db))) as conn:
         conn.execute(
             "UPDATE campaign_systems SET default_formula = ? WHERE slug = ?",
@@ -71,6 +79,7 @@ def test_rollable_default_formula_ignores_configured_variants(campaign_db):
 
 @pytest.mark.usefixtures("campaign_db")
 def test_default_roll_options_respect_system_config(campaign_db):
+    """Verify that default roll options respect system config."""
     set_current_system("d20")
     options = dice_preferences.get_default_roll_options()
     assert options["separate"] is False

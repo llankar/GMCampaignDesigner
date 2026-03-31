@@ -1,3 +1,5 @@
+"""Theme helpers for editor."""
+
 from __future__ import annotations
 
 """Visual theme helpers for the generic editor UI."""
@@ -63,9 +65,11 @@ class _EditorPaletteProxy(dict):
     """Backwards-compatible mapping that resolves values from the active theme."""
 
     def __getitem__(self, key):
+        """Handle getitem."""
         return get_editor_palette()[key]
 
     def get(self, key, default=None):
+        """Return the operation."""
         return get_editor_palette().get(key, default)
 
 
@@ -73,6 +77,7 @@ EDITOR_PALETTE = _EditorPaletteProxy()
 
 
 def toolbar_entry_style() -> dict:
+    """Handle toolbar entry style."""
     palette = get_editor_palette()
     return {
         "fg_color": palette["surface_soft"],
@@ -84,6 +89,7 @@ def toolbar_entry_style() -> dict:
 
 
 def primary_button_style() -> dict:
+    """Handle primary button style."""
     palette = get_editor_palette()
     return {
         "fg_color": palette["accent"],
@@ -95,6 +101,7 @@ def primary_button_style() -> dict:
 
 
 def option_menu_style() -> dict:
+    """Handle option menu style."""
     palette = get_editor_palette()
     return {
         "fg_color": palette["accent"],
@@ -106,6 +113,7 @@ def option_menu_style() -> dict:
 
 
 def section_style() -> dict:
+    """Handle section style."""
     palette = get_editor_palette()
     return {
         "fg_color": palette["surface_alt"],

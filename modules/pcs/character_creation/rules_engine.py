@@ -38,6 +38,7 @@ LIMITED_ADVANCEMENT_TYPES = {
 
 
 def _validate_advancement_choices(advancements: int, choices: list[dict]) -> None:
+    """Validate advancement choices."""
     if advancements <= 0:
         return
 
@@ -48,12 +49,14 @@ def _validate_advancement_choices(advancements: int, choices: list[dict]) -> Non
 
     per_rank_usage: dict[str, set[str]] = {}
     for index, choice in enumerate(choices, start=1):
+        # Process each (index, choice) from enumerate(choices, start=1).
         choice_type = (choice or {}).get("type", "").strip()
         if not choice_type:
             raise CharacterCreationError(f"L'avancement #{index} n'a pas de type sélectionné.")
 
         rank_name, _, _ = rank_from_advancements(index)
         if choice_type in LIMITED_ADVANCEMENT_TYPES:
+            # Handle the branch where choice type is in limited advancement types.
             used = per_rank_usage.setdefault(rank_name, set())
             if choice_type in used:
                 raise CharacterCreationError(
@@ -63,6 +66,7 @@ def _validate_advancement_choices(advancements: int, choices: list[dict]) -> Non
 
 
 def rank_from_advancements(advancements: int) -> tuple[str, int, int]:
+    """Handle rank from advancements."""
     for idx, (start, end, rank_name, skill_cap_points) in enumerate(RANK_TABLE):
         if start <= advancements <= end:
             return rank_name, idx, skill_cap_points
@@ -73,6 +77,7 @@ def rank_from_advancements(advancements: int) -> tuple[str, int, int]:
 
 
 def build_character(character_input: dict) -> CharacterCreationResult:
+    """Build character."""
     name = (character_input.get("name") or "").strip()
     concept = (character_input.get("concept") or "").strip()
     flaw = (character_input.get("flaw") or "").strip()
@@ -144,6 +149,7 @@ def build_character(character_input: dict) -> CharacterCreationResult:
         )
     spent_prowess_points = 0
     for feat_index, feat in enumerate(feats):
+        # Process each (feat_index, feat) from enumerate(feats).
         options = feat.get("options") or []
         limitation = (feat.get("limitation") or "").strip()
         if len(options) < 1:

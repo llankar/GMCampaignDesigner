@@ -1,3 +1,4 @@
+"""Wizard flow for campaign builder."""
 from __future__ import annotations
 
 import json
@@ -53,6 +54,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
     """Three-step wizard helping GMs structure campaigns and internal arcs."""
 
     def __init__(self, master, campaign_wrapper, scenario_wrapper):
+        """Initialize the CampaignBuilderWizard instance."""
         super().__init__(master)
         self.title("Campaign Builder Wizard")
         self.geometry("1480x1040")
@@ -85,6 +87,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         position_window_at_top(self)
 
     def _build_layout(self):
+        """Build layout."""
         root = ctk.CTkFrame(self, fg_color=EDITOR_PALETTE["surface"])
         root.pack(fill="both", expand=True, padx=14, pady=14)
 
@@ -138,6 +141,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._register_interactive_control(self.back_btn, self.next_btn, self.cancel_btn)
 
     def _build_foundation_step(self, parent):
+        """Build foundation step."""
         frame = ctk.CTkFrame(parent, **section_style())
         frame.pack_propagate(False)
 
@@ -226,11 +230,13 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return frame
 
     def _preset_option_labels(self) -> list[str]:
+        """Internal helper for preset option labels."""
         labels = ["No preset"]
         labels.extend(f"{preset['name']} ({preset['id']})" for preset in self.available_presets)
         return labels
 
     def _preset_option_to_id(self, option_label: str) -> str | None:
+        """Internal helper for preset option to ID."""
         if not option_label or option_label == "No preset":
             return None
         if option_label.endswith(")") and "(" in option_label:
@@ -238,6 +244,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return None
 
     def _refresh_preset_description(self):
+        """Refresh preset description."""
         if not hasattr(self, "preset_description_label"):
             return
         preset = self.preset_by_id.get(self.selected_preset_id) if self.selected_preset_id else None
@@ -248,6 +255,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.preset_description_label.configure(text=f"Preset: {description}")
 
     def _on_preset_selected(self, value: str):
+        """Handle preset selected."""
         preset_id = self._preset_option_to_id(value)
         if preset_id == self.selected_preset_id:
             return
@@ -263,6 +271,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         touched_fields, touched_arcs = self._detect_manual_modifications()
         if touched_fields or touched_arcs:
+            # Continue with this path when touched fields is set or touched arcs is set.
             proceed = messagebox.askyesno(
                 "Apply preset",
                 "Some fields/arcs were already modified. Apply the preset without overwriting modified values?",
@@ -277,6 +286,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_preset_description()
 
     def _restore_selected_preset_label(self):
+        """Restore selected preset label."""
         if not hasattr(self, "preset_var"):
             return
         if not self.selected_preset_id:
@@ -286,6 +296,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.preset_var.set(f"{preset['name']} ({preset['id']})" if preset else "No preset")
 
     def _detect_manual_modifications(self) -> tuple[set[str], bool]:
+        """Internal helper for detect manual modifications."""
         touched_fields: set[str] = set()
 
         for key in ("name", "genre", "tone", "status"):
@@ -312,7 +323,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return touched_fields, bool(self.arcs)
 
     def _apply_preset(self, preset: dict, touched_fields: set[str], preserve_arcs: bool):
+        """Apply preset."""
         for key, value in (preset.get("form") or {}).items():
+            # Process each (key, value) from (preset.get('form') or {}).items().
             if key in touched_fields:
                 continue
             if key in self.form_vars:
@@ -332,6 +345,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             "notes": self.notes_box,
         }
         for key, value in (preset.get("text_areas") or {}).items():
+            # Process each (key, value) from (preset.get('text_areas') or {}).items().
             if key in touched_fields:
                 continue
             widget = text_widgets.get(key)
@@ -344,6 +358,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self._refresh_arcs_preview()
 
     def _build_arcs_step(self, parent):
+        """Build arcs step."""
         frame = ctk.CTkFrame(parent, **section_style())
         ctk.CTkLabel(frame, text="Arcs Planner", font=("Arial", 16, "bold"), text_color=EDITOR_PALETTE["text"]).pack(anchor="w", pady=(12, 6), padx=12)
 
@@ -451,6 +466,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return frame
 
     def _build_review_step(self, parent):
+        """Build review step."""
         frame = ctk.CTkFrame(parent, **section_style())
         ctk.CTkLabel(frame, text="Review", font=("Arial", 16, "bold"), text_color=EDITOR_PALETTE["text"]).pack(anchor="w", pady=(12, 6), padx=12)
         self.review_box = ctk.CTkTextbox(frame, height=520, fg_color=EDITOR_PALETTE["surface_soft"], border_width=1, border_color=EDITOR_PALETTE["border"])
@@ -459,17 +475,20 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return frame
 
     def _labeled_entry(self, parent, label: str, key: str, col: int):
+        """Internal helper for labeled entry."""
         ctk.CTkLabel(parent, text=label, text_color=EDITOR_PALETTE["text"]).grid(row=0, column=col, sticky="w", padx=(8 if col else 0, 4))
         ctk.CTkEntry(parent, textvariable=self.form_vars[key], **toolbar_entry_style()).grid(row=1, column=col, sticky="ew", padx=(8 if col else 0, 4))
         parent.grid_columnconfigure(col, weight=1)
 
     def _labeled_box(self, parent, label: str, height: int):
+        """Internal helper for labeled box."""
         ctk.CTkLabel(parent, text=label, text_color=EDITOR_PALETTE["text"]).pack(anchor="w")
         box = ctk.CTkTextbox(parent, height=height, fg_color=EDITOR_PALETTE["surface_soft"], border_width=1, border_color=EDITOR_PALETTE["border"])
         box.pack(fill="x", pady=(0, 8))
         return box
 
     def _show_step(self, index: int):
+        """Show step."""
         self.current_step = max(0, min(index, len(self.steps) - 1))
         for idx, frame in enumerate(self.steps):
             if idx == self.current_step:
@@ -485,15 +504,18 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.next_btn.configure(text="Next", command=self._go_next)
 
     def _go_back(self):
+        """Internal helper for go back."""
         self._show_step(self.current_step - 1)
 
     def _go_next(self):
+        """Internal helper for go next."""
         if self.current_step == 0 and not self.form_vars["name"].get().strip():
             messagebox.showwarning("Missing data", "Campaign name is required.", parent=self)
             return
         self._show_step(self.current_step + 1)
 
     def _add_arc(self):
+        """Internal helper for add arc."""
         arc_name = f"Arc {len(self.arcs) + 1}"
         self.arcs.append(
             self._normalize_arc_dict(
@@ -512,6 +534,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.after(50, lambda: self.arc_detail_form.name_entry.focus_set())
 
     def _edit_selected_arc(self):
+        """Internal helper for edit selected arc."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
             messagebox.showinfo("No arc", "Add at least one arc first.", parent=self)
@@ -521,6 +544,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.arc_detail_form.name_entry.focus_set()
 
     def _create_scenario_for_selected_arc(self):
+        """Create scenario for selected arc."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
             messagebox.showinfo("No arc", "Select or add an arc first.", parent=self)
@@ -533,6 +557,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         }
 
         def _on_embedded_result(payload):
+            """Handle embedded result."""
             self._on_embedded_scenario_created(payload, selected_index)
 
         wizard = ScenarioBuilderWizard(
@@ -547,6 +572,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         wizard.focus_force()
 
     def _on_embedded_scenario_created(self, payload: dict, arc_index: int):
+        """Handle embedded scenario created."""
         if arc_index < 0 or arc_index >= len(self.arcs):
             return
         scenario = (payload or {}).get("scenario") or {}
@@ -565,6 +591,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_review()
 
     def _move_arc_up(self):
+        """Move arc up."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None or selected_index == 0:
             return
@@ -573,6 +600,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_arcs_preview()
 
     def _move_arc_down(self):
+        """Move arc down."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None or selected_index >= len(self.arcs) - 1:
             return
@@ -581,6 +609,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_arcs_preview()
 
     def _duplicate_selected_arc(self):
+        """Internal helper for duplicate selected arc."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
             return
@@ -590,6 +619,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_arcs_preview()
 
     def _delete_selected_arc(self):
+        """Delete selected arc."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
             return
@@ -609,6 +639,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_arcs_preview()
 
     def _generate_arcs_from_scenarios(self):
+        """Internal helper for generate arcs from scenarios."""
         if not self.scenario_titles:
             messagebox.showwarning("No scenarios", "Load or create scenarios before generating arcs.", parent=self)
             return
@@ -617,12 +648,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._set_interactive_controls_enabled(False)
 
         def _worker():
+            """Internal helper for worker."""
             service = ArcGenerationService(self._get_ai(), self.scenario_wrapper)
             result = service.generate_arcs(foundation)
             generated_arcs = [dict(arc) for arc in (result.get("arcs") or []) if isinstance(arc, dict)]
             self.after(0, lambda: _on_success(generated_arcs))
 
         def _on_success(generated_arcs: list[dict]):
+            """Handle success."""
             self._set_interactive_controls_enabled(True)
             if not generated_arcs:
                 messagebox.showwarning("No arcs", "The AI did not return any usable arcs.", parent=self)
@@ -634,12 +667,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             messagebox.showinfo("Arcs generated", f"Applied {len(generated_arcs)} AI-generated arc(s).", parent=self)
 
         def _on_error(exc: Exception):
+            """Handle error."""
             self._set_interactive_controls_enabled(True)
             messagebox.showerror("Arc generation failed", f"Unable to generate arcs: {exc}", parent=self)
 
         self._run_in_worker(_worker, on_error=_on_error)
 
     def _build_arc_generation_foundation(self) -> dict:
+        """Build arc generation foundation."""
         return {
             "name": self.form_vars["name"].get().strip(),
             "genre": self.form_vars["genre"].get().strip(),
@@ -658,6 +693,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         }
 
     def _open_generation_defaults_dialog(self):
+        """Open generation defaults dialog."""
         dialog = CampaignGenerationDefaultsDialog(self, initial_state=self.generation_defaults)
         self.wait_window(dialog)
         if not dialog.result_state:
@@ -666,6 +702,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         messagebox.showinfo("Defaults saved", "AI generation defaults saved for this campaign database.", parent=self)
 
     def _generate_scenarios_per_arc(self, *, existing_scenarios: list[dict] | None = None):
+        """Internal helper for generate scenarios per arc."""
         try:
             self._validate_arcs_for_scenario_generation()
         except ArcScenarioExpansionValidationError as exc:
@@ -677,6 +714,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._set_interactive_controls_enabled(False)
 
         def _worker():
+            """Internal helper for worker."""
             service = ArcScenarioExpansionService(self._get_ai())
             generated_payload = service.generate_scenarios(
                 foundation,
@@ -686,6 +724,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self.after(0, lambda: _on_generated(generated_payload))
 
         def _on_generated(generated_payload: dict):
+            """Handle generated."""
             self._set_interactive_controls_enabled(True)
             accepted_payload = self._preview_generated_arc_scenarios(generated_payload)
             if not accepted_payload:
@@ -701,6 +740,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
                 return
 
             try:
+                # Keep on generated resilient if this step fails.
                 save_result = persistence.save_from_dry_run(accepted_payload, self.arcs, dry_run)
                 saved_groups = save_result.get("saved_groups") or []
             except CampaignForgePersistenceError as exc:
@@ -722,6 +762,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             )
 
         def _on_error(exc: Exception):
+            """Handle error."""
             self._set_interactive_controls_enabled(True)
             messagebox.showerror("Scenario generation failed", f"Unable to generate scenarios: {exc}", parent=self)
 
@@ -736,6 +777,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._generate_scenarios_per_arc(existing_scenarios=existing_scenarios)
 
     def _forge_full_campaign(self):
+        """Internal helper for forge full campaign."""
         request_id = self._resolve_ai_request_id()
         pipeline_started = time.perf_counter()
         foundation = self._build_arc_generation_foundation()
@@ -758,6 +800,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._set_interactive_controls_enabled(False)
 
         def _worker():
+            """Internal helper for worker."""
             stage_started = time.perf_counter()
             ai_pipeline_events.emit(
                 AIPipelineEvent(
@@ -770,6 +813,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             self._log_forge_event("campaign_forge.ui.stage.start", "arcs_started", stage="arcs")
             arcs_for_pipeline = [self._normalize_arc_dict(arc) for arc in arcs_snapshot if (arc.get("name") or "").strip()]
             if not arcs_for_pipeline:
+                # Handle the branch where arcs for pipeline is unavailable.
                 if not scenario_titles_snapshot:
                     raise ArcScenarioExpansionValidationError(
                         "No scenarios available to generate arcs. Add scenarios or create arcs manually first."
@@ -824,6 +868,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             ))
 
         def _on_error(exc: Exception):
+            """Handle error."""
             ai_pipeline_events.emit(
                 AIPipelineEvent(
                     event_type=EVENT_AI_PIPELINE_FAILED,
@@ -860,6 +905,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         generated_payload: dict,
         generated_counts: dict[str, int],
     ):
+        """Handle forge generation ready."""
         self.arcs = [self._normalize_arc_dict(arc) for arc in arcs_for_pipeline if (arc.get("name") or "").strip()]
         self.current_arc_index = 0 if self.arcs else None
         self._refresh_arcs_preview()
@@ -911,6 +957,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         )
         self._log_forge_event("campaign_forge.ui.stage.start", "save_started", stage="save")
         try:
+            # Keep on forge generation ready resilient if this step fails.
             persistence = CampaignForgePersistence(
                 self.scenario_wrapper,
                 campaign_wrapper=self.campaign_wrapper,
@@ -983,13 +1030,16 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         )
 
     def _load_existing_scenarios_for_pipeline(self) -> list[dict]:
+        """Load existing scenarios for pipeline."""
         try:
             return self.scenario_wrapper.load_items() if self.scenario_wrapper else []
         except Exception:
             return []
 
     def _forge_pipeline_generate_or_normalize_arcs(self):
+        """Internal helper for forge pipeline generate or normalize arcs."""
         if self.arcs:
+            # Continue with this path when arcs is set.
             self.arcs = [self._normalize_arc_dict(arc) for arc in self.arcs if (arc.get("name") or "").strip()]
             self.current_arc_index = 0 if self.arcs else None
             self._refresh_arcs_preview()
@@ -1009,6 +1059,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._apply_generated_arcs(generated_arcs, merge=False)
 
     def _build_campaign_save_payload(self) -> dict:
+        """Build campaign save payload."""
         return build_campaign_payload(
             form_data={
                 **{k: var.get() for k, var in self.form_vars.items()},
@@ -1025,6 +1076,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         )
 
     def _resolve_ai_request_id(self) -> str:
+        """Resolve AI request ID."""
         root = self.winfo_toplevel()
         controller = getattr(root, "ai_run_window_controller", None)
         if controller and hasattr(controller, "new_request_id"):
@@ -1033,6 +1085,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
 
     def _confirm_campaign_forge_dry_run(self, dry_run: dict, *, title: str) -> bool:
+        """Internal helper for confirm campaign forge dry run."""
         scenarios_summary = dry_run.get("scenarios", {}).get("summary", {})
         arc_summary = dry_run.get("arc_linkage", {}).get("summary", {})
         message = (
@@ -1045,6 +1098,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return messagebox.askyesno(title, message, parent=self)
 
     def _create_pipeline_progress_dialog(self, title: str, stages: list[str]):
+        """Create pipeline progress dialog."""
         dialog = ctk.CTkToplevel(self)
         dialog.title("Campaign Forge Progress")
         dialog.geometry("560x320")
@@ -1079,11 +1133,13 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         }
 
     def _update_pipeline_progress(self, progress_dialog: dict, stage_index: int, message: str):
+        """Update pipeline progress."""
         progress_dialog["stage_var"].set(message)
         total_stages = max(1, len(progress_dialog["stages"]))
         progress_dialog["progress_bar"].set((stage_index + 1) / total_stages)
         stage_lines = []
         for idx, label in enumerate(progress_dialog["stages"]):
+            # Process each (idx, label) from enumerate(progress_dialog['stages']).
             if idx < stage_index:
                 prefix = "✓"
             elif idx == stage_index:
@@ -1099,6 +1155,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.update()
 
     def _log_forge_event(self, event: str, action: str, *, level: str = "info", **details):
+        """Internal helper for log forge event."""
         detail_parts = [f"{key}={details[key]!r}" for key in sorted(details.keys())]
         message = f"event={event} action={action}"
         if detail_parts:
@@ -1114,17 +1171,21 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     @staticmethod
     def _elapsed_ms(started_at: float) -> int:
+        """Internal helper for elapsed ms."""
         return max(0, int((time.perf_counter() - started_at) * 1000))
 
     @staticmethod
     def _summarize_generated_counts(payload: dict) -> dict[str, int]:
+        """Internal helper for summarize generated counts."""
         arc_groups = [item for item in (payload.get("arcs") or []) if isinstance(item, dict)]
         scenario_count = 0
         scene_count = 0
         for group in arc_groups:
+            # Process each group from arc_groups.
             scenarios = [item for item in (group.get("scenarios") or []) if isinstance(item, dict)]
             scenario_count += len(scenarios)
             for scenario in scenarios:
+                # Process each scenario from scenarios.
                 scenes = scenario.get("scene_ideas") or scenario.get("scenes") or []
                 if isinstance(scenes, list):
                     scene_count += len([scene for scene in scenes if isinstance(scene, dict)])
@@ -1135,19 +1196,24 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         }
 
     def _register_interactive_control(self, *widgets):
+        """Register interactive control."""
         for widget in widgets:
             if widget and widget not in self._interactive_controls:
                 self._interactive_controls.append(widget)
 
     def _set_interactive_controls_enabled(self, enabled: bool):
+        """Set interactive controls enabled."""
         state = "normal" if enabled else "disabled"
         for widget in self._interactive_controls:
             if widget.winfo_exists():
                 widget.configure(state=state)
 
     def _run_in_worker(self, worker, *, on_error=None):
+        """Run in worker."""
         def _runner():
+            """Internal helper for runner."""
             try:
+                # Keep runner resilient if this step fails.
                 worker()
             except Exception as exc:  # pragma: no cover - threaded failure path
                 if on_error:
@@ -1161,15 +1227,18 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         threading.Thread(target=_runner, daemon=True).start()
 
     def _validate_arcs_for_scenario_generation(self):
+        """Validate arcs for scenario generation."""
         if not self.arcs:
             raise ArcScenarioExpansionValidationError("Add at least one arc before generating scenarios.")
 
         for arc in self.arcs:
+            # Process each arc from arcs.
             error_message = ArcEditorDialog.validate_generation_requirements(arc)
             if error_message:
                 raise ArcScenarioExpansionValidationError(error_message)
 
     def _preview_generated_arc_scenarios(self, generated_payload: dict) -> dict | None:
+        """Internal helper for preview generated arc scenarios."""
         arc_metadata_by_name = {
             str(arc.get("name") or "").strip().casefold(): arc for arc in self.arcs if isinstance(arc, dict)
         }
@@ -1181,6 +1250,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         )
 
     def _build_campaign_forge_summary(self) -> str:
+        """Build campaign forge summary."""
         name = self.form_vars["name"].get().strip() if hasattr(self, "form_vars") else ""
         genre = self.form_vars["genre"].get().strip() if hasattr(self, "form_vars") else ""
         tone = self.form_vars["tone"].get().strip() if hasattr(self, "form_vars") else ""
@@ -1198,6 +1268,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return "\n".join(summary_bits)
 
     def _confirm_generated_arc_action(self, generated_count: int) -> str:
+        """Internal helper for confirm generated arc action."""
         if not self.arcs:
             return "replace"
 
@@ -1211,6 +1282,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return "replace" if replace_existing else "merge"
 
     def _apply_generated_arcs(self, generated_arcs: list[dict], merge: bool = False):
+        """Apply generated arcs."""
         normalized_generated = [self._normalize_arc_dict(arc) for arc in generated_arcs if arc.get("name")]
         if merge:
             self.arcs = self._merge_arcs(self.arcs, normalized_generated)
@@ -1221,9 +1293,11 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_review()
 
     def _merge_arcs(self, existing_arcs: list[dict], generated_arcs: list[dict]) -> list[dict]:
+        """Merge arcs."""
         merged = [self._normalize_arc_dict(arc) for arc in existing_arcs if arc.get("name")]
         existing_names = {arc["name"].casefold() for arc in merged}
         for arc in generated_arcs:
+            # Process each arc from generated_arcs.
             normalized = self._normalize_arc_dict(arc)
             if normalized["name"].casefold() in existing_names:
                 continue
@@ -1233,6 +1307,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     @staticmethod
     def _normalize_arc_dict(arc: dict) -> dict:
+        """Normalize arc dict."""
         return {
             "name": (arc.get("name") or "").strip(),
             "summary": (arc.get("summary") or "").strip(),
@@ -1243,6 +1318,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         }
 
     def _get_ai(self):
+        """Return AI."""
         if self._ai_client is None:
             from modules.ai.local_ai_client import LocalAIClient
 
@@ -1250,6 +1326,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return self._ai_client
 
     def _get_selected_arc_index(self) -> int | None:
+        """Return selected arc index."""
         if not self.arcs:
             return None
         if self.current_arc_index is None:
@@ -1259,12 +1336,14 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return self.current_arc_index
 
     def _on_arc_card_selected(self, selected_index: int):
+        """Handle arc card selected."""
         if selected_index < 0 or selected_index >= len(self.arcs):
             return
         self.current_arc_index = selected_index
         self._refresh_arcs_preview()
 
     def _on_arc_details_changed(self):
+        """Handle arc details changed."""
         selected_index = self._get_selected_arc_index()
         if selected_index is None:
             return
@@ -1274,6 +1353,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._refresh_review()
 
     def _refresh_arcs_preview(self):
+        """Refresh arcs preview."""
         if not self.arcs:
             self.current_arc_index = None
         elif self.current_arc_index is None:
@@ -1287,6 +1367,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.arc_detail_form.set_arc(selected_arc)
 
     def _refresh_review(self):
+        """Refresh review."""
         if not hasattr(self, "review_box"):
             return
 
@@ -1310,7 +1391,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.review_box.configure(state="disabled")
 
     def _save_campaign(self):
+        """Save campaign."""
         try:
+            # Keep campaign resilient if this step fails.
             payload = self._build_campaign_save_payload()
             self.campaign_wrapper.save_item(
                 payload,
@@ -1326,6 +1409,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
 
     def _load_existing_campaign(self):
+        """Load existing campaign."""
         campaign_payload = self._choose_existing_campaign()
         if not campaign_payload:
             return
@@ -1337,7 +1421,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._show_step(0)
 
     def _choose_existing_campaign(self):
+        """Internal helper for choose existing campaign."""
         try:
+            # Keep choose existing campaign resilient if this step fails.
             template = load_template("campaigns")
         except Exception as exc:
             log_exception(
@@ -1371,6 +1457,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         return result["payload"]
 
     def _apply_campaign_to_form(self, campaign_data: dict):
+        """Apply campaign to form."""
         form_data, text_areas, arcs = build_form_state_from_campaign(campaign_data)
 
         for key in ("name", "genre", "tone", "status"):
@@ -1394,25 +1481,30 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     @staticmethod
     def _set_textbox_value(textbox: ctk.CTkTextbox, value: str):
+        """Set textbox value."""
         textbox.delete("1.0", "end")
         textbox.insert("1.0", value or "")
 
     @staticmethod
     def _load_scenario_titles(scenario_wrapper) -> list[str]:
+        """Load scenario titles."""
         try:
             scenarios = scenario_wrapper.load_items() if scenario_wrapper else []
         except Exception:
             return []
         titles = []
         for scenario in scenarios:
+            # Process each scenario from scenarios.
             title = (scenario.get("Title") or scenario.get("Name") or "").strip()
             if title and title not in titles:
                 titles.append(title)
         return titles
 
     def _refresh_scenario_titles_from_saved_groups(self, saved_groups: list[dict]) -> None:
+        """Refresh scenario titles from saved groups."""
         for group in saved_groups:
             for scenario in group.get("scenarios") or []:
+                # Process each scenario from group.get('scenarios') or [].
                 title = str(scenario.get("Title") or "").strip()
                 if title and title not in self.scenario_titles:
                     self.scenario_titles.append(title)

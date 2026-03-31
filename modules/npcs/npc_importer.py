@@ -1,3 +1,5 @@
+"""Import helpers for NPC."""
+
 import json
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -13,6 +15,7 @@ def normalize_npc_payload(payload):
         return payload
     if isinstance(payload, dict):
         for key in ("npcs", "NPCs"):
+            # Process each key from ('npcs', 'NPCs').
             value = payload.get(key)
             if isinstance(value, list):
                 return value
@@ -30,6 +33,7 @@ def import_npc_records(payload) -> int:
     existing = wrapper.load_items()
     new_items = []
     for raw in npcs:
+        # Process each raw from npcs.
         if not isinstance(raw, dict):
             continue
         item = {
@@ -67,6 +71,7 @@ def import_npcs_from_json(raw_text: str) -> int:
 
 
 def build_npc_schema() -> dict:
+    """Build NPC schema."""
     return {
         "npcs": [
             {
@@ -92,6 +97,7 @@ def build_npc_schema() -> dict:
 
 
 def build_npc_prompt(raw_text: str, source_label: str) -> str:
+    """Build NPC prompt."""
     schema = build_npc_schema()
     return (
         "You are an assistant that extracts NPC profiles from tabletop RPG PDFs.\n"

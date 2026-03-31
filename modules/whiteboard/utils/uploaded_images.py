@@ -1,3 +1,5 @@
+"""Utilities for whiteboard uploaded images."""
+
 from __future__ import annotations
 
 import uuid
@@ -27,6 +29,7 @@ class UploadedImage:
 
 
 def _uploads_root() -> Path:
+    """Internal helper for uploads root."""
     base = Path(ConfigHelper.get_campaign_dir())
     uploads = base / UPLOAD_DIR_NAME
     uploads.mkdir(parents=True, exist_ok=True)
@@ -34,13 +37,16 @@ def _uploads_root() -> Path:
 
 
 def is_allowed_extension(filename: str | None) -> bool:
+    """Return whether allowed extension."""
     if not filename:
         return False
     return Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
 
 def _normalize_size(value: Iterable[float] | None, default: int) -> int:
+    """Normalize size."""
     try:
+        # Keep size resilient if this step fails.
         if value is None:
             return default
         if isinstance(value, (int, float)):
@@ -48,6 +54,7 @@ def _normalize_size(value: Iterable[float] | None, default: int) -> int:
     except Exception:
         return default
     try:
+        # Keep size resilient if this step fails.
         numeric = list(value)
         if numeric:
             return max(1, int(numeric[0]))
@@ -73,6 +80,7 @@ def save_uploaded_image(file_storage) -> UploadedImage:
         pass
 
     try:
+        # Keep uploaded image resilient if this step fails.
         with Image.open(file_storage.stream) as img:
             convert_mode = "RGB" if extension in {".jpg", ".jpeg"} else "RGBA"
             safe_image = img.convert(convert_mode)
@@ -87,6 +95,7 @@ def save_uploaded_image(file_storage) -> UploadedImage:
 
 
 def resolve_uploaded_asset(asset_key: str | None) -> str | None:
+    """Resolve uploaded asset."""
     if not asset_key:
         return None
     candidate = _uploads_root() / asset_key
@@ -97,6 +106,7 @@ def resolve_uploaded_asset(asset_key: str | None) -> str | None:
 
 @lru_cache(maxsize=64)
 def load_scaled_upload(asset_key: str, width: int, height: int) -> Image.Image:
+    """Load scaled upload."""
     path = resolve_uploaded_asset(asset_key)
     if not path:
         raise FileNotFoundError("Uploaded image not found")
@@ -109,4 +119,5 @@ def load_scaled_upload(asset_key: str, width: int, height: int) -> Image.Image:
 
 
 def clear_upload_cache() -> None:
+    """Clear upload cache."""
     load_scaled_upload.cache_clear()

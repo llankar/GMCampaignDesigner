@@ -1,3 +1,4 @@
+"""Client helpers for local AI."""
 import requests
 import json
 import platform
@@ -25,6 +26,7 @@ class LocalAIClient:
     """
 
     def __init__(self):
+        """Initialize the LocalAIClient instance."""
         # Default to local webserver compatible with /api/generate
         self.base_url = (ConfigHelper.get("AI", "base_url", fallback="http://127.0.0.1:11434") or "").rstrip("/")
         self.api_key = ConfigHelper.get("AI", "api_key", fallback=None)
@@ -67,6 +69,7 @@ class LocalAIClient:
         # caller receives the full response text instead of the first chunk.
         json_lines = []
         for line in s.splitlines():
+            # Process each line from s.splitlines().
             line = line.strip()
             if not line or line[0] not in "[{":
                 continue
@@ -75,17 +78,20 @@ class LocalAIClient:
             except Exception:
                 continue
         if json_lines:
+            # Continue with this path when JSON lines is set.
             if len(json_lines) == 1:
                 return json_lines[0]
             aggregated = {}
             responses = []
             for item in json_lines:
+                # Process each item from json_lines.
                 if not isinstance(item, dict):
                     continue
                 text = item.get("response")
                 if isinstance(text, str):
                     responses.append(text)
                 for key, value in item.items():
+                    # Process each (key, value) from item.items().
                     if key == "response":
                         continue
                     aggregated[key] = value
@@ -102,17 +108,21 @@ class LocalAIClient:
         index = 0
         length = len(s)
         while index < length and s[index] not in "{[":
+            # Keep looping while index < length and s[index] is not in '{['.
             index += 1
         if index >= length:
+            # Handle the branch where index >= length.
             table_data = LocalAIClient._parse_markdown_table(s)
             if table_data is not None:
                 return table_data
             raise RuntimeError("No JSON object found in response")
         try:
+            # Keep JSON safe resilient if this step fails.
             obj, _ = decoder.raw_decode(s, idx=index)
             return obj
         except Exception:
             for line in s.splitlines():
+                # Process each line from s.splitlines().
                 line = line.strip()
                 if not line or line[0] not in "{[":
                     continue
@@ -138,6 +148,7 @@ class LocalAIClient:
         block = []
 
         def flush_block():
+            """Handle flush block."""
             nonlocal block
             if not block:
                 return None
@@ -159,6 +170,7 @@ class LocalAIClient:
                 return None
             rows = []
             for row_line in block[1:]:
+                # Process each row_line from block[1:].
                 stripped = row_line.strip()
                 if not stripped:
                     continue
@@ -179,6 +191,7 @@ class LocalAIClient:
 
         for line in lines:
             if "|" in line:
+                # Handle the branch where '|' is in line.
                 block.append(line)
             else:
                 result = flush_block()
@@ -214,6 +227,7 @@ class LocalAIClient:
             tf.write(script)
             ps1 = tf.name
         try:
+            # Keep powershell generate resilient if this step fails.
             run = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ps1],
                 capture_output=True, check=True
@@ -221,6 +235,7 @@ class LocalAIClient:
         except subprocess.CalledProcessError as e:
             # Decode stderr/stdout robustly for diagnostics
             def _dec(b):
+                """Internal helper for dec."""
                 for enc in ("utf-8", "utf-16-le", "utf-16", "cp65001", "cp1252", "latin-1"):
                     try:
                         return (b or b"").decode(enc)
@@ -238,6 +253,7 @@ class LocalAIClient:
 
         # Decode stdout robustly
         def _dec(b):
+            """Internal helper for dec."""
             for enc in ("utf-8", "utf-16-le", "utf-16", "cp65001", "cp1252", "latin-1"):
                 try:
                     return (b or b"").decode(enc)
@@ -261,6 +277,7 @@ class LocalAIClient:
         """
         # Build a single prompt string from chat-style messages
         def _to_prompt(msgs):
+            """Internal helper for to prompt."""
             if isinstance(msgs, str):
                 return msgs
             parts = []
@@ -304,13 +321,17 @@ class LocalAIClient:
 
         # Prefer Ollama/text-gen style response key
         if isinstance(data, dict):
+            # Handle the branch where isinstance(data, dict).
             if "response" in data and isinstance(data["response"], str):
                 return data["response"].strip()
             # OpenAI-compatible fallbacks
             if "choices" in data and data["choices"]:
+                # Handle the branch where 'choices' is in data and data['choices'].
                 choice = data["choices"][0]
                 if isinstance(choice, dict):
+                    # Handle the branch where isinstance(choice, dict).
                     if "message" in choice and isinstance(choice["message"], dict):
+                        # Handle the branch where 'message' is in choice and isinstance(choice['message'], dict).
                         content = choice["message"].get("content")
                         if isinstance(content, str):
                             return content.strip()

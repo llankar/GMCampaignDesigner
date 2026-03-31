@@ -1,3 +1,5 @@
+"""Regression tests for campaign dashboard data."""
+
 import importlib.util
 from pathlib import Path
 
@@ -10,6 +12,7 @@ extract_campaign_fields = module.extract_campaign_fields
 
 
 def test_extract_campaign_fields_hides_linked_scenarios_and_keeps_raw_arcs():
+    """Verify that extract campaign fields hides linked scenarios and keeps raw arcs."""
     campaign = {
         "Name": "Dragonfall",
         "Arcs": {"text": '[{"name": "Arc One"}]'},

@@ -1,3 +1,4 @@
+"""Execution helpers for runtime AI pipeline."""
 from __future__ import annotations
 
 from time import perf_counter
@@ -17,6 +18,7 @@ class AIPipelineRunner:
     """Common runtime wrapper for LocalAIClient.chat calls and pipeline events."""
 
     def __init__(self, ai_client, pipeline_name: str, request_id: str | None = None) -> None:
+        """Initialize the AIPipelineRunner instance."""
         self.ai_client = ai_client
         self.pipeline_name = pipeline_name
         self.request_id = request_id or str(uuid4())
@@ -26,6 +28,7 @@ class AIPipelineRunner:
         """Serialize the exact conversation payload sent to the model."""
         lines: list[str] = []
         for idx, message in enumerate(messages or [], start=1):
+            # Process each (idx, message) from enumerate(messages or [], start=1).
             if isinstance(message, dict):
                 role = str(message.get("role") or "unknown").strip() or "unknown"
                 content = str(message.get("content") or "")
@@ -58,6 +61,7 @@ class AIPipelineRunner:
         return response_text, metadata
 
     def emit_phase(self, phase: str, message: str = "", **metadata) -> None:
+        """Handle emit phase."""
         publish_local_ai_event(
             event_type=EVENT_AI_PIPELINE_PHASE,
             request_id=self.request_id,
@@ -75,6 +79,7 @@ class AIPipelineRunner:
         context_metadata: dict | None = None,
         **chat_kwargs,
     ):
+        """Run chat."""
         context_metadata = context_metadata or {}
         action_label = str(context_metadata.get("action_label") or "").strip()
         feature = context_metadata.get("feature") or self.pipeline_name
@@ -105,6 +110,7 @@ class AIPipelineRunner:
 
         started = perf_counter()
         try:
+            # Keep chat resilient if this step fails.
             response_text = self.ai_client.chat(messages, **chat_kwargs)
         except Exception as exc:
             publish_local_ai_event(
@@ -146,6 +152,7 @@ def execute_ai_chat(
     context_metadata: dict | None = None,
     **chat_kwargs,
 ):
+    """Handle execute AI chat."""
     runner = AIPipelineRunner(ai_client=ai_client, pipeline_name=pipeline_name, request_id=request_id)
     return runner.run_chat(
         messages,

@@ -1,3 +1,4 @@
+﻿"""GM screen browser for campaign entities grouped by type."""
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +11,7 @@ _LABEL_KEYS = {"Scenarios": "Title", "Informations": "Title", "Books": "Title"}
 
 
 def scenario_label(item: dict[str, Any]) -> str:
+    """Handle scenario label."""
     return coerce_text(item.get("Title") or item.get("Name") or "Scenario").strip() or "Scenario"
 
 
@@ -23,6 +25,7 @@ def build_campaign_entity_catalog(wrappers: dict[str, Any]) -> list[dict[str, An
     catalog: list[dict[str, Any]] = []
 
     for entity_type in ENTITY_ORDER:
+        # Process each entity_type from ENTITY_ORDER.
         wrapper = wrappers.get(entity_type)
         if wrapper is None:
             continue
@@ -33,6 +36,7 @@ def build_campaign_entity_catalog(wrappers: dict[str, Any]) -> list[dict[str, An
 
         label_key = _LABEL_KEYS.get(entity_type, "Name")
         for raw in items:
+            # Process each raw from items.
             item = raw or {}
             cleaned_name = coerce_text(item.get(label_key)).strip()
             if not cleaned_name:
@@ -48,6 +52,7 @@ def build_campaign_entity_catalog(wrappers: dict[str, Any]) -> list[dict[str, An
     deduped: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for entry in catalog:
+        # Process each entry from catalog.
         key = (entry["entity_type"], entry["name"])
         if key in seen:
             continue
@@ -57,6 +62,7 @@ def build_campaign_entity_catalog(wrappers: dict[str, Any]) -> list[dict[str, An
 
 
 def build_option_index(catalog: list[dict[str, Any]]) -> tuple[list[str], dict[str, dict[str, Any]]]:
+    """Build option index."""
     options: list[str] = []
     index: dict[str, dict[str, Any]] = {}
     for entry in catalog:
@@ -67,6 +73,7 @@ def build_option_index(catalog: list[dict[str, Any]]) -> tuple[list[str], dict[s
 
 
 def extract_display_fields(entity_type: str, entity_item: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Extract display fields."""
     if not entity_item:
         return []
 
@@ -75,6 +82,7 @@ def extract_display_fields(entity_type: str, entity_item: dict[str, Any] | None)
     fields: list[dict[str, Any]] = []
 
     for field in template.get("fields", []):
+        # Process each field from template.get('fields', []).
         field_name = coerce_text(field.get("name")).strip()
         field_type = coerce_text(field.get("type")).strip() or "text"
         if not field_name:
@@ -85,6 +93,7 @@ def extract_display_fields(entity_type: str, entity_item: dict[str, Any] | None)
             continue
 
         if field_type == "list":
+            # Handle the branch where field_type == 'list'.
             items = [coerce_text(v).strip() for v in (value or []) if coerce_text(v).strip()]
             if not items:
                 continue
@@ -108,6 +117,7 @@ def extract_display_fields(entity_type: str, entity_item: dict[str, Any] | None)
 
 
 def _is_empty(value: Any) -> bool:
+    """Return whether empty."""
     if value is None:
         return True
     if isinstance(value, str):

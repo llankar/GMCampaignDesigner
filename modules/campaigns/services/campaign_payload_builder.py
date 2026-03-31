@@ -1,3 +1,5 @@
+"""Helpers for building campaign payloads."""
+
 from __future__ import annotations
 
 from modules.campaigns.models.campaign_blueprint import CampaignArc, CampaignBlueprint
@@ -16,6 +18,7 @@ def build_campaign_payload(form_data: dict, arcs_data: list[dict]) -> dict:
 
     arcs: list[CampaignArc] = []
     for raw_arc in arcs_data:
+        # Process each raw_arc from arcs_data.
         arc_name = (raw_arc.get("name") or "").strip()
         if not arc_name:
             continue
@@ -52,4 +55,5 @@ def build_campaign_payload(form_data: dict, arcs_data: list[dict]) -> dict:
 
 
 def _split_lines(value: str) -> list[str]:
+    """Internal helper for split lines."""
     return [line.strip() for line in str(value).splitlines() if line.strip()]

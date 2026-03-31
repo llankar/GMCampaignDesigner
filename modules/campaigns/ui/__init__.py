@@ -7,6 +7,7 @@ __all__ = ["CampaignBuilderWizard", "ArcEditorDialog"]
 
 
 def __getattr__(name: str):
+    """Handle getattr."""
     if name == "CampaignBuilderWizard":
         from .campaign_builder_wizard import CampaignBuilderWizard
 

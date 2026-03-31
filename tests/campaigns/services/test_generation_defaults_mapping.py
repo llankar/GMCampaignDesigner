@@ -1,3 +1,5 @@
+"""Regression tests for generation defaults mapping."""
+
 import json
 
 from modules.campaigns.services.generation_defaults_mapper import (
@@ -12,6 +14,7 @@ from modules.campaigns.services.generation_defaults_service import (
 
 
 def test_generation_defaults_payload_to_state_normalizes_lists_and_toggle():
+    """Verify that generation defaults payload to state normalizes lists and toggle."""
     state = generation_defaults_payload_to_state(
         {
             "main_pc_factions": ["  Dawn Guard  ", "dawn guard", ""],
@@ -30,6 +33,7 @@ def test_generation_defaults_payload_to_state_normalizes_lists_and_toggle():
 
 
 def test_generation_defaults_state_to_payload_round_trip():
+    """Verify that generation defaults state to payload round trip."""
     initial_state = {
         "main_pc_factions": ["Silver Banner", "Silver Banner", " Wayfinders "],
         "protected_factions": ["Archive Keepers"],
@@ -44,12 +48,15 @@ def test_generation_defaults_state_to_payload_round_trip():
 
 
 def test_generation_defaults_service_save_and_load_uses_json_payload():
+    """Verify that generation defaults service save and load uses JSON payload."""
     stored = {}
 
     def _get_setting(key, default=None):
+        """Return setting."""
         return stored.get(key, default)
 
     def _set_setting(key, value):
+        """Set setting."""
         stored[key] = value
 
     service = CampaignGenerationDefaultsService(get_setting=_get_setting, set_setting=_set_setting)
@@ -71,6 +78,7 @@ def test_generation_defaults_service_save_and_load_uses_json_payload():
 
 
 def test_generation_defaults_service_load_falls_back_for_invalid_json():
+    """Verify that generation defaults service load falls back for invalid JSON."""
     service = CampaignGenerationDefaultsService(
         get_setting=lambda _key, _default=None: "{not-valid-json}",
         set_setting=lambda _key, _value: None,

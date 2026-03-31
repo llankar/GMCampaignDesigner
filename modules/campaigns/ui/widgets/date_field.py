@@ -1,3 +1,5 @@
+"""Field helpers for campaign date."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -10,6 +12,7 @@ class CampaignDateField(ctk.CTkFrame):
     """Labeled campaign date input with integrated calendar picker."""
 
     def __init__(self, master, *, label: str, initial_value: str = ""):
+        """Initialize the CampaignDateField instance."""
         super().__init__(master, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
 
@@ -29,7 +32,9 @@ class CampaignDateField(ctk.CTkFrame):
         self.picker.grid(row=1, column=0, sticky="ew")
 
     def get(self) -> str:
+        """Return the operation."""
         return self.picker.get()
 
     def set(self, value) -> None:
+        """Set the operation."""
         self.picker.set(value)

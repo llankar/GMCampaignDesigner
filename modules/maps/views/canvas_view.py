@@ -1,3 +1,5 @@
+"""View for map canvas."""
+
 import tkinter as tk
 from PIL import ImageDraw
 from modules.helpers.logging_helper import log_module_import
@@ -7,6 +9,7 @@ log_module_import(__name__)
 MIN_ZOOM = 0.01  # Minimum zoom level to prevent division by zero
 
 def _build_canvas(self):
+    """Build canvas."""
     self.canvas = tk.Canvas(self.parent, bg="black", highlightthickness=0)
     self.canvas.pack(fill="both", expand=True)
 
@@ -45,6 +48,7 @@ def _build_canvas(self):
     self.canvas.bind("<MouseWheel>",       self.on_zoom)
     # Ensure canvas resizes with parent, accounting for toolbar height when present
     def _on_parent_configure(_e=None):
+        """Handle parent configure."""
         try:
             pw = int(self.parent.winfo_width())
             ph = int(self.parent.winfo_height())
@@ -87,10 +91,12 @@ def _on_delete_key(self, event=None):
     """Delete the hovered marker or the currently selected item when Delete is pressed."""
     hovered_marker = getattr(self, "_hovered_marker", None)
     if hovered_marker and hovered_marker in getattr(self, "tokens", []):
+        # Handle the branch where hovered marker is set and hovered marker is in getattr(self, 'tokens', []).
         entry_widget = hovered_marker.get("entry_widget")
         entry_has_focus = False
         if entry_widget and entry_widget.winfo_exists():
             try:
+                # Keep on delete key resilient if this step fails.
                 focus_widget = entry_widget.focus_get()
             except tk.TclError:
                 focus_widget = None
@@ -102,6 +108,7 @@ def _on_delete_key(self, event=None):
                 )
                 entry_has_focus = focus_widget in [w for w in candidate_widgets if w is not None]
         if not entry_has_focus:
+            # Handle the branch where entry has focus is unavailable.
             self._delete_item(hovered_marker)
             if getattr(self, "_hovered_marker", None) is hovered_marker:
                 self._hovered_marker = None

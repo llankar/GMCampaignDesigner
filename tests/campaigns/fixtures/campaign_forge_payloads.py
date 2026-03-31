@@ -1,7 +1,10 @@
+"""Regression tests for campaign forge payloads."""
+
 from __future__ import annotations
 
 
 def foundation_payload() -> dict:
+    """Handle foundation payload."""
     return {
         "name": "Stormfront",
         "genre": "Noir",
@@ -16,6 +19,7 @@ def foundation_payload() -> dict:
 
 
 def generated_arc_payload() -> dict:
+    """Handle generated arc payload."""
     return {
         "arcs": [
             {
@@ -31,6 +35,7 @@ def generated_arc_payload() -> dict:
 
 
 def generated_scenario_payload() -> dict:
+    """Handle generated scenario payload."""
     return {
         "arcs": [
             {
@@ -59,6 +64,7 @@ def generated_scenario_payload() -> dict:
 
 
 def malformed_but_normalizable_scenario_payload() -> str:
+    """Handle malformed but normalizable scenario payload."""
     return """
     {
       "arcs": [

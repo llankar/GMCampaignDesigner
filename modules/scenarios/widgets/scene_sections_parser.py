@@ -1,3 +1,5 @@
+"""Parsing helpers for scenario scene sections."""
+
 import re
 
 _SECTION_DEFINITIONS = (
@@ -18,10 +20,12 @@ _HEADER_BULLET_PREFIX = re.compile(r"^[•·●▪\-\*]\s*")
 
 
 def _normalize_line(line):
+    """Normalize line."""
     return str(line or "").strip()
 
 
 def _extract_items(section_text):
+    """Extract items."""
     lines = [_normalize_line(line) for line in str(section_text or "").splitlines()]
     lines = [line for line in lines if line]
     if not lines:
@@ -30,6 +34,7 @@ def _extract_items(section_text):
     bullet_items = []
     plain_chunks = []
     for line in lines:
+        # Process each line from lines.
         bullet_match = re.match(r"^[-*•–—]\s*(.+)$", line)
         numbered_match = re.match(r"^\d+[\.)]\s*(.+)$", line)
         if bullet_match:
@@ -45,6 +50,7 @@ def _extract_items(section_text):
     merged = " ".join(plain_chunks)
     candidates = [part.strip(" -•\t") for part in re.split(r"(?:\s*;\s+|\s{2,}|\n+)", merged) if part.strip()]
     if len(candidates) == 1:
+        # Handle the branch where len(candidates) == 1.
         sentence_candidates = [part.strip() for part in re.split(r"(?<=[.!?])\s+", candidates[0]) if part.strip()]
         if len(sentence_candidates) > 1:
             candidates = sentence_candidates
@@ -59,6 +65,7 @@ def parse_scene_body_sections(body_text):
     current_key = None
 
     for raw_line in lines:
+        # Process each raw_line from lines.
         line = raw_line.rstrip()
         line_without_bullet = _HEADER_BULLET_PREFIX.sub("", line, count=1)
         header_match = _HEADER_PATTERN.match(line_without_bullet)
@@ -74,6 +81,7 @@ def parse_scene_body_sections(body_text):
 
     sections = []
     for key, title, emoji in _SECTION_DEFINITIONS:
+        # Process each (key, title, emoji) from _SECTION_DEFINITIONS.
         raw_text = "\n".join(sections_buffer.get(key, [])).strip()
         if not raw_text:
             continue

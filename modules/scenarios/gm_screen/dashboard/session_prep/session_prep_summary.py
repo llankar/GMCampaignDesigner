@@ -1,3 +1,5 @@
+"""Utilities for dashboard session prep summary."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,6 +21,7 @@ class SessionPrepSummary:
 
 
 def build_session_prep_summary(fields: Iterable[dict[str, Any]]) -> SessionPrepSummary:
+    """Build session prep summary."""
     normalized_fields = list(fields)
     active_objectives = _collect_active_objectives(normalized_fields)
     in_progress_arcs = _collect_in_progress_arcs(normalized_fields)
@@ -32,8 +35,10 @@ def build_session_prep_summary(fields: Iterable[dict[str, Any]]) -> SessionPrepS
 
 
 def _collect_active_objectives(fields: list[dict[str, Any]]) -> list[str]:
+    """Collect active objectives."""
     objectives: list[str] = []
     for field in fields:
+        # Process each field from fields.
         name = str(field.get("name") or "")
         lowered = name.lower()
         if not any(keyword in lowered for keyword in _OBJECTIVE_KEYWORDS):
@@ -45,12 +50,15 @@ def _collect_active_objectives(fields: list[dict[str, Any]]) -> list[str]:
 
 
 def _collect_in_progress_arcs(fields: list[dict[str, Any]]) -> list[str]:
+    """Collect in progress arcs."""
     for field in fields:
+        # Process each field from fields.
         if str(field.get("name") or "").strip().lower() != "arcs":
             continue
 
         lines: list[str] = []
         for arc in coerce_arc_list(field.get("value")):
+            # Process each arc from coerce_arc_list(field.get('value')).
             status = str(arc.get("status") or "").strip().lower()
             if status != "in progress":
                 continue
@@ -67,8 +75,10 @@ def _collect_in_progress_arcs(fields: list[dict[str, Any]]) -> list[str]:
 
 
 def _collect_critical_reminders(fields: list[dict[str, Any]]) -> list[str]:
+    """Collect critical reminders."""
     reminders: list[str] = []
     for field in fields:
+        # Process each field from fields.
         name = str(field.get("name") or "")
         lowered = name.lower()
         mentions_actor_or_place = any(key in lowered for key in _NPC_KEYWORDS + _PLACE_KEYWORDS)
@@ -92,6 +102,7 @@ def _collect_critical_reminders(fields: list[dict[str, Any]]) -> list[str]:
 
 
 def _extract_text_values(field: dict[str, Any]) -> list[str]:
+    """Extract text values."""
     if field.get("type") == "list":
         raw_values = field.get("values") or []
         return [str(value).strip() for value in raw_values if str(value).strip()]
@@ -104,10 +115,12 @@ def _extract_text_values(field: dict[str, Any]) -> list[str]:
 
 
 def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
+    """Internal helper for dedupe preserve order."""
     ordered: list[str] = []
     seen: set[str] = set()
 
     for value in values:
+        # Process each value from values.
         key = value.strip().lower()
         if not key or key in seen:
             continue

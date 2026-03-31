@@ -1,3 +1,5 @@
+"""Controller for AI run window."""
+
 from __future__ import annotations
 
 from uuid import uuid4
@@ -17,11 +19,13 @@ from modules.ui.windows.ai_run_window.ai_run_window import AIRunWindow
 class AIRunWindowController:
     @staticmethod
     def _metadata_text(event: AIPipelineEvent, key: str) -> str:
+        """Internal helper for metadata text."""
         metadata = event.metadata or {}
         value = metadata.get(key)
         return str(value).strip() if value is not None else ""
 
     def __init__(self, app, menu_bar):
+        """Initialize the AIRunWindowController instance."""
         self.app = app
         self.menu_bar = menu_bar
         self._window: AIRunWindow | None = None
@@ -38,23 +42,29 @@ class AIRunWindowController:
         ai_request_state.subscribe(self._on_state_changed)
 
     def new_request_id(self) -> str:
+        """Handle new request ID."""
         return uuid4().hex
 
     def open_window(self) -> None:
+        """Open window."""
         window = self._ensure_window()
         window.show()
         ai_request_state.update(window_visibility="visible")
 
     def _ensure_window(self) -> AIRunWindow:
+        """Ensure window."""
         if self._window is None or not self._window.winfo_exists():
             self._window = AIRunWindow(self.app, on_close_requested=self._on_close_requested)
         return self._window
 
     def _on_close_requested(self) -> None:
+        """Handle close requested."""
         ai_request_state.update(window_visibility="hidden")
 
     def _on_pipeline_event(self, event: AIPipelineEvent) -> None:
+        """Handle pipeline event."""
         if event.event_type == EVENT_AI_PIPELINE_STARTED:
+            # Handle the branch where event.event_type == EVENT_AI_PIPELINE_STARTED.
             ai_request_state.clear_timeline()
             ai_request_state.update(
                 request_id=event.request_id,
@@ -72,6 +82,7 @@ class AIRunWindowController:
             return
 
         if event.event_type == EVENT_AI_PIPELINE_PHASE:
+            # Handle the branch where event.event_type == EVENT_AI_PIPELINE_PHASE.
             timeline = ai_request_state.state.timeline
             if timeline:
                 timeline[-1]["status"] = "done"
@@ -87,6 +98,7 @@ class AIRunWindowController:
             return
 
         if event.event_type in (EVENT_AI_PIPELINE_COMPLETED, EVENT_AI_PIPELINE_FAILED):
+            # Handle the branch where event type is in (EVENT_AI_PIPELINE_COMPLETED, EVENT_AI_PIPELINE_FAILED).
             timeline = ai_request_state.state.timeline
             if timeline:
                 timeline[-1]["status"] = "done" if event.event_type == EVENT_AI_PIPELINE_COMPLETED else "error"
@@ -104,7 +116,9 @@ class AIRunWindowController:
             self._schedule_auto_close_if_needed(event.event_type == EVENT_AI_PIPELINE_COMPLETED)
 
     def _schedule_auto_close_if_needed(self, is_success: bool) -> None:
+        """Schedule auto close if needed."""
         if self._auto_close_job is not None:
+            # Handle the branch where auto close job is available.
             try:
                 self.app.after_cancel(self._auto_close_job)
             except Exception:
@@ -118,12 +132,14 @@ class AIRunWindowController:
         self._auto_close_job = self.app.after(seconds * 1000, self._auto_close)
 
     def _auto_close(self) -> None:
+        """Internal helper for auto close."""
         self._auto_close_job = None
         if self._window and self._window.winfo_exists():
             self._window.withdraw()
             ai_request_state.update(window_visibility="hidden")
 
     def _on_state_changed(self, state):
+        """Handle state changed."""
         self._open_button.configure(text="AI Run*" if state.active else "AI Run")
         if self._window and self._window.winfo_exists():
             self._window.render(state)

@@ -1,3 +1,5 @@
+"""Regression tests for campaign storage."""
+
 from __future__ import annotations
 
 import os
@@ -14,6 +16,7 @@ from modules.campaigns.services.campaign_storage import (
 
 
 def test_normalize_campaign_db_path_returns_absolute_path(tmp_path: Path) -> None:
+    """Verify that normalize campaign DB path returns absolute path."""
     relative = tmp_path / "campaigns" / ".." / "campaigns" / "alpha.db"
 
     normalized = normalize_campaign_db_path(str(relative))
@@ -23,6 +26,7 @@ def test_normalize_campaign_db_path_returns_absolute_path(tmp_path: Path) -> Non
 
 
 def test_ensure_campaign_directory_creates_parent_directory(tmp_path: Path) -> None:
+    """Verify that ensure campaign directory creates parent directory."""
     db_path = tmp_path / "nested" / "campaign" / "state.db"
 
     normalized = ensure_campaign_directory(str(db_path))
@@ -32,6 +36,7 @@ def test_ensure_campaign_directory_creates_parent_directory(tmp_path: Path) -> N
 
 
 def test_seed_default_templates_copies_missing_templates(tmp_path: Path) -> None:
+    """Verify that seed default templates copies missing templates."""
     db_path = tmp_path / "campaigns" / "lot3.db"
     project_root = tmp_path / "project"
 
@@ -52,6 +57,7 @@ def test_seed_default_templates_copies_missing_templates(tmp_path: Path) -> None
 
 
 def test_seed_default_templates_preserves_existing_files(tmp_path: Path) -> None:
+    """Verify that seed default templates preserves existing files."""
     db_path = tmp_path / "campaigns" / "lot3.db"
     project_root = tmp_path / "project"
     entity_dir = project_root / "modules" / "pcs"
@@ -68,6 +74,7 @@ def test_seed_default_templates_preserves_existing_files(tmp_path: Path) -> None
 
 
 def test_seed_default_templates_uses_service_relative_project_root_when_not_provided(tmp_path: Path, monkeypatch) -> None:
+    """Verify that seed default templates uses service relative project root when not provided."""
     db_path = tmp_path / "campaigns" / "lot3.db"
     monkeypatch.chdir(tmp_path)
 
@@ -77,6 +84,7 @@ def test_seed_default_templates_uses_service_relative_project_root_when_not_prov
 
 
 def test_ensure_campaign_support_tables_creates_expected_tables() -> None:
+    """Verify that ensure campaign support tables creates expected tables."""
     conn = sqlite3.connect(":memory:")
 
     ensure_campaign_support_tables(conn)

@@ -1,3 +1,5 @@
+"""detail UI package."""
+
 from .entity_layout import (
     create_detail_split_layout,
     create_highlight_card,

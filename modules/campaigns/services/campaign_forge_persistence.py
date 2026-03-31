@@ -1,3 +1,4 @@
+"""Persistence helpers for campaign forge."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -40,6 +41,7 @@ class CampaignForgePersistence:
         campaign_wrapper=None,
         entity_wrappers: dict[str, Any] | None = None,
     ):
+        """Initialize the CampaignForgePersistence instance."""
         self.scenario_wrapper = scenario_wrapper
         self.campaign_wrapper = campaign_wrapper
         self.entity_wrappers = entity_wrappers or {}
@@ -53,6 +55,7 @@ class CampaignForgePersistence:
         *,
         save_mode: str,
     ) -> dict[str, Any]:
+        """Build dry run report."""
         save_mode = self._validate_save_mode(save_mode)
         existing_titles = self._load_existing_titles()
         operations = self._plan_operations(generated_payload, existing_titles, save_mode)
@@ -90,6 +93,7 @@ class CampaignForgePersistence:
         campaign_metadata: dict[str, Any] | None = None,
         campaign_original_key: str | None = None,
     ) -> dict[str, Any]:
+        """Save from dry run."""
         self.unsaved_generated_payload = None
         self.last_error_summary = None
 
@@ -99,6 +103,7 @@ class CampaignForgePersistence:
 
         if campaign_metadata:
             try:
+                # Keep from dry run resilient if this step fails.
                 if not self.campaign_wrapper:
                     raise CampaignForgePersistenceError("campaign_wrapper is required to persist campaign metadata")
                 self.campaign_wrapper.save_item(
@@ -118,9 +123,11 @@ class CampaignForgePersistence:
 
         grouped_saved: dict[str, list[dict[str, Any]]] = {}
         for op in operations:
+            # Process each op from operations.
             if op.action == "skipped":
                 continue
             try:
+                # Keep from dry run resilient if this step fails.
                 self._save_created_entities(op.payload)
                 scenario_payload = dict(op.payload)
                 scenario_payload.pop("EntityCreations", None)
@@ -161,6 +168,7 @@ class CampaignForgePersistence:
         campaign_metadata: dict[str, Any] | None = None,
         campaign_original_key: str | None = None,
     ) -> dict[str, Any]:
+        """Save the operation."""
         dry_run_report = self.build_dry_run_report(generated_payload, arcs, save_mode=save_mode)
         return self.save_from_dry_run(
             generated_payload,
@@ -171,9 +179,11 @@ class CampaignForgePersistence:
         )
 
     def _operations_from_report(self, generated_payload: dict[str, Any], report: dict[str, Any]) -> list[_ScenarioOperation]:
+        """Internal helper for operations from report."""
         item_rows = report.get("scenarios", {}).get("items", [])
         payload_rows = {}
         for group in generated_payload.get("arcs") or []:
+            # Process each group from generated_payload.get('arcs') or [].
             arc_name = str(group.get("arc_name") or "").strip()
             for scenario in group.get("scenarios") or []:
                 title = str(scenario.get("Title") or "Untitled Scenario").strip() or "Untitled Scenario"
@@ -202,12 +212,15 @@ class CampaignForgePersistence:
         existing_titles: set[str],
         save_mode: str,
     ) -> list[_ScenarioOperation]:
+        """Internal helper for plan operations."""
         operations: list[_ScenarioOperation] = []
         reserved_titles = set(existing_titles)
 
         for group in generated_payload.get("arcs") or []:
+            # Process each group from generated_payload.get('arcs') or [].
             arc_name = str(group.get("arc_name") or "").strip()
             for raw_scenario in group.get("scenarios") or []:
+                # Process each raw_scenario from group.get('scenarios') or [].
                 payload = dict(raw_scenario) if isinstance(raw_scenario, dict) else {}
                 source_title = str(payload.get("Title") or "Untitled Scenario").strip() or "Untitled Scenario"
                 final_title = source_title
@@ -254,19 +267,23 @@ class CampaignForgePersistence:
         operations: list[_ScenarioOperation],
         save_mode: str,
     ) -> dict[str, Any]:
+        """Internal helper for plan arc link updates."""
         planned_titles_by_arc: dict[str, list[str]] = {}
         for op in operations:
+            # Process each op from operations.
             if op.action == "skipped":
                 continue
             planned_titles_by_arc.setdefault(op.arc_name.casefold(), []).append(op.final_title)
 
         updates: list[dict[str, Any]] = []
         for arc in arcs:
+            # Process each arc from arcs.
             arc_name = str(arc.get("name") or "").strip()
             key = arc_name.casefold()
             existing_titles = list(arc.get("scenarios") or [])
             generated_titles = planned_titles_by_arc.get(key, [])
             if save_mode == SAVE_MODE_REPLACE_GENERATED_ONLY:
+                # Handle the branch where save_mode == SAVE_MODE_REPLACE_GENERATED_ONLY.
                 next_titles = generated_titles
             else:
                 next_titles = list(existing_titles)
@@ -287,16 +304,19 @@ class CampaignForgePersistence:
 
     @staticmethod
     def _apply_arc_link_updates(arcs: list[dict[str, Any]], arc_linkage_report: dict[str, Any]) -> None:
+        """Apply arc link updates."""
         updates_by_arc = {
             str(row.get("arc_name") or "").casefold(): list(row.get("after") or [])
             for row in arc_linkage_report.get("items") or []
         }
         for arc in arcs:
+            # Process each arc from arcs.
             key = str(arc.get("name") or "").strip().casefold()
             if key in updates_by_arc:
                 arc["scenarios"] = updates_by_arc[key]
 
     def _load_existing_titles(self) -> set[str]:
+        """Load existing titles."""
         try:
             items = self.scenario_wrapper.load_items() if self.scenario_wrapper else []
         except Exception:
@@ -304,17 +324,20 @@ class CampaignForgePersistence:
 
         titles: set[str] = set()
         for item in items or []:
+            # Process each item from items or [].
             title = str(item.get("Title") or item.get("Name") or "").strip()
             if title:
                 titles.add(title.casefold())
         return titles
 
     def _save_created_entities(self, scenario: dict[str, Any]) -> None:
+        """Save created entities."""
         entity_creations = scenario.get("EntityCreations")
         if not isinstance(entity_creations, dict):
             return
 
         for entity_type, spec in ENTITY_WRAPPER_SPECS.items():
+            # Process each (entity_type, spec) from ENTITY_WRAPPER_SPECS.items().
             records = entity_creations.get(entity_type)
             if not isinstance(records, list) or not records:
                 continue
@@ -329,6 +352,7 @@ class CampaignForgePersistence:
             }
             updated = False
             for record in records:
+                # Process each record from records.
                 if not isinstance(record, dict):
                     continue
                 name = str(record.get(key_field) or "").strip()
@@ -344,6 +368,7 @@ class CampaignForgePersistence:
                 wrapper.save_items(list(index.values()))
 
     def _resolve_entity_wrapper(self, entity_type: str):
+        """Resolve entity wrapper."""
         wrapper = self.entity_wrappers.get(entity_type)
         if wrapper is not None:
             return wrapper
@@ -358,6 +383,7 @@ class CampaignForgePersistence:
 
     @staticmethod
     def _build_error_summary(failures: list[dict[str, str]]) -> str:
+        """Build error summary."""
         lines = [f"{len(failures)} persistence operation(s) failed:"]
         for failure in failures:
             phase = failure.get("phase") or "unknown"
@@ -370,12 +396,14 @@ class CampaignForgePersistence:
 
     @staticmethod
     def _make_unique_title(title: Any, reserved_titles: set[str]) -> str:
+        """Internal helper for make unique title."""
         base_title = str(title or "").strip() or "Untitled Scenario"
         if base_title.casefold() not in reserved_titles:
             return base_title
 
         suffix = 2
         while True:
+            # Keep looping while True.
             candidate = f"{base_title} ({suffix})"
             if candidate.casefold() not in reserved_titles:
                 return candidate
@@ -383,6 +411,7 @@ class CampaignForgePersistence:
 
     @staticmethod
     def _validate_save_mode(save_mode: str) -> str:
+        """Validate save mode."""
         normalized = str(save_mode or "").strip()
         if normalized not in SUPPORTED_SAVE_MODES:
             supported = ", ".join(sorted(SUPPORTED_SAVE_MODES))

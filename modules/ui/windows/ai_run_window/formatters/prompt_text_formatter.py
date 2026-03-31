@@ -1,3 +1,5 @@
+"""Formatting helpers for AI run window prompt text."""
+
 from __future__ import annotations
 
 import json
@@ -21,6 +23,7 @@ def format_ai_prompt_for_humans(prompt_text: str | None) -> str:
     parsed_blocks: list[str] = []
 
     for block in blocks:
+        # Process each block from blocks.
         match = _BLOCK_RE.match(block)
         if not match:
             parsed_blocks.append(block)
@@ -41,6 +44,7 @@ def format_ai_prompt_for_humans(prompt_text: str | None) -> str:
 
 
 def _format_content(content: str) -> str:
+    """Format content."""
     if not content:
         return ""
 
@@ -49,6 +53,7 @@ def _format_content(content: str) -> str:
         return ""
 
     if stripped[0] in "[{":
+        # Handle the branch where stripped[0] is in '[{'.
         try:
             parsed = json.loads(stripped)
         except json.JSONDecodeError:

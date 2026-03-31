@@ -1,3 +1,5 @@
+"""Repository helpers for campaign config."""
+
 from __future__ import annotations
 
 from db.db import get_connection
@@ -9,11 +11,13 @@ class CampaignConfigRepository:
     """Database access layer for app-managed per-campaign configuration."""
 
     def load_overview_focus(self, campaign_name: str) -> tuple[str, str]:
+        """Load overview focus."""
         normalized_name = str(campaign_name or "").strip()
         if not normalized_name:
             return "", ""
 
         with get_connection() as conn:
+            # Keep this resource scoped to overview focus.
             cursor = conn.cursor()
             self._ensure_table(cursor)
             cursor.execute(
@@ -30,11 +34,13 @@ class CampaignConfigRepository:
             return str(row[0] or "").strip(), str(row[1] or "").strip()
 
     def save_overview_focus(self, campaign_name: str, *, arc_name: str, scenario_title: str) -> None:
+        """Save overview focus."""
         normalized_name = str(campaign_name or "").strip()
         if not normalized_name:
             return
 
         with get_connection() as conn:
+            # Keep this resource scoped to overview focus.
             cursor = conn.cursor()
             self._ensure_table(cursor)
             cursor.execute(
@@ -56,6 +62,7 @@ class CampaignConfigRepository:
 
     @staticmethod
     def _ensure_table(cursor) -> None:
+        """Ensure table."""
         cursor.execute(
             f"""
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (

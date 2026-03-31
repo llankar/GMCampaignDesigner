@@ -58,6 +58,7 @@ MOOD_KEYWORDS: dict[str, list[str]] = {
 
 
 def classify_track_mood(track_name: str) -> str:
+    """Handle classify track mood."""
     normalized_name = (track_name or "").casefold()
     scores = {mood: 0 for mood in MOOD_KEYWORDS}
     for mood, keywords in MOOD_KEYWORDS.items():

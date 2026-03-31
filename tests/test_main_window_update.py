@@ -1,3 +1,5 @@
+"""Regression tests for main window update."""
+
 from pathlib import Path
 import sys
 
@@ -10,9 +12,11 @@ from modules.helpers import update_helper
 
 class _DummyApp:
     def __init__(self):
+        """Initialize the _DummyApp instance."""
         self.worker_result = None
 
     def _run_progress_task(self, title, worker, success_message, detail_builder=None):
+        """Run progress task."""
         # Execute the worker immediately to capture its arguments
         self.worker_result = worker(lambda *_args, **_kwargs: None)
         if detail_builder:
@@ -20,6 +24,7 @@ class _DummyApp:
 
 
 def test_begin_update_download_uses_project_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify that begin update download uses project root."""
     candidate = update_helper.UpdateCandidate(
         version=Version("2.0.0"),
         tag="v2.0.0",
@@ -57,6 +62,7 @@ def test_begin_update_download_uses_project_root(monkeypatch: pytest.MonkeyPatch
         preserve,
         cleanup_root,
     ):
+        """Internal helper for fake launch installer."""
         captured_install_root["value"] = Path(install_root)
         return _Process()
 

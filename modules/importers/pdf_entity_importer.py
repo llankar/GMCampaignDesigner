@@ -1,3 +1,5 @@
+"""Import helpers for importers PDF entity."""
+
 import json
 
 from modules.helpers.text_helpers import ai_text_to_rtf_json
@@ -59,9 +61,11 @@ def to_list(value) -> list[str]:
     if isinstance(value, dict):
         return [str(item).strip() for item in value.values() if item is not None and str(item).strip()]
     if isinstance(value, str):
+        # Handle the branch where isinstance(value, str).
         parts = []
         for line in value.splitlines():
             for part in line.split(","):
+                # Process each part from line.split(',').
                 cleaned = part.strip()
                 if cleaned:
                     parts.append(cleaned)

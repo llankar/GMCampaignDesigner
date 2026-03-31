@@ -1,3 +1,5 @@
+"""Regression tests for character creation equipment editor."""
+
 import sys
 import tkinter as tk
 import types
@@ -5,25 +7,31 @@ import types
 
 class _StubWidget:
     def __init__(self, master=None, *args, **kwargs):
+        """Initialize the _StubWidget instance."""
         self.master = master
         self._grid_visible = True
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         self._grid_visible = True
         self._grid_kwargs = kwargs
         return None
 
     def grid_remove(self):
+        """Handle grid remove."""
         self._grid_visible = False
         return None
 
     def grid_configure(self, *args, **kwargs):
+        """Handle grid configure."""
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def destroy(self):
+        """Handle destroy."""
         return None
 
 
@@ -41,30 +49,36 @@ class _StubEntry(_StubWidget):
 
 class _StubButton(_StubWidget):
     def __init__(self, master=None, *args, command=None, **kwargs):
+        """Initialize the _StubButton instance."""
         super().__init__(master, *args, **kwargs)
         self.command = command
 
 
 class _StubComboBox(_StubWidget):
     def __init__(self, master=None, *args, values=None, command=None, **kwargs):
+        """Initialize the _StubComboBox instance."""
         super().__init__(master, *args, **kwargs)
         self._values = list(values or [])
         self._value = ""
         self._command = command
 
     def set(self, value):
+        """Set the operation."""
         self._value = value
 
     def get(self):
+        """Return the operation."""
         return self._value
 
     def configure(self, **kwargs):
+        """Handle configure."""
         if "values" in kwargs:
             self._values = list(kwargs["values"])
         if "command" in kwargs:
             self._command = kwargs["command"]
 
     def cget(self, key):
+        """Handle cget."""
         if key == "values":
             return self._values
         raise KeyError(key)
@@ -87,10 +101,12 @@ EquipmentEditor = editor_module.EquipmentEditor
 
 
 def _build_editor(max_level=3):
+    """Build editor."""
     root = tk.Tcl()
     original_string_var = editor_module.tk.StringVar
 
     def _string_var_with_tcl_master(*args, **kwargs):
+        """Internal helper for string var with tcl master."""
         kwargs.setdefault("master", root)
         return original_string_var(*args, **kwargs)
 
@@ -104,6 +120,7 @@ def _build_editor(max_level=3):
 
 
 def test_can_remove_effect_row_from_existing_object():
+    """Verify that can remove effect row from existing object."""
     _, editor = _build_editor()
 
     editor.add_effect_row("weapon")
@@ -116,6 +133,7 @@ def test_can_remove_effect_row_from_existing_object():
 
 
 def test_remove_and_readd_object_slot_updates_visibility_and_payload():
+    """Verify that remove and readd object slot updates visibility and payload."""
     _, editor = _build_editor()
 
     editor.add_object_slot()
@@ -134,6 +152,7 @@ def test_remove_and_readd_object_slot_updates_visibility_and_payload():
 
 
 def test_cannot_remove_last_object_slot():
+    """Verify that cannot remove last object slot."""
     _, editor = _build_editor()
 
     editor.add_object_slot()
@@ -147,6 +166,7 @@ def test_cannot_remove_last_object_slot():
 
 
 def test_add_object_slot_activates_objects_in_order():
+    """Verify that add object slot activates objects in order."""
     _, editor = _build_editor()
 
     assert editor._active_object_keys == ["weapon"]
@@ -158,6 +178,7 @@ def test_add_object_slot_activates_objects_in_order():
 
 
 def test_add_object_slot_after_third_creates_new_row_with_new_object():
+    """Verify that add object slot after third creates new row with new object."""
     _, editor = _build_editor()
 
     editor.add_object_slot()
@@ -170,6 +191,7 @@ def test_add_object_slot_after_third_creates_new_row_with_new_object():
     assert len(editor._columns["object_4"]["rows"]) == 1
 
 def test_apply_payload_restores_dynamic_object_slots_from_saved_draft():
+    """Verify that apply payload restores dynamic object slots from saved draft."""
     _, editor = _build_editor(max_level=4)
 
     editor.apply_payload(

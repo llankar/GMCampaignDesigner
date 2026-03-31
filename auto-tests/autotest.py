@@ -1,12 +1,16 @@
+"""Automated smoke-test runner for the packaged application."""
+
 import sys, time
 from pywinauto import Application, Desktop, timings
 import time, pyautogui
 from pyscreeze import ImageNotFoundException
 
 def findbuttonandclick(icon_path):
+    """Handle findbuttonandclick."""
     save_btn = None
     # A) Fuzzy search (requires opencv-python)
     try:
+        # Keep findbuttonandclick resilient if this step fails.
         save_btn = pyautogui.locateOnScreen(
             icon_path,
             confidence=0.9

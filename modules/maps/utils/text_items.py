@@ -1,3 +1,5 @@
+"""Utilities for map text items."""
+
 import io
 import math
 import tkinter as tk
@@ -14,6 +16,7 @@ class _MultilineTextDialog(ctk.CTkToplevel):
     """A small reusable multi-line text input dialog."""
 
     def __init__(self, parent: tk.Widget | None, *, title: str, prompt: str, initial: str = ""):
+        """Initialize the _MultilineTextDialog instance."""
         super().__init__(parent)
         self.title(title)
         self.result: str | None = None
@@ -50,6 +53,7 @@ class _MultilineTextDialog(ctk.CTkToplevel):
         self.bind("<Control-Return>", lambda _e: self._on_ok())
 
     def _on_ok(self):
+        """Handle ok."""
         try:
             value = self.textbox.get("1.0", "end")
         except tk.TclError:
@@ -59,10 +63,12 @@ class _MultilineTextDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _on_cancel(self):
+        """Handle cancel."""
         self.result = None
         self.destroy()
 
     def get_input(self) -> str | None:
+        """Return input."""
         self.wait_window(self)
         return self.result
 
@@ -83,6 +89,7 @@ def prompt_for_text(parent: tk.Widget | None, *, title: str, prompt: str, initia
 
 
 def create_text_item(text: str, position: tuple[float, float], *, color: str, size: int) -> dict:
+    """Create text item."""
     return {
         "type": "text",
         "text": text,
@@ -97,14 +104,17 @@ class TextFontCache:
     """Cache for tkinter and PIL fonts keyed by size using a shared family."""
 
     def __init__(self, family: str = "Arial"):
+        """Initialize the TextFontCache instance."""
         self._family = family or "Arial"
         self._resolved_family = None
         self._tk_fonts: dict[int, ctk.CTkFont] = {}
         self._pil_fonts: dict[int, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 
     def tk_font(self, size: int) -> ctk.CTkFont:
+        """Handle tk font."""
         normalized = max(8, int(size))
         if normalized not in self._tk_fonts:
+            # Handle the branch where normalized is not in tk fonts.
             font = ctk.CTkFont(family=self._family, size=normalized)
             try:
                 self._resolved_family = font.actual().get("family") or self._family
@@ -114,9 +124,11 @@ class TextFontCache:
         return self._tk_fonts[normalized]
 
     def pil_font(self, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+        """Handle pil font."""
         normalized = max(8, int(size))
         if normalized not in self._pil_fonts:
             try:
+                # Keep pil font resilient if this step fails.
                 family = self._resolved_family or self._family
                 self._pil_fonts[normalized] = ImageFont.truetype(family, normalized)
             except Exception:
@@ -129,7 +141,9 @@ class TextFontCache:
     @staticmethod
     @lru_cache(maxsize=1)
     def _fallback_font_bytes() -> bytes | None:
+        """Internal helper for fallback font bytes."""
         try:
+            # Keep fallback font bytes resilient if this step fails.
             font_file = resources.files("PIL").joinpath("fonts/DejaVuSans.ttf")
             with font_file.open("rb") as fh:
                 return fh.read()
@@ -139,8 +153,10 @@ class TextFontCache:
     @staticmethod
     @lru_cache(maxsize=1)
     def _fallback_font_path() -> str | None:
+        """Internal helper for fallback font path."""
         candidates: list[Path] = []
         try:
+            # Keep fallback font path resilient if this step fails.
             import PIL
 
             pil_dir = Path(PIL.__file__).resolve().parent
@@ -189,6 +205,7 @@ class TextFontCache:
             raise RuntimeError("Unable to load a scalable font for PIL text rendering") from exc
 
         try:
+            # Keep default font resilient if this step fails.
             variant = base.font_variant(size=size)
             if variant:
                 return variant
@@ -202,11 +219,13 @@ class _ScaledDefaultFont(ImageFont.ImageFont):
     """Scale PIL's default bitmap font to approximate a requested size."""
 
     def __init__(self, base_font: ImageFont.ImageFont, size: int):
+        """Initialize the _ScaledDefaultFont instance."""
         super().__init__()
         self._base = base_font
         self._scale = max(1.0, float(size) / max(1.0, self._measure("Hg")[1]))
 
     def getbbox(self, text, *args, **kwargs):
+        """Handle getbbox."""
         left, top, right, bottom = self._measure(text)
         return (
             math.floor(left * self._scale),
@@ -216,10 +235,12 @@ class _ScaledDefaultFont(ImageFont.ImageFont):
         )
 
     def getsize(self, text, *args, **kwargs):
+        """Handle getsize."""
         _, _, right, bottom = self.getbbox(text, *args, **kwargs)
         return right, bottom
 
     def getmask(self, text, mode="L", *args, **kwargs):
+        """Handle getmask."""
         left, top, right, bottom = self._measure(text)
         width = max(1, int(right - left))
         height = max(1, int(bottom - top))
@@ -235,6 +256,7 @@ class _ScaledDefaultFont(ImageFont.ImageFont):
         return base_image.resize(target_size, Image.BICUBIC).im
 
     def _measure(self, text: str) -> tuple[float, float, float, float]:
+        """Internal helper for measure."""
         try:
             left, top, right, bottom = self._base.getbbox(text)
             return float(left), float(top), float(right), float(bottom)

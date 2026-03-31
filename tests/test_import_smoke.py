@@ -1,3 +1,5 @@
+"""Regression tests for import smoke."""
+
 from __future__ import annotations
 
 import importlib
@@ -13,6 +15,7 @@ CRITICAL_MODULES = [
 
 
 def test_critical_modules_import_smoke() -> None:
+    """Verify that critical modules import smoke."""
     for module_name in CRITICAL_MODULES:
         module = importlib.import_module(module_name)
         assert module is not None, f"failed to import {module_name}"

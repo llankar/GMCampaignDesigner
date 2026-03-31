@@ -1,3 +1,5 @@
+"""Regression tests for character creation equipment rules."""
+
 from modules.pcs.character_creation.equipment import (
     available_equipment_points,
     equipment_points_from_advancement_choices,
@@ -7,6 +9,7 @@ from modules.pcs.character_creation.rules_engine import CharacterCreationError, 
 
 
 def _payload():
+    """Internal helper for payload."""
     skills = {
         "Artisanat": 0,
         "Athlétisme": 2,
@@ -49,6 +52,7 @@ def _payload():
 
 
 def test_equipment_points_use_rank_not_prowess_count():
+    """Verify that equipment points use rank not prowess count."""
     choices = [
         {"type": "equipment_points", "details": "N1"},
         {"type": "prowess_points", "details": "+2"},
@@ -62,12 +66,14 @@ def test_equipment_points_use_rank_not_prowess_count():
 
 
 def test_equipment_per_object_cap_depends_on_rank():
+    """Verify that equipment per object cap depends on rank."""
     assert max_pe_per_object(0) == 2
     assert max_pe_per_object(4) == 3
     assert max_pe_per_object(8) == 4
 
 
 def test_build_character_rejects_equipment_over_rank_cap():
+    """Verify that build character rejects equipment over rank cap."""
     payload = _payload()
     payload["equipment_pe"] = {"weapon": 3, "armor": 0, "utility": 0}
     try:
@@ -78,6 +84,7 @@ def test_build_character_rejects_equipment_over_rank_cap():
 
 
 def test_build_character_accepts_allocating_less_than_available_equipment_points():
+    """Verify that build character accepts allocating less than available equipment points."""
     payload = _payload()
     payload["advancements"] = 1
     payload["advancement_choices"] = [{"type": "equipment_points", "details": "Arsenal"}]
@@ -88,6 +95,7 @@ def test_build_character_accepts_allocating_less_than_available_equipment_points
 
 
 def test_build_character_validates_equipment_purchase_distribution():
+    """Verify that build character validates equipment purchase distribution."""
     payload = _payload()
     payload["equipment_purchases"] = {
         "weapon": {"damage": 1, "pierce_armor": 0, "special_effect": 0, "skill_bonus": 0},

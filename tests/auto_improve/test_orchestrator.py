@@ -1,3 +1,5 @@
+"""Regression tests for orchestrator."""
+
 from modules.auto_improve.models import ImprovementProposal
 from modules.auto_improve.orchestrator import AutoImproveOrchestrator
 from modules.auto_improve.settings import AutoImproveSettings
@@ -8,6 +10,7 @@ class DummyRunner:
 
 
 def test_dry_run_execution(monkeypatch, tmp_path):
+    """Verify that dry run execution."""
     monkeypatch.setattr(
         "modules.auto_improve.orchestrator.AutoImproveSettings.load",
         classmethod(lambda cls: AutoImproveSettings(dry_run=True)),

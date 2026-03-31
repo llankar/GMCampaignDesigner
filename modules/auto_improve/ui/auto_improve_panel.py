@@ -1,3 +1,5 @@
+"""Panel for auto improve."""
+
 from __future__ import annotations
 
 import threading
@@ -12,6 +14,7 @@ from modules.auto_improve.models import ImprovementProposal
 
 class AutoImprovePanel(ctk.CTkToplevel):
     def __init__(self, master):
+        """Initialize the AutoImprovePanel instance."""
         super().__init__(master)
         self.title("Auto-improvement")
         self.geometry("900x640")
@@ -58,7 +61,9 @@ class AutoImprovePanel(ctk.CTkToplevel):
         self.load_proposals()
 
     def load_proposals(self):
+        """Load proposals."""
         try:
+            # Keep proposals resilient if this step fails.
             self.proposals = self.orchestrator.list_proposals(limit=10)
         except Exception as exc:
             self.proposals = []
@@ -76,6 +81,7 @@ class AutoImprovePanel(ctk.CTkToplevel):
             self._on_select(None)
 
     def _on_select(self, _event):
+        """Handle select."""
         index = self._selected_index()
         if index is None:
             return
@@ -83,12 +89,14 @@ class AutoImprovePanel(ctk.CTkToplevel):
         self.summary_label.configure(text=f"{proposal.summary}\nScope: {proposal.scope}")
 
     def _selected_index(self) -> int | None:
+        """Internal helper for selected index."""
         selected = self.listbox.curselection()
         if not selected:
             return None
         return int(selected[0])
 
     def run_selected(self):
+        """Run selected."""
         index = self._selected_index()
         if index is None:
             messagebox.showinfo("Auto-improvement", "Please choose a proposal first.")
@@ -100,12 +108,14 @@ class AutoImprovePanel(ctk.CTkToplevel):
         self.run_button.configure(state="disabled")
 
         def worker():
+            """Handle worker."""
             report = self.orchestrator.execute(proposal)
             self.after(0, lambda: self._render_report(report))
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _render_report(self, report):
+        """Render report."""
         self.run_button.configure(state="normal")
         self.output.delete("1.0", tk.END)
         self.output.insert(tk.END, f"Proposal: {report.proposal.title}\n")

@@ -1,3 +1,5 @@
+"""Regression tests for prompt builder tone contract."""
+
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -8,6 +10,7 @@ MODULE_PATH = Path("modules/ai/automation/prompt_builder.py")
 
 
 def _load_prompt_builder_module():
+    """Load prompt builder module."""
     spec = spec_from_file_location("prompt_builder_module", MODULE_PATH)
     module = module_from_spec(spec)
     assert spec is not None and spec.loader is not None
@@ -16,6 +19,7 @@ def _load_prompt_builder_module():
 
 
 def test_build_entity_prompt_includes_tone_contract(monkeypatch):
+    """Verify that build entity prompt includes tone contract."""
     module = _load_prompt_builder_module()
 
     monkeypatch.setattr(

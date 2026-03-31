@@ -1,3 +1,5 @@
+"""Data models for auto improve."""
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List
@@ -21,4 +23,5 @@ class ExecutionReport:
     success: bool = False
 
     def add_step(self, message: str) -> None:
+        """Handle add step."""
         self.steps.append(message)

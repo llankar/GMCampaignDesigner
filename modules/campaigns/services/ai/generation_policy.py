@@ -1,3 +1,4 @@
+"""Policy helpers for AI generation."""
 from __future__ import annotations
 
 from typing import Any
@@ -14,6 +15,7 @@ def resolve_generation_defaults(
     *,
     generation_defaults_service: CampaignGenerationDefaultsService | None = None,
 ) -> dict[str, Any]:
+    """Resolve generation defaults."""
     service = generation_defaults_service or CampaignGenerationDefaultsService()
     try:
         loaded_defaults = generation_defaults_payload_to_state(service.load())
@@ -31,6 +33,7 @@ def resolve_generation_defaults(
 
 
 def build_hard_constraints_block(generation_defaults: dict[str, Any] | None) -> str:
+    """Build hard constraints block."""
     normalized = generation_defaults_payload_to_state(generation_defaults)
     lines: list[str] = []
     forbidden = normalized["forbidden_antagonist_factions"]
@@ -56,10 +59,12 @@ def build_hard_constraints_block(generation_defaults: dict[str, Any] | None) -> 
 
 
 def _merge_string_lists(*values: Any) -> list[str]:
+    """Merge string lists."""
     merged: list[str] = []
     seen: set[str] = set()
     for value in values:
         for item in (value or []):
+            # Process each item from value or [].
             cleaned = str(item or "").strip()
             if not cleaned:
                 continue

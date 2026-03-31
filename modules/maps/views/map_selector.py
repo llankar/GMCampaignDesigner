@@ -1,3 +1,4 @@
+"""Selection helpers for map."""
 from tkinter import messagebox
 import ast
 import json
@@ -31,6 +32,7 @@ def _resolve_campaign_path(path: str) -> str:
 
 
 def _campaign_relative_path(path: str) -> str:
+    """Internal helper for campaign relative path."""
     if not path:
         return ""
     if not os.path.isabs(path):
@@ -70,6 +72,7 @@ def _find_existing_map_image(original_path: str) -> str:
     search_roots = [assets_root, campaign_dir]
 
     for root in search_roots:
+        # Process each root from search_roots.
         if not os.path.isdir(root):
             continue
         for current_root, _, files in os.walk(root):
@@ -131,6 +134,7 @@ def _find_existing_token_image(original_path: str) -> str:
     lowered_parts = [part.lower() for part in parts]
 
     if "assets" in lowered_parts:
+        # Handle the branch where 'assets' is in lowered parts.
         idx = lowered_parts.index("assets")
         candidate_rel = os.path.join(*parts[idx:])
         candidate_abs = os.path.normpath(os.path.join(campaign_dir, candidate_rel))
@@ -139,6 +143,7 @@ def _find_existing_token_image(original_path: str) -> str:
             seen.add(candidate_abs)
 
     for start in range(len(parts)):
+        # Process each start from range(len(parts)).
         candidate_rel = os.path.join(*parts[start:])
         candidate_abs = os.path.normpath(os.path.join(campaign_dir, candidate_rel))
         if candidate_abs not in seen:
@@ -214,6 +219,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     # Restore hover font size if persisted
     hover_size = item.get("hover_font_size")
     if isinstance(hover_size, int) and hover_size > 0:
+        # Handle the branch where isinstance(hover_size, int) and hover_size > 0.
         self.hover_font_size = hover_size
         if hover_size not in getattr(self, "hover_font_size_options", []):
             self.hover_font_size_options.append(hover_size)
@@ -225,6 +231,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
     # Stop any existing video background
     try:
+        # Keep on display map resilient if this step fails.
         existing_player = getattr(self, "_video_bg_player", None)
         if existing_player:
             existing_player.stop()
@@ -249,6 +256,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self.base_id = None
     self.mask_id = None
     if hasattr(self, "canvas") and self.canvas is not None:
+        # Handle the branch where hasattr(self, 'canvas') and canvas is available.
         try:
             self.canvas.destroy()
         except Exception:
@@ -266,8 +274,10 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     map_normalized = False
 
     if image_path and (not full_image_path or not os.path.isfile(full_image_path)):
+        # Handle the branch where image path is set and full image path is unavailable or not os.path.isfile(full_image_path).
         fallback_image_path = _find_existing_map_image(image_path)
         if fallback_image_path and os.path.isfile(fallback_image_path):
+            # Handle the branch where fallback image path is set and os.path.isfile(fallback_image_path).
             log_info(
                 f"Recovered missing map image for '{map_name}' from '{fallback_image_path}'.",
                 func_name="map_selector._on_display_map",
@@ -275,6 +285,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             full_image_path = fallback_image_path
             new_storage_path = _campaign_relative_path(fallback_image_path)
             if new_storage_path != image_path:
+                # Handle the branch where new_storage_path != image_path.
                 item["Image"] = new_storage_path
                 if getattr(self, "current_map", None) is item:
                     self.current_map["Image"] = new_storage_path
@@ -284,6 +295,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     is_video_file = bool(video_probe_path and is_video_path(video_probe_path))
     if is_video_file:
         if not full_image_path or not os.path.isfile(full_image_path):
+            # Handle the branch where full image path is unavailable or not os.path.isfile(full_image_path).
             messagebox.showerror(
                 "Video Error",
                 f"Unable to open video: {image_path or 'Unknown video path'}",
@@ -292,6 +304,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             self._video_bg_player = None
         else:
             try:
+                # Keep on display map resilient if this step fails.
                 player = CanvasVideoBackgroundPlayer(self, full_image_path)
                 self._video_bg_player = player
                 vw, vh = player.size
@@ -368,6 +381,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
     # Start video playback after canvas and state are ready
     try:
+        # Keep on display map resilient if this step fails.
         if getattr(self, "_video_bg_player", None):
             self._video_bg_player.start()
     except Exception as exc:
@@ -381,6 +395,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     # 4) Clear out any old tokens from both canvases
     removed_items = len(getattr(self, "tokens", []))
     for t_obj in self.tokens: # Renamed t to t_obj to avoid conflict
+        # Process each t_obj from tokens.
         for cid in t_obj.get("canvas_ids", []):
             self.canvas.delete(cid)
         if (
@@ -390,6 +405,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         ):
             for cid in t_obj["fs_canvas_ids"]:
                 try:
+                    # Keep on display map resilient if this step fails.
                     self.fs_canvas.delete(cid)
                 except tk.TclError:
                     # The fullscreen canvas was destroyed (for example, when a
@@ -410,6 +426,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     raw = item.get("Tokens", [])
    
     if isinstance(raw, str):
+        # Handle the branch where isinstance(raw, str).
         try:
             # Try ast.literal_eval first as it's safer for simple structures
             token_list = ast.literal_eval(raw.strip() or "[]")
@@ -444,9 +461,11 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
     expected_items = []
     for rec in token_list:
+        # Process each rec from token_list.
         marker_keys = ("linked_map", "video_path", "entry_width", "description")
         item_type_from_rec = rec.get("type")
         if not item_type_from_rec and any(key in rec for key in marker_keys):
+            # Handle the branch where item type from rec is unavailable and any((key in rec for key in marker_keys)).
             item_type_from_rec = "marker"
             rec["type"] = "marker"
             tokens_normalized = True
@@ -473,10 +492,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
         if item_type_from_rec == "token":
 
+            # Handle the branch where item_type_from_rec == 'token'.
             portrait_path = (rec.get("image_path") or "").strip()
             path = _resolve_campaign_path(portrait_path) if portrait_path else ""
 
             if path and not os.path.exists(path):
+                # Handle the branch where path is set and not os.path.exists(path).
                 fallback_path = _find_existing_token_image(portrait_path)
                 if not fallback_path and portrait_path != path:
                     fallback_path = _find_existing_token_image(path)
@@ -503,6 +524,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             if path:
                 if os.path.exists(path):
                     try:
+                        # Keep on display map resilient if this step fails.
                         source_image = Image.open(path).convert("RGBA")
                         pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
                         resolved_path = path
@@ -516,9 +538,11 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 print(f"[_on_display_map] Token missing image_path. Trying default pin image for ID: {rec.get('entity_id')}.")
 
             if pil_image is None:
+                # Handle the branch where pil image is missing.
                 default_pin_path = _default_token_image_path()
                 if default_pin_path and os.path.exists(default_pin_path):
                     try:
+                        # Keep on display map resilient if this step fails.
                         source_image = Image.open(default_pin_path).convert("RGBA")
                         pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
                         resolved_path = default_pin_path
@@ -555,6 +579,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "player_visible": bool(rec.get("player_visible", True)),
             })
         elif item_type_from_rec in ["rectangle", "oval"]:
+            # Handle the branch where item type from rec is in ['rectangle', 'oval'].
             item_data.update({
                 "shape_type":   rec.get("shape_type", item_type_from_rec), # Ensure this matches type
                 "fill_color":   rec.get("fill_color", "#FFFFFF"),
@@ -569,6 +594,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "height": item_data["height"],
             })
         elif item_type_from_rec == "whiteboard":
+            # Handle the branch where item_type_from_rec == 'whiteboard'.
             points = rec.get("points", [])
             item_data.update({
                 "points": points,
@@ -580,6 +606,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "points": len(points),
             })
         elif item_type_from_rec == "text":
+            # Handle the branch where item_type_from_rec == 'text'.
             item_data.update({
                 "text": rec.get("text", ""),
                 "color": rec.get("color", self.whiteboard_color),
@@ -592,6 +619,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "color": item_data["color"],
             })
         elif item_type_from_rec == "marker":
+            # Handle the branch where item_type_from_rec == 'marker'.
             item_data.update({
                 "text": rec.get("text", "New Marker"),
                 "description": rec.get("description", "Marker description"),
@@ -639,11 +667,14 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
     # 8) Hydrate token metadata for info card display (ONLY FOR TOKENS)
     for current_item in self.tokens:
+        # Process each current_item from tokens.
         if current_item.get("type", "token") == "token":
+            # Handle the branch where current_item.get('type', 'token') == 'token'.
             token_entity_type = current_item.get("entity_type")
             token_entity_id = current_item.get("entity_id")
 
             if not token_entity_type or not token_entity_id:
+                # Handle the branch where token entity type is unavailable or token entity ID is unavailable.
                 print(f"[_on_display_map] Token missing entity_type or entity_id, cannot hydrate info: {current_item}")
                 current_item["entity_record"] = {}
             else:

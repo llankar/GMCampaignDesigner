@@ -1,3 +1,5 @@
+"""Loading helpers for template."""
+
 import json
 import os
 import re
@@ -38,11 +40,13 @@ _BUILTIN_ENTITY_METADATA = {
 
 @log_function
 def _default_template_path(entity_name: str) -> str:
+    """Internal helper for default template path."""
     return os.path.join("modules", entity_name, f"{entity_name}_template.json")
 
 
 @log_function
 def _campaign_template_path(entity_name: str) -> str:
+    """Internal helper for campaign template path."""
     camp = ConfigHelper.get_campaign_dir()
     return os.path.join(camp, "templates", f"{entity_name}_template.json")
 
@@ -76,15 +80,18 @@ def _load_base_template(entity_name: str) -> dict:
 
 
 def _custom_manifest_path() -> str:
+    """Internal helper for custom manifest path."""
     camp = ConfigHelper.get_campaign_dir()
     return os.path.join(camp, "templates", _CUSTOM_ENTITY_MANIFEST)
 
 
 def _load_custom_manifest() -> dict:
+    """Load custom manifest."""
     path = _custom_manifest_path()
     if not os.path.exists(path):
         return {}
     try:
+        # Keep custom manifest resilient if this step fails.
         with open(path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
     except Exception as exc:
@@ -109,6 +116,7 @@ def _load_custom_manifest() -> dict:
 
 
 def _save_custom_manifest(manifest: dict):
+    """Save custom manifest."""
     path = _custom_manifest_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as fh:
@@ -116,10 +124,12 @@ def _save_custom_manifest(manifest: dict):
 
 
 def _resolve_icon_path(icon_value: str | None) -> str | None:
+    """Resolve icon path."""
     if not icon_value:
         return None
     candidates = []
     if os.path.isabs(icon_value):
+        # Handle the branch where os.path.isabs(icon_value).
         candidates.append(icon_value)
     else:
         candidates.append(os.path.join(_PROJECT_ROOT, icon_value))
@@ -134,6 +144,7 @@ def _resolve_icon_path(icon_value: str | None) -> str | None:
 
 
 def _prepare_icon_for_entity(entity_slug: str, icon_source: str | None) -> str | None:
+    """Internal helper for prepare icon for entity."""
     if not icon_source:
         return None
     if not os.path.exists(icon_source):
@@ -179,6 +190,7 @@ def load_entity_definitions() -> dict:
 
     resolved = {}
     for slug, meta in defs.items():
+        # Process each (slug, meta) from defs.items().
         tpl_path = _template_path(slug)
         if not os.path.exists(tpl_path):
             continue
@@ -208,6 +220,7 @@ def load_template(entity_name: str) -> dict:
     merged = list(base_fields)
     for fld in custom_fields:
         try:
+            # Keep template resilient if this step fails.
             name = str(fld.get("name", "")).strip()
             ftype = str(fld.get("type", "text")).strip() or "text"
             if not name or name in existing_names:
@@ -245,6 +258,7 @@ def create_custom_entity(entity_slug: str, display_name: str, icon_source: str |
 
     skeleton_path = os.path.join(_PROJECT_ROOT, _SKELETON_TEMPLATE)
     try:
+        # Keep custom entity resilient if this step fails.
         with open(skeleton_path, "r", encoding="utf-8") as fh:
             skeleton = json.load(fh)
     except Exception:
@@ -308,6 +322,7 @@ def update_custom_entity(
     old_icon = entry.get("icon")
 
     if clear_icon:
+        # Continue with this path when clear icon is set.
         if old_icon and os.path.exists(old_icon):
             try:
                 os.remove(old_icon)
@@ -318,8 +333,10 @@ def update_custom_entity(
                 )
         entry["icon"] = None
     elif icon_source:
+        # Continue with this path when icon source is set.
         new_icon = _prepare_icon_for_entity(slug, icon_source)
         if new_icon:
+            # Continue with this path when new icon is set.
             if old_icon and old_icon != new_icon and os.path.exists(old_icon):
                 try:
                     os.remove(old_icon)
@@ -380,6 +397,7 @@ def delete_custom_entity(entity_slug: str):
 
     conn = None
     try:
+        # Keep custom entity resilient if this step fails.
         from db.db import get_connection
 
         conn = get_connection()
@@ -410,6 +428,7 @@ def _render_template_content(fields: list, custom_fields: list) -> str:
     """Return the canonical JSON body for a template file."""
 
     def _render_items(items):
+        """Render items."""
         rendered = []
         for item in items:
             line = json.dumps(item, ensure_ascii=False, separators=(", ", ": "))
@@ -482,6 +501,7 @@ def sync_campaign_template(entity_name: str) -> bool:
         return False
 
     try:
+        # Keep campaign template resilient if this step fails.
         with open(default_path, "r", encoding="utf-8") as fh:
             default_data = json.load(fh)
     except Exception as exc:
@@ -498,6 +518,7 @@ def sync_campaign_template(entity_name: str) -> bool:
 
     if os.path.exists(campaign_path):
         try:
+            # Keep campaign template resilient if this step fails.
             with open(campaign_path, "r", encoding="utf-8") as fh:
                 campaign_data = json.load(fh)
             custom_fields = list(campaign_data.get("custom_fields", []))
@@ -523,6 +544,7 @@ def sync_campaign_template(entity_name: str) -> bool:
 
 @log_function
 def list_known_entities() -> list:
+    """Handle list known entities."""
     entities = sorted(load_entity_definitions().keys())
     log_debug(
         f"Discovered {len(entities)} entity templates",
@@ -538,6 +560,7 @@ def list_known_entity_labels() -> list:
     definitions = load_entity_definitions()
     labels = []
     for slug in sorted(definitions.keys()):
+        # Process each slug from sorted(definitions.keys()).
         label = str(definitions.get(slug, {}).get("label") or "").strip()
         if label:
             labels.append(label)

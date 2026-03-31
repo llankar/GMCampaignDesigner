@@ -1,3 +1,5 @@
+"""Regression tests for character creation advancement binding."""
+
 import sys
 import tkinter as tk
 import types
@@ -5,15 +7,19 @@ import types
 
 class _StubWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _StubWidget instance."""
         pass
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def destroy(self):
+        """Handle destroy."""
         return None
 
 
@@ -37,6 +43,7 @@ import modules.pcs.character_creation.view as view_module
 
 
 def test_binding_updates_internal_type_and_calls_callback_on_label_change():
+    """Verify that binding updates internal type and calls callback on label change."""
     root = tk.Tcl()
     value_to_label = {value: label for value, label in ADVANCEMENT_OPTIONS}
     label_to_value = {label: value for value, label in ADVANCEMENT_OPTIONS}
@@ -59,10 +66,12 @@ def test_binding_updates_internal_type_and_calls_callback_on_label_change():
 
 
 def test_render_feat_rows_uses_updated_advancement_type_for_prowess_budget(monkeypatch):
+    """Verify that render feat rows uses updated advancement type for prowess budget."""
     root = tk.Tcl()
     captured = {}
 
     def fake_prowess_points_from_advancement_choices(choices):
+        """Handle fake prowess points from advancement choices."""
         captured["choices"] = choices
         return []
 

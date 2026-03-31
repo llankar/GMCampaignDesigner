@@ -1,3 +1,5 @@
+"""Import helpers for scenario."""
+
 import re
 import os
 import customtkinter as ctk
@@ -38,6 +40,7 @@ default_formatting = {
 
 @log_function
 def remove_emojis(text):
+    """Remove emojis."""
     emoji_pattern = re.compile("[" 
                                u"\U0001F600-\U0001F64F"  
                                u"\U0001F300-\U0001F5FF"  
@@ -52,6 +55,7 @@ def remove_emojis(text):
 
 @log_function
 def import_formatted_scenario(text):
+    """Import formatted scenario."""
     # Remove emojis.
     cleaned_text = remove_emojis(text)
    #logging.info("Cleaned text (first 200 chars): %s", cleaned_text[:200])
@@ -74,6 +78,7 @@ def import_formatted_scenario(text):
     locations = []
     loc_split = re.split(r'(?mi)^\s*(?:Main Locations|ðŸ“ Main Locations).*$', cleaned_text, maxsplit=1)
     if len(loc_split) > 1:
+        # Handle the branch where len(loc_split) > 1.
         remainder = loc_split[1]
         npc_index = remainder.find("Key NPCs")
         if npc_index == -1:
@@ -85,6 +90,7 @@ def import_formatted_scenario(text):
        #logging.info("Extracted Places section (first 200 chars): %s", locs_text[:200])
         loc_entries = re.split(r'(?m)^\d+\.\s+', locs_text)
         for entry in loc_entries:
+            # Process each entry from loc_entries.
             entry = entry.strip()
             if not entry:
                 continue
@@ -95,8 +101,10 @@ def import_formatted_scenario(text):
             description = ""
             current_section = None
             for line in lines[1:]:
+                # Process each line from lines[1:].
                 line = line.strip()
                 if line.startswith("Description:"):
+                    # Handle the branch where line.startswith('Description:').
                     current_section = "description"
                     description = line[len("Description:"):].strip()
                 else:
@@ -111,12 +119,14 @@ def import_formatted_scenario(text):
     npcs = []
     npc_split = re.split(r'(?mi)^\s*(?:[^\w\s]*\s*)?(?:Key NPCs|NPCs)\s*:?.*$', cleaned_text, maxsplit=1)
     if len(npc_split) > 1:
+        # Handle the branch where len(npc_split) > 1.
         npc_text = npc_split[1].strip()
         #logging.info("Extracted NPCs section (first 200 chars): %s", npc_text[:200])
         npc_entries = re.split(r'(?m)^\d+\.\s+', npc_text)
         if npc_entries and not npc_entries[0].strip():
             npc_entries = npc_entries[1:]
         for entry in npc_entries:
+            # Process each entry from npc_entries.
             entry = entry.strip()
             if not entry:
                 continue
@@ -134,17 +144,22 @@ def import_formatted_scenario(text):
             secret = ""
             current_section = None
             for line in lines[1:]:
+                # Process each line from lines[1:].
                 line = line.strip()
                 if line.startswith("Appearance:"):
+                    # Handle the branch where line.startswith('Appearance:').
                     current_section = "appearance"
                     appearance = line[len("Appearance:"):].strip()
                 elif line.startswith("Background:"):
+                    # Handle the branch where line.startswith('Background:').
                     current_section = "background"
                     background = line[len("Background:"):].strip()
                 elif line.startswith("Savage Fate Stats:"):
+                    # Handle the branch where line.startswith('Savage Fate Stats:').
                     current_section = "stats"
                     secret = line[len("Savage Fate Stats:"):].strip()
                 elif line.startswith("Stunt:"):
+                    # Handle the branch where line.startswith('Stunt:').
                     current_section = "stunt"
                     secret += " " + line[len("Stunt:"):].strip()
                 else:
@@ -230,6 +245,7 @@ def import_formatted_scenario(text):
 @log_methods
 class ScenarioImportWindow(ctk.CTkToplevel):
     def __init__(self, master=None):
+        """Initialize the ScenarioImportWindow instance."""
         super().__init__(master)
         self.title("Import Formatted Scenario")
         self.geometry("600x600")
@@ -270,9 +286,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self.status_label.pack(side="right", padx=(8,0))
         
     def import_scenario(self):
+        """Import scenario."""
         log_info("Importing scenario from JSON", func_name="ScenarioImportWindow.import_scenario")
         scenario_text = self.scenario_textbox.get("1.0", "end-1c")
         try:
+            # Keep scenario resilient if this step fails.
             self._set_status("Importing pasted scenario...")
             self._busy(True)
             import_formatted_scenario(scenario_text)
@@ -287,8 +305,10 @@ class ScenarioImportWindow(ctk.CTkToplevel):
     # AI-powered PDF import
     # -------------------------
     def import_pdf_via_ai(self):
+        """Import PDF via AI."""
         log_info("Importing scenario PDF via AI", func_name="ScenarioImportWindow.import_pdf_via_ai")
         try:
+            # Keep PDF via AI resilient if this step fails.
             pdf_path = filedialog.askopenfilename(
                 title="Select Scenario PDF",
                 filetypes=[("PDF Files", "*.pdf"), ("All Files", "*.*")]
@@ -299,9 +319,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             pdf_hash = None
             previous_record = None
             try:
+                # Keep PDF via AI resilient if this step fails.
                 pdf_hash = PDFHashTracker.compute_hash(pdf_path)
                 previous_record = PDFHashTracker.get_record(pdf_hash)
                 if previous_record:
+                    # Continue with this path when previous record is set.
                     imported_when = previous_record.get("timestamp", "an earlier session")
                     imported_from = previous_record.get("path", pdf_path)
                     should_continue = messagebox.askyesno(
@@ -324,7 +346,9 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             self._busy(True)
 
             def worker():
+                """Handle worker."""
                 try:
+                    # Keep worker resilient if this step fails.
                     self._set_status("Extracting PDF text...")
                     pages = self._extract_pdf_text(pdf_path)
                     if not pages or not any(page.strip() for page in pages):
@@ -352,16 +376,20 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             messagebox.showerror("AI PDF Import Error", str(e))
 
     def ai_parse_textarea(self):
+        """Handle AI parse textarea."""
         log_info("Parsing scenario text via AI", func_name="ScenarioImportWindow.ai_parse_textarea")
         text = self.scenario_textbox.get("1.0", "end-1c").strip()
         if not text:
             messagebox.showwarning("No Text", "Please paste scenario text first.")
             return
         try:
+            # Keep AI parse textarea resilient if this step fails.
             self._set_status("Preparing AI parse...")
             self._busy(True)
             def worker():
+                """Handle worker."""
                 try:
+                    # Keep worker resilient if this step fails.
                     multiple_scenarios = bool(self.multiple_scenarios_var.get())
                     self._ai_extract_and_import(
                         text,
@@ -381,12 +409,14 @@ class ScenarioImportWindow(ctk.CTkToplevel):
     def _extract_pdf_text(self, path: str) -> list[str]:
         """Attempt to extract text from PDF using available backends."""
         try:
+            # Keep PDF text resilient if this step fails.
             try:
                 import PyPDF2 as pypdf
             except Exception:
                 import pypdf as pypdf  # type: ignore
             text = []
             with open(path, "rb") as f:
+                # Keep this resource scoped to PDF text.
                 reader = pypdf.PdfReader(f)
                 for page in reader.pages:
                     try:
@@ -398,10 +428,12 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             pass
 
     def _review_extracted_pages(self, pages: list[str], source_name: str) -> str | None:
+        """Internal helper for review extracted pages."""
         selection: dict[str, str | None] = {"text": None}
         event = threading.Event()
 
         def _open_dialog():
+            """Open dialog."""
             dialog = PDFReviewDialog(self, pages, title=f"Review {source_name}")
             self.wait_window(dialog)
             chosen = dialog.selected_pages
@@ -413,6 +445,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         return selection["text"]
         
     def _ai_extract_and_import(self, raw_text: str, source_label: str = "", multiple_scenarios: bool = False):
+        """Internal helper for AI extract and import."""
         log_info(f"Running AI extraction for {source_label or 'input'}", func_name="ScenarioImportWindow._ai_extract_and_import")
         """
         Multi-phase AI extraction to improve depth, especially Scenario Summary and Scenes.
@@ -437,6 +470,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         existing_creatures = creatures_wrapper.load_items()
         stats_examples = []
         for row in existing_creatures:
+            # Process each row from existing_creatures.
             st = row.get("Stats")
             if isinstance(st, dict):
                 st = st.get("text", "")
@@ -485,6 +519,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
 
         total_scenarios = len(outlines)
         for idx, outline in enumerate(outlines, start=1):
+            # Process each (idx, outline) from enumerate(outlines, start=1).
             title = outline.get("Title") or f"Unnamed Scenario {idx}"
             summary_draft = outline.get("Summary") or ""
             outline_scenes = outline.get("Scenes") or []
@@ -517,6 +552,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             )
 
             def to_longtext(val):
+                """Handle to longtext."""
                 if isinstance(val, dict) and "text" in val:
                     return val
                 return ai_text_to_rtf_json(str(val) if val is not None else "")
@@ -546,9 +582,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             # NPCs
             self._set_status(f"Merging NPCs into database ({idx}/{total_scenarios})...")
             if isinstance(entities.get("npcs"), list):
+                # Handle the branch where isinstance(entities.get('npcs'), list).
                 current_items = npcs_wrapper.load_items()
                 new_items = []
                 for n in entities.get("npcs"):
+                    # Process each n from entities.get('npcs').
                     if not isinstance(n, dict):
                         continue
                     item = {
@@ -579,9 +617,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             # Creatures
             self._set_status(f"Merging creatures into database ({idx}/{total_scenarios})...")
             if isinstance(entities.get("creatures"), list):
+                # Handle the branch where isinstance(entities.get('creatures'), list).
                 current_items = creatures_wrapper.load_items()
                 new_items = []
                 for c in entities.get("creatures"):
+                    # Process each c from entities.get('creatures').
                     if not isinstance(c, dict):
                         continue
                     stats_val = c.get("Stats", "")
@@ -603,9 +643,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             # Places
             self._set_status(f"Merging places into database ({idx}/{total_scenarios})...")
             if isinstance(entities.get("places"), list):
+                # Handle the branch where isinstance(entities.get('places'), list).
                 current_items = places_wrapper.load_items()
                 new_items = []
                 for p in entities.get("places"):
+                    # Process each p from entities.get('places').
                     if not isinstance(p, dict):
                         continue
                     item = {
@@ -631,9 +673,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self._busy(False)
     # --- UI helpers ---
     def _set_status(self, text: str):
+        """Set status."""
         # Log the provided status text (fix NameError from 'message')
         log_info(f"Import status: {text}", func_name="ScenarioImportWindow._set_status")
         def _do():
+            """Internal helper for do."""
             try:
                 self.status_label.configure(text=text)
             except Exception:
@@ -641,8 +685,11 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _busy(self, on: bool):
+        """Internal helper for busy."""
         def _do():
+            """Internal helper for do."""
             try:
+                # Keep do resilient if this step fails.
                 if on:
                     self.progress.start()
                 else:
@@ -664,10 +711,13 @@ class ScenarioImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _info(self, title: str, msg: str):
+        """Internal helper for info."""
         self.after(0, lambda: messagebox.showinfo(title, msg))
 
     def _warn(self, title: str, msg: str):
+        """Internal helper for warn."""
         self.after(0, lambda: messagebox.showwarning(title, msg))
 
     def _error(self, title: str, msg: str):
+        """Internal helper for error."""
         self.after(0, lambda: messagebox.showerror(title, msg))

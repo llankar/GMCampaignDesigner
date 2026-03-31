@@ -1,3 +1,5 @@
+﻿"""Utilities for logging helper."""
+
 import logging
 import os
 import inspect
@@ -18,6 +20,7 @@ _ACTIVE_LOG_PATH: Optional[str] = None
 
 
 def _resolve_log_path(directory: str, filename: str) -> str:
+    """Resolve log path."""
     resolved_dir = _resolve_directory(directory)
     os.makedirs(resolved_dir, exist_ok=True)
     if os.path.isabs(filename):
@@ -30,6 +33,7 @@ def _append_fallback_error_log(message: str, *, exc_info: bool = False) -> None:
     from modules.helpers.config_helper import ConfigHelper
 
     try:
+        # Keep fallback error log resilient if this step fails.
         directory = ConfigHelper.get("Logging", "directory", fallback="logs") or "logs"
         filename = ConfigHelper.get("Logging", "filename", fallback="gmcampaigndesigner.log") or "gmcampaigndesigner.log"
         log_path = _resolve_log_path(directory, filename)
@@ -39,7 +43,9 @@ def _append_fallback_error_log(message: str, *, exc_info: bool = False) -> None:
         log_path = os.path.join(fallback_dir, "gmcampaigndesigner.log")
 
     try:
+        # Keep fallback error log resilient if this step fails.
         with open(log_path, "a", encoding="utf-8") as handle:
+            # Keep this resource scoped to fallback error log.
             handle.write(f"[FALLBACK][ERROR] {message}\n")
             if exc_info:
                 handle.write("".join(traceback.format_exc()))
@@ -49,6 +55,7 @@ def _append_fallback_error_log(message: str, *, exc_info: bool = False) -> None:
 
 
 def _resolve_directory(directory: str) -> str:
+    """Resolve directory."""
     directory = directory or "logs"
     if os.path.isabs(directory):
         return directory
@@ -56,6 +63,7 @@ def _resolve_directory(directory: str) -> str:
 
 
 def _refresh_logger() -> logging.Logger:
+    """Refresh logger."""
     global _LOGGER, _LAST_CONFIG, _LOGGER_ENABLED, _ACTIVE_LOG_PATH
 
     from modules.helpers.config_helper import ConfigHelper
@@ -72,6 +80,7 @@ def _refresh_logger() -> logging.Logger:
         _LOGGER.propagate = False
 
     if config_signature != _LAST_CONFIG:
+        # Handle the branch where config_signature != _LAST_CONFIG.
         _LAST_CONFIG = config_signature
 
         for handler in list(_LOGGER.handlers):
@@ -81,6 +90,7 @@ def _refresh_logger() -> logging.Logger:
         _ACTIVE_LOG_PATH = None
 
         if enabled:
+            # Continue with this path when enabled is set.
             log_path = _resolve_log_path(directory, filename)
 
             level = getattr(logging, str(level_name).upper(), logging.INFO)
@@ -108,25 +118,31 @@ def _refresh_logger() -> logging.Logger:
 
 
 def ensure_logger() -> tuple[logging.Logger, bool]:
+    """Ensure logger."""
     logger = _refresh_logger()
     return logger, _LOGGER_ENABLED
 
 
 def is_logging_enabled() -> bool:
+    """Return whether logging enabled."""
     _, enabled = ensure_logger()
     return enabled
 
 
 def get_active_log_path() -> Optional[str]:
+    """Return active log path."""
     return _ACTIVE_LOG_PATH
 
 
 def _determine_caller(extra_depth: int = 0) -> str:
+    """Internal helper for determine caller."""
     frame = inspect.currentframe()
     target = frame
     try:
+        # Keep determine caller resilient if this step fails.
         depth = 2 + max(extra_depth, 0)
         for _ in range(depth):
+            # Process each _ from range(depth).
             if target is None:
                 break
             target = target.f_back
@@ -143,6 +159,7 @@ def _determine_caller(extra_depth: int = 0) -> str:
 
 
 def _log(level: int, message: str, *, func_name: Optional[str] = None, extra_depth: int = 0, exc_info: bool = False) -> None:
+    """Internal helper for log."""
     logger, enabled = ensure_logger()
     if not enabled:
         return
@@ -155,18 +172,22 @@ def _log(level: int, message: str, *, func_name: Optional[str] = None, extra_dep
 
 
 def log_debug(message: str, *, func_name: Optional[str] = None) -> None:
+    """Handle log debug."""
     _log(logging.DEBUG, message, func_name=func_name)
 
 
 def log_info(message: str, *, func_name: Optional[str] = None) -> None:
+    """Handle log info."""
     _log(logging.INFO, message, func_name=func_name)
 
 
 def log_warning(message: str, *, func_name: Optional[str] = None) -> None:
+    """Handle log warning."""
     _log(logging.WARNING, message, func_name=func_name)
 
 
 def log_error(message: str, *, func_name: Optional[str] = None) -> None:
+    """Handle log error."""
     logger, enabled = ensure_logger()
     if enabled:
         name = func_name or _determine_caller()
@@ -178,6 +199,7 @@ def log_error(message: str, *, func_name: Optional[str] = None) -> None:
 
 
 def log_exception(message: str, *, func_name: Optional[str] = None) -> None:
+    """Handle log exception."""
     logger, enabled = ensure_logger()
     name = func_name or _determine_caller()
     if enabled:
@@ -187,6 +209,7 @@ def log_exception(message: str, *, func_name: Optional[str] = None) -> None:
 
 
 def _handle_uncaught_exception(exc_type, exc_value, exc_traceback) -> None:
+    """Internal helper for handle uncaught exception."""
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
@@ -197,6 +220,7 @@ def _handle_uncaught_exception(exc_type, exc_value, exc_traceback) -> None:
 
 
 def _handle_thread_exception(args: threading.ExceptHookArgs) -> None:
+    """Internal helper for handle thread exception."""
     log_error(
         f"Unhandled thread exception in {args.thread.name if args.thread else 'unknown-thread'}: {args.exc_value}",
         func_name="global.threading_excepthook",
@@ -207,6 +231,7 @@ def _handle_thread_exception(args: threading.ExceptHookArgs) -> None:
 
 
 def install_global_exception_hooks() -> None:
+    """Handle install global exception hooks."""
     sys.excepthook = _handle_uncaught_exception
     if hasattr(threading, "excepthook"):
         threading.excepthook = _handle_thread_exception
@@ -215,12 +240,16 @@ def install_global_exception_hooks() -> None:
 
 
 def log_module_import(module_name: Optional[str] = None) -> None:
+    """Handle log module import."""
     name = module_name or _determine_caller(extra_depth=1)
     _log(logging.INFO, "module import", func_name=name)
 
 def log_function(func: F) -> F:
+    """Wrap a function to emit start, completion, and failure logs."""
+
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
+        """Execute the wrapped function with logging around the call."""
         logger, enabled = ensure_logger()
         if not enabled:
             return func(*args, **kwargs)
@@ -239,14 +268,18 @@ def log_function(func: F) -> F:
 
 
 def log_methods(cls: type) -> type:
+    """Handle log methods."""
     for name, attr in list(cls.__dict__.items()):
+        # Process each (name, attr) from list(__dict__.items()).
         if name.startswith("__"):
             continue
 
         if isinstance(attr, staticmethod):
+            # Handle the branch where isinstance(attr, staticmethod).
             original = attr.__func__
             setattr(cls, name, staticmethod(log_function(original)))
         elif isinstance(attr, classmethod):
+            # Handle the branch where isinstance(attr, classmethod).
             original = attr.__func__
             setattr(cls, name, classmethod(log_function(original)))
         elif callable(attr):
@@ -256,6 +289,7 @@ def log_methods(cls: type) -> type:
 
 
 def initialize_logging() -> bool:
+    """Handle initialize logging."""
     logger, enabled = ensure_logger()
     if not enabled:
         return False

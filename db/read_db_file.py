@@ -1,9 +1,12 @@
+"""Utilities for inspecting database files."""
+
 import sqlite3
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
 def print_db_info(db_file):
+    """Print DB info."""
     conn = sqlite3.connect(db_file)
     conn.row_factory = sqlite3.Row  # Allow column access by name
     cursor = conn.cursor()
@@ -13,6 +16,7 @@ def print_db_info(db_file):
     tables = cursor.fetchall()
     print("Tables in the database:")
     for table in tables:
+        # Process each table from tables.
         table_name = table[0]
         print(f"\nTable: {table_name}")
         

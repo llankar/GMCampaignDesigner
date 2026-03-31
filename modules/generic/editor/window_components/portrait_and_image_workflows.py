@@ -1,9 +1,12 @@
+﻿"""Utilities for window components portrait and image workflows."""
+
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, tk_listbox_theme
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
     def create_portrait_field(self, field):
+        """Create portrait field."""
         frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         frame.pack(fill="x", pady=5)
 
@@ -53,10 +56,12 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         self._update_portrait_preview(primary_only=True)
     def open_portrait_image_browser(self):
+        """Open portrait image browser."""
         query = self._resolve_portrait_search_query()
         query = quote_plus(query) 
         url = ImageBrowserDialog.build_search_url(query)
         try:
+            # Keep portrait image browser resilient if this step fails.
             PyWebviewClient(title="Image Browser").open(url)
         except Exception as exc:
             log_exception(
@@ -68,6 +73,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 "Impossible d’ouvrir la page d’images. Vérifiez la connexion puis réessayez.",
             )
     def _resolve_portrait_search_query(self):
+        """Resolve portrait search query."""
         key_field = self.model_wrapper._infer_key_field()
         widget = self.field_widgets.get(key_field)
         name = ""
@@ -91,9 +97,11 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             return
 
         if isinstance(data, list):
+            # Handle the branch where isinstance(data, list).
             added = False
             for path in data:
                 try:
+                    # Keep paste portrait from clipboard resilient if this step fails.
                     if os.path.isfile(path):
                         copied = self.copy_and_resize_portrait(path)
                         self._add_portrait_path(copied, make_primary=not self.portrait_paths)
@@ -106,6 +114,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         if isinstance(data, Image.Image):
             try:
+                # Keep paste portrait from clipboard resilient if this step fails.
                 campaign_dir = Path(ConfigHelper.get_campaign_dir())
                 portrait_folder = campaign_dir / 'assets' / 'portraits'
                 portrait_folder.mkdir(parents=True, exist_ok=True)
@@ -136,6 +145,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         messagebox.showinfo("Paste Portrait", "Clipboard content is not an image.")
     def create_image_field(self, field):
+        """Create image field."""
         frame = ctk.CTkFrame(self._field_parent())
         frame.pack(fill="x", pady=5)
 
@@ -146,6 +156,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         abs_path = None
         if normalized_path:
+            # Continue with this path when normalized path is set.
             candidate = Path(normalized_path)
             abs_path = candidate if candidate.is_absolute() else campaign_dir / candidate
         elif raw_image_path:
@@ -156,6 +167,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         image_frame.pack(fill="x", pady=5)
 
         if abs_path and abs_path.exists():
+            # Handle the branch where abs path is set and abs_path.exists().
             try:
                 image = Image.open(abs_path).resize((256, 256))
                 self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
@@ -193,9 +205,12 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         # If clipboard contains a list of file paths, try first valid image path
         if isinstance(data, list):
+            # Handle the branch where isinstance(data, list).
             for path in data:
                 try:
+                    # Keep paste image from clipboard resilient if this step fails.
                     if os.path.isfile(path):
+                        # Handle the branch where os.path.isfile(path).
                         self.image_path = self.copy_and_resize_image(path)
                         if self.image_path:
                             candidate = Path(self.image_path)
@@ -203,6 +218,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                         else:
                             abs_path = None
                         try:
+                            # Keep paste image from clipboard resilient if this step fails.
                             if abs_path and abs_path.exists():
                                 image = Image.open(abs_path).resize((256, 256))
                                 self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
@@ -223,6 +239,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         # If clipboard contains a PIL Image
         if isinstance(data, Image.Image):
             try:
+                # Keep paste image from clipboard resilient if this step fails.
                 campaign_dir = Path(ConfigHelper.get_campaign_dir())
                 image_folder = campaign_dir / 'assets' / 'images' / 'map_images'
                 image_folder.mkdir(parents=True, exist_ok=True)
@@ -247,6 +264,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 self.image_path = relative
                 abs_path = Path(dest_path)
                 try:
+                    # Keep paste image from clipboard resilient if this step fails.
                     if abs_path.exists():
                         image = Image.open(abs_path).resize((256, 256))
                         self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
@@ -265,6 +283,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         messagebox.showinfo("Paste Image", "Clipboard content is not an image.")
     def launch_swarmui(self):
+        """Launch swarmui."""
         global SWARMUI_PROCESS
         # Retrieve the SwarmUI path from config.ini
         swarmui_path = ConfigHelper.get("Paths", "swarmui_path", fallback=r"E:\SwarmUI\SwarmUI")
@@ -274,6 +293,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         env.pop('VIRTUAL_ENV', None)
         if SWARMUI_PROCESS is None or SWARMUI_PROCESS.poll() is not None:
             try:
+                # Keep swarmui resilient if this step fails.
                 SWARMUI_PROCESS = subprocess.Popen(
                     SWARMUI_CMD,
                     shell=True,
@@ -292,7 +312,8 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         if SWARMUI_PROCESS is not None and SWARMUI_PROCESS.poll() is None:
             SWARMUI_PROCESS.terminate()
     def create_portrait_with_swarmui(self):
-      
+        """Create a portrait by delegating image generation to SwarmUI."""
+
         self.launch_swarmui()
         # Ask for model
         model_options = get_available_models()
@@ -318,6 +339,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         ctk.CTkOptionMenu(top, values=model_options, variable=selected_model).pack(pady=10)
 
         def on_confirm():
+            """Handle confirm."""
             top.destroy()
             ConfigHelper.set("LastUsed", "model", selected_model.get())
             self.generate_portrait(selected_model.get())
@@ -375,6 +397,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             images_bytes = []
             for rel_path in images:
                 try:
+                    # Keep generate portrait resilient if this step fails.
                     url = f"{SWARM_API_URL}/{rel_path}"
                     resp = requests.get(url)
                     if resp.status_code == 200:
@@ -436,6 +459,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         selected = {"idx": None}
 
         def on_choose(i):
+            """Handle choose."""
             selected["idx"] = i
             top.destroy()
 
@@ -453,6 +477,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         cancel_btn = ctk.CTkButton(top, text="Cancel", command=lambda: (setattr(selected, "idx", None), top.destroy()))
         # Workaround: setattr on dict won't work; override with lambda capturing selected
         def _cancel():
+            """Internal helper for cancel."""
             selected["idx"] = None
             top.destroy()
         cancel_btn.configure(command=_cancel)
@@ -470,6 +495,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         top.wait_window()
         return selected["idx"]
     def select_portrait(self):
+        """Select portrait."""
         file_paths = filedialog.askopenfilenames(
             title="Select Portrait Image(s)",
             filetypes=[

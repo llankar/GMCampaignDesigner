@@ -11,9 +11,11 @@ def collect_scene_entity_names(scenes, field_name):
     names = []
     seen = set()
     for scene in scenes:
+        # Process each scene from scenes.
         if not isinstance(scene, dict):
             continue
         for name in normalise_entity_list(scene.get(field_name)):
+            # Process each name from normalise_entity_list(scene.get(field_name)).
             key = name.casefold()
             if key in seen:
                 continue

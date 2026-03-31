@@ -1,3 +1,5 @@
+"""Utilities for campaign generation defaults service."""
+
 from __future__ import annotations
 
 import json
@@ -22,10 +24,12 @@ class CampaignGenerationDefaultsService:
         get_setting: Callable[[str, str | None], str | None] = get_campaign_setting,
         set_setting: Callable[[str, str | None], None] = set_campaign_setting,
     ):
+        """Initialize the CampaignGenerationDefaultsService instance."""
         self._get_setting = get_setting
         self._set_setting = set_setting
 
     def load(self) -> dict:
+        """Load the operation."""
         raw = self._get_setting(CAMPAIGN_GENERATION_DEFAULTS_KEY, None)
         if not raw:
             return dict(DEFAULT_GENERATION_DEFAULTS_STATE)
@@ -36,6 +40,7 @@ class CampaignGenerationDefaultsService:
         return generation_defaults_payload_to_state(parsed if isinstance(parsed, dict) else {})
 
     def save(self, state: dict | None) -> dict:
+        """Save the operation."""
         payload = generation_defaults_state_to_payload(state)
         self._set_setting(CAMPAIGN_GENERATION_DEFAULTS_KEY, json.dumps(payload, ensure_ascii=False))
         return payload

@@ -1,3 +1,5 @@
+"""View for map web display."""
+
 import io
 import logging
 import threading
@@ -19,6 +21,7 @@ log_module_import(__name__)
 # Simple Flask app to serve the current map image
 
 def open_web_display(self, port=None):
+    """Open web display."""
     if port is None:
         port = int(ConfigHelper.get("MapServer", "map_port", fallback=32000))
     if getattr(self, '_web_server_thread', None):
@@ -61,6 +64,7 @@ def open_web_display(self, port=None):
     register_map_api(self._web_app, controller=self, access_guard=self._map_remote_access_guard)
 
     def _plot_twist_payload(result):
+        """Internal helper for plot twist payload."""
         if not result:
             return {"has_result": False}
         payload = result.to_payload()
@@ -69,14 +73,17 @@ def open_web_display(self, port=None):
 
     @self._web_app.route('/plot_twist')
     def plot_twist():
+        """Handle plot twist."""
         return jsonify(_plot_twist_payload(get_latest_plot_twist()))
 
     @self._web_app.route('/plot_twist/roll', methods=['POST'])
     def plot_twist_roll():
+        """Handle plot twist roll."""
         return jsonify(_plot_twist_payload(roll_plot_twist()))
 
     @self._web_app.route('/')
     def index():
+        """Handle index."""
         # Basic HTML page that reloads the map image periodically so
         # changes on the GM side appear without requiring a manual refresh.
         use_mjpeg = bool(getattr(controller, '_web_use_mjpeg', True))
@@ -202,12 +209,14 @@ def open_web_display(self, port=None):
 
     @self._web_app.route('/favicon.ico')
     def favicon():
+        """Handle favicon."""
         if _favicon_path.exists():
             return send_from_directory(static_dir, 'favicon.ico')
         return ('', 204)
 
     @self._web_app.route('/player')
     def player():
+        """Handle player."""
         token_param = request.args.get('token', '')
         return render_template_string(
             """
@@ -262,6 +271,7 @@ def open_web_display(self, port=None):
 
     @self._web_app.route('/map.png')
     def map_png():
+        """Map png."""
         # Rebuild the composited image for each request so movement and fog
         # changes are reflected immediately.
         controller._update_web_display_map()
@@ -280,10 +290,12 @@ def open_web_display(self, port=None):
 
     @self._web_app.route('/stream.mjpg')
     def stream_mjpeg():
+        """Handle stream mjpeg."""
         boundary = 'frame'
         interval = max(1, int(getattr(controller, '_web_refresh_ms', 200))) / 1000.0
 
         def _ensure_rgb(img):
+            """Ensure RGB."""
             if img is None:
                 return None
             if img.mode == 'RGB':
@@ -304,19 +316,23 @@ def open_web_display(self, port=None):
                 return None
 
         def frame_bytes():
+            """Handle frame bytes."""
             # Compose a JPEG-encoded frame from the current map state
             img = _ensure_rgb(_render_map_image(controller))
             if img is None:
                 return None
             buf = io.BytesIO()
             try:
+                # Keep frame bytes resilient if this step fails.
                 img.save(buf, format='JPEG', quality=80)
                 return buf.getvalue()
             finally:
                 buf.close()
 
         def generate():
+            """Handle generate."""
             while True:
+                # Keep looping while True.
                 data = frame_bytes()
                 if data is None:
                     time.sleep(interval)
@@ -330,7 +346,9 @@ def open_web_display(self, port=None):
         return Response(generate(), mimetype=f'multipart/x-mixed-replace; boundary={boundary}')
 
     def run_app():
+        """Run app."""
         try:
+            # Keep app resilient if this step fails.
             import logging as _logging
             # Suppress werkzeug request logs
             _logging.getLogger('werkzeug').setLevel(_logging.ERROR)
@@ -344,6 +362,7 @@ def open_web_display(self, port=None):
             from werkzeug.serving import WSGIRequestHandler as _WSGIRequestHandler
             class _QuietHandler(_WSGIRequestHandler):
                 def log(self, type, message, *args):
+                    """Handle log."""
                     pass
             self._web_server = make_server('0.0.0.0', port, self._web_app, threaded=True, request_handler=_QuietHandler)
         except Exception:
@@ -355,6 +374,7 @@ def open_web_display(self, port=None):
 
 
 def _web_render_geometry(self):
+    """Internal helper for web render geometry."""
     base = getattr(self, '_video_current_frame_pil', None) or getattr(self, 'base_img', None)
     if base is None:
         base_size = (1920, 1080)
@@ -375,6 +395,7 @@ def _web_render_geometry(self):
 
 
 def _describe_remote_tokens(self, render_offset=None):
+    """Internal helper for describe remote tokens."""
     if render_offset is None:
         _, render_offset, _ = _web_render_geometry(self)
     min_x, min_y = render_offset
@@ -383,6 +404,7 @@ def _describe_remote_tokens(self, render_offset=None):
     pan_y = float(getattr(self, 'pan_y', 0.0))
     tokens = []
     for idx, token in enumerate(getattr(self, 'tokens', []) or []):
+        # Process each (idx, token) from enumerate(getattr(self, 'tokens', []) or []).
         if str(token.get('type', 'token')).lower() != 'token':
             continue
         if not bool(token.get('player_visible', True)):
@@ -419,6 +441,7 @@ def _describe_remote_tokens(self, render_offset=None):
 
 
 def _render_map_image(self):
+    """Render map image."""
     base = getattr(self, '_video_current_frame_pil', None) or getattr(self, 'base_img', None)
     if not base:
         return None
@@ -435,6 +458,7 @@ def _render_map_image(self):
 
     draw = ImageDraw.Draw(img)
     for item in self.tokens:
+        # Process each item from tokens.
         item_type = item.get('type', 'token')
         xw, yw = item.get('position', (0, 0))
         sx = int(xw * self.zoom + self.pan_x - min_x)
@@ -442,6 +466,7 @@ def _render_map_image(self):
         if item_type == 'marker':
             continue
         if item_type == 'token':
+            # Handle the branch where item_type == 'token'.
             if not bool(item.get('player_visible', True)):
                 continue
             source = item.get('source_image')
@@ -460,11 +485,13 @@ def _render_map_image(self):
                 size_px = max(1, int(getattr(self, 'token_size', 64)))
 
             if source is not None:
+                # Handle the branch where source is available.
                 nw = nh = max(1, int(size_px * self.zoom))
                 if nw <= 0 or nh <= 0:
                     continue
                 img_r = source.resize((nw, nh), Image.LANCZOS)
             elif pil:
+                # Continue with this path when pil is set.
                 tw, th = pil.size
                 nw, nh = int(tw * self.zoom), int(th * self.zoom)
                 if nw <= 0 or nh <= 0:
@@ -476,6 +503,7 @@ def _render_map_image(self):
             img.paste(img_r, (sx, sy), img_r.convert('RGBA'))
             draw.rectangle([sx - 3, sy - 3, sx + nw + 3, sy + nh + 3], outline=item.get('border_color', '#0000ff'), width=3)
         elif item_type in ['rectangle', 'oval']:
+            # Handle the branch where item type is in ['rectangle', 'oval'].
             shape_w = int(item.get('width', 50) * self.zoom)
             shape_h = int(item.get('height', 50) * self.zoom)
             fill_color = None
@@ -488,6 +516,7 @@ def _render_map_image(self):
             else:
                 draw.ellipse([sx, sy, sx + shape_w, sy + shape_h], fill=fill_color, outline=border_color, width=2)
         elif item_type == 'whiteboard':
+            # Handle the branch where item_type == 'whiteboard'.
             points = item.get('points') or []
             if len(points) < 2:
                 continue
@@ -498,6 +527,7 @@ def _render_map_image(self):
             width = item.get('width', 4)
             draw.line(screen_points, fill=color, width=int(max(1, width)), joint='curve')
         elif item_type == 'text':
+            # Handle the branch where item_type == 'text'.
             text_value = item.get('text', '')
             color = item.get('color', '#FF0000')
             size = int(item.get('text_size', getattr(self, 'text_size', 24)))
@@ -523,6 +553,7 @@ def _render_map_image(self):
 
 
 def _update_web_display_map(self):
+    """Update web display map."""
     if not getattr(self, '_web_server_thread', None):
         return
     img = _render_map_image(self)
@@ -558,6 +589,7 @@ def close_web_display(self, port=None):
             pass
 
     for _ in range(5):  # wait up to ~5 seconds total
+        # Process each _ from range(5).
         thread.join(timeout=1)
         if not thread.is_alive():
             break

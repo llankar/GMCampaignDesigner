@@ -1,3 +1,5 @@
+"""Loading helpers for generic treeview."""
+
 import tkinter as tk
 from typing import Callable, Iterable, List, Optional, Any
 
@@ -6,6 +8,7 @@ class TreeviewLoader:
     """Utility to insert rows into a Treeview in responsive chunks."""
 
     def __init__(self, tree: tk.Misc):
+        """Initialize the TreeviewLoader instance."""
         self.tree = tree
         self._rows: List[Any] = []
         self._insert_callback: Optional[Callable[[Any], None]] = None
@@ -29,7 +32,9 @@ class TreeviewLoader:
             pass
 
     def cancel(self) -> None:
+        """Handle cancel."""
         if self._job:
+            # Continue with this path when job is set.
             try:
                 self.tree.after_cancel(self._job)
             except Exception:
@@ -76,9 +81,11 @@ class TreeviewLoader:
             self._run_next_chunk()
 
     def is_running(self) -> bool:
+        """Return whether running."""
         return bool(self._job)
 
     def _run_next_chunk(self) -> None:
+        """Run next chunk."""
         if not self._insert_callback:
             return
         end = min(self._index + self._chunk_size, len(self._rows))
@@ -86,6 +93,7 @@ class TreeviewLoader:
             self._insert_callback(payload)
         self._index = end
         if self._index < len(self._rows):
+            # Handle the branch where _index < len(_rows).
             self._job = self.tree.after(self._delay_ms, self._run_next_chunk)
         else:
             self._job = None

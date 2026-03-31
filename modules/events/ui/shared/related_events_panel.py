@@ -1,3 +1,5 @@
+"""Panel for related event."""
+
 import customtkinter as ctk
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -7,6 +9,7 @@ class RelatedEventsPanel(ctk.CTkFrame):
     """Reusable panel listing calendar events linked to an entity."""
 
     def __init__(self, master, *, entity_type, entity_name, on_open_entity=None):
+        """Initialize the RelatedEventsPanel instance."""
         super().__init__(master)
         self._on_open_entity = on_open_entity
 
@@ -26,6 +29,7 @@ class RelatedEventsPanel(ctk.CTkFrame):
 
     @staticmethod
     def _collect_related_events(entity_type, entity_name):
+        """Collect related events."""
         key = str(entity_name or "").strip()
         if not key:
             return []
@@ -50,11 +54,13 @@ class RelatedEventsPanel(ctk.CTkFrame):
         seen = set()
 
         for wrapper in wrappers:
+            # Process each wrapper from wrappers.
             try:
                 items = wrapper.load_items()
             except Exception:
                 continue
             for item in items:
+                # Process each item from items.
                 links = item.get(linked_field) or []
                 if key not in links:
                     continue

@@ -1,9 +1,12 @@
+"""Regression tests for campaign payload builder."""
+
 import pytest
 
 from modules.campaigns.services.campaign_payload_builder import build_campaign_payload
 
 
 def test_build_campaign_payload_embeds_arcs_and_linked_scenarios():
+    """Verify that build campaign payload embeds arcs and linked scenarios."""
     payload = build_campaign_payload(
         form_data={
             "name": "The Shattered Crown",
@@ -40,5 +43,6 @@ def test_build_campaign_payload_embeds_arcs_and_linked_scenarios():
 
 
 def test_build_campaign_payload_requires_name():
+    """Verify that build campaign payload requires name."""
     with pytest.raises(ValueError):
         build_campaign_payload(form_data={"name": "  "}, arcs_data=[])

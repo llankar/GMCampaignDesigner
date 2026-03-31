@@ -1,3 +1,5 @@
+"""Event Editor package."""
+
 from .palette import EVENT_EDITOR_PALETTE, get_event_editor_palette
 from .sections import EventEditorHero, EventEditorSection
 from .link_groups import EVENT_LINK_GROUPS

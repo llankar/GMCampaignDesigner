@@ -1,3 +1,4 @@
+"""Section helpers for campaign form."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -9,6 +10,7 @@ class FormSection(ctk.CTkFrame):
     """Reusable card section with title and optional helper copy."""
 
     def __init__(self, master, *, title: str, description: str | None = None):
+        """Initialize the FormSection instance."""
         super().__init__(
             master,
             fg_color=ARC_EDITOR_PALETTE.surface,

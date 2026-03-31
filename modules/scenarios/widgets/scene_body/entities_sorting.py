@@ -1,3 +1,5 @@
+"""Utilities for scenario entities sorting."""
+
 from __future__ import annotations
 
 from modules.scenarios.widgets.entity_chips import normalize_entity_payload
@@ -11,6 +13,7 @@ def prepare_entities_for_group(entities):
 
     normalized_entities = []
     for index, entry in enumerate(entities or []):
+        # Process each (index, entry) from enumerate(entities or []).
         payload = normalize_entity_payload(entry)
         if not payload["name"]:
             continue
@@ -40,6 +43,7 @@ def prepare_entities_for_group(entities):
 
 
 def _sort_key(payload: dict):
+    """Sort key."""
     is_priority = payload.get("_priority_flag", False)
     has_metadata = payload.get("_has_metadata", False)
     order_index = int(payload.get("_input_index", 0))
@@ -51,6 +55,7 @@ def _sort_key(payload: dict):
 
 
 def _extract_metadata(entry) -> dict:
+    """Extract metadata."""
     if not isinstance(entry, dict):
         return {}
     metadata = entry.get("metadata")
@@ -58,6 +63,7 @@ def _extract_metadata(entry) -> dict:
 
 
 def _extract_tags(entry, metadata: dict) -> set[str]:
+    """Extract tags."""
     tags = []
     if isinstance(entry, dict):
         tags.extend(_coerce_list(entry.get("tags")))
@@ -65,6 +71,7 @@ def _extract_tags(entry, metadata: dict) -> set[str]:
 
     normalized_tags = set()
     for tag in tags:
+        # Process each tag from tags.
         tag_value = str(tag or "").strip().lower()
         if tag_value:
             normalized_tags.add(tag_value)
@@ -72,6 +79,7 @@ def _extract_tags(entry, metadata: dict) -> set[str]:
 
 
 def _extract_importance(entry, metadata: dict) -> str:
+    """Extract importance."""
     raw_value = None
     if isinstance(entry, dict):
         raw_value = entry.get("importance") or entry.get("priority_level")
@@ -87,6 +95,7 @@ def _extract_importance(entry, metadata: dict) -> str:
 
 
 def _coerce_list(value):
+    """Coerce list."""
     if isinstance(value, (list, tuple, set)):
         return list(value)
     if value is None:
@@ -95,6 +104,7 @@ def _coerce_list(value):
 
 
 def _to_bool(value) -> bool:
+    """Internal helper for to bool."""
     if isinstance(value, bool):
         return value
     if isinstance(value, (int, float)):

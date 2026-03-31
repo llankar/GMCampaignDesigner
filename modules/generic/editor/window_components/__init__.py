@@ -1,3 +1,5 @@
+"""Window Components package."""
+
 from .navigation_and_rendering import GenericEditorWindowNavigationAndRendering
 from .scene_fields import GenericEditorWindowSceneFields
 from .list_and_basic_fields import GenericEditorWindowListAndBasicFields

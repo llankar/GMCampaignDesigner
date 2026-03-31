@@ -1,3 +1,5 @@
+"""UI helpers for campaign generator."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -11,6 +13,7 @@ class CampaignGeneratorApp(tk.Tk):
     """Main application window for generating campaigns."""
 
     def __init__(self) -> None:
+        """Initialize the CampaignGeneratorApp instance."""
         super().__init__()
         self.title("Scenario Generator")
         # Set a sensible default window size; allow resizing
@@ -53,6 +56,7 @@ class CampaignGeneratorApp(tk.Tk):
         self.current_campaign: Dict[str, str] | None = None
 
     def _create_widgets(self) -> None:
+        """Create widgets."""
         # Header label
         header = ttk.Label(
             self,
@@ -136,6 +140,7 @@ class CampaignGeneratorApp(tk.Tk):
             widget.destroy()
         # Create a card for each entry
         for key, value in campaign.items():
+            # Process each (key, value) from campaign.items().
             card = tk.Frame(self.cards_frame, bg="#34495e", bd=1, relief="ridge")
             title_label = tk.Label(
                 card,
@@ -161,6 +166,7 @@ class CampaignGeneratorApp(tk.Tk):
         self.export_json_button.state(["!disabled"])
 
     def export_campaign(self) -> None:
+        """Export campaign."""
         if not self.current_campaign:
             messagebox.showwarning("No Campaign", "Please generate a campaign first.")
             return

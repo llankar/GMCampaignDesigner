@@ -1,3 +1,5 @@
+"""Regression tests for local AI client."""
+
 import sys
 import types
 
@@ -11,6 +13,7 @@ from modules.ai.local_ai_client import LocalAIClient
 
 
 def test_parse_json_safe_markdown_table_fallback():
+    """Verify that parse JSON safe markdown table fallback."""
     text = (
         "Below is a table.\n"
         "| # | Item Name | Category |\n"
@@ -27,4 +30,5 @@ def test_parse_json_safe_markdown_table_fallback():
 
 
 def test_parse_markdown_table_ignores_non_tables():
+    """Verify that parse markdown table ignores non tables."""
     assert LocalAIClient._parse_markdown_table("No tables here") is None

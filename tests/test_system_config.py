@@ -1,3 +1,5 @@
+"""Regression tests for system config."""
+
 import json
 import os
 import re
@@ -20,6 +22,7 @@ from modules.helpers.system_config import (
 
 
 def _reset_manager_state() -> None:
+    """Reset manager state."""
     SystemConfigManager._cached_config = None
     SystemConfigManager._cached_slug = None
     SystemConfigManager._cached_signature = None
@@ -28,11 +31,13 @@ def _reset_manager_state() -> None:
 
 @pytest.fixture
 def campaign_db(monkeypatch, tmp_path):
+    """Handle campaign DB."""
     db_path = tmp_path / "campaign.db"
 
     original_get = ConfigHelper.get
 
     def fake_get(cls, section, key, fallback=None):
+        """Handle fake get."""
         if (section, key) == ("Database", "path"):
             return str(db_path)
         return original_get(section, key, fallback=fallback)
@@ -42,12 +47,14 @@ def campaign_db(monkeypatch, tmp_path):
     db_module.initialize_db()
     _reset_manager_state()
     try:
+        # Keep campaign DB resilient if this step fails.
         yield db_path
     finally:
         _reset_manager_state()
 
 
 def test_system_config_seeds_defaults(campaign_db):
+    """Verify that system config seeds defaults."""
     config = get_current_system_config()
     assert config is not None
     assert config.slug == "d20"
@@ -55,10 +62,12 @@ def test_system_config_seeds_defaults(campaign_db):
 
 
 def test_system_config_switching_updates_selection_and_notifies(campaign_db):
+    """Verify that system config switching updates selection and notifies."""
     events = []
 
     unsubscribe = register_system_change_listener(lambda cfg: events.append(cfg.slug))
     try:
+        # Keep test system config switching updates selection and notifies resilient if this step fails.
         initial = get_current_system_config()
         available = list_available_systems()
         target = next(system for system in available if system.slug != initial.slug)
@@ -74,6 +83,7 @@ def test_system_config_switching_updates_selection_and_notifies(campaign_db):
 
 
 def test_system_config_cache_invalidation_detects_db_changes(campaign_db):
+    """Verify that system config cache invalidation detects DB changes."""
     initial = get_current_system_config()
     assert initial is not None
 
@@ -94,6 +104,7 @@ def test_system_config_cache_invalidation_detects_db_changes(campaign_db):
 
 
 def test_system_config_parses_analyzer_patterns(campaign_db):
+    """Verify that system config parses analyzer patterns."""
     initial = get_current_system_config()
     assert initial is not None
 
@@ -160,6 +171,7 @@ def test_system_config_parses_analyzer_patterns(campaign_db):
 
 
 def test_refresh_current_system_forces_reload_when_signature_static(monkeypatch, campaign_db):
+    """Verify that refresh current system forces reload when signature static."""
     initial = get_current_system_config()
     assert initial is not None
 

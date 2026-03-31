@@ -1,3 +1,4 @@
+﻿"""Multi-select widget for assigning scenarios inside campaign UI flows."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -9,6 +10,7 @@ class ScenarioMultiSelector(ctk.CTkFrame):
     """Searchable multi-select control with quick actions and visible selected chips."""
 
     def __init__(self, master, scenarios: list[str], *, label: str = "Scenarios"):
+        """Initialize the ScenarioMultiSelector instance."""
         super().__init__(master, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
 
@@ -116,19 +118,23 @@ class ScenarioMultiSelector(ctk.CTkFrame):
         self._refresh_selected_summary()
 
     def set_values(self, values: list[str]):
+        """Set values."""
         self._selected_scenarios = {str(value).strip() for value in (values or []) if str(value).strip()}
         self._sync_checkboxes()
         self._refresh_selected_summary()
 
     def get_values(self) -> list[str]:
+        """Return values."""
         return [name for name in self._all_scenarios if name in self._selected_scenarios]
 
     def _build_scenario_list(self) -> None:
+        """Build scenario list."""
         for widget in self.results_scroll.winfo_children():
             widget.destroy()
         self._scenario_checks.clear()
 
         for row, scenario in enumerate(self._all_scenarios):
+            # Process each (row, scenario) from enumerate(_all_scenarios).
             var = ctk.StringVar(value="on" if scenario in self._selected_scenarios else "off")
             check = ctk.CTkCheckBox(
                 self.results_scroll,
@@ -148,12 +154,15 @@ class ScenarioMultiSelector(ctk.CTkFrame):
             self._scenario_checks.append((scenario, check))
 
     def _on_search(self, _event=None) -> None:
+        """Handle search."""
         self._filter_visible_scenarios()
 
     def _filter_visible_scenarios(self) -> None:
+        """Internal helper for filter visible scenarios."""
         query = self.search_var.get().strip().lower()
         any_visible = False
         for row, (scenario, check) in enumerate(self._scenario_checks):
+            # Process each (row, (scenario, check)) from enumerate(_scenario_checks).
             visible = not query or query in scenario.lower()
             if visible:
                 check.grid(row=row, column=0, sticky="ew", padx=10, pady=6)
@@ -167,6 +176,7 @@ class ScenarioMultiSelector(ctk.CTkFrame):
             self.empty_results_label.grid(row=4, column=0, sticky="ew", pady=(8, 0))
 
     def _toggle_scenario(self, scenario: str) -> None:
+        """Toggle scenario."""
         if self._scenario_vars[scenario].get() == "on":
             self._selected_scenarios.add(scenario)
         else:
@@ -174,6 +184,7 @@ class ScenarioMultiSelector(ctk.CTkFrame):
         self._refresh_selected_summary()
 
     def _select_visible(self) -> None:
+        """Select visible."""
         query = self.search_var.get().strip().lower()
         for scenario, _check in self._scenario_checks:
             if not query or query in scenario.lower():
@@ -182,15 +193,18 @@ class ScenarioMultiSelector(ctk.CTkFrame):
         self._refresh_selected_summary()
 
     def _clear_selection(self) -> None:
+        """Clear selection."""
         self._selected_scenarios.clear()
         self._sync_checkboxes()
         self._refresh_selected_summary()
 
     def _sync_checkboxes(self) -> None:
+        """Synchronize checkboxes."""
         for scenario, var in self._scenario_vars.items():
             var.set("on" if scenario in self._selected_scenarios else "off")
 
     def _refresh_selected_summary(self) -> None:
+        """Refresh selected summary."""
         selected = [name for name in self._all_scenarios if name in self._selected_scenarios]
         self.selection_count_label.configure(text=f"{len(selected)} selected")
         if not selected:

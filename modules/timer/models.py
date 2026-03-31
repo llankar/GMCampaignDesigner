@@ -1,3 +1,5 @@
+"""Data models for timer."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -21,6 +23,7 @@ class TimerState:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TimerState":
+        """Handle from dict."""
         return cls(
             id=str(data.get("id", "")),
             name=str(data.get("name", "Timer")),
@@ -36,6 +39,7 @@ class TimerState:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Handle to dict."""
         return {
             "id": self.id,
             "name": self.name,
@@ -62,6 +66,7 @@ class TimerPreset:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TimerPreset":
+        """Handle from dict."""
         return cls(
             id=str(data.get("id", "")),
             name=str(data.get("name", "Preset")),
@@ -72,6 +77,7 @@ class TimerPreset:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Handle to dict."""
         return {
             "id": self.id,
             "name": self.name,

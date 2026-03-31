@@ -1,3 +1,4 @@
+"""Section definitions for scenario scene body."""
 import customtkinter as ctk
 from customtkinter import CTkLabel
 
@@ -8,11 +9,13 @@ from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sec
 
 
 def _compute_wraplength(container_width, *, horizontal_padding, min_wrap, safety_margin=10):
+    """Internal helper for compute wraplength."""
     available = max(0, int(container_width) - (horizontal_padding * 2))
     return max(min_wrap, available - max(0, int(safety_margin)))
 
 
 def _create_section_shell(parent):
+    """Create section shell."""
     palette = get_detail_palette()
     shell = ctk.CTkFrame(parent, fg_color=palette["surface_card"], corner_radius=18, border_width=1, border_color=palette["muted_border"])
     shell.pack(fill="x", padx=0, pady=(0, 0))
@@ -21,6 +24,7 @@ def _create_section_shell(parent):
 
 
 def _create_section_title(parent, label_text):
+    """Create section title."""
     palette = get_detail_palette()
     title = ctk.CTkLabel(
         parent,
@@ -34,6 +38,7 @@ def _create_section_title(parent, label_text):
 
 
 def _add_subtle_separator(parent):
+    """Internal helper for add subtle separator."""
     palette = get_detail_palette()
     separator = ctk.CTkFrame(parent, height=1, fg_color=palette["muted_border"])
     separator.pack(fill="x", padx=14, pady=(6, 10))
@@ -41,6 +46,7 @@ def _add_subtle_separator(parent):
 
 
 def _create_description_block_fallback(parent, body_text, *, description_font_size=13):
+    """Create description block fallback."""
     palette = get_detail_palette()
     description_block = ctk.CTkFrame(parent, fg_color=palette["surface_overlay"], corner_radius=16, border_width=1, border_color=palette["pill_border"])
     description_block.pack(fill="x", padx=12, pady=(12, 0))
@@ -65,6 +71,7 @@ def _create_description_block_fallback(parent, body_text, *, description_font_si
     description_label.pack(fill="x", padx=14, pady=(0, 8 if has_description else 14))
 
     def _refresh_description_wrap(_event=None):
+        """Refresh description wrap."""
         wrap_px = _compute_wraplength(description_block.winfo_width(), horizontal_padding=14, min_wrap=200)
         description_label.configure(wraplength=wrap_px, text=full_text)
 
@@ -74,12 +81,15 @@ def _create_description_block_fallback(parent, body_text, *, description_font_si
 
 
 def _build_hero_text(raw_intro, sections):
+    """Build hero text."""
     intro = str(raw_intro or "").strip()
     if intro:
+        # Stop early when intro is set.
         return intro
     else:
         candidates = []
         for section in sections:
+            # Process each section from sections.
             if section.get("items"):
                 candidates.extend(section["items"][:2])
             if len(candidates) >= 3:
@@ -87,6 +97,7 @@ def _build_hero_text(raw_intro, sections):
 
     hero_lines = []
     for line in candidates:
+        # Process each line from candidates.
         compact = " ".join(str(line).split())
         if not compact:
             continue
@@ -98,12 +109,14 @@ def _build_hero_text(raw_intro, sections):
 
 
 def _render_card_bullets(container, items, *, expanded, font_size):
+    """Render card bullets."""
     for child in container.winfo_children():
         child.destroy()
 
     shown_items = items if expanded else items[:4]
     labels = []
     for item in shown_items:
+        # Process each item from shown_items.
         text = " ".join(str(item).split())
         if not expanded and len(text) > 170:
             text = text[:167].rstrip() + "…"
@@ -132,6 +145,7 @@ def _render_card_bullets(container, items, *, expanded, font_size):
         labels.append(empty)
 
     def _refresh_wrap(_event=None):
+        """Refresh wrap."""
         wrap_px = _compute_wraplength(container.winfo_width(), horizontal_padding=10, min_wrap=180)
         for current in labels:
             current.configure(wraplength=wrap_px)
@@ -141,6 +155,7 @@ def _render_card_bullets(container, items, *, expanded, font_size):
 
 
 def _create_description_block(parent, body_text, *, description_font_size=13):
+    """Create description block."""
     palette = get_detail_palette()
     parsed = parse_scene_body_sections(body_text)
     if not parsed.get("has_sections"):
@@ -177,6 +192,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
     cards_grid.grid_columnconfigure(1, weight=1)
 
     for index, section in enumerate(parsed.get("sections") or []):
+        # Process each (index, section) from enumerate(parsed.get('sections') or []).
         row = index // 2
         col = index % 2
         card = ctk.CTkFrame(
@@ -205,6 +221,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
         is_expanded = ctk.BooleanVar(master=card, value=False)
 
         def _refresh_card(*, container=bullet_container, values=items, state=is_expanded):
+            """Refresh card."""
             _render_card_bullets(
                 container,
                 values,
@@ -215,6 +232,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
         _refresh_card()
 
         if len(items) > 4:
+            # Handle the branch where len(items) > 4.
             toggle = ctk.CTkButton(
                 card,
                 text="Voir plus",
@@ -234,6 +252,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
                 button=toggle,
                 refresh=_refresh_card,
             ):
+                """Toggle section."""
                 state.set(not state.get())
                 button.configure(text="Voir moins" if state.get() else "Voir plus")
                 refresh()
@@ -241,6 +260,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
             toggle.configure(command=_toggle_section)
 
     def _refresh_hero_wrap(_event=None):
+        """Refresh hero wrap."""
         wrap_px = _compute_wraplength(hero_strip.winfo_width(), horizontal_padding=12, min_wrap=220)
         description_label.configure(wraplength=wrap_px)
 
@@ -251,6 +271,7 @@ def _create_description_block(parent, body_text, *, description_font_size=13):
 
 
 def _create_entities_block(parent, npc_names, villain_names, creature_names, place_names, open_entity_callback=None):
+    """Create entities block."""
     palette = get_detail_palette()
     has_entities = bool(npc_names or villain_names or creature_names or place_names)
     if not has_entities:
@@ -277,6 +298,7 @@ def _create_entities_block(parent, npc_names, villain_names, creature_names, pla
 
 
 def _create_maps_block(parent, map_names, gm_view_ref):
+    """Create maps block."""
     palette = get_detail_palette()
     if not map_names:
         return None
@@ -287,6 +309,7 @@ def _create_maps_block(parent, map_names, gm_view_ref):
 
     interactive = bool(gm_view_ref and hasattr(gm_view_ref, "open_map_tool"))
     if not interactive:
+        # Handle the branch where interactive is unavailable.
         names_row = ctk.CTkFrame(maps_block, fg_color="transparent")
         names_row.pack(fill="x", padx=12, pady=(0, 2))
         for name in map_names:
@@ -298,6 +321,7 @@ def _create_maps_block(parent, map_names, gm_view_ref):
     has_thumbnail_provider = hasattr(gm_view_ref, "get_map_thumbnail")
 
     for name in map_names:
+        # Process each name from map_names.
         display_name = name or "(Unnamed Map)"
         tile = ctk.CTkFrame(gallery, fg_color=palette["surface_overlay"], corner_radius=12, border_width=1, border_color=palette["muted_border"])
         tile.pack(side="left", padx=4, pady=4)
@@ -334,6 +358,7 @@ def _create_maps_block(parent, map_names, gm_view_ref):
         name_label.configure(cursor="hand2")
 
         def _open_map(_event=None, map_name=name):
+            """Open map."""
             try:
                 gm_view_ref.open_map_tool(map_name)
             except Exception:
@@ -347,6 +372,7 @@ def _create_maps_block(parent, map_names, gm_view_ref):
 
 
 def _create_links_block(parent, links, open_scene_callback=None):
+    """Create links block."""
     palette = get_detail_palette()
     if not links:
         return None
@@ -358,6 +384,7 @@ def _create_links_block(parent, links, open_scene_callback=None):
     selected_link = {"button": None}
 
     for link in links:
+        # Process each link from links.
         text_val = str(link.get("text") or "").strip()
         target_val = link.get("target")
         resolved_target = link.get("resolved_target_key")
@@ -390,6 +417,7 @@ def _create_links_block(parent, links, open_scene_callback=None):
             continue
 
         def _on_link_click(target=resolved_target, button=link_button):
+            """Handle link click."""
             opened = bool(open_scene_callback(target))
             if not opened:
                 return
@@ -426,6 +454,7 @@ def build_scene_body_sections(
     gm_view_ref=None,
     scene_density="Normal",
 ):
+    """Build scene body sections."""
     density_style = get_scene_density_style(scene_density)
     has_entities = bool(npc_names or villain_names or creature_names or place_names)
     has_maps = bool(map_names)
@@ -461,6 +490,7 @@ def build_scene_body_sections(
     secondary_toggles = {}
     if density_style["collapse_secondary_by_default"]:
         for block_name, block_widget in (("Maps", maps_block), ("Links", links_block)):
+            # Process each (block_name, block_widget) from (('Maps', maps_block), ('Links', links_block)).
             if block_widget is None:
                 continue
             toggle_holder = ctk.CTkFrame(shell, fg_color="transparent")
@@ -490,6 +520,7 @@ def build_scene_body_sections(
                 state=collapsed,
                 holder=toggle_holder,
             ):
+                """Toggle section."""
                 now_collapsed = not state.get()
                 state.set(now_collapsed)
                 if now_collapsed:

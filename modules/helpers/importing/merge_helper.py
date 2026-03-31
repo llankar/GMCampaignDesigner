@@ -1,3 +1,5 @@
+"""Utilities for importing merge helper."""
+
 from __future__ import annotations
 
 from tkinter import messagebox
@@ -9,6 +11,7 @@ log_module_import(__name__)
 
 
 def _normalize_key(value) -> str:
+    """Normalize key."""
     if value is None:
         return ""
     return str(value).strip().lower()
@@ -17,6 +20,7 @@ def _normalize_key(value) -> str:
 def find_duplicates(
     existing_items: Sequence[dict], incoming_items: Sequence[dict], key_field: str
 ) -> list[str]:
+    """Find duplicates."""
     existing_keys = {
         _normalize_key(item.get(key_field))
         for item in existing_items
@@ -24,6 +28,7 @@ def find_duplicates(
     }
     duplicates: list[str] = []
     for item in incoming_items:
+        # Process each item from incoming_items.
         if not isinstance(item, dict):
             continue
         key_value = _normalize_key(item.get(key_field))
@@ -39,10 +44,12 @@ def merge_items(
     key_field: str,
     merge_duplicates: bool = True,
 ) -> list[dict]:
+    """Merge items."""
     merged: List[dict] = list(existing_items)
     key_to_index: dict[str, int] = {}
 
     for idx, item in enumerate(existing_items):
+        # Process each (idx, item) from enumerate(existing_items).
         if not isinstance(item, dict):
             continue
         key_value = _normalize_key(item.get(key_field))
@@ -50,6 +57,7 @@ def merge_items(
             key_to_index.setdefault(key_value, idx)
 
     for item in incoming_items:
+        # Process each item from incoming_items.
         if not isinstance(item, dict):
             merged.append(item)
             continue
@@ -60,6 +68,7 @@ def merge_items(
             continue
 
         if key_value in key_to_index:
+            # Handle the branch where key value is in key to index.
             if merge_duplicates:
                 merged[key_to_index[key_value]] = item
         else:
@@ -77,6 +86,7 @@ def merge_with_confirmation(
     entity_label: str,
     preview_limit: int = 10,
 ) -> list[dict]:
+    """Merge with confirmation."""
     duplicates = find_duplicates(existing_items, incoming_items, key_field)
     if not duplicates:
         return list(existing_items) + list(incoming_items)

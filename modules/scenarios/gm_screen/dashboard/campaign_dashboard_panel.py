@@ -1,3 +1,5 @@
+"""Panel for campaign dashboard."""
+
 from __future__ import annotations
 
 import math
@@ -39,6 +41,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         open_entity_callback: Callable[[str, str], None],
         **kwargs,
     ):
+        """Initialize the CampaignDashboardPanel instance."""
         super().__init__(master, fg_color=DASHBOARD_THEME.panel_bg, **kwargs)
         self.wrappers = wrappers or {}
         self.open_entity_callback = open_entity_callback
@@ -66,11 +69,13 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             self._on_campaign_selected(self._campaign_options[0])
 
     def _build_header(self, parent: ctk.CTkFrame) -> None:
+        """Build header."""
         parent.grid_columnconfigure(0, weight=1)
 
         self._build_campaign_picker(parent)
 
     def _make_summary_card(self, parent: ctk.CTkFrame, label: str, value: str) -> ctk.CTkLabel:
+        """Internal helper for make summary card."""
         card = ctk.CTkFrame(
             parent,
             corner_radius=12,
@@ -100,6 +105,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         return value_label
 
     def _build_campaign_picker(self, parent: ctk.CTkFrame) -> None:
+        """Build campaign picker."""
         selector_wrap = ctk.CTkFrame(
             parent,
             fg_color=DASHBOARD_THEME.card_bg,
@@ -166,6 +172,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         ).grid(row=2, column=0, columnspan=3, sticky="ew", padx=6, pady=(0, 10))
 
     def _build_details_content(self, parent: ctk.CTkFrame) -> None:
+        """Build details content."""
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(3, weight=1)
 
@@ -215,6 +222,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         self.details_scroll.grid_columnconfigure(0, weight=1)
 
     def _on_campaign_selected(self, selected_option: str) -> None:
+        """Handle campaign selected."""
         entry = self._option_to_campaign.get(selected_option)
         for child in self.details_scroll.winfo_children():
             child.destroy()
@@ -236,12 +244,15 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         self._render_filtered_fields()
 
     def _on_search_changed(self) -> None:
+        """Handle search changed."""
         self._render_filtered_fields()
 
     def _on_session_prep_toggled(self) -> None:
+        """Handle session prep toggled."""
         self._render_filtered_fields()
 
     def _render_empty_state(self, message: str) -> None:
+        """Render empty state."""
         ctk.CTkLabel(
             self.details_scroll,
             text=message,
@@ -250,6 +261,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         ).grid(row=0, column=0, sticky="ew", padx=8, pady=8)
 
     def _render_filtered_fields(self) -> None:
+        """Render filtered fields."""
         for child in self.details_scroll.winfo_children():
             child.destroy()
 
@@ -272,6 +284,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         row = 0
         for field in visible_fields:
+            # Process each field from visible_fields.
             block = ctk.CTkFrame(
                 self.details_scroll,
                 corner_radius=12,
@@ -291,6 +304,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             ).grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
 
             if field["type"] == "list":
+                # Handle the branch where field['type'] == 'list'.
                 values_wrap = ctk.CTkFrame(block, fg_color="transparent")
                 values_wrap.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
                 values_wrap.grid_columnconfigure(0, weight=1)
@@ -330,6 +344,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             row += 1
 
     def _render_session_prep_view(self, visible_fields: list[dict], query: str) -> None:
+        """Render session prep view."""
         summary = build_session_prep_summary(visible_fields)
 
         prep_sections = [
@@ -340,6 +355,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         row = 0
         for title, lines in prep_sections:
+            # Process each (title, lines) from prep_sections.
             if query and not lines:
                 continue
 
@@ -382,6 +398,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             self._render_empty_state("No field matches your search.")
 
     def _render_read_only_field(self, parent: ctk.CTkFrame, raw_value: str | None, query: str) -> None:
+        """Render read only field."""
         value = raw_value or ""
         if self._should_use_compact_render(value):
             self._render_compact_with_highlight(parent, value, query)
@@ -404,11 +421,13 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         body.configure(state="disabled")
 
     def _render_compact_with_highlight(self, parent: ctk.CTkFrame, value: str, query: str) -> None:
+        """Render compact with highlight."""
         content_wrap = ctk.CTkFrame(parent, fg_color="transparent")
         content_wrap.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
         self._render_highlighted_line(content_wrap, value, query)
 
     def _render_highlighted_line(self, parent: ctk.CTkFrame, value: str, query: str) -> None:
+        """Render highlighted line."""
         ranges = find_match_ranges(value, query)
         if not ranges:
             ctk.CTkLabel(
@@ -422,6 +441,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
 
         cursor = 0
         for start, end in ranges:
+            # Process each (start, end) from ranges.
             if start > cursor:
                 ctk.CTkLabel(
                     parent,
@@ -452,6 +472,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             ).pack(side="left")
 
     def _highlight_textbox_matches(self, textbox: ctk.CTkTextbox, value: str, query: str) -> None:
+        """Internal helper for highlight textbox matches."""
         ranges = find_match_ranges(value, query)
         if not ranges:
             return
@@ -461,14 +482,17 @@ class CampaignDashboardPanel(ctk.CTkFrame):
             textbox.tag_add("search_match", f"1.0+{start}c", f"1.0+{end}c")
 
     def _should_use_compact_render(self, value: str) -> bool:
+        """Return whether use compact render."""
         return "\n" not in value and len(value) <= self._COMPACT_VALUE_MAX_LENGTH
 
     def _compute_textbox_height(self, value: str) -> int:
+        """Internal helper for compute textbox height."""
         line_count = max(value.count("\n") + 1, math.ceil(len(value) / self._TEXTBOX_WIDTH_CHARS))
         content_height = line_count * self._TEXTBOX_LINE_HEIGHT
         return max(self._TEXTBOX_MIN_HEIGHT, min(self._TEXTBOX_MAX_HEIGHT, content_height))
 
     def _export_session_brief(self) -> None:
+        """Export session brief."""
         if not self._selected_campaign_entry:
             messagebox.showwarning("Session brief", "Select a campaign first.")
             return
@@ -505,6 +529,7 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         messagebox.showinfo("Session brief", f"Session brief exported to:\n{exported}")
 
     def _open_selected_campaign(self) -> None:
+        """Open selected campaign."""
         selected = self.campaign_picker_var.get()
         entry = self._option_to_campaign.get(selected)
         if not entry:

@@ -1,3 +1,4 @@
+"""Opening helpers for PC."""
 import customtkinter as ctk
 from tkinter import messagebox
 

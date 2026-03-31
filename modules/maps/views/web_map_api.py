@@ -1,3 +1,5 @@
+"""Utilities for web map API."""
+
 from __future__ import annotations
 
 from __future__ import annotations
@@ -8,14 +10,17 @@ from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
 
 
 def _extract_token() -> str | None:
+    """Extract token."""
     return request.headers.get("X-Map-Token") or request.args.get("token")
 
 
 def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
+    """Register map API."""
     access_guard = access_guard or RemoteAccessGuard(enabled=False, token="")
     blueprint = Blueprint("map_api", __name__)
 
     def _require_access():
+        """Internal helper for require access."""
         token = _extract_token()
         if not access_guard.enabled:
             return jsonify({"message": "Editing is currently disabled"}), 403
@@ -25,6 +30,7 @@ def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
 
     @blueprint.route("/api/status", methods=["GET"])
     def api_status():
+        """Handle API status."""
         viewport_size, render_offset, base_size = controller._web_render_geometry()
         tokens = controller._describe_remote_tokens(render_offset=render_offset)
         return jsonify(
@@ -43,6 +49,7 @@ def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
 
     @blueprint.route("/api/tokens/move", methods=["POST"])
     def api_move_token():
+        """Handle API move token."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -63,6 +70,7 @@ def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
 
     @blueprint.route("/api/strokes", methods=["POST"])
     def api_strokes():
+        """Handle API strokes."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -82,6 +90,7 @@ def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
 
     @blueprint.route("/api/text", methods=["POST"])
     def api_text():
+        """Handle API text."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -96,6 +105,7 @@ def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
         if not isinstance(position, (list, tuple)) or len(position) != 2:
             return jsonify({"message": "Position must be a two element array"}), 400
         try:
+            # Keep API text resilient if this step fails.
             controller.handle_remote_text(
                 text=text,
                 position=position,

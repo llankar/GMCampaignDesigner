@@ -1,3 +1,5 @@
+"""Utilities for secret helper."""
+
 from __future__ import annotations
 
 import os
@@ -18,6 +20,7 @@ _KEY_PATH: Optional[Path] = None
 
 
 def _get_key_path() -> Path:
+    """Return key path."""
     global _KEY_PATH
     if _KEY_PATH is not None:
         return _KEY_PATH
@@ -35,6 +38,7 @@ def _get_key_path() -> Path:
 
 
 def _load_or_create_key() -> bytes:
+    """Load or create key."""
     key_path = _get_key_path()
     if key_path.exists():
         return key_path.read_bytes()
@@ -50,6 +54,7 @@ def _load_or_create_key() -> bytes:
 
 
 def _get_fernet() -> Optional[Fernet]:
+    """Return fernet."""
     global _FERNET
     if _FERNET is not None:
         return _FERNET
@@ -76,10 +81,12 @@ def _get_fernet() -> Optional[Fernet]:
 
 
 def is_encrypted_secret(value: Optional[str]) -> bool:
+    """Return whether encrypted secret."""
     return bool(value and value.startswith(_SECRET_PREFIX))
 
 
 def encrypt_secret(value: Optional[str]) -> str:
+    """Handle encrypt secret."""
     normalized = (value or "").strip()
     if not normalized:
         return ""
@@ -93,6 +100,7 @@ def encrypt_secret(value: Optional[str]) -> str:
 
 
 def decrypt_secret(value: Optional[str]) -> str:
+    """Handle decrypt secret."""
     if not value:
         return ""
     value = value.strip()
@@ -112,6 +120,7 @@ def decrypt_secret(value: Optional[str]) -> str:
 
     token = value[len(_SECRET_PREFIX) :].encode("utf-8")
     try:
+        # Keep decrypt secret resilient if this step fails.
         decrypted = fernet.decrypt(token)
     except InvalidToken:
         log_warning(

@@ -1,3 +1,5 @@
+"""Regression tests for campaign config repository."""
+
 import sqlite3
 
 from modules.campaigns.ui.graphical_display.services.persistence import campaign_config_repository as repository_module
@@ -8,13 +10,16 @@ from modules.campaigns.ui.graphical_display.services.persistence.campaign_config
 
 class _ConnectionFactory:
     def __init__(self):
+        """Initialize the _ConnectionFactory instance."""
         self.conn = sqlite3.connect(":memory:")
 
     def __call__(self):
+        """Invoke the instance like a callable."""
         return self.conn
 
 
 def test_repository_roundtrip_persists_overview_focus_in_campaign_config(monkeypatch):
+    """Verify that repository roundtrip persists overview focus in campaign config."""
     factory = _ConnectionFactory()
     monkeypatch.setattr(repository_module, "get_connection", factory)
     repository = CampaignConfigRepository()

@@ -1,4 +1,6 @@
-﻿import tkinter as tk
+﻿"""3D dice roller window and rendered dice model definitions."""
+
+import tkinter as tk
 import time
 import math
 from dataclasses import dataclass
@@ -30,6 +32,7 @@ class DiceModel:
 
 
 def _normalize_vertices(vertices: np.ndarray) -> np.ndarray:
+    """Normalize vertices."""
     max_norm = np.max(np.linalg.norm(vertices, axis=1))
     if max_norm == 0:
         return vertices.copy()
@@ -37,6 +40,7 @@ def _normalize_vertices(vertices: np.ndarray) -> np.ndarray:
 
 
 def _convex_faces(vertices: np.ndarray) -> List[np.ndarray]:
+    """Internal helper for convex faces."""
     if ConvexHull is None:
         raise RuntimeError("scipy is required to build 3D dice models.")
     hull = ConvexHull(vertices)
@@ -44,6 +48,7 @@ def _convex_faces(vertices: np.ndarray) -> List[np.ndarray]:
 
 
 def _make_model(vertices: List[Tuple[float, float, float]], predefined_faces: List[List[int]] | None = None) -> DiceModel:
+    """Internal helper for make model."""
     verts = _normalize_vertices(np.array(vertices, dtype=float))
     if predefined_faces:
         faces = [np.array(face, dtype=int) for face in predefined_faces]
@@ -55,6 +60,7 @@ def _make_model(vertices: List[Tuple[float, float, float]], predefined_faces: Li
 
 
 def _cube_vertices() -> List[Tuple[float, float, float]]:
+    """Internal helper for cube vertices."""
     return [
         (-1, -1, -1),
         (1, -1, -1),
@@ -68,6 +74,7 @@ def _cube_vertices() -> List[Tuple[float, float, float]]:
 
 
 def _tetra_vertices() -> List[Tuple[float, float, float]]:
+    """Internal helper for tetra vertices."""
     return [
         (1, 1, 1),
         (-1, -1, 1),
@@ -77,6 +84,7 @@ def _tetra_vertices() -> List[Tuple[float, float, float]]:
 
 
 def _octa_vertices() -> List[Tuple[float, float, float]]:
+    """Internal helper for octa vertices."""
     return [
         (1, 0, 0),
         (-1, 0, 0),
@@ -88,6 +96,7 @@ def _octa_vertices() -> List[Tuple[float, float, float]]:
 
 
 def _trapezohedron_vertices() -> List[Tuple[float, float, float]]:
+    """Internal helper for trapezohedron vertices."""
     vertices: List[Tuple[float, float, float]] = [(0.0, 0.0, 1.15), (0.0, 0.0, -1.15)]
     upper_height = 0.45
     lower_height = -0.45
@@ -102,6 +111,7 @@ def _trapezohedron_vertices() -> List[Tuple[float, float, float]]:
 
 
 def _d10_faces() -> List[List[int]]:
+    """Internal helper for d10 faces."""
     faces: List[List[int]] = []
     for i in range(5):
         ui = 2 + i
@@ -114,6 +124,7 @@ def _d10_faces() -> List[List[int]]:
 
 
 def _dodecahedron_vertices() -> List[Tuple[float, float, float]]:
+    """Internal helper for dodecahedron vertices."""
     phi = (1 + np.sqrt(5)) / 2
     inv_phi = 1 / phi
     vertices: List[Tuple[float, float, float]] = []
@@ -133,6 +144,7 @@ def _dodecahedron_vertices() -> List[Tuple[float, float, float]]:
     unique: List[Tuple[float, float, float]] = []
     seen: Set[Tuple[float, float, float]] = set()
     for vertex in vertices:
+        # Process each vertex from vertices.
         key = (round(vertex[0], 6), round(vertex[1], 6), round(vertex[2], 6))
         if key in seen:
             continue
@@ -142,6 +154,7 @@ def _dodecahedron_vertices() -> List[Tuple[float, float, float]]:
 
 
 def _icosahedron_vertices() -> List[Tuple[float, float, float]]:
+    """Internal helper for icosahedron vertices."""
     phi = (1 + np.sqrt(5)) / 2
     vertices = []
     for signs in ((1, 0, phi), (-1, 0, phi), (1, 0, -phi), (-1, 0, -phi)):
@@ -209,6 +222,7 @@ _PREDEFINED_FACES: Dict[int, List[List[int]]] = {
 
 
 def _build_dice_models() -> Dict[int, DiceModel]:
+    """Build dice models."""
     models: Dict[int, DiceModel] = {}
     models[4] = _make_model(_tetra_vertices(), _PREDEFINED_FACES.get(4))
     models[6] = _make_model(_cube_vertices(), _PREDEFINED_FACES.get(6))
@@ -225,6 +239,7 @@ DICE_MODELS = _build_dice_models()
 class DiceRollerWindow(ctk.CTkToplevel):
 
     def __init__(self, master: ctk.CTk):
+        """Initialize the DiceRollerWindow instance."""
         super().__init__(master)
         self.title("Dice Roller")
         self.geometry("1280x760")
@@ -264,6 +279,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
             faces = tuple(sorted(DICE_MODELS.keys()))
 
         if faces != self._supported_faces:
+            # Handle the branch where faces != _supported_faces.
             self._supported_faces = faces
             self._dice_choices = tuple(f"d{face}" for face in faces)
             segmented = self._preset_segmented
@@ -298,6 +314,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # Layout & UI setup
     # -----------------
     def _build_layout(self) -> None:
+        """Build layout."""
         tokens = theme_manager.get_tokens()
         container = ctk.CTkFrame(self, fg_color=tokens.get("panel_bg"))
         container.pack(fill="both", expand=True, padx=12, pady=12)
@@ -433,6 +450,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
     # -----------------
     def _set_result_text(self, text: str, highlights: List[Tuple[int, int]] | None = None) -> None:
+        """Set result text."""
         box = self.result_display
         box.configure(state="normal")
         box.delete("1.0", "end")
@@ -440,16 +458,19 @@ class DiceRollerWindow(ctk.CTkToplevel):
         box.tag_remove("result_highlight", "1.0", "end")
         if highlights:
             for start, end in highlights:
+                # Process each (start, end) from highlights.
                 if end <= start:
                     continue
                 box.tag_add("result_highlight", f"1.0+{start}c", f"1.0+{end}c")
         box.configure(state="disabled")
 
     def _on_choice(self, _value: str) -> None:
+        """Handle choice."""
         choice = self.dice_selection_var.get()
         self._set_result_text(f"Selected {choice}. Double-click the preset to add it.")
 
     def _setup_preset_double_clicks(self) -> None:
+        """Internal helper for setup preset double clicks."""
         segmented = self._preset_segmented
         if segmented is None:
             return
@@ -461,6 +482,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
                 continue
 
     def _handle_preset_double_click(self, value: str) -> None:
+        """Internal helper for handle preset double click."""
         if value:
             self.dice_selection_var.set(value)
         try:
@@ -469,11 +491,13 @@ class DiceRollerWindow(ctk.CTkToplevel):
             messagebox.showerror("Invalid Formula", str(exc))
 
     def _on_slider(self, value: float) -> None:
+        """Handle slider."""
         count = int(round(value))
         self.dice_count_var.set(count)
         self.count_value_label.configure(text=str(count))
 
     def _clear_formula(self) -> None:
+        """Clear formula."""
         self.formula_var.set("")
         self._set_result_text("Formula cleared. Build a new roll.")
 
@@ -481,6 +505,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # Formula helpers
     # -----------------
     def _add_to_formula(self) -> None:
+        """Internal helper for add to formula."""
         faces = int(self.dice_selection_var.get()[1:])
         count = max(1, self.dice_count_var.get())
         fragment = f"{count}d{faces}"
@@ -499,6 +524,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # Rolling & history
     # -----------------
     def roll_dice(self) -> None:
+        """Handle roll dice."""
         formula_text = self.formula_var.get()
         supported_faces = dice_preferences.get_supported_faces()
         try:
@@ -533,6 +559,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
         breakdown_parts: List[str] = []
         for summary in result.face_summaries:
+            # Process each summary from result.face_summaries.
             values = summary.display_values
             if not values:
                 continue
@@ -545,8 +572,10 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
         highlight_spans: List[Tuple[int, int]] = []
         if separate:
+            # Continue with this path when separate is set.
             segments: List[str] = []
             for summary in result.face_summaries:
+                # Process each summary from result.face_summaries.
                 values = summary.display_values
                 if not values:
                     continue
@@ -557,9 +586,11 @@ class DiceRollerWindow(ctk.CTkToplevel):
             if modifier:
                 segments.append(f"modifier {modifier:+d}")
             if segments:
+                # Continue with this path when segments is set.
                 result_text_parts: List[str] = []
                 cumulative_length = 0
                 for segment in segments:
+                    # Process each segment from segments.
                     if result_text_parts:
                         result_text_parts.append(" | ")
                         cumulative_length += 3
@@ -567,6 +598,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
                     result_text_parts.append(segment)
                     cumulative_length += len(segment)
                     if "=" in segment:
+                        # Handle the branch where '=' is in segment.
                         eq_pos = segment.rfind("=")
                         after_eq = segment[eq_pos + 1:]
                         trimmed = after_eq.lstrip()
@@ -601,9 +633,11 @@ class DiceRollerWindow(ctk.CTkToplevel):
         self._render_dice(dice_sequence)
 
     def _build_render_sequence(self, result: dice_engine.RollResult) -> List[Dict[str, object]]:
+        """Build render sequence."""
         sequence: List[Dict[str, object]] = []
         group_index = 0
         for chain in result.chains:
+            # Process each chain from result.chains.
             chain_entries: List[Dict[str, object]] = []
             for roll in chain.rolls:
                 display_value = f"{roll.value}{'!' if roll.exploded else ''}"
@@ -624,15 +658,18 @@ class DiceRollerWindow(ctk.CTkToplevel):
         return sequence
 
     def _clear_history(self) -> None:
+        """Clear history."""
         self.history_box.configure(state="normal")
         self.history_box.delete("1.0", "end")
         self.history_box.configure(state="disabled")
         self._set_result_text("History cleared. Ready for new rolls.")
 
     def _append_history(self, canonical: str, grouped: Dict[int, List[str]], base_counts: Dict[int, int], grouped_totals: Dict[int, int], modifier: int, total: int, separate: bool) -> None:
+        """Append history."""
         timestamp = time.strftime("%H:%M:%S")
         breakdown_parts: List[str] = []
         for faces in sorted(grouped):
+            # Process each faces from sorted(grouped).
             values = grouped[faces]
             base = base_counts.get(faces, len(values))
             segment = f"{base}d{faces}:[{', '.join(values)}]"
@@ -654,6 +691,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # Animation helpers
     # -----------------
     def _render_dice(self, dice_sequence: List[Dict[str, object]]) -> None:
+        """Render dice."""
         if not hasattr(self, "dice_canvas"):
             return
         canvas = self.dice_canvas
@@ -682,6 +720,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         cursor = 0.0
         previous_group = None
         for die in dice_sequence:
+            # Process each die from dice_sequence.
             positions.append(cursor)
             step = base_spacing
             if die.get("exploded"):
@@ -700,6 +739,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         current_row: List[int] = []
         row_start_pos = 0.0
         for idx, pos in enumerate(positions):
+            # Process each (idx, pos) from enumerate(positions).
             if not current_row:
                 current_row = [idx]
                 row_start_pos = pos
@@ -716,6 +756,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
         centers_by_index: Dict[int, float] = {}
         for row_indices in rows:
+            # Process each row_indices from rows.
             if not row_indices:
                 continue
             row_positions = [positions[i] for i in row_indices]
@@ -735,6 +776,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         bottom_padding = base_size * 1.6
         row_height = base_row_height
         if row_count > 1:
+            # Handle the branch where row_count > 1.
             max_block_height = max(0.0, height - top_padding - bottom_padding)
             needed_height = base_row_height * (row_count - 1)
             if needed_height > max_block_height and (row_count - 1) > 0:
@@ -751,8 +793,10 @@ class DiceRollerWindow(ctk.CTkToplevel):
         font_size = int(max(14, base_size * 0.45))
 
         for row_idx, row_indices in enumerate(rows):
+            # Process each (row_idx, row_indices) from enumerate(rows).
             y = start_y + row_idx * row_height
             for idx in row_indices:
+                # Process each idx from row_indices.
                 die = dice_sequence[idx]
                 faces = int(die.get("faces", 6))
                 value = die.get("value", 0)
@@ -772,6 +816,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
                 )
 
     def _effective_scale(self) -> Tuple[float, float]:
+        """Internal helper for effective scale."""
         try:
             factor = float(self.dice_scale)
         except Exception:
@@ -780,6 +825,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         return self._base_dice_scale * factor, factor
 
     def _draw_die_shape(self, canvas: tk.Canvas, x: float, y: float, size: float, faces: int, rgba: Tuple[float, float, float, float], value: int | None = None) -> None:
+        """Internal helper for draw die shape."""
         base_hex = self._rgba_to_hex(rgba)
         darker = self._rgba_to_hex(rgba, 0.7)
         lighter = self._rgba_to_hex(rgba, 1.25)
@@ -806,7 +852,9 @@ class DiceRollerWindow(ctk.CTkToplevel):
             self._draw_regular_polygon(canvas, x, y, size, sides, base_hex, darker)
 
     def _draw_polyhedral_die(self, canvas: tk.Canvas, x: float, y: float, size: float, model: DiceModel, rgba: Tuple[float, float, float, float], faces: int, value: int | None = None) -> bool:
+        """Internal helper for draw polyhedral die."""
         try:
+            # Keep draw polyhedral die resilient if this step fails.
             rotation = self._polyhedron_rotation(faces, value)
             rotated = model.vertices.dot(rotation.T)
             scale = size * 0.95
@@ -825,6 +873,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
             faces_to_draw: List[Tuple[float, List[Tuple[float, float]], str]] = []
             for face_indices in model.faces:
+                # Process each face_indices from model.faces.
                 indices = [int(i) for i in face_indices]
                 if len(indices) < 3:
                     continue
@@ -851,6 +900,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
             faces_to_draw.sort(key=lambda entry: entry[0])
             for _depth, polygon, fill_hex in faces_to_draw:
+                # Process each (_depth, polygon, fill_hex) from faces_to_draw.
                 coords: List[float] = []
                 for px, py in polygon:
                     coords.extend((px, py))
@@ -860,6 +910,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
             return False
 
     def _polyhedron_rotation(self, faces: int, value: int | None = None) -> np.ndarray:
+        """Internal helper for polyhedron rotation."""
         presets = {
             4: (32.0, -24.0, -26.0, 0.6),
             6: (32.0, -28.0, 18.0, 0.6),
@@ -909,12 +960,14 @@ class DiceRollerWindow(ctk.CTkToplevel):
         return rz @ ry @ rx
 
     def _rgb_to_hex(self, rgb: Tuple[float, float, float]) -> str:
+        """Internal helper for RGB to hex."""
         r = max(0, min(255, int(round(float(rgb[0]) * 255))))
         g = max(0, min(255, int(round(float(rgb[1]) * 255))))
         b = max(0, min(255, int(round(float(rgb[2]) * 255))))
         return f"#{r:02x}{g:02x}{b:02x}"
 
     def _draw_tetra_die(self, canvas: tk.Canvas, x: float, y: float, size: float, top: str, left: str, right: str) -> None:
+        """Internal helper for draw tetra die."""
         apex = (x, y - size * 0.9)
         left_mid = (x - size * 0.9, y + size * 0.35)
         right_mid = (x + size * 0.9, y + size * 0.35)
@@ -940,6 +993,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         )
 
     def _draw_cube_die(self, canvas: tk.Canvas, x: float, y: float, size: float, top: str, right: str, left: str) -> None:
+        """Internal helper for draw cube die."""
         top_poly = [
             x,
             y - size * 0.75,
@@ -975,6 +1029,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         canvas.create_polygon(left_poly, fill=left, outline="#091624", tags="dice")
 
     def _draw_octa_die(self, canvas: tk.Canvas, x: float, y: float, size: float, top: str, base: str, bottom: str) -> None:
+        """Internal helper for draw octa die."""
         top_poly = [
             x,
             y - size,
@@ -1012,6 +1067,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
 
     def _draw_trapezohedron_die(self, canvas: tk.Canvas, x: float, y: float, size: float, fill_hex: str, outline_hex: str) -> None:
+        """Internal helper for draw trapezohedron die."""
         top_apex = (x, y - size * 0.92)
         bottom_apex = (x, y + size * 0.92)
 
@@ -1064,6 +1120,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
             )
 
     def _draw_dodeca_die(self, canvas: tk.Canvas, x: float, y: float, size: float, top_hex: str, side_hex: str, bottom_hex: str) -> None:
+        """Internal helper for draw dodeca die."""
         outline = "#091624"
         top_points = self._regular_polygon_coords(x, y - size * 0.55, size * 0.45, 5, rotation=-math.pi / 2)
         upper_ring = self._regular_polygon_coords(x, y - size * 0.1, size * 0.7, 5, rotation=-math.pi / 2)
@@ -1093,6 +1150,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         canvas.create_polygon(self._flatten_points(bottom_points), fill=bottom_fill, outline=outline, tags="dice")
 
     def _draw_icosa_die(self, canvas: tk.Canvas, x: float, y: float, size: float, top_hex: str, side_hex: str, bottom_hex: str) -> None:
+        """Internal helper for draw icosa die."""
         outline = "#091624"
         top_apex = (x, y - size * 0.95)
         bottom_apex = (x, y + size * 0.95)
@@ -1133,17 +1191,20 @@ class DiceRollerWindow(ctk.CTkToplevel):
 
 
     def _flatten_points(self, coords: List[Tuple[float, float]]) -> List[float]:
+        """Internal helper for flatten points."""
         flat: List[float] = []
         for px, py in coords:
             flat.extend([px, py])
         return flat
 
     def _draw_pent_trapezohedron(self, canvas: tk.Canvas, x: float, y: float, size: float, fill_hex: str, outline_hex: str) -> None:
+        """Internal helper for draw pent trapezohedron."""
         outline = outline_hex
         top_coords = self._regular_polygon_coords(x, y - size * 0.35, size * 0.58, 5, rotation=-math.pi / 2)
         bottom_coords = self._regular_polygon_coords(x, y + size * 0.45, size * 0.52, 5, rotation=-math.pi / 2 + math.pi / 5)
 
         for i in range(5):
+            # Process each i from range(5).
             next_idx = (i + 1) % 5
             quad = [
                 top_coords[i],
@@ -1174,12 +1235,14 @@ class DiceRollerWindow(ctk.CTkToplevel):
         )
 
     def _draw_regular_polygon(self, canvas: tk.Canvas, x: float, y: float, radius: float, sides: int, fill_hex: str, outline_hex: str) -> None:
+        """Internal helper for draw regular polygon."""
         points = self._regular_polygon_points(x, y, radius, sides)
         canvas.create_polygon(points, fill=fill_hex, outline=outline_hex, width=2, tags="dice")
         inner = self._regular_polygon_points(x, y - radius * 0.08, radius * 0.6, sides, rotation=math.pi / sides)
         canvas.create_polygon(inner, fill=self._shade_hex(fill_hex, 1.15), outline="", tags="dice")
 
     def _regular_polygon_points(self, x: float, y: float, radius: float, sides: int, rotation: float = 0.0) -> List[float]:
+        """Internal helper for regular polygon points."""
         coords = self._regular_polygon_coords(x, y, radius, sides, rotation=rotation)
         points: List[float] = []
         for px, py in coords:
@@ -1187,6 +1250,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         return points
 
     def _regular_polygon_coords(self, x: float, y: float, radius: float, sides: int, rotation: float = 0.0) -> List[Tuple[float, float]]:
+        """Internal helper for regular polygon coords."""
         coords: List[Tuple[float, float]] = []
         for i in range(sides):
             angle = rotation + math.pi / 2 - 2 * math.pi * i / sides
@@ -1196,12 +1260,14 @@ class DiceRollerWindow(ctk.CTkToplevel):
         return coords
 
     def _rgba_to_hex(self, rgba: Tuple[float, float, float, float], multiplier: float = 1.0) -> str:
+        """Internal helper for rgba to hex."""
         r = max(0.0, min(1.0, rgba[0] * multiplier))
         g = max(0.0, min(1.0, rgba[1] * multiplier))
         b = max(0.0, min(1.0, rgba[2] * multiplier))
         return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
     def _shade_hex(self, hex_color: str, factor: float) -> str:
+        """Internal helper for shade hex."""
         hex_color = hex_color.lstrip('#')
         r = int(hex_color[0:2], 16)
         g = int(hex_color[2:4], 16)
@@ -1211,6 +1277,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
         b = max(0, min(255, int(b * factor)))
         return f"#{r:02x}{g:02x}{b:02x}"
     def _color_for_value(self, faces: int, value: int) -> Tuple[float, float, float, float]:
+        """Internal helper for color for value."""
         if faces <= 1:
             return 0.6, 0.2, 0.8, 1.0
         normalized = max(0.0, min(1.0, (value - 1) / (faces - 1)))
@@ -1221,6 +1288,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
     # Lifecycle helpers
     # -----------------
     def _on_close(self) -> None:
+        """Handle close."""
         if self._animation_job:
             try:
                 self.after_cancel(self._animation_job)
@@ -1229,7 +1297,9 @@ class DiceRollerWindow(ctk.CTkToplevel):
         self.destroy()
 
     def show(self) -> None:
+        """Show the operation."""
         try:
+            # Keep show resilient if this step fails.
             self.deiconify()
             self.lift()
             self.focus_force()
@@ -1239,6 +1309,7 @@ class DiceRollerWindow(ctk.CTkToplevel):
             pass
 
     def withdraw(self) -> None:  # pragma: no cover - handled by Tk
+        """Handle withdraw."""
         super().withdraw()
 
 

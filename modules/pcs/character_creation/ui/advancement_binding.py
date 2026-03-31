@@ -17,23 +17,27 @@ def bind_advancement_type_and_label_vars(
     guard = {"active": False}
 
     def _update_type_from_label(*_args):
+        """Update type from label."""
         if guard["active"]:
             return
         selected_label = (label_var.get() or "").strip()
         selected_value = label_to_value.get(selected_label, "")
         guard["active"] = True
         try:
+            # Keep type from label resilient if this step fails.
             type_var.set(selected_value)
         finally:
             guard["active"] = False
 
     def _update_label_from_type(*_args):
+        """Update label from type."""
         if guard["active"]:
             return
         selected_type = (type_var.get() or "").strip()
         selected_label = value_to_label.get(selected_type, "")
         guard["active"] = True
         try:
+            # Keep label from type resilient if this step fails.
             label_var.set(selected_label)
         finally:
             guard["active"] = False

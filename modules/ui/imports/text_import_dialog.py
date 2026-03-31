@@ -1,3 +1,5 @@
+"""Dialog for imports text import."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -34,6 +36,7 @@ class TextImportDialog(ctk.CTkToplevel):
         default_target_slug: str | None = None,
         on_complete=None,
     ):
+        """Initialize the TextImportDialog instance."""
         super().__init__(master)
         self.source_text = source_text or ""
         self.source_url = source_url or ""
@@ -43,6 +46,7 @@ class TextImportDialog(ctk.CTkToplevel):
         self._build_ui()
 
     def _init_state(self):
+        """Initialize state."""
         default_label = None
         if self.default_target_slug:
             default_label = target_for_slug(self.default_target_slug).label
@@ -52,6 +56,7 @@ class TextImportDialog(ctk.CTkToplevel):
         )
 
     def _build_ui(self):
+        """Build UI."""
         self.title("Import de texte")
         self.geometry("920x920")
         self.minsize(900, 780)
@@ -138,6 +143,7 @@ class TextImportDialog(ctk.CTkToplevel):
         self._refresh_mapping_labels()
 
     def _refresh_mapping_labels(self):
+        """Refresh mapping labels."""
         target = target_for_label(self.target_var.get())
         self.mapping_label.configure(
             text=(
@@ -148,10 +154,12 @@ class TextImportDialog(ctk.CTkToplevel):
         )
 
     def _extract_field_text(self, widget: ctk.CTkTextbox) -> str:
+        """Extract field text."""
         return widget.get("1.0", "end-1c").strip()
 
     @log_function
     def _create_record(self):
+        """Create record."""
         target = target_for_label(self.target_var.get())
         name_value = self.name_var.get().strip()
         if not name_value:
@@ -171,6 +179,7 @@ class TextImportDialog(ctk.CTkToplevel):
             item[target.notes_field] = notes
 
         try:
+            # Keep record resilient if this step fails.
             template = load_template(target.slug)
             wrapper = GenericModelWrapper(target.slug)
         except Exception as exc:
@@ -192,6 +201,7 @@ class TextImportDialog(ctk.CTkToplevel):
         if not getattr(editor, "saved", False):
             return
         try:
+            # Keep record resilient if this step fails.
             wrapper.save_item(editor.item)
         except Exception as exc:
             log_exception(

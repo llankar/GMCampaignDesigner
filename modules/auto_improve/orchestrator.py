@@ -1,3 +1,4 @@
+"""Orchestration helpers for auto improve."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from modules.auto_improve.settings import AutoImproveSettings
 
 class AutoImproveOrchestrator:
     def __init__(self, workdir: Path | None = None):
+        """Initialize the AutoImproveOrchestrator instance."""
         self.workdir = workdir or Path.cwd()
         self.settings = AutoImproveSettings.load()
         self.runner = CommandRunner()
@@ -19,9 +21,11 @@ class AutoImproveOrchestrator:
         configure_catalog(runner=self.runner, command_template=self.settings.agent_command, workdir=self.workdir)
 
     def list_proposals(self, limit: int = 10) -> list[ImprovementProposal]:
+        """Handle list proposals."""
         return get_proposals(limit)
 
     def execute(self, proposal: ImprovementProposal) -> ExecutionReport:
+        """Handle execute."""
         report = ExecutionReport(proposal=proposal)
         report.add_step(f"Starting auto-improvement for: {proposal.title}")
 
@@ -33,6 +37,7 @@ class AutoImproveOrchestrator:
             return report
 
         try:
+            # Keep execute resilient if this step fails.
             agent_output = self.runner.run_agent(
                 command_template=self.settings.agent_command,
                 prompt=proposal.prompt,

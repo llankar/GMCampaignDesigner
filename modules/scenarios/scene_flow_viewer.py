@@ -1,3 +1,4 @@
+"""Viewer for scenario scene flow."""
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Dict, Optional, Sequence
@@ -30,6 +31,7 @@ class SceneFlowViewerWindow(ctk.CTkToplevel):
         initial_scenario: Optional[dict] = None,
         on_close: Optional[Callable[[], None]] = None,
     ) -> None:
+        """Initialize the SceneFlowViewerWindow instance."""
         super().__init__(master)
 
         self.title("Scene Flow Viewer")
@@ -52,6 +54,7 @@ class SceneFlowViewerWindow(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self._handle_close)
 
     def _focus_window(self) -> None:
+        """Internal helper for focus window."""
         try:
             self.focus()
             self.lift()
@@ -59,7 +62,9 @@ class SceneFlowViewerWindow(ctk.CTkToplevel):
             pass
 
     def _handle_close(self) -> None:
+        """Internal helper for handle close."""
         try:
+            # Keep handle close resilient if this step fails.
             if callable(self._on_close_callback):
                 self._on_close_callback()
         finally:
@@ -84,6 +89,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         initial_scenario: Optional[dict] = None,
         **kwargs,
     ) -> None:
+        """Initialize the SceneFlowViewerFrame instance."""
         # Initial fit mode for zoom behaviour in the viewer
         self.fit_mode: str = "Contain"  # Contain | Width | Height
         self._fit_initialized = False
@@ -131,6 +137,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     def _hide_detail_header_rows(self) -> None:
         """Give the detail text area more space by removing header/meta rows."""
         for attr_name in ("detail_panel_title", "detail_panel_meta"):
+            # Process each attr_name from ('detail_panel_title', 'detail_panel_meta').
             widget = getattr(self, attr_name, None)
             if widget is None:
                 continue
@@ -151,6 +158,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         except Exception:
             pass
         if getattr(self, "detail_html_label", None) is not None:
+            # Handle the branch where getattr(self, 'detail_html_label', None) is available.
             try:
                 self.detail_html_label.pack_forget()
                 self.detail_html_label.destroy()
@@ -169,6 +177,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             return cached_font
 
         try:
+            # Keep detail text font resilient if this step fails.
             label_font = self.detail_panel_meta.cget("font")
             if isinstance(label_font, ctk.CTkFont):
                 self._detail_text_font = ctk.CTkFont(
@@ -192,6 +201,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             getattr(self, "_detail_text_wrapper", None) is None
             or not int(self._detail_text_wrapper.winfo_exists())
         ):
+            # Handle this branch separately before continuing.
             wrapper = ctk.CTkFrame(self.detail_content_container, fg_color="transparent")
             text_font = self._resolve_detail_text_font()
             text_widget = tk.Text(
@@ -211,6 +221,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             text_widget.configure(yscrollcommand=scrollbar.set)
 
             def _scroll_units(units: int):
+                """Internal helper for scroll units."""
                 try:
                     text_widget.yview_scroll(units, "units")
                 except Exception:
@@ -218,6 +229,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
                 return "break"
 
             def _on_mousewheel(event):
+                """Handle mousewheel."""
                 delta = int(getattr(event, "delta", 0))
                 if delta != 0:
                     # Windows/macOS style wheel events.
@@ -302,6 +314,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     # Toolbar configuration
     # ------------------------------------------------------------------
     def init_toolbar(self) -> None:  # type: ignore[override]
+        """Initialize toolbar."""
         toolbar = ctk.CTkFrame(self)
         toolbar.pack(fill="x", padx=8, pady=(8, 4))
         self.toolbar = toolbar
@@ -372,12 +385,14 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     # Scenario selection helpers
     # ------------------------------------------------------------------
     def _extract_title(self, scenario: Optional[dict]) -> str:
+        """Extract title."""
         if not isinstance(scenario, dict):
             return ""
         title = scenario.get("Title") or scenario.get("Name") or ""
         return str(title).strip()
 
     def _populate_scenario_menu(self) -> None:
+        """Internal helper for populate scenario menu."""
         try:
             scenarios = self.scenario_wrapper.load_items()
         except Exception as exc:
@@ -390,6 +405,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         lookup: Dict[str, dict] = {}
         names: list[str] = []
         for scenario in scenarios:
+            # Process each scenario from scenarios.
             title = self._extract_title(scenario)
             if not title:
                 continue
@@ -404,9 +420,11 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         self._scenario_lookup = lookup
         if hasattr(self, "scenario_menu"):
+            # Handle the branch where hasattr(self, 'scenario_menu').
             menu_values: Sequence[str] = names if names else ["No scenarios available"]
             self.scenario_menu.configure(values=list(menu_values))
             if names:
+                # Continue with this path when names is set.
                 current = self.scenario_var.get()
                 target = current or self._initial_title or names[0]
                 self.scenario_var.set(target)
@@ -418,9 +436,11 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
                 self.scenario_menu.configure(state="disabled")
 
     def _on_scenario_selected(self, _: str) -> None:
+        """Handle scenario selected."""
         self._load_selected_scenario()
 
     def _load_selected_scenario(self) -> None:
+        """Load selected scenario."""
         title = self.scenario_var.get().strip()
         if not title or title == "No scenarios available":
             return
@@ -442,17 +462,20 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self._schedule_relayout(0)
 
     def _on_canvas_resized(self, _event=None) -> None:
+        """Handle canvas resized."""
         if not self._fit_initialized:
             self._fit_to_view()
         self._schedule_relayout(80)
 
     def _on_fit_mode_change(self, value: str) -> None:
+        """Handle fit mode change."""
         self.fit_mode = (value or "Contain").title()
         self._fit_initialized = False
         self._fit_to_view()
         self._schedule_relayout(0)
 
     def _fit_to_view(self) -> None:
+        """Internal helper for fit to view."""
         canvas = getattr(self, "canvas", None)
         if not canvas:
             return
@@ -545,6 +568,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         for tags in (("node", "link"), ("node",), ("link",)):
             try:
+                # Keep content bbox resilient if this step fails.
                 bbox = canvas.bbox(*tags)
                 if bbox:
                     return bbox
@@ -557,30 +581,36 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             return None
 
     def _on_layout_resize(self, _event=None) -> None:
+        """Handle layout resize."""
         if getattr(self, "_detail_panel_visible", False):
             self._place_detail_overlay()
 
     def _on_scene_flow_container_resized(self, _event=None) -> None:
+        """Handle scene flow container resized."""
         if getattr(self, "_detail_panel_visible", False):
             self._place_detail_overlay()
 
     def _toggle_detail_panel(self, *_args) -> None:
+        """Toggle detail panel."""
         if getattr(self.detail_toggle, "get", lambda: True)():
             self._show_detail_panel()
         else:
             self._hide_detail_panel()
 
     def _toggle_detail_panel_mode(self, *_args) -> None:
+        """Toggle detail panel mode."""
         expanded = bool(getattr(self.detail_expand_toggle, "get", lambda: False)())
         self._set_detail_panel_expanded(expanded)
 
     def _show_detail_panel(self) -> None:  # type: ignore[override]
+        """Show detail panel."""
         if self._detail_panel_visible:
             return
         self._detail_panel_visible = True
         self._place_detail_overlay()
 
     def _compute_detail_panel_height(self, container_h: Optional[int] = None) -> int:
+        """Internal helper for compute detail panel height."""
         container = self.main_container if hasattr(self, "main_container") else self
         if container_h is None:
             container_h = int(container.winfo_height()) if int(container.winfo_height()) > 1 else 0
@@ -624,6 +654,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             self.detail_panel_meta.configure(wraplength=wrap_length)
 
     def _hide_detail_panel(self) -> None:  # type: ignore[override]
+        """Hide detail panel."""
         if not self._detail_panel_visible:
             return
         self.detail_overlay.place_forget()
@@ -633,8 +664,10 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     # Visual styling adjustments
     # ------------------------------------------------------------------
     def _apply_scene_flow_styling(self) -> None:
+        """Apply scene flow styling."""
         self.canvas.configure(bg="#1B1F27")
         if hasattr(self, "background_id"):
+            # Handle the branch where hasattr(self, 'background_id').
             try:
                 self.canvas.delete(self.background_id)
             except Exception:
@@ -656,6 +689,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     def _schedule_relayout(self, delay_ms: int = 60) -> None:
         """Debounce relayout to handle resize/fit changes smoothly."""
         if self._relayout_after_id:
+            # Continue with this path when relayout after ID is set.
             try:
                 self.after_cancel(self._relayout_after_id)
             except Exception:
@@ -672,6 +706,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         self._relayout_scene_flow()
 
     def _relayout_scene_flow(self) -> None:
+        """Internal helper for relayout scene flow."""
         if self._relayout_in_progress:
             return
         self._relayout_in_progress = True
@@ -719,14 +754,17 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
         gap_y = base_gap_y
 
         def chunk(items, size):
+            """Handle chunk."""
             for i in range(0, len(items), size):
                 yield items[i : i + size]
 
         def compute_layout(cols, gx, gy):
+            """Handle compute layout."""
             rows = list(chunk(scenes, max(1, cols)))
             row_heights = []
             row_widths = []
             for r in rows:
+                # Process each r from rows.
                 heights = [int(s.get("card_height", avg_h)) for s in r]
                 widths_row = [int(s.get("card_width", avg_w)) for s in r]
                 row_heights.append(max(heights) if heights else 0)
@@ -741,6 +779,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             positions = []
             cursor_y = edge_pad_y
             for row_idx, row in enumerate(rows):
+                # Process each (row_idx, row) from enumerate(rows).
                 cursor_x = edge_pad_x
                 height = row_heights[row_idx]
                 for col_idx, scene in enumerate(row):
@@ -754,6 +793,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
             return total_width, total_height, positions
 
         for _ in range(12):
+            # Process each _ from range(12).
             layout_width, layout_height, positions = compute_layout(col_count, gap_x, gap_y)
             if layout_width > available_width and col_count > 1:
                 col_count -= 1
@@ -768,11 +808,13 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
         _, _, positions = compute_layout(col_count, gap_x, gap_y)
         for scene, (x, y) in zip(scenes, positions):
+            # Process each (scene, (x, y)) from zip(scenes, positions).
             tag = scene.get("tag")
             if not tag:
                 continue
             self.node_positions[tag] = (x, y)
             for node in self.graph.get("nodes", []):
+                # Process each node from graph.get('nodes', []).
                 node_tag = self._build_tag(node.get("type", ""), node.get("name", ""))
                 if node_tag == tag:
                     node["x"] = x
@@ -790,6 +832,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
     # Scene drawing overrides
     # ------------------------------------------------------------------
     def _draw_scene_card(self, node, scale):  # type: ignore[override]
+        """Internal helper for draw scene card."""
         super()._draw_scene_card(node, scale)
 
         node_name = node.get("name", "Scene")
@@ -820,6 +863,7 @@ class SceneFlowViewerFrame(ScenarioGraphEditor):
 
     # Override scenario selection to avoid generic dialog usage.
     def select_scenario(self):  # type: ignore[override]
+        """Select scenario."""
         self._populate_scenario_menu()
 
 
@@ -835,6 +879,7 @@ def create_scene_flow_frame(
 
     initial_scenario = None
     if scenario_title:
+        # Continue with this path when scenario title is set.
         try:
             items = scenario_wrapper.load_items() or []
         except Exception:

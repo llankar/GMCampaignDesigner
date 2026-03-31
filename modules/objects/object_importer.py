@@ -1,3 +1,5 @@
+"""Import helpers for object."""
+
 import json
 import os
 import threading
@@ -58,6 +60,7 @@ def _normalize_object_payload(payload):
     """Return the equipment list from various payload shapes."""
 
     def _as_list(value):
+        """Internal helper for as list."""
         if isinstance(value, list):
             return value
         if isinstance(value, dict):
@@ -65,7 +68,9 @@ def _normalize_object_payload(payload):
         return None
 
     if isinstance(payload, str):
+        # Handle the branch where isinstance(payload, str).
         try:
+            # Keep object payload resilient if this step fails.
             parsed = parse_json_relaxed(payload)
         except Exception as exc:  # pragma: no cover - defensive logging aid
             log_warning(
@@ -82,6 +87,7 @@ def _normalize_object_payload(payload):
         return payload
 
     if isinstance(payload, dict):
+        # Handle the branch where isinstance(payload, dict).
         for key in (
             "objects",
             "object",
@@ -94,6 +100,7 @@ def _normalize_object_payload(payload):
             "Items",
         ):
             if key in payload:
+                # Handle the branch where key is in payload.
                 value = payload.get(key)
                 normalized = _as_list(value)
                 if normalized is not None:
@@ -101,6 +108,7 @@ def _normalize_object_payload(payload):
 
         if "choices" in payload and isinstance(payload["choices"], list):
             for choice in payload["choices"]:
+                # Process each choice from payload['choices'].
                 if not isinstance(choice, dict):
                     continue
                 message = choice.get("message") if isinstance(choice.get("message"), dict) else None
@@ -123,6 +131,7 @@ def _normalize_object_payload(payload):
 
         # If the dict itself looks like a single object entry, wrap it.
         if any(key in payload for key in ("Name", "Description", "Stats", "Secrets", "Portrait")):
+            # Handle the branch where any((key in payload for key in ('Name', 'Description', 'Stats', 'Secrets', 'Portrait'))).
             normalized = _as_list(payload)
             if normalized is not None:
                 return normalized
@@ -156,6 +165,7 @@ def import_object_records(payload) -> int:
 
     objects = _normalize_object_payload(payload)
     if not objects:
+        # Handle the branch where objects is unavailable.
         preview = ""
         try:
             preview = json.dumps(payload, ensure_ascii=False)
@@ -182,6 +192,7 @@ def import_object_records(payload) -> int:
 
     new_items = []
     for raw in objects:
+        # Process each raw from objects.
         if not isinstance(raw, dict):
             continue
         item = {
@@ -213,6 +224,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
     """Window allowing AI-assisted import of equipment objects from PDFs or pasted text."""
 
     def __init__(self, master=None):
+        """Initialize the ObjectImportWindow instance."""
         super().__init__(master)
         self.title("Import Equipment from PDF")
         self.geometry("600x600")
@@ -246,11 +258,13 @@ class ObjectImportWindow(ctk.CTkToplevel):
         self.status_label.pack(side="right", padx=(8, 0))
 
     def import_pasted_json(self):
+        """Import pasted JSON."""
         text = self.textbox.get("1.0", "end-1c").strip()
         if not text:
             messagebox.showwarning("No Data", "Please paste JSON describing objects first.")
             return
         try:
+            # Keep pasted JSON resilient if this step fails.
             self._set_status("Importing objects from JSON...")
             self._busy(True)
             count = import_objects_from_json(text)
@@ -262,6 +276,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
             self._set_status("Idle")
 
     def import_pdf_via_ai(self):
+        """Import PDF via AI."""
         try:
             path = filedialog.askopenfilename(
                 title="Select Equipment PDF",
@@ -274,7 +289,9 @@ class ObjectImportWindow(ctk.CTkToplevel):
             return
 
         def worker():
+            """Handle worker."""
             try:
+                # Keep worker resilient if this step fails.
                 self._set_status("Extracting PDF text...")
                 pages = self._extract_pdf_text(path)
                 if not pages or not any(page.strip() for page in pages):
@@ -288,6 +305,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
                 failed_chunks = []
                 basename = os.path.basename(path)
                 for index in range(0, len(reviewed_pages), 4):
+                    # Process each index from range(0, len(reviewed_pages), 4).
                     chunk_text = "\n".join(reviewed_pages[index : index + 4]).strip()
                     if not chunk_text:
                         continue
@@ -296,6 +314,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
                     label = f"{basename} p{start_page}-{end_page}"
                     self._set_status(f"Processing {label}...")
                     try:
+                        # Keep worker resilient if this step fails.
                         objects, count = self._ai_extract_and_import(
                             chunk_text,
                             source_label=label,
@@ -313,7 +332,9 @@ class ObjectImportWindow(ctk.CTkToplevel):
                     total_imported += count
 
                 if not combined_objects:
+                    # Handle the branch where combined objects is unavailable.
                     if failed_chunks:
+                        # Continue with this path when failed chunks is set.
                         joined = "\n".join(
                             f"- {name}: {error}" for name, error in failed_chunks[:5]
                         )
@@ -332,6 +353,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
                 self._set_text(pretty)
                 message = f"Imported {total_imported} object(s) from {basename}."
                 if failed_chunks:
+                    # Continue with this path when failed chunks is set.
                     joined = "\n".join(f"- {name}: {error}" for name, error in failed_chunks[:5])
                     if len(failed_chunks) > 5:
                         joined += "\n- (additional failures omitted)"
@@ -347,13 +369,16 @@ class ObjectImportWindow(ctk.CTkToplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     def ai_parse_textarea(self):
+        """Handle AI parse textarea."""
         raw = self.textbox.get("1.0", "end-1c").strip()
         if not raw:
             messagebox.showwarning("No Text", "Please paste equipment source text first.")
             return
 
         def worker():
+            """Handle worker."""
             try:
+                # Keep worker resilient if this step fails.
                 self._ai_extract_and_import(raw, source_label="Pasted Text")
             except Exception as exc:
                 self._error("AI Parse Error", str(exc))
@@ -367,13 +392,16 @@ class ObjectImportWindow(ctk.CTkToplevel):
 
     # --- Internal helpers -------------------------------------------------
     def _extract_pdf_text(self, path: str) -> list[str]:
+        """Extract PDF text."""
         try:
+            # Keep PDF text resilient if this step fails.
             try:
                 import PyPDF2 as pypdf  # type: ignore
             except Exception:
                 import pypdf as pypdf  # type: ignore
             chunks = []
             with open(path, "rb") as handle:
+                # Keep this resource scoped to PDF text.
                 reader = pypdf.PdfReader(handle)
                 for page in reader.pages:
                     try:
@@ -386,10 +414,12 @@ class ObjectImportWindow(ctk.CTkToplevel):
             raise
 
     def _review_extracted_pages(self, pages: list[str], source_name: str) -> list[str] | None:
+        """Internal helper for review extracted pages."""
         selection: dict[str, list[str] | None] = {"pages": None}
         event = threading.Event()
 
         def _open_dialog():
+            """Open dialog."""
             dialog = PDFReviewDialog(self, pages, title=f"Review {source_name}")
             self.wait_window(dialog)
             selection["pages"] = dialog.selected_pages
@@ -400,6 +430,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
         return selection["pages"]
 
     def _ai_extract_and_import(self, raw_text: str, source_label: str = "", *, update_text: bool = True):
+        """Internal helper for AI extract and import."""
         log_info(
             f"Running object AI import for {source_label or 'input'}",
             func_name="ObjectImportWindow._ai_extract_and_import",
@@ -411,6 +442,7 @@ class ObjectImportWindow(ctk.CTkToplevel):
         existing = wrapper.load_items()
         stats_examples = []
         for entry in existing:
+            # Process each entry from existing.
             stats_val = entry.get("Stats")
             if isinstance(stats_val, dict):
                 stats_val = stats_val.get("text", "")
@@ -473,7 +505,9 @@ class ObjectImportWindow(ctk.CTkToplevel):
         return objects, count
 
     def _set_text(self, value: str):
+        """Set text."""
         def _do():
+            """Internal helper for do."""
             try:
                 self.textbox.delete("1.0", "end")
                 self.textbox.insert("1.0", value)
@@ -483,7 +517,9 @@ class ObjectImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _set_status(self, text: str):
+        """Set status."""
         def _do():
+            """Internal helper for do."""
             try:
                 self.status_label.configure(text=text)
             except Exception:
@@ -492,8 +528,11 @@ class ObjectImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _busy(self, active: bool):
+        """Internal helper for busy."""
         def _do():
+            """Internal helper for do."""
             try:
+                # Keep do resilient if this step fails.
                 if active:
                     self.progress.start()
                 else:
@@ -510,10 +549,13 @@ class ObjectImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _info(self, title: str, message: str):
+        """Internal helper for info."""
         self.after(0, lambda: messagebox.showinfo(title, message))
 
     def _warn(self, title: str, message: str):
+        """Internal helper for warn."""
         self.after(0, lambda: messagebox.showwarning(title, message))
 
     def _error(self, title: str, message: str):
+        """Internal helper for error."""
         self.after(0, lambda: messagebox.showerror(title, message))

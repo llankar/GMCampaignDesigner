@@ -42,8 +42,10 @@ SCENE_DENSITY_STYLES = {
 
 
 def normalize_scene_density(value):
+    """Normalize scene density."""
     return value if value in SCENE_DENSITY_MODES else DEFAULT_SCENE_DENSITY
 
 
 def get_scene_density_style(mode):
+    """Return scene density style."""
     return SCENE_DENSITY_STYLES[normalize_scene_density(mode)]

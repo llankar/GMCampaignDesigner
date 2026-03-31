@@ -1,3 +1,5 @@
+"""Parsing helpers for automation response."""
+
 import json
 import re
 from typing import Any, Dict, List
@@ -8,6 +10,7 @@ log_module_import(__name__)
 
 
 def parse_ai_json(payload: str) -> Any:
+    """Parse AI JSON."""
     if not payload:
         raise RuntimeError("Empty AI response")
     text = payload.strip()
@@ -29,6 +32,7 @@ def parse_ai_json(payload: str) -> Any:
 
     tail = text[start:]
     for end in range(len(tail), max(len(tail) - 2000, 0), -1):
+        # Process each end from range(len(tail), max(len(tail) - 2000, 0), -1).
         chunk = tail[:end]
         try:
             return json.loads(chunk)
@@ -39,15 +43,18 @@ def parse_ai_json(payload: str) -> Any:
 
 
 def _normalize_string_list(value: Any) -> List[str]:
+    """Normalize string list."""
     if not value:
         return []
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     if isinstance(value, str):
+        # Handle the branch where isinstance(value, str).
         raw = value.strip()
         if not raw:
             return []
         try:
+            # Keep string list resilient if this step fails.
             parsed = json.loads(raw)
             if isinstance(parsed, list):
                 return [str(item).strip() for item in parsed if str(item).strip()]
@@ -58,6 +65,7 @@ def _normalize_string_list(value: Any) -> List[str]:
 
 
 def parse_story_arc_json(payload: str) -> Dict[str, Any]:
+    """Parse story arc JSON."""
     data = parse_ai_json(payload)
     if not isinstance(data, dict):
         raise RuntimeError("Story arc response must be a JSON object")
@@ -88,6 +96,7 @@ def parse_story_arc_json(payload: str) -> Dict[str, Any]:
         "LeadsTo",
     }
     for index, entry in enumerate(scenarios_raw, start=1):
+        # Process each (index, entry) from enumerate(scenarios_raw, start=1).
         if not isinstance(entry, dict):
             raise RuntimeError(f"Scenario {index} is not a JSON object")
         missing_keys = sorted(key for key in required_scenario_keys if key not in entry)

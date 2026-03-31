@@ -1,3 +1,5 @@
+"""Utilities for icon dropdown."""
+
 import tkinter as tk
 import customtkinter as ctk
 
@@ -18,6 +20,7 @@ class IconDropdown(ctk.CTkFrame):
     """
 
     def __init__(self, parent, items, default_key=None, button_size=(32, 32)):
+        """Initialize the IconDropdown instance."""
         super().__init__(parent, fg_color="transparent")
 
         if not items:
@@ -62,10 +65,13 @@ class IconDropdown(ctk.CTkFrame):
 
     @property
     def option_buttons(self):
+        """Handle option buttons."""
         return dict(self._option_buttons)
 
     def _build_menu(self):
+        """Build menu."""
         for key in self._order:
+            # Process each key from _order.
             item = self._items[key]
             btn = ctk.CTkButton(
                 self._menu,
@@ -86,12 +92,14 @@ class IconDropdown(ctk.CTkFrame):
                 ToolTip(btn, item.get("tooltip"))
 
     def _toggle_menu(self):
+        """Toggle menu."""
         if self._menu.winfo_viewable():
             self._close_menu()
         else:
             self._open_menu()
 
     def _open_menu(self):
+        """Open menu."""
         if not self.winfo_ismapped():
             return
         x = self.winfo_rootx()
@@ -102,10 +110,12 @@ class IconDropdown(ctk.CTkFrame):
         self._menu.focus_force()
 
     def _close_menu(self):
+        """Close menu."""
         if self._menu:
             self._menu.withdraw()
 
     def _select(self, key):
+        """Select the operation."""
         item = self._items.get(key)
         if not item:
             return
@@ -116,10 +126,12 @@ class IconDropdown(ctk.CTkFrame):
         self._close_menu()
 
     def set_active(self, key, active_style=None, default_style=None):
+        """Set active."""
         active_style = active_style or {}
         default_style = default_style or {}
 
         for option_key, btn in self._option_buttons.items():
+            # Process each (option_key, btn) from _option_buttons.items().
             style = active_style if option_key == key else default_style
             try:
                 btn.configure(**style)
@@ -135,7 +147,9 @@ class IconDropdown(ctk.CTkFrame):
                 pass
 
     def _safe_destroy_menu(self):
+        """Internal helper for safe destroy menu."""
         if self._menu:
+            # Continue with this path when menu is set.
             try:
                 self._menu.destroy()
             except tk.TclError:

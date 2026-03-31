@@ -1,3 +1,5 @@
+"""Helpers for building campaign forge prompts."""
+
 from __future__ import annotations
 
 import json

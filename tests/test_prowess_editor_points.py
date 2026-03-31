@@ -1,3 +1,5 @@
+"""Regression tests for prowess editor points."""
+
 import sys
 import tkinter as tk
 import types
@@ -5,23 +7,29 @@ import types
 
 class _StubWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _StubWidget instance."""
         self._grid_visible = True
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         self._grid_visible = True
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def grid_remove(self):
+        """Handle grid remove."""
         self._grid_visible = False
         return None
 
     def destroy(self):
+        """Handle destroy."""
         return None
 
     def configure(self, **kwargs):
+        """Handle configure."""
         return None
 
 
@@ -41,10 +49,12 @@ from modules.pcs.character_creation.ui.prowess_editor import ProwessEditor
 
 
 def _label_for(prefix: str) -> str:
+    """Internal helper for label for."""
     return next(label for label in PROWESS_OPTION_LABELS if label.startswith(prefix))
 
 
 def _row(root, label: str, points: str = "1", detail: str = "", mode: str = "Contact") -> dict:
+    """Internal helper for row."""
     return {
         "label_var": tk.StringVar(master=root, value=_label_for(label)),
         "points_var": tk.StringVar(master=root, value=points),
@@ -60,6 +70,7 @@ def _row(root, label: str, points: str = "1", detail: str = "", mode: str = "Con
 
 
 def test_get_total_spent_prowess_points_uses_variable_option_costs():
+    """Verify that get total spent prowess points uses variable option costs."""
     root = tk.Tcl()
     editor = ProwessEditor.__new__(ProwessEditor)
     editor._cards = [
@@ -76,6 +87,7 @@ def test_get_total_spent_prowess_points_uses_variable_option_costs():
 
 
 def test_refresh_feat_card_ui_updates_label_with_variable_option_costs():
+    """Verify that refresh feat card UI updates label with variable option costs."""
     root = tk.Tcl()
     editor = ProwessEditor.__new__(ProwessEditor)
     card = {
@@ -92,6 +104,7 @@ def test_refresh_feat_card_ui_updates_label_with_variable_option_costs():
 
 
 def test_sync_variable_points_visibility_handles_bonus_damage_mode_widgets():
+    """Verify that sync variable points visibility handles bonus damage mode widgets."""
     root = tk.Tcl()
     editor = ProwessEditor.__new__(ProwessEditor)
 
@@ -107,6 +120,7 @@ def test_sync_variable_points_visibility_handles_bonus_damage_mode_widgets():
 
 
 def test_get_payload_serializes_bonus_damage_with_mode_and_scale():
+    """Verify that get payload serializes bonus damage with mode and scale."""
     root = tk.Tcl()
     editor = ProwessEditor.__new__(ProwessEditor)
     editor._cards = [
@@ -124,6 +138,7 @@ def test_get_payload_serializes_bonus_damage_with_mode_and_scale():
 
 
 def test_get_payload_serializes_armor_with_three_armor_per_point():
+    """Verify that get payload serializes armor with three armor per point."""
     root = tk.Tcl()
     editor = ProwessEditor.__new__(ProwessEditor)
     editor._cards = [
@@ -141,6 +156,7 @@ def test_get_payload_serializes_armor_with_three_armor_per_point():
 
 
 def test_request_feat_removal_calls_callback_with_feat_index():
+    """Verify that request feat removal calls callback with feat index."""
     root = tk.Tcl()
     captured: list[int] = []
     editor = ProwessEditor.__new__(ProwessEditor)

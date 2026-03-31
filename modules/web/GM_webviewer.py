@@ -1,3 +1,5 @@
+"""Utilities for GM webviewer."""
+
 import os
 import re
 import json
@@ -97,11 +99,14 @@ auth_bp = Blueprint('auth', __name__)
 
 @login_manager.user_loader
 def load_user(user_id):
+    """Load user."""
     return db.session.get(User, int(user_id))
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    """Handle login."""
     if request.method == 'POST':
+        # Handle the branch where request.method == 'POST'.
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
         user = User.query.filter_by(username=username).first()
@@ -112,7 +117,9 @@ def login():
     return render_template('login.html')
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    """Register the operation."""
     if request.method == 'POST':
+        # Handle the branch where request.method == 'POST'.
         username = request.form.get('username','').strip()
         password = request.form.get('password','')
         password2 = request.form.get('password2','')
@@ -140,6 +147,7 @@ def register():
 @auth_bp.route('/logout')
 @login_required
 def logout():
+    """Handle logout."""
     logout_user()
     return redirect(url_for('auth.login'))
 
@@ -153,6 +161,7 @@ journal_bp = Blueprint('journal', __name__, url_prefix='/journals')
 @journal_bp.route('/', methods=['GET'])
 @login_required
 def list_entries():
+    """Handle list entries."""
     # eager‐load .user to avoid extra queries
     entries = (JournalEntry.query
             .options(joinedload(JournalEntry.user))
@@ -162,6 +171,7 @@ def list_entries():
 @journal_bp.route('/<int:entry_id>', methods=['GET'])
 @login_required
 def view_entry(entry_id):
+    """Handle view entry."""
     # Fetch any entry by its ID (no user_id check)
     entry = JournalEntry.query.get_or_404(entry_id)
     return render_template('journal_view.html', entry=entry)
@@ -169,7 +179,9 @@ def view_entry(entry_id):
 @journal_bp.route('/new', methods=['GET', 'POST'])
 @login_required
 def new_entry():
+    """Handle new entry."""
     if request.method == 'POST':
+        # Handle the branch where request.method == 'POST'.
         title = request.form.get('title', '').strip()
         raw_content = request.form.get('content', '').strip()
         # option A: use set union
@@ -205,10 +217,12 @@ def new_entry():
 @journal_bp.route('/edit/<int:entry_id>', methods=['GET', 'POST'])
 @login_required
 def edit_entry(entry_id):
+    """Handle edit entry."""
     entry = JournalEntry.query.get_or_404(entry_id)
     if entry.user_id != current_user.id:
         return redirect(url_for('journal.list_entries'))
     if request.method == 'POST':
+        # Handle the branch where request.method == 'POST'.
         entry.title = request.form.get('title', '').strip()
         raw_content = request.form.get('content', '').strip()
         # option A: use set union
@@ -234,6 +248,7 @@ def edit_entry(entry_id):
 @journal_bp.route('/delete/<int:entry_id>', methods=['POST'])
 @login_required
 def delete_entry(entry_id):
+    """Delete entry."""
     entry = JournalEntry.query.get_or_404(entry_id)
     if entry.user_id == current_user.id:
         db.session.delete(entry)
@@ -267,18 +282,22 @@ POSITIONS_FILE = os.path.join(BASE_DIR, "data", "save", "clue_positions.json")
 LINKS_FILE     = os.path.join(BASE_DIR, "data", "save", "clue_links.json")
 
 def load_links():
+    """Load links."""
     try:
+        # Keep links resilient if this step fails.
         with open(LINKS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return []
 
 def save_links_list(links_list):
+    """Save links list."""
     os.makedirs(os.path.dirname(LINKS_FILE), exist_ok=True)
     with open(LINKS_FILE, "w", encoding="utf-8") as f:
         json.dump(links_list, f, indent=2)
 
 def save_link(link):
+    """Save link."""
     links = load_links()
     links.append(link)
     os.makedirs(os.path.dirname(LINKS_FILE), exist_ok=True)
@@ -287,12 +306,14 @@ def save_link(link):
 
 @app.route('/api/clue-link-delete', methods=['POST'])
 def delete_clue_link():
+    """Delete clue link."""
     data = request.get_json() or {}
     idx = data.get("index")
     if idx is None:
         return jsonify(error="Missing index"), 400
     links = load_links()
     try:
+        # Keep clue link resilient if this step fails.
         idx = int(idx)
         if 0 <= idx < len(links):
             links.pop(idx)
@@ -304,6 +325,7 @@ def delete_clue_link():
 
 @app.route('/api/clue-delete', methods=['POST'])
 def delete_clue():
+    """Delete clue."""
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     if not name:
@@ -330,13 +352,16 @@ def delete_clue():
     return jsonify(success=True)
 
 def load_positions():
+    """Load positions."""
     try:
+        # Keep positions resilient if this step fails.
         with open(POSITIONS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
 
 def save_positions(positions):
+    """Save positions."""
     os.makedirs(os.path.dirname(POSITIONS_FILE), exist_ok=True)
     with open(POSITIONS_FILE, "w", encoding="utf-8") as f:
         json.dump(positions, f, indent=2)
@@ -345,7 +370,9 @@ def save_positions(positions):
 # Data loaders
 # ──────────────────────────────────────────────────────────────────────────────
 def get_graph_list():
+    """Return graph list."""
     try:
+        # Keep graph list resilient if this step fails.
         if not os.path.isdir(CHARACTER_GRAPH_DIR):
             return []
         files = [
@@ -359,10 +386,13 @@ def get_graph_list():
         return []
 
 def get_portrait_mapping():
+    """Return portrait mapping."""
     mapping = {}
     try:
+        # Keep portrait mapping resilient if this step fails.
         npc_wrapper = GenericModelWrapper("npcs")
         for npc in npc_wrapper.load_items():
+            # Process each npc from npc_wrapper.load_items().
             name = npc.get("Name","").strip()
             portrait = primary_portrait(npc.get("Portrait", "")).strip()
             if name and portrait:
@@ -373,6 +403,7 @@ def get_portrait_mapping():
     return mapping
 
 def get_character_record_maps():
+    """Return character record maps."""
     records = {"npc": {}, "pc": {}}
     try:
         npc_wrapper = GenericModelWrapper("npcs")
@@ -391,6 +422,7 @@ def get_character_record_maps():
     return records
 
 def normalize_character_graph(graph_data):
+    """Normalize character graph."""
     if not isinstance(graph_data, dict):
         return {"nodes": [], "links": []}
     graph_data.setdefault("nodes", [])
@@ -398,8 +430,10 @@ def normalize_character_graph(graph_data):
     ensure_graph_tabs(graph_data)
     seen = set()
     for node in graph_data["nodes"]:
+        # Process each node from graph_data['nodes'].
         if "entity_type" not in node or "entity_name" not in node:
             if "npc_name" in node:
+                # Handle the branch where 'npc_name' is in node.
                 node["entity_type"] = "npc"
                 node["entity_name"] = node.pop("npc_name")
             elif "pc_name" in node:
@@ -410,16 +444,20 @@ def normalize_character_graph(graph_data):
         base = f"{entity_type}_{entity_name.replace(' ', '_')}"
         tag = node.get("tag", base)
         if tag in seen:
+            # Handle the branch where tag is in seen.
             i = 1
             while f"{base}_{i}" in seen:
+                # Keep looping while f'{base}_{i}' is in seen.
                 i += 1
             tag = f"{base}_{i}"
         node["tag"] = tag
         node.setdefault("color", "#1D3572")
         seen.add(tag)
     for link in graph_data["links"]:
+        # Process each link from graph_data['links'].
         if "node1_tag" not in link or "node2_tag" not in link:
             if "npc_name1" in link and "npc_name2" in link:
+                # Handle the branch where 'npc_name1' is in link and 'npc_name2' is in link.
                 link["node1_tag"] = f"npc_{link['npc_name1'].replace(' ', '_')}"
                 link["node2_tag"] = f"npc_{link['npc_name2'].replace(' ', '_')}"
                 link.pop("npc_name1", None)
@@ -433,6 +471,7 @@ def normalize_character_graph(graph_data):
     return graph_data
 
 def load_character_graph(graph_file=None):
+    """Load character graph."""
     os.makedirs(CHARACTER_GRAPH_DIR, exist_ok=True)
     safe_name = secure_filename(graph_file or DEFAULT_CHARACTER_GRAPH)
     if not safe_name:
@@ -445,8 +484,10 @@ def load_character_graph(graph_file=None):
     return normalize_character_graph(data), path
 
 def build_character_graph_payload(graph_data):
+    """Build character graph payload."""
     record_maps = get_character_record_maps()
     for node in graph_data.get("nodes", []):
+        # Process each node from graph_data.get('nodes', []).
         entity_type = node.get("entity_type", "npc")
         entity_name = node.get("entity_name", "").strip()
         record = record_maps.get(entity_type, {}).get(entity_name)
@@ -460,6 +501,7 @@ def build_character_graph_payload(graph_data):
         background_text = ""
         if record:
             for key in ("Background", "Description", "Notes", "Backstory"):
+                # Process each key while updating character graph payload.
                 value = record.get(key)
                 if value:
                     background_text = value
@@ -470,11 +512,14 @@ def build_character_graph_payload(graph_data):
     return graph_data
 
 def get_places_list():
+    """Return places list."""
     try:
+        # Keep places list resilient if this step fails.
         wrapper = GenericModelWrapper("places")
         filtered = []
         for p in wrapper.load_items():
             if p.get("PlayerDisplay") in (True,"True","true",1,"1"):
+                # Handle the branch where p.get('PlayerDisplay') is in (True, 'True', 'true', 1, '1').
                 p["DisplayDescription"] = format_multiline_text(p.get("Description","")) if p.get("Description") else ""
                 portrait = primary_portrait(p.get("Portrait") or "").strip()
                 if portrait:
@@ -490,7 +535,9 @@ def get_places_list():
         return []
 
 def get_informations_list():
+    """Return informations list."""
     try:
+        # Keep informations list resilient if this step fails.
         wrapper = GenericModelWrapper("informations")
         filtered = []
         for info in wrapper.load_items():
@@ -505,10 +552,12 @@ def get_informations_list():
         return []
 
 def get_clues_list():
+    """Return clues list."""
     wrapper = GenericModelWrapper("clues")
     filtered = []
     for clue in wrapper.load_items():
         if clue.get("PlayerDisplay") in (True,"True","true",1,"1"):
+            # Handle the branch where clue.get('PlayerDisplay') is in (True, 'True', 'true', 1, '1').
             desc = clue.get("Description", "")
             # if it's RTF‐JSON, convert to HTML; else just escape lines
             if isinstance(desc, dict) and "text" in desc:
@@ -532,10 +581,12 @@ def get_clues_list():
 # ──────────────────────────────────────────────────────────────────────────────
 @app.route('/')
 def default():
+    """Handle default."""
     return redirect(url_for('welcome'))
 
 @app.route('/welcome')
 def welcome():
+    """Handle welcome."""
     # look for a matching background
     two_up = os.path.dirname( os.path.dirname(CURRENT_DIR) )
     asset_dir = os.path.join(two_up,"assets", "images", "backgrounds")
@@ -552,6 +603,7 @@ def welcome():
     )
 @app.route('/npc')
 def npc_view():
+    """Handle NPC view."""
     selected = request.args.get("graph")
     if selected:
         title = os.path.splitext(selected)[0]
@@ -564,18 +616,21 @@ def npc_view():
 
 @app.route('/locations')
 def locations_view():
+    """Handle locations view."""
     return render_template('locations.html',
                         places=get_places_list(),
                         db_name=DB_NAME)
 
 @app.route('/news')
 def news_view():
+    """Handle news view."""
     return render_template('news_board.html',
                         informations=get_informations_list(),
                         db_name=DB_NAME)
 
 @app.route('/clues')
 def clues_view():
+    """Handle clues view."""
     links = [
         {"from":"0","to":"2","text":"leads to","color":"#d6336c"},
         {"from":"2","to":"5","text":"related","color":"#198754"},
@@ -588,16 +643,19 @@ def clues_view():
 
 @app.route('/api/clue-links', methods=['GET'])
 def get_clue_links():
+    """Return clue links."""
     return jsonify(load_links())
 
 @app.route('/api/clue-link', methods=['POST'])
 def add_clue_link():
+    """Handle add clue link."""
     link = request.get_json()
     save_link(link)
     return ('', 204)
 
 @app.route('/api/npc-graph')
 def npc_graph():
+    """Handle NPC graph."""
     graph_file = request.args.get("graph")
     graph_data, path = load_character_graph(graph_file)
     if not graph_data:
@@ -606,6 +664,7 @@ def npc_graph():
 
 @app.route('/api/character-graph')
 def character_graph():
+    """Handle character graph."""
     graph_file = request.args.get("graph")
     graph_data, path = load_character_graph(graph_file)
     if not graph_data:
@@ -614,6 +673,7 @@ def character_graph():
 
 @app.route('/api/character-graph/link-delete', methods=['POST'])
 def delete_character_graph_link():
+    """Delete character graph link."""
     data = request.get_json() or {}
     graph_file = data.get("graph")
     source = data.get("source")
@@ -628,6 +688,7 @@ def delete_character_graph_link():
     updated_links = []
     removed = False
     for link in links:
+        # Process each link from links.
         node1 = link.get("node1_tag")
         node2 = link.get("node2_tag")
         text = (link.get("text") or "").strip()
@@ -647,10 +708,12 @@ def delete_character_graph_link():
 
 @app.route('/api/clue-positions', methods=['GET'])
 def get_clue_positions():
+    """Return clue positions."""
     return jsonify(load_positions())
 
 @app.route('/api/clue-position', methods=['POST'])
 def set_clue_position():
+    """Set clue position."""
     data = request.get_json() or {}
     cid = str(data.get("id"))
     x = data.get("x")
@@ -664,10 +727,12 @@ def set_clue_position():
 
 @app.route("/portraits/<path:filename>")
 def get_portrait(filename):
+    """Return portrait."""
     return send_from_directory(PORTRAITS_DIR, filename)
 
 @app.route("/assets/<path:filename>")
 def get_asset(filename):
+    """Return asset."""
     two_up = os.path.dirname( os.path.dirname(CURRENT_DIR) )
     asset_dir = os.path.join(two_up,"assets", "images")
    
@@ -675,6 +740,7 @@ def get_asset(filename):
 
 @app.route("/assets/css/<path:filename>")
 def get_css(filename):
+        """Return css."""
         # climb two levels up from CURRENT_DIR, then into “assets/css”
         two_up = os.path.dirname(os.path.dirname(CURRENT_DIR))
         css_dir = os.path.join(two_up, "assets", "css")
@@ -682,12 +748,14 @@ def get_css(filename):
 
 @app.route('/api/clue-positions', methods=['POST'])
 def set_all_clue_positions():
+    """Set all clue positions."""
     positions = request.get_json() or {}
     save_positions(positions)
     return jsonify(success=True)
 
 @app.route('/uploads/informations/<path:filename>')
 def information_upload(filename):
+    """Handle information upload."""
     return send_from_directory(
         app.config['UPLOAD_FOLDER'],
         filename,
@@ -695,6 +763,7 @@ def information_upload(filename):
     )
 @app.route('/uploads/clues/<path:filename>')
 def clue_upload(filename):
+    """Handle clue upload."""
     return send_from_directory(
         app.config['UPLOAD_FOLDER'],
         filename,
@@ -702,7 +771,9 @@ def clue_upload(filename):
     )
 @app.route('/informations/add', methods=['GET', 'POST'])
 def add_information():
+    """Handle add information."""
     if request.method == 'POST':
+        # Handle the branch where request.method == 'POST'.
         title = request.form.get('Title', '').strip()
         info_txt = request.form.get('Information', '').strip()
         level = request.form.get('Level', '').strip()
@@ -733,8 +804,10 @@ def add_information():
 
 @app.route('/factions')
 def factions_view():
+    """Handle factions view."""
     selected = request.args.get("graph")
     if selected:
+        # Continue with this path when selected is set.
         title = os.path.splitext(selected)[0]
         return render_template('factions.html',
                             page_title=title,
@@ -752,6 +825,7 @@ def factions_view():
 
 @app.route('/api/faction-graph')
 def faction_graph():
+    """Handle faction graph."""
     graph_file = request.args.get("graph")
     if not graph_file:
         return jsonify(error="No graph specified"), 400
@@ -763,6 +837,7 @@ def faction_graph():
     faction_wrapper = GenericModelWrapper("factions")
     faction_map = {item.get("Name"): item for item in faction_wrapper.load_items()}
     for node in data.get("nodes", []):
+        # Process each node from data.get('nodes', []).
         name = node.get("name", "").strip()
         record = faction_map.get(name)
         portrait_src = ""
@@ -775,6 +850,7 @@ def faction_graph():
         background = ""
         if record:
             for key in ("Description", "Secrets", "Notes", "Background"):
+                # Process each key from ('Description', 'Secrets', 'Notes', 'Background').
                 value = record.get(key)
                 if value:
                     background = value
@@ -789,6 +865,7 @@ def faction_graph():
 
 @app.route('/clues/add', methods=['GET','POST'])
 def add_clue():
+    """Handle add clue."""
     wrapper = GenericModelWrapper("clues")
     if request.method == 'POST':
         # parse the RTF-JSON
@@ -808,6 +885,7 @@ def add_clue():
 
 @app.route('/clues/edit/<int:idx>', methods=['GET','POST'])
 def edit_clue(idx):
+    """Handle edit clue."""
     wrapper = GenericModelWrapper("clues")
     items   = wrapper.load_items()
     if idx < 0 or idx >= len(items):

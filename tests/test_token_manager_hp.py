@@ -1,3 +1,5 @@
+"""Regression tests for token manager hp."""
+
 import json
 
 import pytest
@@ -8,6 +10,7 @@ from modules.maps.services import token_manager
 
 
 def _make_record(stats=None, traits=None):
+    """Internal helper for make record."""
     record = {}
     if stats is not None:
         record["Stats"] = stats
@@ -42,15 +45,18 @@ def _make_record(stats=None, traits=None):
     ],
 )
 def test_extract_entity_hp_value(entity_type, record, expected):
+    """Verify that extract entity hp value."""
     assert token_manager._extract_entity_hp_value(entity_type, record) == expected
 
 
 def test_extract_entity_hp_value_from_serialized_json():
+    """Verify that extract entity hp value from serialized JSON."""
     stats = json.dumps({"text": "HP 40 (10d8 + 5)"})
     record = _make_record(stats=stats)
     assert token_manager._extract_entity_hp_value("Creature", record) == 40
 
 
 def test_extract_entity_hp_value_missing_hp():
+    """Verify that extract entity hp value missing hp."""
     record = _make_record(stats="Speed 30 ft")
     assert token_manager._extract_entity_hp_value("Creature", record) is None

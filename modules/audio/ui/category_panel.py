@@ -1,3 +1,5 @@
+"""Panel for audio category."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -7,6 +9,7 @@ import customtkinter as ctk
 
 
 def build_category_panel(parent: Any, *, section: str, on_select: Callable[[str], None], on_add: Callable[[str], None], on_rename: Callable[[str], None], on_remove: Callable[[str], None]) -> dict[str, Any]:
+    """Build category panel."""
     frame = ctk.CTkFrame(parent)
     frame.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
     frame.grid_rowconfigure(1, weight=1)

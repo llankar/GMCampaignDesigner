@@ -1,3 +1,5 @@
+"""Utilities for RTF rendering."""
+
 import tkinter as tk
 import tkinter.font as tkfont
 from typing import Any, Dict, Iterable, Tuple
@@ -53,6 +55,7 @@ def _ensure_dynamic_tag(text_widget: tk.Text, tag: str, base_font: tkfont.Font):
         return
 
     if tag.startswith("size_"):
+        # Handle the branch where tag.startswith('size_').
         try:
             size = int(tag.split("_", 1)[1])
         except (TypeError, ValueError):
@@ -79,9 +82,11 @@ def render_rtf_to_text_widget(widget: tk.Text, value: Any, base_font: Tuple[str,
     _configure_base_tags(text_widget, (tk_font.actual("family"), tk_font.actual("size")))
 
     for tag, ranges in formatting.items():
+        # Process each (tag, ranges) from formatting.items().
         if tag.startswith(("size_", "color_")):
             _ensure_dynamic_tag(text_widget, tag, tk_font)
         for start, end in ranges:
+            # Process each (start, end) from ranges.
             idx1 = _index_from_offset(start)
             idx2 = _index_from_offset(end)
             try:

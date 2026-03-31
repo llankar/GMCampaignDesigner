@@ -1,3 +1,4 @@
+"""Visual helpers for campaign."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -14,6 +15,7 @@ class ArcScenarioStrip(ctk.CTkFrame):
     """Compact linear graph for scenarios inside an arc."""
 
     def __init__(self, parent, *, scenarios: list[CampaignGraphScenario], on_open_scenario: Callable[[str], None]):
+        """Initialize the ArcScenarioStrip instance."""
         super().__init__(parent, fg_color="transparent")
         self._scenarios = scenarios
         self._on_open_scenario = on_open_scenario
@@ -31,6 +33,7 @@ class ArcScenarioStrip(ctk.CTkFrame):
         self.after_idle(self._render)
 
     def _render(self, *_args, **_kwargs) -> None:
+        """Render the operation."""
         canvas = getattr(self, "canvas", None)
         if canvas is None or not canvas.winfo_exists():
             return
@@ -45,6 +48,7 @@ class ArcScenarioStrip(ctk.CTkFrame):
         count = max(len(self._scenarios), 1)
         step = (width - 96) / count
         for index, scenario in enumerate(self._scenarios):
+            # Process each (index, scenario) from enumerate(_scenarios).
             x = 48 + step * index + step / 2
             y = height / 2
             r = 18
@@ -68,6 +72,7 @@ class ArcScenarioStrip(ctk.CTkFrame):
 
 
 def _truncate(value: str, limit: int) -> str:
+    """Internal helper for truncate."""
     text = str(value or "").strip()
     if len(text) <= limit:
         return text

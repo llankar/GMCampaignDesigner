@@ -1,3 +1,5 @@
+"""Utilities for window components random content generation."""
+
 from modules.generic.editor.window_context import *
 
 
@@ -28,6 +30,7 @@ class GenericEditorWindowRandomContentGeneration:
             selected_lines = {}
             # Process each file.
             for key, filepath in files.items():
+                # Process each (key, filepath) from files.items().
                 if not os.path.exists(filepath):
                     raise FileNotFoundError(f"File not found: {filepath}")
                 with open(filepath, "r", encoding="utf-8") as f:
@@ -72,6 +75,7 @@ class GenericEditorWindowRandomContentGeneration:
 
                 # Define a helper function to pick a random line from a given file.
                 def pick_random_line(filepath):
+                    """Handle pick random line."""
                     if not os.path.exists(filepath):
                         raise FileNotFoundError(f"File not found: {filepath}")
                     with open(filepath, "r", encoding="utf-8") as f:
@@ -88,6 +92,7 @@ class GenericEditorWindowRandomContentGeneration:
                     "RoleplayingCues": "assets/npc_quirks.txt"
                 }
                 for field, path in npc_fields.items():
+                    # Process each (field, path) from npc_fields.items().
                     value = pick_random_line(path)
                     self.item[field] = value
                     widget = self.field_widgets.get(field)
@@ -123,7 +128,9 @@ class GenericEditorWindowRandomContentGeneration:
             except Exception as e:
                 messagebox.showerror("Error generating NPC", str(e))
     def generate_scenario(self):
+        """Handle generate scenario."""
         try:
+            # Keep generate scenario resilient if this step fails.
             self.generate_scenario_description()
             self.generate_secret_text()
 
@@ -142,6 +149,7 @@ class GenericEditorWindowRandomContentGeneration:
             npc_widgets = self.field_widgets.get("NPCs", [])
             add_npc_combobox = self.field_widgets.get("NPCs_add_combobox")
             while len(npc_widgets) < 3:
+                # Keep looping while len(npc_widgets) < 3.
                 add_npc_combobox()
                 npc_widgets = self.field_widgets["NPCs"]  # Update after adding new combobox
 
@@ -154,6 +162,7 @@ class GenericEditorWindowRandomContentGeneration:
             creature_widgets = self.field_widgets.get("Creatures", [])
             add_creatures_combobox = self.field_widgets.get("Creatures_add_combobox")
             while len(creature_widgets) < 3:
+                # Keep looping while len(creature_widgets) < 3.
                 add_creatures_combobox()
                 creature_widgets = self.field_widgets["Creatures"]  # Update after adding new combobox
 
@@ -166,6 +175,7 @@ class GenericEditorWindowRandomContentGeneration:
             place_widgets = self.field_widgets.get("Places", [])
             add_place_combobox = self.field_widgets.get("Places_add_combobox")
             while len(place_widgets) < 3:
+                # Keep looping while len(place_widgets) < 3.
                 add_place_combobox()
                 place_widgets = self.field_widgets["Places"]  # Update after adding new combobox
 
@@ -201,6 +211,7 @@ class GenericEditorWindowRandomContentGeneration:
             # Read all non-empty lines from each file and roll for a random element.
             selected_lines = {}
             for key, filepath in files.items():
+                # Process each (key, filepath) from files.items().
                 with open(filepath, "r", encoding="utf-8") as f:
                     # Read non-empty stripped lines.
                     lines = [line.strip() for line in f if line.strip()]

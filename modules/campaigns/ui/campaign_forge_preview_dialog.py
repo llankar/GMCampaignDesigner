@@ -1,3 +1,5 @@
+"""Dialog for campaign forge preview."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -21,6 +23,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         generated_payload: dict,
         arc_metadata_by_name: dict[str, dict] | None = None,
     ):
+        """Initialize the CampaignForgePreviewDialog instance."""
         super().__init__(master)
         self.title("Campaign Forge Preview")
         self.geometry("980x900")
@@ -47,6 +50,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         position_window_at_top(self)
 
     def _build_summary_block(self, parent: ctk.CTkFrame, campaign_summary: str) -> None:
+        """Build summary block."""
         card = ctk.CTkFrame(parent)
         card.grid(row=0, column=0, sticky="ew", pady=(0, 12))
         card.grid_columnconfigure(0, weight=1)
@@ -76,6 +80,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         warning_box.configure(state="disabled")
 
     def _build_content_block(self, parent: ctk.CTkFrame) -> None:
+        """Build content block."""
         self.scroll = ctk.CTkScrollableFrame(parent)
         self.scroll.grid(row=1, column=0, sticky="nsew")
         self.scroll.grid_columnconfigure(0, weight=1)
@@ -84,6 +89,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
             self._build_arc_card(arc_index, arc)
 
     def _build_arc_card(self, row_index: int, arc: CampaignForgeArcPreview) -> None:
+        """Build arc card."""
         arc_frame = ctk.CTkFrame(self.scroll)
         arc_frame.grid(row=row_index, column=0, sticky="ew", padx=4, pady=(0, 10))
         arc_frame.grid_columnconfigure(0, weight=1)
@@ -110,6 +116,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         self._arc_rows.append({"arc_var": arc_var, "arc_toggle": arc_toggle, "scenario_rows": scenario_rows, "arc": arc})
 
     def _build_scenario_row(self, parent: ctk.CTkFrame, scenario_index: int, scenario: CampaignForgeScenarioPreview) -> dict:
+        """Build scenario row."""
         row = ctk.CTkFrame(parent, fg_color="transparent")
         row.grid(row=scenario_index + 2, column=0, sticky="ew", padx=22, pady=(0, 6))
         row.grid_columnconfigure(1, weight=1)
@@ -131,6 +138,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         return {"scenario_var": scenario_var, "toggle": toggle, "label": label, "scenario": scenario}
 
     def _build_footer(self, parent: ctk.CTkFrame) -> None:
+        """Build footer."""
         footer = ctk.CTkFrame(parent, fg_color="transparent")
         footer.grid(row=2, column=0, sticky="ew", pady=(12, 0))
 
@@ -138,6 +146,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         ctk.CTkButton(footer, text="Accept selection", command=self._accept).pack(side="right")
 
     def _on_arc_toggle(self, row_index: int) -> None:
+        """Handle arc toggle."""
         arc_row = self._arc_rows[row_index]
         enabled = bool(arc_row["arc_var"].get())
         state = "normal" if enabled else "disabled"
@@ -146,9 +155,11 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
             scenario_row["label"].configure(text_color=("gray35" if enabled else "gray58"))
 
     def _accept(self) -> None:
+        """Internal helper for accept."""
         accepted_arcs: list[dict] = []
 
         for arc_row in self._arc_rows:
+            # Process each arc_row from _arc_rows.
             if not arc_row["arc_var"].get():
                 continue
 
@@ -158,6 +169,7 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
             source_scenarios = source_arc_group.get("scenarios") or []
 
             for scenario_row in arc_row["scenario_rows"]:
+                # Process each scenario_row from arc_row['scenario_rows'].
                 if not scenario_row["scenario_var"].get():
                     continue
                 title = scenario_row["scenario"].title.casefold()
@@ -180,14 +192,17 @@ class CampaignForgePreviewDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _find_source_arc_group(self, arc_name: str) -> dict:
+        """Find source arc group."""
         for group in self._generated_payload.get("arcs") or []:
             if str(group.get("arc_name") or "").strip().casefold() == arc_name.casefold():
                 return group
         return {}
 
     def _build_arc_previews(self, generated_payload: dict, arc_metadata_by_name: dict[str, dict]) -> list[CampaignForgeArcPreview]:
+        """Build arc previews."""
         previews: list[CampaignForgeArcPreview] = []
         for group in generated_payload.get("arcs") or []:
+            # Process each group from generated_payload.get('arcs') or [].
             arc_name = str(group.get("arc_name") or "Unnamed arc").strip() or "Unnamed arc"
             arc_meta = arc_metadata_by_name.get(arc_name.casefold(), {})
             scenario_previews: list[CampaignForgeScenarioPreview] = []
@@ -225,6 +240,7 @@ def preview_campaign_forge_payload(
     generated_payload: dict,
     arc_metadata_by_name: dict[str, dict] | None = None,
 ) -> dict | None:
+    """Handle preview campaign forge payload."""
     dialog = CampaignForgePreviewDialog(
         master,
         campaign_summary=campaign_summary,

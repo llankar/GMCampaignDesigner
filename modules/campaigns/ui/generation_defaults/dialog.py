@@ -1,3 +1,5 @@
+"""Dialog for campaign."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -10,6 +12,7 @@ class CampaignGenerationDefaultsDialog(ctk.CTkToplevel):
     """Editor dialog for campaign AI generation defaults."""
 
     def __init__(self, master, *, initial_state: dict | None = None):
+        """Initialize the CampaignGenerationDefaultsDialog instance."""
         super().__init__(master)
         self.title("AI Generation Defaults")
         self.geometry("760x680")
@@ -80,6 +83,7 @@ class CampaignGenerationDefaultsDialog(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_list_field(self, parent, label: str, helper: str, value: str) -> ctk.CTkTextbox:
+        """Build list field."""
         ctk.CTkLabel(parent, text=label, font=("Arial", 13, "bold")).pack(anchor="w")
         ctk.CTkLabel(parent, text=helper, justify="left", text_color=EDITOR_PALETTE["muted_text"], wraplength=700).pack(anchor="w", pady=(0, 4))
         box = ctk.CTkTextbox(parent, height=94, fg_color=EDITOR_PALETTE["surface_soft"], border_width=1, border_color=EDITOR_PALETTE["border"])
@@ -89,6 +93,7 @@ class CampaignGenerationDefaultsDialog(ctk.CTkToplevel):
         return box
 
     def _on_save(self):
+        """Handle save."""
         self.result_state = generation_defaults_state_to_payload(
             {
                 "main_pc_factions": self._textbox_lines(self.main_pc_factions_box),
@@ -101,4 +106,5 @@ class CampaignGenerationDefaultsDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _textbox_lines(widget: ctk.CTkTextbox) -> list[str]:
+        """Internal helper for textbox lines."""
         return [line.strip() for line in widget.get("1.0", "end").splitlines() if line.strip()]

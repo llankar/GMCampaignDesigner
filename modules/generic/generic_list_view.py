@@ -1,3 +1,5 @@
+"""View for generic list."""
+
 import ast
 import copy
 import functools
@@ -89,6 +91,7 @@ ENTITY_DISPLAY_LABELS = {
 
 
 def _dynamic_entity_labels() -> dict:
+    """Internal helper for dynamic entity labels."""
     labels = dict(ENTITY_DISPLAY_LABELS)
     try:
         labels.update(entity_label_map())
@@ -107,30 +110,35 @@ except AttributeError:  # Pillow < 9.1 fallback
 
 
 def _lazy_editor_window():
+    """Internal helper for lazy editor window."""
     from modules.generic.generic_editor_window import GenericEditorWindow
 
     return GenericEditorWindow
 
 
 def _lazy_selection_view():
+    """Internal helper for lazy selection view."""
     from modules.generic.generic_list_selection_view import GenericListSelectionView
 
     return GenericListSelectionView
 
 
 def _lazy_portrait_viewer():
+    """Internal helper for lazy portrait viewer."""
     from modules.ui.image_viewer import show_portrait
 
     return show_portrait
 
 
 def _lazy_second_screen():
+    """Internal helper for lazy second screen."""
     from modules.ui.second_screen_display import show_entity_on_second_screen
 
     return show_entity_on_second_screen
 
 
 def _lazy_audio():
+    """Internal helper for lazy audio."""
     from modules.audio.entity_audio import (
         get_entity_audio_value,
         play_entity_audio,
@@ -141,6 +149,7 @@ def _lazy_audio():
 
 
 def _lazy_gm_screen():
+    """Internal helper for lazy GM screen."""
     from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
     from modules.scenarios.gm_screen_view import GMScreenView
 
@@ -148,6 +157,7 @@ def _lazy_gm_screen():
 
 
 def _lazy_ai_components():
+    """Internal helper for lazy AI components."""
     from modules.ai.authoring_wizard import AuthoringWizardView
     from modules.ai.local_ai_client import LocalAIClient
 
@@ -155,18 +165,21 @@ def _lazy_ai_components():
 
 
 def _lazy_auto_generation_dialog():
+    """Internal helper for lazy auto generation dialog."""
     from modules.ai.automation.ui.auto_generation_dialog import AutoGenerationDialog
 
     return AutoGenerationDialog
 
 
 def _lazy_template_loader():
+    """Internal helper for lazy template loader."""
     from modules.helpers.template_loader import load_template
 
     return load_template
 
 
 def _lazy_book_importers():
+    """Internal helper for lazy book importers."""
     from modules.books.book_importer import (
         extract_text_from_book,
         prepare_books_from_directory,
@@ -177,30 +190,35 @@ def _lazy_book_importers():
 
 
 def _lazy_text_import_dialog():
+    """Internal helper for lazy text import dialog."""
     from modules.ui.imports import TextImportDialog
 
     return TextImportDialog
 
 
 def _lazy_web_text_import_dialog():
+    """Internal helper for lazy web text import dialog."""
     from modules.ui.imports import WebTextImportDialog
 
     return WebTextImportDialog
 
 
 def _lazy_book_viewer():
+    """Internal helper for lazy book viewer."""
     from modules.books.book_viewer import open_book_viewer
 
     return open_book_viewer
 
 
 def _lazy_puzzle_display():
+    """Internal helper for lazy puzzle display."""
     from modules.puzzles.puzzle_display_window import open_puzzle_display
 
     return open_puzzle_display
 
 
 def _lazy_newsletter_components():
+    """Internal helper for lazy newsletter components."""
     from modules.handouts.newsletter_ai import generate_newsletter_ai
     from modules.handouts.newsletter_dialog import NewsletterConfigDialog
     from modules.handouts.newsletter_generator import build_newsletter_payload
@@ -215,23 +233,27 @@ def _lazy_newsletter_components():
 
 
 def _lazy_pdf_processing():
+    """Internal helper for lazy PDF processing."""
     from modules.books.pdf_processing import export_pdf_page_range, get_pdf_page_count
 
     return export_pdf_page_range, get_pdf_page_count
 
 
 def _lazy_object_shelf():
+    """Internal helper for lazy object shelf."""
     from modules.objects.object_shelf_canvas_view import ObjectShelfView
 
     return ObjectShelfView
 
 
 def _profile_call(name, fn):
+    """Internal helper for profile call."""
     if getattr(fn, "_profile_wrapped", False):
         return fn
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
+        """Handle wrapper."""
         return fn(*args, **kwargs)
 
     wrapper._profile_wrapped = True
@@ -239,7 +261,9 @@ def _profile_call(name, fn):
 
 
 def _profile_module_functions(namespace, func_names, prefix):
+    """Internal helper for profile module functions."""
     for name in func_names:
+        # Process each name from func_names.
         fn = namespace.get(name)
         if not callable(fn):
             continue
@@ -247,7 +271,9 @@ def _profile_module_functions(namespace, func_names, prefix):
 
 
 def _profile_class_methods(cls, prefix):
+    """Internal helper for profile class methods."""
     for attr_name, attr_value in list(vars(cls).items()):
+        # Process each (attr_name, attr_value) from list(vars(cls).items()).
         if attr_name.startswith("__"):
             continue
         wrapped = None
@@ -263,6 +289,7 @@ def _profile_class_methods(cls, prefix):
 
 @log_function
 def sanitize_id(s):
+    """Handle sanitize ID."""
     return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
 
 @log_function
@@ -271,6 +298,7 @@ def unique_iid(tree, base_id):
     iid = base_id
     counter = 1
     while tree.exists(iid):
+        # Keep looping while tree.exists(iid).
         counter += 1
         iid = f"{base_id}_{counter}"
     return iid
@@ -281,6 +309,7 @@ def unique_iid_from_registry(base_id, registry):
     iid = base_id
     counter = 1
     while iid in registry:
+        # Keep looping while iid is in registry.
         counter += 1
         iid = f"{base_id}_{counter}"
     registry.add(iid)
@@ -289,6 +318,7 @@ def unique_iid_from_registry(base_id, registry):
 class _ToolTip:
     """Simple tooltip for a Treeview showing full cell text on hover."""
     def __init__(self, widget, text_resolver=None):
+        """Initialize the _ToolTip instance."""
         self.widget = widget
         self.tipwindow = None
         self.text = ""
@@ -297,6 +327,7 @@ class _ToolTip:
         widget.bind("<Leave>", self._on_leave)
 
     def _on_motion(self, event):
+        """Handle motion."""
         rowid = self.widget.identify_row(event.y)
         colid = self.widget.identify_column(event.x)
         if rowid and colid:
@@ -309,15 +340,18 @@ class _ToolTip:
         else:
             txt = ""
         if txt and txt != self.text:
+            # Handle the branch where txt is set and txt != text.
             self.text = txt
             self._show(event.x_root + 20, event.y_root + 10, txt)
         elif not txt:
             self._hide()
 
     def _on_leave(self, _):
+        """Handle leave."""
         self._hide()
 
     def _show(self, x, y, text):
+        """Show the operation."""
         self._hide()
         tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
@@ -334,6 +368,7 @@ class _ToolTip:
         self.tipwindow = tw
 
     def _hide(self):
+        """Hide the operation."""
         if self.tipwindow:
             self.tipwindow.destroy()
             self.tipwindow = None
@@ -341,6 +376,7 @@ class _ToolTip:
 
 class GenericListView(ctk.CTkFrame):
     def __init__(self, master, model_wrapper, template, *args, **kwargs):
+        """Initialize the GenericListView instance."""
         super().__init__(master, *args, **kwargs)
         self.model_wrapper = model_wrapper
         self.template = template
@@ -408,6 +444,7 @@ class GenericListView(ctk.CTkFrame):
         # measurements on every cell.
         self._longtext_columns = set()
         for field in self.template.get("fields", []):
+            # Process each field from template.get('fields', []).
             if not isinstance(field, dict):
                 continue
             name = field.get("name")
@@ -424,6 +461,7 @@ class GenericListView(ctk.CTkFrame):
             self._link_column = None
 
         if self.model_wrapper.entity_type == "books":
+            # Handle the branch where model_wrapper.entity_type == 'books'.
             lightweight_columns = [
                 "Title",
                 "Subject",
@@ -693,18 +731,23 @@ class GenericListView(ctk.CTkFrame):
         self._update_view_toggle_state()
     
     def _on_select_all(self, _event=None):
+        """Handle select all."""
         item_ids = self.tree.get_children()
         if item_ids:
             self.tree.selection_set(item_ids)
         return "break"
     def _hide_search_frame(self):
+        """Hide search frame."""
         if getattr(self, "search_frame", None) and self.search_frame.winfo_manager():
             self.search_frame.pack_forget()
 
     def _show_search_frame(self):
+        """Show search frame."""
         if getattr(self, "search_frame", None) and not self.search_frame.winfo_manager():
+            # Handle the branch where getattr(self, 'search_frame', None) and not search_frame.winfo_manager().
             kwargs = dict(self._search_frame_pack_kwargs)
             if hasattr(self, "tree_frame"):
+                # Handle the branch where hasattr(self, 'tree_frame').
                 try:
                     manager = self.tree_frame.winfo_manager()
                 except Exception:
@@ -727,6 +770,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_bulk_controls()
 
     def show_portrait_window(self, iid):
+        """Show portrait window."""
         log_info(f"Showing portrait for {self.model_wrapper.entity_type} item: {iid}", func_name="GenericListView.show_portrait_window")
         item, _ = self._find_item_by_iid(iid)
         if not item:
@@ -738,6 +782,7 @@ class GenericListView(ctk.CTkFrame):
         show_portrait(path, title)
 
     def refresh_list(self, *, skip_background_fetch=False):
+        """Refresh list."""
         log_info(f"Refreshing list for {self.model_wrapper.entity_type}", func_name="GenericListView.refresh_list")
         if not skip_background_fetch:
             self._initial_dataset_ready = False
@@ -784,6 +829,7 @@ class GenericListView(ctk.CTkFrame):
             self.tree.delete(*self.tree.get_children())
         # Seed the UI immediately with a small slice so something appears at once.
         if initial_slice:
+            # Continue with this path when initial slice is set.
             if not skip_background_fetch:
                 self.items.extend(initial_slice)
                 self.filtered_items.extend(initial_slice)
@@ -791,14 +837,17 @@ class GenericListView(ctk.CTkFrame):
             initial_payloads = self._build_payloads(initial_slice)
             self._start_tree_insertion(initial_payloads, reset_tree=True)
             for it in initial_slice:
+                # Process each it from initial_slice.
                 base_id = self._get_base_id(it)
                 if base_id:
                     self._seen_base_ids.add(base_id)
         if skip_background_fetch:
+            # Continue with this path when skip background fetch is set.
             self._load_session_id += 1
             self._load_queue = None
             remaining_items = self.filtered_items[len(initial_slice):]
             if remaining_items:
+                # Continue with this path when remaining items is set.
                 self._display_queue.extend(remaining_items)
                 self._submit_payload_job(remaining_items, reset_tree=False)
             elif not initial_slice:
@@ -833,10 +882,13 @@ class GenericListView(ctk.CTkFrame):
         self._update_load_more_state()
 
     def _configure_batch_settings(self, total_items):
+        """Internal helper for configure batch settings."""
         if total_items > 2500:
+            # Handle the branch where total_items > 2500.
             self.batch_size = 800
             self._batch_delay_ms = 10
         elif total_items > 1500:
+            # Handle the branch where total_items > 1500.
             self.batch_size = 650
             self._batch_delay_ms = 15
         elif total_items > 800:
@@ -849,6 +901,7 @@ class GenericListView(ctk.CTkFrame):
         self._payload_batch_size = self._calculate_payload_batch_size(total_items)
 
     def _reset_paging(self, total_items):
+        """Reset paging."""
         self._display_queue = []
         self._display_window_start = 0
         self._next_page_start = self._display_window_start
@@ -856,6 +909,7 @@ class GenericListView(ctk.CTkFrame):
         self._page_size = self._calculate_page_size(total_items)
 
     def _calculate_page_size(self, total_items):
+        """Internal helper for calculate page size."""
         if total_items > 3000:
             return 800
         if total_items > 1500:
@@ -865,6 +919,7 @@ class GenericListView(ctk.CTkFrame):
         return 250
 
     def _calculate_payload_batch_size(self, total_items):
+        """Internal helper for calculate payload batch size."""
         if total_items > 3000:
             return 1200
         if total_items > 1500:
@@ -874,6 +929,7 @@ class GenericListView(ctk.CTkFrame):
         return 500
 
     def _reset_tree_for_window(self):
+        """Reset tree for window."""
         self._base_to_iids = {}
         self._group_nodes = {}
         self._payload_iid_registry = set()
@@ -888,12 +944,14 @@ class GenericListView(ctk.CTkFrame):
         import sqlite3
 
         try:
+            # Keep background fetch items resilient if this step fails.
             conn = self.model_wrapper._get_connection()
             conn.row_factory = sqlite3.Row
             cur = conn.cursor()
             cur.execute(f"SELECT * FROM {self.model_wrapper.table}")
             batch = 40
             while True:
+                # Keep looping while True.
                 rows = cur.fetchmany(batch)
                 if not rows:
                     break
@@ -912,10 +970,12 @@ class GenericListView(ctk.CTkFrame):
                 pass
 
     def _drain_load_queue(self, session_id, query):
+        """Internal helper for drain load queue."""
         if session_id != self._load_session_id:
             return
         done = False
         try:
+            # Keep drain load queue resilient if this step fails.
             sid, payload = self._load_queue.get_nowait()
         except queue.Empty:
             pass
@@ -936,11 +996,13 @@ class GenericListView(ctk.CTkFrame):
             self.after(15, lambda: self._drain_load_queue(session_id, query))
 
     def _handle_loaded_items(self, items, query):
+        """Internal helper for handle loaded items."""
         # Merge into master list
         self.items.extend(items)
         # Apply in-flight filter if any
         if query:
             def iter_search_values(item):
+                """Handle iter search values."""
                 if self.model_wrapper.entity_type == "books":
                     for col in self.columns:
                         yield self._get_display_value(item, col)
@@ -959,6 +1021,7 @@ class GenericListView(ctk.CTkFrame):
 
         deduped = []
         for it in filtered:
+            # Process each it from filtered.
             base_id = self._get_base_id(it)
             if base_id and base_id in self._seen_base_ids:
                 continue
@@ -981,10 +1044,12 @@ class GenericListView(ctk.CTkFrame):
         self.update_entity_count()
 
     def _shift_window_forward(self):
+        """Internal helper for shift window forward."""
         # Windowing is no longer used; keep method for compatibility
         return
 
     def _queue_next_page(self, *, reset_tree=False):
+        """Internal helper for queue next page."""
         if not self.filtered_items:
             self._set_tree_loading(False)
             return
@@ -996,6 +1061,7 @@ class GenericListView(ctk.CTkFrame):
         self._submit_payload_job(new_items, reset_tree)
 
     def _slice_next_items(self):
+        """Internal helper for slice next items."""
         if self._next_page_start >= len(self.filtered_items):
             return []
         end = min(
@@ -1008,14 +1074,17 @@ class GenericListView(ctk.CTkFrame):
         return new_items
 
     def _submit_payload_job(self, items, reset_tree):
+        """Submit payload job."""
         iid_registry_snapshot = set(self._payload_iid_registry)
         group_nodes_snapshot = dict(self._group_nodes)
 
         def build_payload_batches():
+            """Build payload batches."""
             batches = []
             local_iid_registry = set(iid_registry_snapshot)
             local_group_nodes = dict(group_nodes_snapshot)
             for start in range(0, len(items), self._payload_batch_size):
+                # Process each start from range(0, len(items), _payload_batch_size).
                 subset = items[start : start + self._payload_batch_size]
                 payloads = self._build_payloads(
                     subset,
@@ -1027,11 +1096,13 @@ class GenericListView(ctk.CTkFrame):
             return batches, local_iid_registry, local_group_nodes
 
         def on_complete(future):
+            """Handle complete."""
             try:
                 batches, built_iids, built_groups = future.result()
             except Exception:
                 batches, built_iids, built_groups = [], iid_registry_snapshot, group_nodes_snapshot
             try:
+                # Keep on complete resilient if this step fails.
                 if not self.winfo_exists():
                     return
                 self.after(0, lambda: self._enqueue_payload_batches(batches, reset_tree, built_iids, built_groups))
@@ -1042,7 +1113,9 @@ class GenericListView(ctk.CTkFrame):
         future.add_done_callback(on_complete)
 
     def _enqueue_payload_batches(self, batches, reset_tree, built_iids=None, built_groups=None):
+        """Internal helper for enqueue payload batches."""
         try:
+            # Keep enqueue payload batches resilient if this step fails.
             if not self.winfo_exists():
                 return
         except Exception:
@@ -1058,6 +1131,7 @@ class GenericListView(ctk.CTkFrame):
             self._start_tree_insertion(batch, reset_tree if index == 0 else False)
 
     def _start_tree_insertion(self, payloads, reset_tree):
+        """Start tree insertion."""
         if not payloads:
             self._on_tree_load_complete()
             return
@@ -1076,11 +1150,13 @@ class GenericListView(ctk.CTkFrame):
             self._tree_loader.append(payloads)
 
     def _build_payloads(self, items, iid_registry=None, group_nodes=None):
+        """Build payloads."""
         payloads = []
         iid_registry = iid_registry if iid_registry is not None else self._payload_iid_registry
         group_nodes = group_nodes if group_nodes is not None else self._group_nodes
         if self.group_column:
             for item in items:
+                # Process each item from items.
                 group_val = self.clean_value(item.get(self.group_column, "")) or "Unknown"
                 group_id = group_nodes.get(group_val)
                 if not group_id:
@@ -1094,6 +1170,7 @@ class GenericListView(ctk.CTkFrame):
         return payloads
 
     def _build_row_payload(self, item, parent="", iid_registry=None):
+        """Build row payload."""
         raw = item.get(self.unique_field, "")
         if isinstance(raw, dict):
             raw = raw.get("text", "")
@@ -1120,7 +1197,9 @@ class GenericListView(ctk.CTkFrame):
         }
 
     def _insert_tree_payload(self, payload):
+        """Internal helper for insert tree payload."""
         if payload.get("type") == "group":
+            # Handle the branch where payload.get('type') == 'group'.
             if self.tree.exists(payload["iid"]):
                 return
             self.tree.insert("", "end", iid=payload["iid"], text=payload.get("label", ""), open=True)
@@ -1154,6 +1233,7 @@ class GenericListView(ctk.CTkFrame):
             self.tree.selection_add(iid)
 
     def _on_tree_load_complete(self):
+        """Handle tree load complete."""
         self._tree_loading = False
         self._set_tree_loading(False)
         self._update_tree_selection_tags()
@@ -1164,6 +1244,7 @@ class GenericListView(ctk.CTkFrame):
             self._load_next_page(auto=True)
 
     def update_entity_count(self):
+        """Update entity count."""
         total = len(self.filtered_items)
         overall = len(self.items)
         visible = min(len(self._display_queue), total)
@@ -1175,6 +1256,7 @@ class GenericListView(ctk.CTkFrame):
         if getattr(self, "count_label", None) is None:
             return
         try:
+            # Keep entity count resilient if this step fails.
             if self.count_label.winfo_exists():
                 self.count_label.configure(text=text)
         except tk.TclError:
@@ -1184,6 +1266,7 @@ class GenericListView(ctk.CTkFrame):
             self.shelf_view.update_summary()
 
     def _set_tree_loading(self, loading):
+        """Set tree loading."""
         self._tree_loading = loading
         log_info(
             f"Tree loading set to {loading}",
@@ -1198,28 +1281,35 @@ class GenericListView(ctk.CTkFrame):
             self._suppress_tree_select_event = False
 
     def _can_load_more(self):
+        """Return whether load more."""
         return False
 
     def _update_load_more_state(self):
+        """Update load more state."""
         state = tk.DISABLED
         if getattr(self, "load_more_button", None) and self.load_more_button.winfo_exists():
             self.load_more_button.configure(state=state)
 
     def _load_next_page(self, auto=False):
+        """Load next page."""
         self._pending_scroll_load = False
 
     def _on_tree_yview(self, first, last):
+        """Handle tree yview."""
         if getattr(self, "_vertical_scrollbar", None):
             self._vertical_scrollbar.set(first, last)
         # No-op for infinite scrolling; everything is loaded eagerly.
 
     def _maybe_trigger_scroll_load(self, last):
+        """Internal helper for maybe trigger scroll load."""
         return
 
     def _trigger_scroll_load(self):
+        """Internal helper for trigger scroll load."""
         return
 
     def _create_view_toggle_button(self, mode, label):
+        """Create view toggle button."""
         if getattr(self, "view_toggle_frame", None) is None:
             return
         button = ctk.CTkButton(
@@ -1237,6 +1327,7 @@ class GenericListView(ctk.CTkFrame):
         self.view_toggle_buttons[mode] = button
 
     def _set_view_mode(self, mode):
+        """Set view mode."""
         if mode == self.view_mode:
             return
         if mode == "grid":
@@ -1247,7 +1338,9 @@ class GenericListView(ctk.CTkFrame):
             self.show_list_view()
 
     def _update_view_toggle_state(self):
+        """Update view toggle state."""
         for mode, button in self.view_toggle_buttons.items():
+            # Process each (mode, button) from view_toggle_buttons.items().
             if not button or not button.winfo_exists():
                 continue
             if mode == self.view_mode:
@@ -1256,6 +1349,7 @@ class GenericListView(ctk.CTkFrame):
                 button.configure(state=tk.NORMAL, fg_color="#2F2F2F")
 
     def show_grid_view(self):
+        """Show grid view."""
         if self.view_mode == "grid" and self.grid_frame.winfo_manager():
             return
         self.view_mode = "grid"
@@ -1272,6 +1366,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_view_toggle_state()
 
     def show_list_view(self):
+        """Show list view."""
         if self.view_mode == "list" and self.tree_frame.winfo_manager():
             return
         self.view_mode = "list"
@@ -1287,6 +1382,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_view_toggle_state()
 
     def show_shelf_view(self):
+        """Show shelf view."""
         if not self.shelf_view or not self.shelf_view.is_available():
             return
         if self.view_mode == "shelf" and self.shelf_view.is_visible():
@@ -1304,6 +1400,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_view_toggle_state()
 
     def _cancel_grid_render(self):
+        """Internal helper for cancel grid render."""
         if self._grid_render_job:
             try:
                 self.after_cancel(self._grid_render_job)
@@ -1312,6 +1409,7 @@ class GenericListView(ctk.CTkFrame):
         self._grid_render_job = None
 
     def _show_grid_loading_indicator(self, row, columns):
+        """Show grid loading indicator."""
         if self._grid_loading_frame is None or not self._grid_loading_frame.winfo_exists():
             self._grid_loading_frame = ctk.CTkFrame(self.grid_container, fg_color="#2B2B2B")
             self._grid_loading_bar = ctk.CTkProgressBar(
@@ -1335,6 +1433,7 @@ class GenericListView(ctk.CTkFrame):
         )
 
     def _hide_grid_loading_indicator(self):
+        """Hide grid loading indicator."""
         if self._grid_loading_bar and self._grid_loading_bar.winfo_exists():
             try:
                 self._grid_loading_bar.stop()
@@ -1346,6 +1445,7 @@ class GenericListView(ctk.CTkFrame):
         self._grid_loading_bar = None
 
     def _calculate_grid_batch_size(self, total):
+        """Internal helper for calculate grid batch size."""
         if total > 800:
             return 90
         if total > 500:
@@ -1357,6 +1457,7 @@ class GenericListView(ctk.CTkFrame):
         return total or 1
 
     def _create_grid_card(self, item, row, col):
+        """Create grid card."""
         card = ctk.CTkFrame(
             self.grid_container,
             corner_radius=8,
@@ -1373,6 +1474,7 @@ class GenericListView(ctk.CTkFrame):
         name_label.grid(row=1, column=0, padx=10, pady=(0, 10))
 
         def bind_open(widget):
+            """Bind open."""
             widget.bind(
                 "<Double-Button-1>",
                 lambda e, it=item: self.open_book(it)
@@ -1385,14 +1487,17 @@ class GenericListView(ctk.CTkFrame):
         bind_open(name_label)
 
         def bind_select(widget):
+            """Bind select."""
             widget.bind("<Button-1>", lambda e, it=item: self.on_grid_click(e, it))
 
         bind_select(image_label)
         bind_select(card)
         bind_select(name_label)
         if self.model_wrapper.entity_type == "books":
+            # Handle the branch where model_wrapper.entity_type == 'books'.
             summary = self._summarize_book_excerpts(item)
             if summary:
+                # Continue with this path when summary is set.
                 summary_label = ctk.CTkLabel(
                     card,
                     text=summary,
@@ -1425,6 +1530,7 @@ class GenericListView(ctk.CTkFrame):
         return card
 
     def _render_grid_batch(self):
+        """Render grid batch."""
         if not hasattr(self, "grid_container"):
             return
         total = len(self.filtered_items)
@@ -1452,6 +1558,7 @@ class GenericListView(ctk.CTkFrame):
             self._hide_grid_loading_indicator()
 
     def populate_grid(self):
+        """Handle populate grid."""
         if not hasattr(self, "grid_container"):
             return
         self._cancel_grid_render()
@@ -1479,9 +1586,11 @@ class GenericListView(ctk.CTkFrame):
         self._render_grid_batch()
 
     def on_grid_click(self, _event, item):
+        """Handle grid click."""
         self.toggle_item_selection(item)
 
     def toggle_item_selection(self, item):
+        """Toggle item selection."""
         base_id = self._get_base_id(item)
         if not base_id:
             return
@@ -1496,20 +1605,24 @@ class GenericListView(ctk.CTkFrame):
             self.shelf_view.refresh_selection()
 
     def _detect_media_field(self):
+        """Internal helper for detect media field."""
         fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
         # Prefer explicit image type first.
         for field in fields:
+            # Process each field from fields.
             try:
                 field_type = str(field.get("type", "")).strip().lower()
             except AttributeError:
                 continue
             if field_type == "image":
+                # Handle the branch where field_type == 'image'.
                 name = field.get("name")
                 if isinstance(name, str) and name.strip():
                     return name.strip()
         # Build lookup of normalized names so we can match Portrait/Image variants.
         normalized = {}
         for field in fields:
+            # Process each field from fields.
             name = field.get("name") if isinstance(field, dict) else None
             if not isinstance(name, str):
                 continue
@@ -1527,6 +1640,7 @@ class GenericListView(ctk.CTkFrame):
         return None
 
     def _resolve_media_path(self, media_path):
+        """Resolve media path."""
         if not media_path:
             return None
         primary_path = primary_portrait(media_path)
@@ -1535,6 +1649,7 @@ class GenericListView(ctk.CTkFrame):
         return resolve_portrait_candidate(primary_path, ConfigHelper.get_campaign_dir())
 
     def _load_grid_image(self, item):
+        """Load grid image."""
         media_value = ""
         if self.media_field:
             media_value = item.get(self.media_field, "")
@@ -1547,6 +1662,7 @@ class GenericListView(ctk.CTkFrame):
         image_obj = None
         if resolved:
             try:
+                # Keep grid image resilient if this step fails.
                 with Image.open(resolved) as img:
                     image_obj = img.copy()
                 image_obj.thumbnail((160, 160), RESAMPLE_MODE)
@@ -1560,6 +1676,7 @@ class GenericListView(ctk.CTkFrame):
         return ctk_image
 
     def _edit_item(self, item):
+        """Internal helper for edit item."""
         key_field = self.unique_field or self.model_wrapper._infer_key_field()
         original_key_value = item.get(key_field)
         editor_cls = _lazy_editor_window()
@@ -1587,6 +1704,7 @@ class GenericListView(ctk.CTkFrame):
             self.refresh_list()
 
     def _edit_selected_item(self):
+        """Internal helper for edit selected item."""
         selection = self.tree.selection()
         iid = selection[0] if selection else self.tree.focus()
         if not iid:
@@ -1596,12 +1714,14 @@ class GenericListView(ctk.CTkFrame):
             self._edit_item(item)
 
     def on_button_press(self, event):
+        """Handle button press."""
         region = self.tree.identify("region", event.x, event.y)
         log_info(
             f"ButtonPress region={region} row={self.tree.identify_row(event.y)} col={self.tree.identify_column(event.x)} loading={self._tree_loading}",
             func_name="GenericListView.on_button_press",
         )
         if region == "heading":
+            # Handle the branch where region == 'heading'.
             col = self.tree.identify_column(event.x)
             if col != "#0":
                 self.dragging_column = col
@@ -1612,13 +1732,16 @@ class GenericListView(ctk.CTkFrame):
             self.on_tree_click(event)
 
     def on_mouse_move(self, event):
+        """Handle mouse move."""
         if self.dragging_column:
             return
         # Activate row drag only after cursor moved enough to count as a drag.
         if not self.dragging_iid and self._drag_start_row and self._drag_start_xy:
+            # Continue with this path when dragging iid is unavailable and drag start row is set and drag start xy is set.
             dx = abs(event.x - self._drag_start_xy[0])
             dy = abs(event.y - self._drag_start_xy[1])
             if max(dx, dy) >= self._drag_threshold:
+                # Handle the branch where max(dx, dy) >= _drag_threshold.
                 self.dragging_iid = self._drag_start_row
                 try:
                     self.start_index = self.tree.index(self.dragging_iid)
@@ -1628,12 +1751,16 @@ class GenericListView(ctk.CTkFrame):
             self.on_tree_drag(event)
 
     def on_button_release(self, event):
+        """Handle button release."""
         if self.dragging_column:
+            # Continue with this path when dragging column is set.
             target = self.tree.identify_column(event.x)
             if target != self.dragging_column:
+                # Handle the branch where target != dragging_column.
                 drag_name = self._column_from_ident(self.dragging_column)
                 target_name = self._column_from_ident(target)
                 if drag_name and drag_name in self.column_order:
+                    # Handle the branch where drag name is set and drag name is in column order.
                     cols = [c for c in self.column_order if c != drag_name]
                     if target_name in cols:
                         idx = cols.index(target_name)
@@ -1650,6 +1777,7 @@ class GenericListView(ctk.CTkFrame):
         self._save_column_settings()
 
     def on_tree_click(self, event):
+        """Handle tree click."""
         column = self._normalize_column_id(self.tree.identify_column(event.x))
         row = self.tree.identify_row(event.y)
         log_info(
@@ -1659,10 +1787,12 @@ class GenericListView(ctk.CTkFrame):
         # Track pointer row for double-click targeting independent of selection
         self._last_pointer_row = row
         if self._link_column and column == self._link_column and row:
+            # Continue with this path when link column is set and column == _link_column and row is set.
             self.tree.selection_set(row)
             self.tree.focus(row)
             self._link_toggle_in_progress = True
             try:
+                # Keep on tree click resilient if this step fails.
                 self._toggle_linked_rows(row)
             finally:
                 self._link_toggle_in_progress = False
@@ -1681,9 +1811,11 @@ class GenericListView(ctk.CTkFrame):
         self._drag_start_xy = (event.x, event.y)
 
     def on_tree_drag(self, event):
+        """Handle tree drag."""
         pass
 
     def on_tree_drop(self, event):
+        """Handle tree drop."""
         if not self.dragging_iid:
             return
         if self.group_column or self.filtered_items != self.items:
@@ -1698,11 +1830,13 @@ class GenericListView(ctk.CTkFrame):
             return
         target_iid = self.tree.identify_row(event.y)
         if not target_iid:
+            # Handle the branch where target iid is unavailable.
             target_index = len(self.tree.get_children()) - 1
         else:
             # Normalize target to its root ancestor to keep moves within top level
             parent = self.tree.parent(target_iid)
             while parent != "":
+                # Keep looping while parent != ''.
                 target_iid = parent
                 parent = self.tree.parent(target_iid)
             target_index = self.tree.index(target_iid)
@@ -1726,16 +1860,19 @@ class GenericListView(ctk.CTkFrame):
         self.start_index = None
 
     def _reset_drag_state(self):
+        """Reset drag state."""
         self.dragging_iid = None
         self._drag_start_row = None
         self._drag_start_xy = None
         self.start_index = None
 
     def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
+        """Load portrait menu image."""
         resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
         if not resolved:
             return None
         try:
+            # Keep portrait menu image resilient if this step fails.
             img = Image.open(resolved)
             img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
             photo = ImageTk.PhotoImage(img)
@@ -1763,6 +1900,7 @@ class GenericListView(ctk.CTkFrame):
 
         copied = []
         for selected_iid in selection:
+            # Process each selected_iid from selection.
             item, _ = self._find_item_by_iid(selected_iid)
             if item:
                 copied.append(copy.deepcopy(item))
@@ -1770,6 +1908,7 @@ class GenericListView(ctk.CTkFrame):
         self.copied_items = copied
 
     def paste_item(self, iid=None):
+        """Handle paste item."""
         if not self.copied_items:
             return
         existing = {
@@ -1795,6 +1934,7 @@ class GenericListView(ctk.CTkFrame):
 
         insert_index = index
         for original in self.copied_items:
+            # Process each original from copied_items.
             new_item = copy.deepcopy(original)
             base_value = new_item.get(self.unique_field, "")
             if isinstance(base_value, dict):
@@ -1805,6 +1945,7 @@ class GenericListView(ctk.CTkFrame):
             new_name = base_name
             counter = 1
             while sanitize_id(new_name).lower() in existing:
+                # Keep looping while sanitize_id(new_name).lower() is in existing.
                 counter += 1
                 new_name = f"{base_name} {counter}"
             new_item[self.unique_field] = new_name
@@ -1817,15 +1958,18 @@ class GenericListView(ctk.CTkFrame):
         self.filter_items(self.search_var.get())
 
     def insert_next_batch(self):
+        """Handle insert next batch."""
         self._load_next_page(auto=True)
 
     def insert_grouped_items(self):
+        """Handle insert grouped items."""
         grouped = {}
         for item in self.filtered_items:
             key = self.clean_value(item.get(self.group_column, "")) or "Unknown"
             grouped.setdefault(key, []).append(item)
 
         for group_val in sorted(grouped.keys()):
+            # Process each group_val from sorted(grouped.keys()).
             base_group_id = sanitize_id(f"group_{group_val}")
             group_id = unique_iid(self.tree, base_group_id)
             self.tree.insert(
@@ -1837,6 +1981,7 @@ class GenericListView(ctk.CTkFrame):
                 open=False,
             )
             for item in grouped[group_val]:
+                # Process each item from grouped[group_val].
                 raw = item.get(self.unique_field, "")
                 if isinstance(raw, dict):
                     raw = raw.get("text", "")
@@ -1850,6 +1995,7 @@ class GenericListView(ctk.CTkFrame):
                     self._format_cell(c, self._get_display_value(item, c), iid) for c in self.columns
                 )
                 try:
+                    # Keep insert grouped items resilient if this step fails.
                     self.tree.insert(group_id, "end", iid=iid, text=name_text, values=tuple(vals))
                     color = self.row_colors.get(base_iid)
                     if color:
@@ -1862,6 +2008,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_tree_selection_tags()
 
     def _collect_linked_entities(self, item):
+        """Collect linked entities."""
         result = OrderedDict()
         fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
         if not isinstance(fields, list):
@@ -1872,6 +2019,7 @@ class GenericListView(ctk.CTkFrame):
         normalized_labels = {label.lower(): slug for label, slug in label_to_slug.items()}
 
         for field in fields:
+            # Process each field from fields.
             if not isinstance(field, dict):
                 continue
             field_type = str(field.get("type", "")).strip().lower()
@@ -1889,14 +2037,17 @@ class GenericListView(ctk.CTkFrame):
 
             slug = None
             if linked_label:
+                # Continue with this path when linked label is set.
                 candidate = linked_label.lower()
                 if candidate in entity_labels:
+                    # Handle the branch where candidate is in entity labels.
                     slug = candidate
                 else:
                     slug = label_to_slug.get(linked_label) or normalized_labels.get(candidate)
                     if not slug:
                         slug = resolve_entity_slug(candidate) or candidate
             elif field_label:
+                # Continue with this path when field label is set.
                 slug = label_to_slug.get(field_label) or normalized_labels.get(field_label.lower())
                 if not slug and field_label:
                     slug = field_label.replace(" ", "_").lower()
@@ -1911,8 +2062,10 @@ class GenericListView(ctk.CTkFrame):
             if isinstance(raw_values, (list, tuple)):
                 values = list(raw_values)
             elif isinstance(raw_values, str):
+                # Handle the branch where isinstance(raw_values, str).
                 stripped = raw_values.strip()
                 if stripped:
+                    # Continue with this path when stripped is set.
                     parsed = None
                     if stripped.startswith(("[", "{", '"')):
                         try:
@@ -1944,6 +2097,7 @@ class GenericListView(ctk.CTkFrame):
             initial_len = len(collected)
             seen = set()
             for existing in collected:
+                # Process each existing from collected.
                 if isinstance(existing, dict):
                     key_value = existing.get("display") or ""
                 else:
@@ -1953,6 +2107,7 @@ class GenericListView(ctk.CTkFrame):
                 if key_value:
                     seen.add(key_value.casefold())
             for entry in values:
+                # Process each entry from values.
                 display_name = self.clean_value(entry)
                 if not display_name:
                     continue
@@ -1962,6 +2117,7 @@ class GenericListView(ctk.CTkFrame):
 
                 lookup_candidates = []
                 if isinstance(entry, dict):
+                    # Handle the branch where isinstance(entry, dict).
                     for key in (
                         "Name",
                         "name",
@@ -1974,6 +2130,7 @@ class GenericListView(ctk.CTkFrame):
                         "value",
                         "Value",
                     ):
+                        # Process each key while updating linked entities.
                         value = entry.get(key)
                         if value:
                             lookup_candidates.append(value)
@@ -1989,6 +2146,7 @@ class GenericListView(ctk.CTkFrame):
                 lookup_values = []
                 lookup_seen = set()
                 for candidate in lookup_candidates:
+                    # Process each candidate from lookup_candidates.
                     cleaned = self.clean_value(candidate)
                     if not cleaned:
                         continue
@@ -2010,6 +2168,7 @@ class GenericListView(ctk.CTkFrame):
         return result
 
     def _display_label_for_slug(self, slug):
+        """Internal helper for display label for slug."""
         if not slug:
             return ""
         entity_labels = _dynamic_entity_labels()
@@ -2022,16 +2181,19 @@ class GenericListView(ctk.CTkFrame):
         return str(slug).replace("_", " ").title()
 
     def _blank_row_values(self):
+        """Internal helper for blank row values."""
         values = tuple("" for _ in self.columns)
         if self._link_column:
             return ("",) + values
         return values
 
     def _template_supports_linking(self):
+        """Internal helper for template supports linking."""
         fields = self.template.get("fields", []) if isinstance(self.template, dict) else []
         if not isinstance(fields, list):
             return False
         for field in fields:
+            # Process each field from fields.
             if not isinstance(field, dict):
                 continue
             field_type = str(field.get("type", "")).strip().lower()
@@ -2043,12 +2205,14 @@ class GenericListView(ctk.CTkFrame):
         return False
 
     def _has_linkable_content(self, item):
+        """Return whether linkable content."""
         if not isinstance(self.template, dict):
             return False
         fields = self.template.get("fields", [])
         if not isinstance(fields, list):
             return False
         for field in fields:
+            # Process each field from fields.
             if not isinstance(field, dict):
                 continue
             field_type = str(field.get("type", "")).strip().lower()
@@ -2071,6 +2235,7 @@ class GenericListView(ctk.CTkFrame):
         return False
 
     def _register_link_source(self, iid, item):
+        """Register link source."""
         marker = ""
         if not self._link_column:
             return marker
@@ -2086,6 +2251,7 @@ class GenericListView(ctk.CTkFrame):
         return marker
 
     def _ensure_linked_groups(self, parent_iid):
+        """Ensure linked groups."""
         if parent_iid in self._linked_rows:
             return self._linked_rows[parent_iid]
         item = self._linked_row_sources.get(parent_iid)
@@ -2093,6 +2259,7 @@ class GenericListView(ctk.CTkFrame):
             return None
         groups = self._collect_linked_entities(item)
         if groups:
+            # Continue with this path when groups is set.
             self._linked_rows[parent_iid] = groups
             if self._link_column and self.tree.exists(parent_iid):
                 self.tree.set(parent_iid, self._link_column, "-")
@@ -2103,6 +2270,7 @@ class GenericListView(ctk.CTkFrame):
         return groups
 
     def _toggle_linked_rows(self, parent_iid):
+        """Toggle linked rows."""
         groups = self._ensure_linked_groups(parent_iid)
         if not groups:
             return
@@ -2112,10 +2280,12 @@ class GenericListView(ctk.CTkFrame):
             self._expand_linked_rows(parent_iid, groups)
 
     def _expand_linked_rows(self, parent_iid, groups, *, auto=False):
+        """Internal helper for expand linked rows."""
         headers = []
         name_nodes = []
         self.tree.item(parent_iid, open=True)
         for slug, names in groups.items():
+            # Process each (slug, names) from groups.items().
             if not names:
                 continue
             header_base = sanitize_id(f"{parent_iid}_{slug}_group") or f"{parent_iid}_{slug}_group"
@@ -2125,6 +2295,7 @@ class GenericListView(ctk.CTkFrame):
             self.tree.item(header_iid, open=True)
             headers.append(header_iid)
             for entry in names:
+                # Process each entry from names.
                 if isinstance(entry, dict):
                     display_name = (
                         entry.get("display")
@@ -2154,6 +2325,7 @@ class GenericListView(ctk.CTkFrame):
                     values=self._blank_row_values(),
                 )
                 if isinstance(entry, dict):
+                    # Handle the branch where isinstance(entry, dict).
                     lookup_payload = dict(entry)
                     lookup_payload.setdefault("display", display_name)
                     if not lookup_payload.get("lookups"):
@@ -2174,6 +2346,7 @@ class GenericListView(ctk.CTkFrame):
             self._auto_expanded_rows.discard(parent_iid)
 
     def _collapse_linked_rows(self, parent_iid):
+        """Collapse linked rows."""
         info = self._link_children.pop(parent_iid, None)
         if not info:
             return
@@ -2190,6 +2363,7 @@ class GenericListView(ctk.CTkFrame):
         self._linked_rows.pop(parent_iid, None)
 
     def _open_link_target(self, iid):
+        """Open link target."""
         target = self._link_targets.get(iid)
         if not target:
             return
@@ -2197,6 +2371,7 @@ class GenericListView(ctk.CTkFrame):
         display_name = ""
         lookup_values = []
         if isinstance(payload, dict):
+            # Handle the branch where isinstance(payload, dict).
             display_name = (
                 payload.get("display")
                 or payload.get("name")
@@ -2230,6 +2405,7 @@ class GenericListView(ctk.CTkFrame):
 
         if not display_name:
             for candidate in lookup_values:
+                # Process each candidate from lookup_values.
                 candidate_str = self.clean_value(candidate)
                 if candidate_str:
                     display_name = candidate_str
@@ -2237,6 +2413,7 @@ class GenericListView(ctk.CTkFrame):
 
         normalized_lookups = set()
         for candidate in lookup_values:
+            # Process each candidate from lookup_values.
             candidate_str = self.clean_value(candidate)
             if not candidate_str:
                 continue
@@ -2246,6 +2423,7 @@ class GenericListView(ctk.CTkFrame):
             normalized_lookups.add(normalized)
 
         if not normalized_lookups and display_name:
+            # Continue with this path when normalized lookups is unavailable and display name is set.
             display_candidate = self.clean_value(display_name)
             if display_candidate:
                 normalized_lookups.add(display_candidate.casefold())
@@ -2273,9 +2451,11 @@ class GenericListView(ctk.CTkFrame):
         key_field = "Title" if slug in {"scenarios", "books"} else "Name"
         target_item = None
         for record in items:
+            # Process each record from items.
             raw_value = record.get(key_field, "")
             candidates = []
             if isinstance(raw_value, dict):
+                # Handle the branch where isinstance(raw_value, dict).
                 for key in (
                     "Name",
                     "name",
@@ -2305,6 +2485,7 @@ class GenericListView(ctk.CTkFrame):
                 candidates.append(cleaned_candidate)
 
             for candidate in candidates:
+                # Process each candidate from candidates.
                 candidate_str = self.clean_value(candidate)
                 if not candidate_str:
                     continue
@@ -2333,12 +2514,14 @@ class GenericListView(ctk.CTkFrame):
         self.master.wait_window(editor)
 
         if getattr(editor, "saved", False):
+            # Handle the branch where getattr(editor, 'saved', False).
             try:
                 wrapper.save_items(items)
             except Exception as exc:
                 messagebox.showerror("Open Linked Entity", f"Failed to save changes: {exc}")
                 return
             if slug == self.model_wrapper.entity_type:
+                # Handle the branch where slug == model_wrapper.entity_type.
                 current_query = self.search_var.get() if hasattr(self, "search_var") else ""
                 try:
                     self.search_var.set(current_query)
@@ -2347,15 +2530,18 @@ class GenericListView(ctk.CTkFrame):
                 self.reload_from_db()
 
     def clean_value(self, val):
+        """Handle clean value."""
         if val is None:
             return ""
         if isinstance(val, dict):
+            # Handle the branch where isinstance(val, dict).
             if "text" in val:
                 return self.clean_value(val.get("text", ""))
             if "Label" in val or "label" in val:
                 label = val.get("Label", val.get("label", ""))
                 return str(label).strip()
             if "Path" in val or "path" in val:
+                # Handle the branch where 'Path' is in val or 'path' is in val.
                 start = val.get("StartPage") or val.get("start_page")
                 end = val.get("EndPage") or val.get("end_page")
                 if isinstance(val.get("page_range"), (list, tuple)) and len(val["page_range"]) >= 2:
@@ -2373,7 +2559,9 @@ class GenericListView(ctk.CTkFrame):
         return str(val).replace("{", "").replace("}", "").strip()
 
     def _get_display_value(self, item, column):
+        """Return display value."""
         if self.model_wrapper.entity_type == "books":
+            # Handle the branch where model_wrapper.entity_type == 'books'.
             if column == "Excerpts":
                 return self._summarize_book_excerpts(item)
             if column in {"ExtractedText", "ExtractedPages"}:
@@ -2382,11 +2570,14 @@ class GenericListView(ctk.CTkFrame):
         return item.get(column, "")
 
     def _summarize_book_excerpts(self, item):
+        """Internal helper for summarize book excerpts."""
         excerpts = list(self._iter_book_excerpts(item))
         labels = []
         for excerpt in excerpts:
+            # Process each excerpt from excerpts.
             label = excerpt.get("Label")
             if not label:
+                # Handle the branch where label is unavailable.
                 start = excerpt.get("StartPage")
                 end = excerpt.get("EndPage")
                 if start and end and start != end:
@@ -2400,10 +2591,12 @@ class GenericListView(ctk.CTkFrame):
         return ", ".join(labels)
 
     def _iter_book_excerpts(self, item):
+        """Internal helper for iter book excerpts."""
         pages = item.get("ExtractedPages") if isinstance(item, dict) else None
         if not isinstance(pages, list):
             return
         for entry in pages:
+            # Process each entry from pages.
             if not isinstance(entry, dict):
                 continue
             path = entry.get("Path") or entry.get("path")
@@ -2424,6 +2617,7 @@ class GenericListView(ctk.CTkFrame):
             }
 
     def _build_excerpt_entry(self, metadata):
+        """Build excerpt entry."""
         page_range = metadata.get("page_range") if isinstance(metadata, dict) else None
         start = end = None
         if isinstance(page_range, (list, tuple)) and len(page_range) >= 2:
@@ -2454,6 +2648,7 @@ class GenericListView(ctk.CTkFrame):
         }
 
     def _parse_page_range_input(self, text, total_pages):
+        """Parse page range input."""
         cleaned = text.strip()
         match = re.fullmatch(r"(\d+)(...:\s*-\s*(\d+))...", cleaned)
         if not match:
@@ -2469,6 +2664,7 @@ class GenericListView(ctk.CTkFrame):
         return start, end
 
     def _resolve_book_path(self, relative_path):
+        """Resolve book path."""
         if not relative_path:
             return ""
         if os.path.isabs(relative_path):
@@ -2476,6 +2672,7 @@ class GenericListView(ctk.CTkFrame):
         return os.path.join(ConfigHelper.get_campaign_dir(), relative_path)
 
     def _open_book_excerpt(self, excerpt):
+        """Open book excerpt."""
         path = excerpt.get("Path") if isinstance(excerpt, dict) else None
         if not path:
             messagebox.showwarning("Open Excerpt", "This excerpt does not have an associated file.")
@@ -2488,6 +2685,7 @@ class GenericListView(ctk.CTkFrame):
             )
             return
         try:
+            # Keep book excerpt resilient if this step fails.
             if sys.platform.startswith("win"):
                 os.startfile(resolved)  # type: ignore[attr-defined]
             elif sys.platform == "darwin":
@@ -2506,6 +2704,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showerror("Open Excerpt", f"Failed to open the file:\n{exc}")
 
     def _show_book_excerpts_menu(self, item, widget=None):
+        """Show book excerpts menu."""
         excerpts = list(self._iter_book_excerpts(item))
         if not excerpts:
             messagebox.showinfo("Book Excerpts", "No excerpts available for this book.")
@@ -2522,11 +2721,13 @@ class GenericListView(ctk.CTkFrame):
             x = self.winfo_pointerx()
             y = self.winfo_pointery()
         try:
+            # Keep book excerpts menu resilient if this step fails.
             menu.tk_popup(x, y)
         finally:
             menu.grab_release()
 
     def open_book(self, item):
+        """Open book."""
         if not item:
             return
         open_book_viewer = _lazy_book_viewer()
@@ -2534,6 +2735,7 @@ class GenericListView(ctk.CTkFrame):
         open_book_viewer(top, item)
 
     def extract_book_pages(self, item):
+        """Extract book pages."""
         if not item:
             return
         attachment = item.get("Attachment", "")
@@ -2543,6 +2745,7 @@ class GenericListView(ctk.CTkFrame):
         campaign_dir = ConfigHelper.get_campaign_dir()
         export_pdf_page_range, get_pdf_page_count = _lazy_pdf_processing()
         try:
+            # Keep book pages resilient if this step fails.
             total_pages = get_pdf_page_count(attachment, campaign_dir=campaign_dir)
         except Exception as exc:
             log_warning(
@@ -2566,6 +2769,7 @@ class GenericListView(ctk.CTkFrame):
             return
 
         try:
+            # Keep book pages resilient if this step fails.
             metadata = export_pdf_page_range(
                 attachment,
                 start_page,
@@ -2593,6 +2797,7 @@ class GenericListView(ctk.CTkFrame):
             func_name="GenericListView.extract_book_pages",
         )
         try:
+            # Keep book pages resilient if this step fails.
             self.model_wrapper.save_items(self.items)
         except Exception as exc:
             log_warning(
@@ -2607,6 +2812,7 @@ class GenericListView(ctk.CTkFrame):
 
 
     def _normalize_unique_value(self, value):
+        """Normalize unique value."""
         if value is None:
             return ""
         if isinstance(value, dict):
@@ -2616,6 +2822,7 @@ class GenericListView(ctk.CTkFrame):
         return str(value).strip().lower()
 
     def _merge_duplicate_group(self, group):
+        """Merge duplicate group."""
         base = copy.deepcopy(group[0])
         for item in group[1:]:
             for field, value in item.items():
@@ -2624,12 +2831,14 @@ class GenericListView(ctk.CTkFrame):
         return base
 
     def _merge_field_value(self, existing, new):
+        """Merge field value."""
         if self._is_empty_value(existing):
             return copy.deepcopy(new)
         if self._is_empty_value(new):
             return existing
 
         if isinstance(existing, dict) and isinstance(new, dict):
+            # Handle the branch where isinstance(existing, dict) and isinstance(new, dict).
             merged = copy.deepcopy(existing)
             for key, value in new.items():
                 if key in merged:
@@ -2639,6 +2848,7 @@ class GenericListView(ctk.CTkFrame):
             return merged
 
         if isinstance(existing, list) and isinstance(new, list):
+            # Handle the branch where isinstance(existing, list) and isinstance(new, list).
             merged_list = list(existing)
             for item in new:
                 if item not in merged_list:
@@ -2649,6 +2859,7 @@ class GenericListView(ctk.CTkFrame):
             return existing | new
 
         if isinstance(existing, tuple) and isinstance(new, tuple):
+            # Handle the branch where isinstance(existing, tuple) and isinstance(new, tuple).
             merged_items = list(existing)
             for item in new:
                 if item not in merged_items:
@@ -2656,11 +2867,13 @@ class GenericListView(ctk.CTkFrame):
             return tuple(merged_items)
 
         if isinstance(existing, (int, float)) and isinstance(new, (int, float)):
+            # Handle the branch where isinstance(existing, (int, float)) and isinstance(new, (int, float)).
             if existing == 0 and new != 0:
                 return new
             return existing
 
         if isinstance(existing, str) and isinstance(new, str):
+            # Handle the branch where isinstance(existing, str) and isinstance(new, str).
             existing_clean = existing.strip()
             new_clean = new.strip()
             if not existing_clean:
@@ -2680,6 +2893,7 @@ class GenericListView(ctk.CTkFrame):
         return existing
 
     def _is_empty_value(self, value):
+        """Return whether empty value."""
         if value is None:
             return True
         if isinstance(value, str):
@@ -2693,6 +2907,7 @@ class GenericListView(ctk.CTkFrame):
         if column_id == "#0":
             return column_id
         if column_id and column_id.startswith("#"):
+            # Handle the branch where column ID is set and column_id.startswith('#').
             try:
                 index = int(column_id[1:]) - 1
             except ValueError:
@@ -2703,6 +2918,7 @@ class GenericListView(ctk.CTkFrame):
         return column_id
 
     def _get_cell_text(self, iid, column_id):
+        """Return cell text."""
         column_key = self._normalize_column_id(column_id)
         if (iid, column_key) in self._cell_texts:
             return self._cell_texts[(iid, column_key)]
@@ -2718,6 +2934,7 @@ class GenericListView(ctk.CTkFrame):
         return self._truncate_text(text, column_id)
 
     def _truncate_text(self, text, column_id):
+        """Internal helper for truncate text."""
         if not text:
             return ""
         # Use a cheap, width-based estimate to avoid expensive tk font measurements per cell.
@@ -2745,6 +2962,7 @@ class GenericListView(ctk.CTkFrame):
         return text[: max(char_limit - len(self._ellipsis), 0)].rstrip() + self._ellipsis
 
     def sort_column(self, column_name):
+        """Sort column."""
         if not hasattr(self, "sort_directions"):
             self.sort_directions = {}
         asc = self.sort_directions.get(column_name, True)
@@ -2756,6 +2974,7 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list(skip_background_fetch=True)
 
     def on_double_click(self, event):
+        """Handle double click."""
         # Resolve target strictly from pointer position to avoid stale selection
         click_iid = self.tree.identify_row(event.y)
         iid = click_iid or self._last_pointer_row
@@ -2784,12 +3003,14 @@ class GenericListView(ctk.CTkFrame):
             except Exception:
                 display_name = ""
             if display_name:
+                # Continue with this path when display name is set.
                 normalized = self.clean_value(display_name)
                 for candidate in self.filtered_items or self.items:
                     if self.clean_value(candidate.get(self.unique_field, "")) == normalized:
                         item = candidate
                         break
         if item:
+            # Continue with this path when item is set.
             modifiers = getattr(event, "state", 0)
             if (
                 self.model_wrapper.entity_type == "books"
@@ -2810,6 +3031,7 @@ class GenericListView(ctk.CTkFrame):
         self._last_pointer_row = None
 
     def on_right_click(self, event):
+        """Handle right click."""
         region = self.tree.identify("region", event.x, event.y)
         if region == "heading":
             self._show_columns_menu(event)
@@ -2825,6 +3047,7 @@ class GenericListView(ctk.CTkFrame):
         self._show_item_menu(iid, event)
 
     def _show_item_menu(self, iid, event):
+        """Show item menu."""
         item, base_id = self._find_item_by_iid(iid)
         portrait_paths = []
         if item:
@@ -2838,6 +3061,7 @@ class GenericListView(ctk.CTkFrame):
 
         menu = tk.Menu(self, tearoff=0)
         if self.model_wrapper.entity_type == "books" and item:
+            # Continue with this path when model_wrapper.entity_type == 'books' and item is set.
             menu.add_command(
                 label="Open Book",
                 command=lambda it=item: self.open_book(it),
@@ -2848,6 +3072,7 @@ class GenericListView(ctk.CTkFrame):
             )
             excerpts = list(self._iter_book_excerpts(item))
             if excerpts:
+                # Continue with this path when excerpts is set.
                 excerpt_menu = tk.Menu(menu, tearoff=0)
                 for index, excerpt in enumerate(excerpts, start=1):
                     label = excerpt.get("Label") or f"Excerpt {index}"
@@ -2886,9 +3111,11 @@ class GenericListView(ctk.CTkFrame):
                 command=lambda: self.display_on_second_screen(iid)
             )
         if has_portrait:
+            # Continue with this path when has portrait is set.
             show_portrait = _lazy_portrait_viewer()
             title = str(item.get(self.unique_field, "")) if item else ""
             if len(portrait_paths) == 1:
+                # Handle the branch where len(portrait_paths) == 1.
                 menu.add_command(
                     label="Show Portrait",
                     command=lambda p=portrait_paths[0]: show_portrait(p, title),
@@ -2896,6 +3123,7 @@ class GenericListView(ctk.CTkFrame):
             else:
                 portrait_menu = tk.Menu(menu, tearoff=0)
                 for index, path in enumerate(portrait_paths, start=1):
+                    # Process each (index, path) from enumerate(portrait_paths, start=1).
                     label = f"Portrait {index}"
                     portrait_image = self._load_portrait_menu_image(path)
                     if portrait_image:
@@ -2930,6 +3158,7 @@ class GenericListView(ctk.CTkFrame):
             command=lambda: self.delete_item(iid)
         )
         if item:
+            # Continue with this path when item is set.
             color_menu = tk.Menu(menu, tearoff=0)
             for name in self.color_options.keys():
                 color_menu.add_command(
@@ -2954,6 +3183,7 @@ class GenericListView(ctk.CTkFrame):
         menu.post(event.x_root, event.y_root)
 
     def display_puzzle(self, iid):
+        """Handle display puzzle."""
         item, _ = self._find_item_by_iid(iid)
         if not item:
             return
@@ -2962,6 +3192,7 @@ class GenericListView(ctk.CTkFrame):
         open_puzzle_display(parent, item)
 
     def display_on_second_screen(self, iid):
+        """Handle display on second screen."""
         log_info(f"Displaying {self.model_wrapper.entity_type} on second screen: {iid}", func_name="GenericListView.display_on_second_screen")
         item, _ = self._find_item_by_iid(iid)
         if not item:
@@ -2972,6 +3203,7 @@ class GenericListView(ctk.CTkFrame):
         show_on_second_screen(item=item, title=title, fields=fields)
 
     def open_newsletter_preview(self, iid):
+        """Open newsletter preview."""
         item, _ = self._find_item_by_iid(iid)
         if not item:
             return
@@ -2991,6 +3223,7 @@ class GenericListView(ctk.CTkFrame):
         ) = _lazy_newsletter_components()
 
         def _handle_generate(config):
+            """Internal helper for handle generate."""
             sections = config.get("sections") or []
             language = config.get("language")
             style = config.get("style")
@@ -2999,6 +3232,7 @@ class GenericListView(ctk.CTkFrame):
             pcs = config.get("pcs") or []
 
             if use_ai:
+                # Continue with this path when use AI is set.
                 ai_text = generate_newsletter_ai(
                     {
                         "scenario_title": scenario_title,
@@ -3040,12 +3274,14 @@ class GenericListView(ctk.CTkFrame):
         dialog.wait_window(dialog)
 
     def _get_audio_value(self, item):
+        """Return audio value."""
         if not item:
             return ""
         get_audio_value, _, _ = _lazy_audio()
         return get_audio_value(item)
 
     def play_item_audio(self, item):
+        """Handle play item audio."""
         audio_value = self._get_audio_value(item)
         if not audio_value:
             messagebox.showinfo("Audio", "No audio file configured for this entry.")
@@ -3056,6 +3292,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
 
     def delete_item(self, iid):
+        """Delete item."""
         targets = self._resolve_action_target_bases(iid)
         if not targets:
             return
@@ -3075,6 +3312,7 @@ class GenericListView(ctk.CTkFrame):
             self.items = remaining
         self.selected_iids.difference_update(targets)
         if removed_any:
+            # Continue with this path when removed any is set.
             self.model_wrapper.save_items(self.items)
             self._save_list_order()
             self.filter_items(self.search_var.get())
@@ -3086,6 +3324,7 @@ class GenericListView(ctk.CTkFrame):
             self._update_bulk_controls()
 
     def turn_npc_to_pc(self, iid):
+        """Handle turn NPC to PC."""
         if self.model_wrapper.entity_type != "npcs":
             return
         targets = self._resolve_action_target_bases(iid)
@@ -3098,6 +3337,7 @@ class GenericListView(ctk.CTkFrame):
         npc_items = []
         remaining_items = []
         for item in self.items:
+            # Process each item from items.
             base_id = self._get_base_id(item)
             if base_id in targets:
                 npc_items.append(item)
@@ -3121,6 +3361,7 @@ class GenericListView(ctk.CTkFrame):
         self.filter_items(self.search_var.get())
 
     def open_in_gm_screen(self, iid):
+        """Open in GM screen."""
         log_info(f"Opening {self.model_wrapper.entity_type} in GM screen: {iid}", func_name="GenericListView.open_in_gm_screen")
         item = next(
             (
@@ -3150,6 +3391,7 @@ class GenericListView(ctk.CTkFrame):
         view.pack(fill="both", expand=True)
 
     def add_item(self):
+        """Handle add item."""
         log_info(f"Adding new {self.model_wrapper.entity_type} item", func_name="GenericListView.add_item")
         new = {}
         if self.open_editor(new, True):
@@ -3160,6 +3402,7 @@ class GenericListView(ctk.CTkFrame):
             self.filter_items(self.search_var.get())
 
     def _notify_calendar_event_change(self, item=None):
+        """Notify calendar event change."""
         if getattr(self.model_wrapper, "entity_type", "") != "events":
             return
 
@@ -3174,6 +3417,7 @@ class GenericListView(ctk.CTkFrame):
         callback(target_date)
 
     def open_editor(self, item, creation_mode=False):
+        """Open editor."""
         log_info(f"Opening editor for {self.model_wrapper.entity_type} (creation={creation_mode})", func_name="GenericListView.open_editor")
         editor_cls = _lazy_editor_window()
         ed = editor_cls(
@@ -3184,6 +3428,7 @@ class GenericListView(ctk.CTkFrame):
         return getattr(ed, "saved", False)
 
     def filter_items(self, query):
+        """Handle filter items."""
         log_info(f"Filtering {self.model_wrapper.entity_type} with query: {query}", func_name="GenericListView.filter_items")
         trimmed = query.strip()
         # Keep the search box in sync when filtering is triggered programmatically.
@@ -3195,7 +3440,9 @@ class GenericListView(ctk.CTkFrame):
         has_cache = bool(self.items)
 
         if normalized and has_cache:
+            # Continue with this path when normalized is set and has cache is set.
             def iter_search_values(item):
+                """Handle iter search values."""
                 if self.model_wrapper.entity_type == "books":
                     for col in self.columns:
                         yield self._get_display_value(item, col)
@@ -3219,6 +3466,7 @@ class GenericListView(ctk.CTkFrame):
         self.refresh_list()
 
     def add_items(self, items, overwrite=True):
+        """Handle add items."""
         log_info(
             f"Adding batch of {len(items)} items to {self.model_wrapper.entity_type}",
             func_name="GenericListView.add_items"
@@ -3226,16 +3474,19 @@ class GenericListView(ctk.CTkFrame):
         added = 0
         updated = 0
         for itm in items:
+            # Process each itm from items.
             nid = sanitize_id(str(itm.get(self.unique_field, ""))).lower()
             # 🔍 Find existing item
             existing_index = None
             for idx, i in enumerate(self.items):
+                # Process each (idx, i) from enumerate(items).
                 existing_nid = sanitize_id(str(i.get(self.unique_field, ""))).lower()
                 if existing_nid == nid:
                     existing_index = idx
                     break
             # ➕ Not found → add
             if existing_index is None:
+                # Handle the branch where existing index is missing.
                 self.items.append(itm)
                 added += 1
             # 🔁 Found → update
@@ -3255,6 +3506,7 @@ class GenericListView(ctk.CTkFrame):
         )
         
     def merge_duplicate_entities(self):
+        """Merge duplicate entities."""
         func_name = "GenericListView.merge_duplicate_entities"
         if not self.unique_field:
             messagebox.showwarning(
@@ -3266,6 +3518,7 @@ class GenericListView(ctk.CTkFrame):
         name_groups = {}
         order = []
         for item in self.items:
+            # Process each item from items.
             key = self._normalize_unique_value(item.get(self.unique_field))
             if not key:
                 continue
@@ -3297,8 +3550,10 @@ class GenericListView(ctk.CTkFrame):
         new_items = []
         processed = set()
         for item in self.items:
+            # Process each item from items.
             key = self._normalize_unique_value(item.get(self.unique_field))
             if key in merged_groups:
+                # Handle the branch where key is in merged groups.
                 if key in processed:
                     continue
                 new_items.append(merged_groups[key])
@@ -3317,6 +3572,7 @@ class GenericListView(ctk.CTkFrame):
         )
 
     def _iter_faction_names(self, item):
+        """Internal helper for iter faction names."""
         raw = item.get("Factions") or []
         if isinstance(raw, str):
             values = [raw]
@@ -3327,6 +3583,7 @@ class GenericListView(ctk.CTkFrame):
         else:
             values = []
         for value in values:
+            # Process each value from values.
             if isinstance(value, dict):
                 name = value.get("Name") or value.get("text")
             else:
@@ -3338,6 +3595,7 @@ class GenericListView(ctk.CTkFrame):
                 yield name
 
     def create_factions_from_entities(self):
+        """Create factions from entities."""
         if self.model_wrapper.entity_type not in ("pcs", "npcs"):
             return
         log_info(
@@ -3361,6 +3619,7 @@ class GenericListView(ctk.CTkFrame):
         created = 0
         for item in source_items:
             for name in self._iter_faction_names(item):
+                # Process each name from _iter_faction_names(item).
                 key = self._normalize_unique_value(name)
                 if not key or key in existing:
                     continue
@@ -3380,6 +3639,7 @@ class GenericListView(ctk.CTkFrame):
         )
 
     def import_map_directory(self):
+        """Import map directory."""
         log_info("Importing maps from directory", func_name="GenericListView.import_map_directory")
         dir_path = filedialog.askdirectory(title="Select Map Image Directory")
         if not dir_path:
@@ -3388,6 +3648,7 @@ class GenericListView(ctk.CTkFrame):
         supported = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
         new_items = []
         for filename in os.listdir(dir_path):
+            # Process each filename from os.listdir(dir_path).
             src = os.path.join(dir_path, filename)
             if not os.path.isfile(src):
                 continue
@@ -3415,6 +3676,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showwarning("No Images Found", "No supported image files were found in the selected directory.")
 
     def import_books_from_files_dialog(self):
+        """Import books from files dialog."""
         if self.model_wrapper.entity_type != "books":
             return
         log_info("Importing books from file selection", func_name="GenericListView.import_books_from_files_dialog")
@@ -3433,6 +3695,7 @@ class GenericListView(ctk.CTkFrame):
         self._persist_imported_books(records)
 
     def import_books_from_directory_dialog(self):
+        """Import books from directory dialog."""
         if self.model_wrapper.entity_type != "books":
             return
         log_info("Importing books from directory", func_name="GenericListView.import_books_from_directory_dialog")
@@ -3448,6 +3711,7 @@ class GenericListView(ctk.CTkFrame):
         self._persist_imported_books(records)
 
     def open_text_import_dialog(self):
+        """Open text import dialog."""
         entity_type = self.model_wrapper.entity_type
         if entity_type not in ("scenarios", "creatures", "objects"):
             return
@@ -3467,6 +3731,7 @@ class GenericListView(ctk.CTkFrame):
         dialog.focus_force()
 
     def open_web_text_import_dialog(self):
+        """Open web text import dialog."""
         entity_type = self.model_wrapper.entity_type
         if entity_type not in ("scenarios", "creatures", "objects"):
             return
@@ -3483,6 +3748,7 @@ class GenericListView(ctk.CTkFrame):
         dialog.focus_force()
 
     def _persist_imported_books(self, records):
+        """Persist imported books."""
         records = [rec for rec in records if isinstance(rec, dict)]
         if not records:
             messagebox.showinfo("Import Books", "No new PDF files were found to import.")
@@ -3496,6 +3762,7 @@ class GenericListView(ctk.CTkFrame):
 
         existing_by_title = {}
         for item in existing_items:
+            # Process each item from existing_items.
             title = item.get("Title")
             if isinstance(title, str):
                 existing_by_title[title.casefold()] = item
@@ -3503,6 +3770,7 @@ class GenericListView(ctk.CTkFrame):
         to_save = []
         titles_for_indexing = []
         for record in records:
+            # Process each record from records.
             title = record.get("Title", "")
             if not isinstance(title, str) or not title.strip():
                 continue
@@ -3538,6 +3806,7 @@ class GenericListView(ctk.CTkFrame):
         self._queue_book_indexing(titles_for_indexing)
 
     def _queue_book_indexing(self, titles):
+        """Internal helper for queue book indexing."""
         filtered_titles = [t.strip() for t in titles if isinstance(t, str) and t.strip()]
         if not filtered_titles:
             return
@@ -3545,6 +3814,7 @@ class GenericListView(ctk.CTkFrame):
         title_lookup = {t.casefold(): t for t in filtered_titles}
 
         def worker():
+            """Handle worker."""
             try:
                 items = self.model_wrapper.load_items()
             except Exception as exc:
@@ -3557,6 +3827,7 @@ class GenericListView(ctk.CTkFrame):
             campaign_dir = ConfigHelper.get_campaign_dir()
             target_records = []
             for item in items:
+                # Process each item from items.
                 title = item.get("Title")
                 if not isinstance(title, str):
                     continue
@@ -3588,8 +3859,10 @@ class GenericListView(ctk.CTkFrame):
             failures = []
             extract_text_from_book, _, _ = _lazy_book_importers()
             for record in target_records:
+                # Process each record from target_records.
                 attachment = record.get("Attachment", "")
                 try:
+                    # Keep worker resilient if this step fails.
                     page_count, extracted_text, extracted_pages = extract_text_from_book(
                         attachment, campaign_dir=campaign_dir
                     )
@@ -3627,6 +3900,7 @@ class GenericListView(ctk.CTkFrame):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_book_indexing_complete(self, success_count, failures):
+        """Handle book indexing complete."""
         current_query = self.search_var.get() if hasattr(self, "search_var") else ""
         try:
             self.search_var.set(current_query)
@@ -3635,6 +3909,7 @@ class GenericListView(ctk.CTkFrame):
         self.reload_from_db()
 
         if failures:
+            # Continue with this path when failures is set.
             failed_titles = ", ".join(title or "(Unknown)" for title, _ in failures[:5])
             if len(failures) > 5:
                 failed_titles += ", ..."
@@ -3644,6 +3919,7 @@ class GenericListView(ctk.CTkFrame):
             messagebox.showinfo("Book Indexing", f"Indexed {success_count} book(s).")
 
     def _copy_map_image(self, src_path, image_name):
+        """Copy map image."""
         campaign_dir = ConfigHelper.get_campaign_dir()
         image_folder = os.path.join(campaign_dir, "assets", "images", "map_images")
         os.makedirs(image_folder, exist_ok=True)
@@ -3655,6 +3931,7 @@ class GenericListView(ctk.CTkFrame):
         return os.path.join("assets/images/map_images", dest_filename)
 
     def choose_group_column(self):
+        """Handle choose group column."""
         log_info(f"Selecting group column for {self.model_wrapper.entity_type}", func_name="GenericListView.choose_group_column")
         options = ["None", self.unique_field] + [c for c in self.columns if c != self.unique_field]
         top = ctk.CTkToplevel(self)
@@ -3665,8 +3942,10 @@ class GenericListView(ctk.CTkFrame):
         menu.pack(padx=10, pady=5)
 
         def confirm():
+            """Handle confirm."""
             selection = var.get()
             if selection == "None":
+                # Handle the branch where selection == 'None'.
                 self.group_column = None
                 cfg = ConfigHelper.load_campaign_config()
                 if not cfg.has_section("ListGrouping"):
@@ -3691,6 +3970,7 @@ class GenericListView(ctk.CTkFrame):
         top.focus_force()
 
     def open_ai_wizard(self):
+        """Open AI wizard."""
         log_info(f"Launching AI wizard for {self.model_wrapper.entity_type}", func_name="GenericListView.open_ai_wizard")
         """Open the AI Authoring Wizard in a modal window, scoped to this entity list."""
         top = ctk.CTkToplevel(self)
@@ -3705,6 +3985,7 @@ class GenericListView(ctk.CTkFrame):
         except Exception:
             pass
         def on_close():
+            """Handle close."""
             try:
                 top.grab_release()
             except Exception:
@@ -3713,6 +3994,7 @@ class GenericListView(ctk.CTkFrame):
         top.protocol("WM_DELETE_WINDOW", on_close)
 
     def open_auto_generation(self):
+        """Open auto generation."""
         dialog_cls = _lazy_auto_generation_dialog()
         dialog = dialog_cls(
             self,
@@ -3723,6 +4005,7 @@ class GenericListView(ctk.CTkFrame):
         return dialog
 
     def _set_ai_categorize_running(self, running: bool):
+        """Set AI categorize running."""
         self._ai_categorize_running = running
         if self.ai_categorize_button:
             if running:
@@ -3731,10 +4014,12 @@ class GenericListView(ctk.CTkFrame):
                 self.ai_categorize_button.configure(state="normal", text="AI Categorize")
 
     def _normalize_ai_excerpt(self, value, limit: int = 320) -> str:
+        """Normalize AI excerpt."""
         if value is None:
             return ""
         if isinstance(value, dict):
             for key in ("text", "value", "content", "description"):
+                # Process each key from ('text', 'value', 'content', 'description').
                 inner = value.get(key)
                 if isinstance(inner, str) and inner.strip():
                     value = inner
@@ -3754,10 +4039,12 @@ class GenericListView(ctk.CTkFrame):
         return text
 
     def _build_ai_categorization_payload(self, items):
+        """Build AI categorization payload."""
         payload = []
         name_map = {}
         existing_categories = set()
         for item in items:
+            # Process each item from items.
             name = str(item.get("Name") or item.get(self.unique_field) or "").strip()
             if not name:
                 continue
@@ -3778,6 +4065,7 @@ class GenericListView(ctk.CTkFrame):
         return payload, name_map, sorted(existing_categories)
 
     def _request_ai_category_assignments(self, payload, existing_categories):
+        """Internal helper for request AI category assignments."""
         log_info(
             f"Requesting AI categorization for {len(payload)} objects",
             func_name="GenericListView._request_ai_category_assignments",
@@ -3832,6 +4120,7 @@ class GenericListView(ctk.CTkFrame):
         allowed_from_ai = None
 
         def _salvage_assignment_list_from_text(text):
+            """Internal helper for salvage assignment list from text."""
             if not isinstance(text, str):
                 return None
             pattern = re.compile(
@@ -3840,6 +4129,7 @@ class GenericListView(ctk.CTkFrame):
             )
             salvaged = []
             for match in pattern.finditer(text):
+                # Process each match from pattern.finditer(text).
                 name = match.group(1).strip()
                 category = match.group(2).strip()
                 if not name:
@@ -3853,11 +4143,14 @@ class GenericListView(ctk.CTkFrame):
             return salvaged or None
 
         def _coerce_assignment_list(value):
+            """Coerce assignment list."""
             if isinstance(value, list):
                 return value
             if isinstance(value, dict):
+                # Handle the branch where isinstance(value, dict).
                 converted = []
                 for key, entry in value.items():
+                    # Process each (key, entry) from value.items().
                     if isinstance(entry, dict):
                         converted.append(entry)
                         continue
@@ -3870,6 +4163,7 @@ class GenericListView(ctk.CTkFrame):
                 )
                 return converted
             if isinstance(value, str):
+                # Handle the branch where isinstance(value, str).
                 try:
                     parsed = ai_client_cls._parse_json_safe(value)
                 except Exception as parse_exc:
@@ -3893,27 +4187,33 @@ class GenericListView(ctk.CTkFrame):
             seen = set()
 
             def _inner(current):
+                """Internal helper for inner."""
                 obj_id = id(current)
                 if obj_id in seen:
                     return None
                 seen.add(obj_id)
 
                 if isinstance(current, dict):
+                    # Handle the branch where isinstance(current, dict).
                     for key in candidate_keys:
                         if key in current and current[key] is not None:
                             return current[key]
                     for nested in current.values():
+                        # Process each nested from current.values().
                         found = _inner(nested)
                         if found is not None:
                             return found
                     return None
                 if isinstance(current, list):
+                    # Handle the branch where isinstance(current, list).
                     for item in current:
+                        # Process each item from current.
                         found = _inner(item)
                         if found is not None:
                             return found
                     return None
                 if isinstance(current, str):
+                    # Handle the branch where isinstance(current, str).
                     try:
                         parsed = ai_client_cls._parse_json_safe(current)
                     except Exception:
@@ -3924,6 +4224,7 @@ class GenericListView(ctk.CTkFrame):
             return _inner(value)
 
         if isinstance(data, dict):
+            # Handle the branch where isinstance(data, dict).
             assignments_raw = _extract_field(data, ("assignments", "Assignments", "items", "Items"))
             allowed_from_ai = _extract_field(data, ("allowed_categories", "AllowedCategories"))
         elif isinstance(data, list):
@@ -3939,6 +4240,7 @@ class GenericListView(ctk.CTkFrame):
         if not isinstance(assignments_raw, list):
             assignments_raw = _coerce_assignment_list(assignments_raw)
         if not isinstance(assignments_raw, list):
+            # Handle the branch where not isinstance(assignments_raw, list).
             salvage_source = raw if isinstance(raw, str) else json.dumps(data, ensure_ascii=False)
             salvaged = _salvage_assignment_list_from_text(salvage_source)
             if isinstance(salvaged, list):
@@ -3964,8 +4266,10 @@ class GenericListView(ctk.CTkFrame):
                     func_name="GenericListView._request_ai_category_assignments",
                 )
         if isinstance(allowed_from_ai, list):
+            # Handle the branch where isinstance(allowed_from_ai, list).
             seen_used = set()
             for cat in allowed_from_ai:
+                # Process each cat from allowed_from_ai.
                 if not isinstance(cat, str):
                     continue
                 key = cat.strip()
@@ -3984,6 +4288,7 @@ class GenericListView(ctk.CTkFrame):
                     seen_used.add(resolved.casefold())
         assignments = {}
         for entry in assignments_raw:
+            # Process each entry from assignments_raw.
             if not isinstance(entry, dict):
                 continue
             name = entry.get("Name") or entry.get("name") or entry.get("Item") or entry.get("item")
@@ -3995,8 +4300,10 @@ class GenericListView(ctk.CTkFrame):
                 continue
             resolved_category = None
             if isinstance(category, str):
+                # Handle the branch where isinstance(category, str).
                 cat_key = category.strip()
                 if cat_key:
+                    # Continue with this path when cat key is set.
                     resolved_category = allowed_lookup.get(cat_key.casefold())
                     if not resolved_category:
                         for ak, av in allowed_lookup.items():
@@ -4017,6 +4324,7 @@ class GenericListView(ctk.CTkFrame):
         return assignments, used_categories
 
     def ai_categorize_objects(self):
+        """Handle AI categorize objects."""
         if self.model_wrapper.entity_type != "objects":
             return
         if self._ai_categorize_running:
@@ -4039,14 +4347,17 @@ class GenericListView(ctk.CTkFrame):
         self._set_ai_categorize_running(True)
 
         def worker():
+            """Handle worker."""
             assignments = {}
             used_categories = []
             used_seen = set()
             try:
+                # Keep worker resilient if this step fails.
                 batch_size = max(1, AI_CATEGORIZE_BATCH_SIZE)
                 total = len(payload)
                 total_batches = (total + batch_size - 1) // batch_size
                 for index, start in enumerate(range(0, total, batch_size), start=1):
+                    # Process each (index, start) from enumerate(range(0, total, batch_size), start=1).
                     end = start + batch_size
                     batch_payload = payload[start:end]
                     batch_existing = sorted(set(existing_categories + used_categories))
@@ -4060,6 +4371,7 @@ class GenericListView(ctk.CTkFrame):
                     )
                     assignments.update(batch_assignments)
                     for cat in batch_used:
+                        # Process each cat from batch_used.
                         if not isinstance(cat, str):
                             continue
                         key = cat.casefold()
@@ -4082,10 +4394,12 @@ class GenericListView(ctk.CTkFrame):
                 return
 
             def apply_results():
+                """Apply results."""
                 updated = 0
                 missing = []
                 seen_missing = set()
                 for entry in payload:
+                    # Process each entry from payload.
                     name = entry["Name"]
                     key = name.casefold()
                     targets = name_map.get(key, [])
@@ -4093,6 +4407,7 @@ class GenericListView(ctk.CTkFrame):
                         continue
                     category = assignments.get(key)
                     if not category:
+                        # Handle the branch where category is unavailable.
                         if key not in seen_missing:
                             missing.append(name)
                             seen_missing.add(key)
@@ -4102,6 +4417,7 @@ class GenericListView(ctk.CTkFrame):
                             item["Category"] = category
                             updated += 1
                 if updated:
+                    # Continue with this path when updated is set.
                     try:
                         self.model_wrapper.save_items(items)
                     except Exception as save_exc:
@@ -4115,9 +4431,11 @@ class GenericListView(ctk.CTkFrame):
                 else:
                     summary.append("No object categories were changed.")
                 if used_categories:
+                    # Continue with this path when used categories is set.
                     unique_cats = []
                     seen = set()
                     for cat in used_categories:
+                        # Process each cat from used_categories.
                         if not isinstance(cat, str):
                             continue
                         if cat.casefold() in seen:
@@ -4127,6 +4445,7 @@ class GenericListView(ctk.CTkFrame):
                     if unique_cats:
                         summary.append("Categories used: " + ", ".join(unique_cats))
                 if missing:
+                    # Continue with this path when missing is set.
                     preview = ", ".join(missing[:5])
                     if len(missing) > 5:
                         preview += ", ..."
@@ -4136,7 +4455,9 @@ class GenericListView(ctk.CTkFrame):
             self.after(0, apply_results)
 
         def run():
+            """Run the operation."""
             try:
+                # Keep run resilient if this step fails.
                 worker()
             finally:
                 self.after(0, lambda: self._set_ai_categorize_running(False))
@@ -4144,6 +4465,7 @@ class GenericListView(ctk.CTkFrame):
         threading.Thread(target=run, daemon=True).start()
 
     def _find_item_by_iid(self, iid):
+        """Find item by iid."""
         # Fast lookup for streamed rows
         if iid in self._iid_to_item:
             item = self._iid_to_item.get(iid)
@@ -4157,6 +4479,7 @@ class GenericListView(ctk.CTkFrame):
 
         # Prefer exact match on sanitized ID or mapped base
         for it in self.filtered_items:
+            # Process each it from filtered_items.
             base_id = self._get_base_id(it, fallback_iid=mapped_base or iid)
             if iid == base_id or (mapped_base and base_id == mapped_base):
                 return it, base_id
@@ -4164,8 +4487,10 @@ class GenericListView(ctk.CTkFrame):
         # If the iid has a duplicate suffix like "_2", strip it and try again
         m = re.match(r"^(.*)_\d+$", iid or "")
         if m:
+            # Continue with this path when m is set.
             base = m.group(1)
             for it in self.filtered_items:
+                # Process each it from filtered_items.
                 base_id = self._get_base_id(it, fallback_iid=base)
                 if base_id == base:
                     return it, base_id
@@ -4173,6 +4498,7 @@ class GenericListView(ctk.CTkFrame):
         return None, None
 
     def _get_base_id(self, item, fallback_iid=None):
+        """Return base ID."""
         raw = item.get(self.unique_field, "")
         if isinstance(raw, dict):
             raw = raw.get("text", "")
@@ -4182,6 +4508,7 @@ class GenericListView(ctk.CTkFrame):
 
         # Try to derive the base id from existing tree mappings
         if fallback_iid:
+            # Continue with this path when fallback iid is set.
             for base, iids in self._base_to_iids.items():
                 if fallback_iid == base or fallback_iid in iids:
                     return base
@@ -4198,12 +4525,14 @@ class GenericListView(ctk.CTkFrame):
         if not base_id:
             return []
         if base_id in self.selected_iids:
+            # Handle the branch where base ID is in selected iids.
             if len(self.selected_iids) > 1:
                 return sorted(self.selected_iids)
             return [base_id]
         return [base_id]
 
     def _register_tree_iid(self, base_id, iid):
+        """Register tree iid."""
         if not base_id:
             return
         entries = self._base_to_iids.setdefault(base_id, [])
@@ -4211,6 +4540,7 @@ class GenericListView(ctk.CTkFrame):
             entries.append(iid)
 
     def _apply_selection_to_tree(self):
+        """Apply selection to tree."""
         if not hasattr(self, "tree"):
             return
         visible = set(self._base_to_iids.keys())
@@ -4221,6 +4551,7 @@ class GenericListView(ctk.CTkFrame):
         self._suppress_tree_select_event = True
         desired = []
         try:
+            # Keep selection to tree resilient if this step fails.
             for base_id in self.selected_iids:
                 desired.extend(self._base_to_iids.get(base_id, []))
             if desired:
@@ -4232,6 +4563,7 @@ class GenericListView(ctk.CTkFrame):
         self._update_tree_selection_tags(desired)
 
     def _on_tree_selection_changed(self, _event=None):
+        """Handle tree selection changed."""
         if self._suppress_tree_select_event or self._freeze_selection_changes:
             return
         start = time.perf_counter()
@@ -4244,22 +4576,26 @@ class GenericListView(ctk.CTkFrame):
         parents_with_selected_children = set()
         if selection_set and self._link_children:
             for parent_iid, info in self._link_children.items():
+                # Process each (parent_iid, info) from _link_children.items().
                 names = set(info.get("names", []))
                 headers = set(info.get("headers", []))
                 if names.intersection(selection_set) or headers.intersection(selection_set):
                     parents_with_selected_children.add(parent_iid)
         selected = set()
         for iid in current_selection:
+            # Process each iid from current_selection.
             _, base_id = self._find_item_by_iid(iid)
             if base_id:
                 selected.add(base_id)
         self.selected_iids = selected
         if current_selection:
+            # Continue with this path when current selection is set.
             focus_iid = self.tree.focus()
             if focus_iid not in current_selection:
                 self.tree.focus(current_selection[0])
         multi_select = len(current_selection) > 1
         if multi_select and current_selection:
+            # Continue with this path when multi select is set and current selection is set.
             first_iid = current_selection[0]
             if (
                 first_iid in self._auto_expanded_rows
@@ -4269,6 +4605,7 @@ class GenericListView(ctk.CTkFrame):
                 self._collapse_linked_rows(first_iid)
         if not self._link_toggle_in_progress and not multi_select:
             for iid in newly_selected:
+                # Process each iid from newly_selected.
                 if iid in self._link_children:
                     continue
                 groups = self._ensure_linked_groups(iid)
@@ -4293,10 +4630,12 @@ class GenericListView(ctk.CTkFrame):
         )
 
     def _update_tree_selection_tags(self, selection=None):
+        """Update tree selection tags."""
         if not hasattr(self, "tree"):
             return
 
         try:
+            # Keep tree selection tags resilient if this step fails.
             if not self.tree.winfo_exists():
                 return
             if selection is None:
@@ -4317,6 +4656,7 @@ class GenericListView(ctk.CTkFrame):
         self._last_tree_selection = selection_set
 
     def _apply_selection_tag(self, iid):
+        """Apply selection tag."""
         if not self.tree.exists(iid):
             return
         current_tags = list(self.tree.item(iid, "tags") or ())
@@ -4325,12 +4665,14 @@ class GenericListView(ctk.CTkFrame):
             self.tree.item(iid, tags=tuple(current_tags))
 
     def _remove_selection_tag(self, iid):
+        """Remove selection tag."""
         if not self.tree.exists(iid):
             return
         current_tags = [t for t in (self.tree.item(iid, "tags") or ()) if t != "selected_row"]
         self.tree.item(iid, tags=tuple(current_tags))
 
     def _refresh_grid_selection(self):
+        """Refresh grid selection."""
         if not getattr(self, "grid_cards", None):
             return
         for info in self.grid_cards:
@@ -4339,6 +4681,7 @@ class GenericListView(ctk.CTkFrame):
             self._set_grid_card_selected(card, base_id in self.selected_iids)
 
     def _set_grid_card_selected(self, card, selected):
+        """Set grid card selected."""
         if not card or not card.winfo_exists():
             return
         if selected:
@@ -4347,6 +4690,7 @@ class GenericListView(ctk.CTkFrame):
             card.configure(border_color="#1E1E1E", border_width=1)
 
     def _update_bulk_controls(self):
+        """Update bulk controls."""
         count = len(self.selected_iids)
         if count:
             self.selection_label.configure(text=f"{count} selected")
@@ -4356,6 +4700,7 @@ class GenericListView(ctk.CTkFrame):
             self.bulk_action_button.configure(state=tk.DISABLED)
 
     def _get_display_label(self):
+        """Return display label."""
         entity_labels = _dynamic_entity_labels()
         return entity_labels.get(
             self.model_wrapper.entity_type,
@@ -4363,18 +4708,21 @@ class GenericListView(ctk.CTkFrame):
         )
 
     def _format_entity_noun(self, count):
+        """Format entity noun."""
         label = self._get_display_label()
         if count == 1 and label.endswith("s"):
             return label[:-1]
         return label
 
     def _find_item_by_base_id(self, base_id):
+        """Find item by base ID."""
         for item in self.items:
             if self._get_base_id(item) == base_id:
                 return item
         return None
 
     def _open_bulk_menu(self):
+        """Open bulk menu."""
         if not self.selected_iids:
             messagebox.showinfo("Bulk Actions", "Select at least one item to continue.")
             return
@@ -4392,6 +4740,7 @@ class GenericListView(ctk.CTkFrame):
             state=tk.NORMAL if gm_supported else tk.DISABLED,
         )
         try:
+            # Keep bulk menu resilient if this step fails.
             menu.tk_popup(
                 self.bulk_action_button.winfo_rootx(),
                 self.bulk_action_button.winfo_rooty() + self.bulk_action_button.winfo_height(),
@@ -4400,6 +4749,7 @@ class GenericListView(ctk.CTkFrame):
             menu.grab_release()
 
     def _bulk_link_to_scenario(self):
+        """Internal helper for bulk link to scenario."""
         field_name = SCENARIO_LINK_FIELDS.get(self.model_wrapper.entity_type)
         if not field_name:
             messagebox.showinfo(
@@ -4419,7 +4769,9 @@ class GenericListView(ctk.CTkFrame):
         template = load_template("scenarios")
 
         def _close_dialog():
+            """Close dialog."""
             if dialog.winfo_exists():
+                # Handle the branch where dialog.winfo_exists().
                 try:
                     dialog.grab_release()
                 except Exception:
@@ -4427,6 +4779,7 @@ class GenericListView(ctk.CTkFrame):
                 dialog.destroy()
 
         def _on_select(_entity_type, name):
+            """Handle select."""
             _close_dialog()
             if name:
                 self._apply_bulk_link_to_scenario(name, field_name)
@@ -4445,6 +4798,7 @@ class GenericListView(ctk.CTkFrame):
         dialog.wait_window(dialog)
 
     def _apply_bulk_link_to_scenario(self, scenario_name, field_name):
+        """Apply bulk link to scenario."""
         wrapper = GenericModelWrapper("scenarios")
         scenarios = wrapper.load_items()
         scenario = next(
@@ -4462,6 +4816,7 @@ class GenericListView(ctk.CTkFrame):
         current = list(scenario.get(field_name) or [])
         added = 0
         for base_id in sorted(self.selected_iids):
+            # Process each base_id from sorted(selected_iids).
             item = self._find_item_by_base_id(base_id)
             if not item:
                 continue
@@ -4486,6 +4841,7 @@ class GenericListView(ctk.CTkFrame):
             )
 
     def _bulk_add_to_gm_screen(self):
+        """Internal helper for bulk add to GM screen."""
         gm_type = GM_SCREEN_ENTITY_TYPES.get(self.model_wrapper.entity_type)
         if not gm_type:
             messagebox.showinfo(
@@ -4505,7 +4861,9 @@ class GenericListView(ctk.CTkFrame):
         template = load_template("scenarios")
 
         def _close_dialog():
+            """Close dialog."""
             if dialog.winfo_exists():
+                # Handle the branch where dialog.winfo_exists().
                 try:
                     dialog.grab_release()
                 except Exception:
@@ -4513,6 +4871,7 @@ class GenericListView(ctk.CTkFrame):
                 dialog.destroy()
 
         def _on_select(_entity_type, name):
+            """Handle select."""
             _close_dialog()
             if name:
                 self._apply_bulk_add_to_gm_screen(name, gm_type)
@@ -4531,6 +4890,7 @@ class GenericListView(ctk.CTkFrame):
         dialog.wait_window(dialog)
 
     def _apply_bulk_add_to_gm_screen(self, scenario_name, gm_type):
+        """Apply bulk add to GM screen."""
         layout_manager_cls, _ = _lazy_gm_screen()
         manager = layout_manager_cls()
         existing_default = manager.get_scenario_default(scenario_name)
@@ -4538,6 +4898,7 @@ class GenericListView(ctk.CTkFrame):
         layout = manager.get_layout(layout_name) if layout_name else None
         created_layout = False
         if layout is None:
+            # Handle the branch where layout is missing.
             layout_name = layout_name or f"Auto: {scenario_name}"
             layout = manager.get_layout(layout_name)
             if layout is None:
@@ -4552,6 +4913,7 @@ class GenericListView(ctk.CTkFrame):
             and str(tab.get("entity_name")) == scenario_name
             for tab in tabs
         ):
+            # Handle this branch separately before continuing.
             tabs.insert(
                 0,
                 {
@@ -4565,6 +4927,7 @@ class GenericListView(ctk.CTkFrame):
 
         added = 0
         for base_id in sorted(self.selected_iids):
+            # Process each base_id from sorted(selected_iids).
             item = self._find_item_by_base_id(base_id)
             if not item:
                 continue
@@ -4591,11 +4954,13 @@ class GenericListView(ctk.CTkFrame):
 
         changed = added > 0 or scenario_tab_added or created_layout
         if changed:
+            # Continue with this path when changed is set.
             layout["scenario"] = scenario_name
             manager.save_layout(layout_name, layout)
             if existing_default is None:
                 manager.set_scenario_default(scenario_name, layout_name)
             if added:
+                # Continue with this path when added is set.
                 noun = self._format_entity_noun(added)
                 messagebox.showinfo(
                     "GM Screen",
@@ -4618,6 +4983,7 @@ class GenericListView(ctk.CTkFrame):
             )
 
     def _column_from_ident(self, ident):
+        """Internal helper for column from ident."""
         if ident == "#0":
             return None
         try:
@@ -4630,13 +4996,16 @@ class GenericListView(ctk.CTkFrame):
         return None
 
     def _load_column_settings(self):
+        """Load column settings."""
         cfg = ConfigHelper.load_campaign_config()
         self.column_order = list(self.columns)
         self.hidden_columns = set()
         self.column_widths = {}
         if cfg.has_section(self.column_section):
+            # Handle the branch where cfg.has_section(column_section).
             order_str = cfg.get(self.column_section, "order", fallback="")
             if order_str:
+                # Continue with this path when order str is set.
                 loaded = [c for c in order_str.split(",") if c in self.columns]
                 for c in self.columns:
                     if c not in loaded:
@@ -4646,6 +5015,7 @@ class GenericListView(ctk.CTkFrame):
             if hidden_str:
                 self.hidden_columns = {c for c in hidden_str.split(",") if c in self.columns}
             for col in ["#0"] + self.columns:
+                # Process each col from ['#0'] + columns.
                 key = f"width_{sanitize_id(col)}"
                 w = cfg.get(self.column_section, key, fallback="")
                 try:
@@ -4654,6 +5024,7 @@ class GenericListView(ctk.CTkFrame):
                     pass
 
     def _apply_column_settings(self):
+        """Apply column settings."""
         for col, width in self.column_widths.items():
             try:
                 self.tree.column(col, width=width)
@@ -4661,12 +5032,14 @@ class GenericListView(ctk.CTkFrame):
                 continue
         display = [c for c in self.column_order if c not in self.hidden_columns]
         if self._link_column:
+            # Continue with this path when link column is set.
             if self._link_column not in display:
                 display = display + [self._link_column]
             display = [self._link_column] + [c for c in display if c != self._link_column]
         self.tree["displaycolumns"] = display
 
     def _save_column_settings(self):
+        """Save column settings."""
         cfg = ConfigHelper.load_campaign_config()
         section = self.column_section
         if not cfg.has_section(section):
@@ -4674,6 +5047,7 @@ class GenericListView(ctk.CTkFrame):
         cfg.set(section, "order", ",".join(self.column_order))
         cfg.set(section, "hidden", ",".join(self.hidden_columns))
         for col in ["#0"] + list(self.columns):
+            # Process each col from ['#0'] + list(columns).
             key = f"width_{sanitize_id(col)}"
             try:
                 width = self.tree.column("#0" if col == "#0" else col, "width")
@@ -4689,12 +5063,14 @@ class GenericListView(ctk.CTkFrame):
         
 
     def _show_columns_menu(self, event):
+        """Show columns menu."""
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Columns...", command=self._open_column_chooser)
         menu.add_command(label="Display Fields...", command=self._open_display_fields_chooser)
         menu.post(event.x_root, event.y_root)
 
     def _open_column_chooser(self):
+        """Open column chooser."""
         top = ctk.CTkToplevel(self)
         top.title("Columns")
         vars = {}
@@ -4705,6 +5081,7 @@ class GenericListView(ctk.CTkFrame):
             chk.pack(anchor="w", padx=10, pady=2)
 
         def apply():
+            """Apply the operation."""
             self.hidden_columns = {c for c, v in vars.items() if not v.get()}
             self._apply_column_settings()
             self._save_column_settings()
@@ -4716,6 +5093,7 @@ class GenericListView(ctk.CTkFrame):
         top.focus_force()
 
     def _open_display_fields_chooser(self):
+        """Open display fields chooser."""
         top = ctk.CTkToplevel(self)
         top.title("Display Fields (Second Screen)")
         vars = {}
@@ -4732,6 +5110,7 @@ class GenericListView(ctk.CTkFrame):
             chk.pack(anchor="w", padx=10, pady=2)
 
         def apply():
+            """Apply the operation."""
             self.display_fields = {c for c, v in vars.items() if v.get()}
             self._save_display_fields()
             top.destroy()
@@ -4742,6 +5121,7 @@ class GenericListView(ctk.CTkFrame):
         top.focus_force()
 
     def _load_list_order(self):
+        """Load list order."""
         cfg = ConfigHelper.load_campaign_config()
         self.list_order = {}
         if cfg.has_section(self.order_section):
@@ -4754,6 +5134,7 @@ class GenericListView(ctk.CTkFrame):
         self.filtered_items = list(self.items)
 
     def _save_list_order(self):
+        """Save list order."""
         cfg = ConfigHelper.load_campaign_config()
         section = self.order_section
         if not cfg.has_section(section):
@@ -4771,9 +5152,11 @@ class GenericListView(ctk.CTkFrame):
             pass
 
     def _load_display_fields(self):
+        """Load display fields."""
         cfg = ConfigHelper.load_campaign_config()
         self.display_fields = set()
         if cfg.has_section(self.display_section):
+            # Handle the branch where cfg.has_section(display_section).
             raw = cfg.get(self.display_section, "fields", fallback="")
             if raw:
                 self.display_fields = {c for c in raw.split(",") if c}
@@ -4781,6 +5164,7 @@ class GenericListView(ctk.CTkFrame):
             self.display_fields = set(self.columns[:3])
 
     def _save_display_fields(self):
+        """Save display fields."""
         cfg = ConfigHelper.load_campaign_config()
         section = self.display_section
         if not cfg.has_section(section):
@@ -4794,11 +5178,13 @@ class GenericListView(ctk.CTkFrame):
             pass
 
     def set_row_color(self, iid, color_name):
+        """Set row color."""
         targets = self._resolve_action_target_bases(iid)
         if not targets:
             return
         affected_tree_iids = set()
         for base_id in targets:
+            # Process each base_id from targets.
             tree_iids = self._base_to_iids.get(base_id, [])
             if color_name:
                 for tree_iid in tree_iids:
@@ -4817,11 +5203,13 @@ class GenericListView(ctk.CTkFrame):
         self._update_bulk_controls()
 
     def _save_row_color(self, base_id, color_name):
+        """Save row color."""
         cfg = ConfigHelper.load_campaign_config()
         section = self.row_color_section
         if not cfg.has_section(section):
             cfg.add_section(section)
         if color_name:
+            # Continue with this path when color name is set.
             cfg.set(section, base_id, color_name)
             self.row_colors[base_id] = color_name
         else:

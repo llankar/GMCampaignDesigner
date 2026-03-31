@@ -1,9 +1,12 @@
+"""Utilities for whiteboard player page."""
+
 from __future__ import annotations
 
 from urllib.parse import urlencode
 
 
 def _style_block() -> str:
+    """Internal helper for style block."""
     return """
     <style>
         :root {
@@ -326,6 +329,7 @@ def _script_block(
     text_sizes: list[int],
     default_text_size: int,
 ) -> str:
+    """Internal helper for script block."""
     return f"""
     <script>
         (() => {{
@@ -1353,6 +1357,7 @@ def build_player_page(
     use_mjpeg: bool,
     token: str | None = None,
 ) -> str:
+    """Build player page."""
     params = {}
     if token:
         params["token"] = token

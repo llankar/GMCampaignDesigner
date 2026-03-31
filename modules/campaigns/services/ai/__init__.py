@@ -1,3 +1,5 @@
+"""AI package."""
+
 from .arc_generation_service import ArcGenerationService
 from .arc_scenario_expansion_service import ArcScenarioExpansionService, ArcScenarioExpansionValidationError
 from .constraints import minimum_scenarios_per_arc

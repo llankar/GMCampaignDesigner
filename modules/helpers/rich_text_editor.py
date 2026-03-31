@@ -1,3 +1,5 @@
+"""Editor helpers for rich text."""
+
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import simpledialog, colorchooser
@@ -8,6 +10,7 @@ log_module_import(__name__)
 
 class RichTextEditor(ctk.CTkFrame):
     def __init__(self, master, initial_text="", max_lines=100):
+        """Initialize the RichTextEditor instance."""
         super().__init__(master)
         self.max_lines = max_lines
         # Global toolbar at the top (exposed as self.toolbar)
@@ -52,6 +55,7 @@ class RichTextEditor(ctk.CTkFrame):
         self.text_widget.tag_configure("right", justify="right")
     
     def update_text_height(self, event=None):
+        """Update text height."""
         lines = int(self.text_widget.count("1.0", "end", "displaylines")[0])
         clamped = max(1, min(lines, self.max_lines))
         self.text_widget.configure(height=clamped)
@@ -59,7 +63,9 @@ class RichTextEditor(ctk.CTkFrame):
     # Formatting Functions
     # ----------------------
     def toggle_bold(self):
+        """Toggle bold."""
         try:
+            # Keep bold resilient if this step fails.
             start = self.text_widget.index("sel.first")
             end = self.text_widget.index("sel.last")
             if "bold" in self.text_widget.tag_names(start):
@@ -70,7 +76,9 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def toggle_italic(self):
+        """Toggle italic."""
         try:
+            # Keep italic resilient if this step fails.
             start = self.text_widget.index("sel.first")
             end = self.text_widget.index("sel.last")
             if "italic" in self.text_widget.tag_names(start):
@@ -81,7 +89,9 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def toggle_underline(self):
+        """Toggle underline."""
         try:
+            # Keep underline resilient if this step fails.
             start = self.text_widget.index("sel.first")
             end = self.text_widget.index("sel.last")
             if "underline" in self.text_widget.tag_names(start):
@@ -92,9 +102,12 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def change_font_size(self):
+        """Handle change font size."""
         try:
+            # Keep change font size resilient if this step fails.
             new_size = simpledialog.askinteger("Font Size", "Enter new font size:", minvalue=6, maxvalue=72)
             if new_size:
+                # Continue with this path when new size is set.
                 start = self.text_widget.index("sel.first")
                 end = self.text_widget.index("sel.last")
                 for tag in self.text_widget.tag_names(start):
@@ -107,9 +120,12 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def change_text_color(self):
+        """Handle change text color."""
         try:
+            # Keep change text color resilient if this step fails.
             color = colorchooser.askcolor()[1]
             if color:
+                # Continue with this path when color is set.
                 start = self.text_widget.index("sel.first")
                 end = self.text_widget.index("sel.last")
                 for tag in self.text_widget.tag_names(start):
@@ -122,6 +138,7 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def align_left(self):
+        """Handle align left."""
         try:
             start = self.text_widget.index("sel.first")
             end = self.text_widget.index("sel.last")
@@ -130,6 +147,7 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def align_center(self):
+        """Handle align center."""
         try:
             start = self.text_widget.index("sel.first")
             end = self.text_widget.index("sel.last")
@@ -138,6 +156,7 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def align_right(self):
+        """Handle align right."""
         try:
             start = self.text_widget.index("sel.first")
             end = self.text_widget.index("sel.last")
@@ -146,7 +165,9 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def toggle_bullet_list(self):
+        """Toggle bullet list."""
         try:
+            # Keep bullet list resilient if this step fails.
             start_index = self.text_widget.index("sel.first linestart")
             end_index = self.text_widget.index("sel.last lineend")
             lines = self.text_widget.get(start_index, end_index).splitlines()
@@ -172,8 +193,10 @@ class RichTextEditor(ctk.CTkFrame):
             pass
 
     def toggle_numbered_list(self):
+        """Toggle numbered list."""
         import re
         try:
+            # Keep numbered list resilient if this step fails.
             start_index = self.text_widget.index("sel.first linestart")
             end_index = self.text_widget.index("sel.last lineend")
             lines = self.text_widget.get(start_index, end_index).splitlines()
@@ -201,6 +224,7 @@ class RichTextEditor(ctk.CTkFrame):
         formatting = {}
 
         for tag in tags:
+            # Process each tag from tags.
             formatting[tag] = []
             ranges = self.text_widget.tag_ranges(tag)
             # ranges comes back as [start1, end1, start2, end2, ...]
@@ -226,6 +250,7 @@ class RichTextEditor(ctk.CTkFrame):
             for start, end in runs:
                 # Convert numeric offsets into "1.0 + N chars"
                 try:
+                    # Keep text data resilient if this step fails.
                     s = int(start)
                     e = int(end)
                     idx1 = f"1.0 + {s} chars"

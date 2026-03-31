@@ -1,3 +1,5 @@
+"""Panel for audio mood."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -7,6 +9,7 @@ import customtkinter as ctk
 
 
 def build_mood_panel(parent: Any, *, section: str, on_select: Callable[[str], None], on_add: Callable[[str], None], on_rename: Callable[[str], None], on_remove: Callable[[str], None]) -> dict[str, Any]:
+    """Build mood panel."""
     frame = ctk.CTkFrame(parent)
     frame.grid(row=0, column=1, sticky="nsew", padx=(0, 12))
     frame.grid_rowconfigure(1, weight=1)

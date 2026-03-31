@@ -1,3 +1,4 @@
+"""Validation helpers for campaign forge."""
 from __future__ import annotations
 
 from typing import Any
@@ -8,6 +9,7 @@ class CampaignForgeValidationError(ValueError):
 
 
 def validate_foundation(foundation: dict[str, Any]) -> None:
+    """Validate foundation."""
     required = {
         "name": "Campaign name is required.",
         "logline": "Campaign logline is required.",
@@ -19,10 +21,12 @@ def validate_foundation(foundation: dict[str, Any]) -> None:
 
 
 def validate_arcs(arcs: list[dict[str, Any]], *, min_arcs: int = 1) -> None:
+    """Validate arcs."""
     if len(arcs) < min_arcs:
         raise CampaignForgeValidationError(f"At least {min_arcs} arc(s) are required.")
 
     for index, arc in enumerate(arcs, start=1):
+        # Process each (index, arc) from enumerate(arcs, start=1).
         if not str(arc.get("name") or "").strip():
             raise CampaignForgeValidationError(f"Arc #{index} is missing 'name'.")
         if not isinstance(arc.get("scenarios"), list) or not arc.get("scenarios"):
@@ -38,6 +42,7 @@ def validate_generated_payload(
     scenarios_per_arc: int = 2,
     required_scenario_fields: tuple[str, ...] = ("Title", "Summary", "Scenes"),
 ) -> None:
+    """Validate generated payload."""
     groups = payload.get("arcs")
     if not isinstance(groups, list):
         raise CampaignForgeValidationError("Generated payload must include an 'arcs' list.")
@@ -47,6 +52,7 @@ def validate_generated_payload(
         )
 
     for group in groups:
+        # Process each group from groups.
         if not isinstance(group, dict):
             raise CampaignForgeValidationError("Each generated arc group must be an object.")
         arc_name = str(group.get("arc_name") or "").strip()
@@ -61,11 +67,14 @@ def validate_generated_payload(
             )
 
         for scenario in scenarios:
+            # Process each scenario from scenarios.
             if not isinstance(scenario, dict):
                 raise CampaignForgeValidationError(f"Arc '{arc_name}' includes a non-object scenario payload.")
             for field_name in required_scenario_fields:
+                # Process each field_name from required_scenario_fields.
                 value = scenario.get(field_name)
                 if field_name == "Scenes":
+                    # Handle the branch where field_name == 'Scenes'.
                     if not isinstance(value, list) or not value:
                         raise CampaignForgeValidationError(
                             f"Scenario in arc '{arc_name}' must include a non-empty Scenes list."

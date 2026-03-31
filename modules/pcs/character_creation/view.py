@@ -21,6 +21,7 @@ from .storage.payload_normalizer import normalize_draft_payload_for_form
 
 class CharacterCreationView(ctk.CTkFrame):
     def __init__(self, parent):
+        """Initialize the CharacterCreationView instance."""
         super().__init__(parent)
         self.drafts = CharacterDraftRepository()
         self.advancement_rows = []
@@ -76,6 +77,7 @@ class CharacterCreationView(ctk.CTkFrame):
         skill_frame = ctk.CTkFrame(scroll)
         skill_frame.grid(row=7, column=0, columnspan=2, sticky="ew", padx=6, pady=4)
         for i, skill in enumerate(SKILLS):
+            # Process each (i, skill) from enumerate(SKILLS).
             r = i // 2
             c = (i % 2) * 3
             ctk.CTkLabel(skill_frame, text=skill).grid(row=r, column=c, sticky="w", padx=(6, 2), pady=2)
@@ -166,6 +168,7 @@ class CharacterCreationView(ctk.CTkFrame):
         btn.grid(row=0, column=3, sticky="e", padx=(10, 0))
 
     def _entry(self, parent, label, key, row, col, default=""):
+        """Internal helper for entry."""
         frame = ctk.CTkFrame(parent)
         frame.grid(row=row, column=col, sticky="ew", padx=6, pady=3)
         frame.grid_columnconfigure(0, weight=1)
@@ -175,6 +178,7 @@ class CharacterCreationView(ctk.CTkFrame):
         ctk.CTkEntry(frame, textvariable=var).grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 6))
 
     def _build_payload(self) -> dict:
+        """Build payload."""
         favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
         feats = self.prowess_editor.get_payload()
         advancement_choices = []
@@ -203,6 +207,7 @@ class CharacterCreationView(ctk.CTkFrame):
         }
 
     def _on_advancements_changed(self, *_args):
+        """Handle advancements changed."""
         self._update_favorites_limit_ui()
         self._render_advancement_rows()
         self._render_feat_rows(self._collect_current_feats())
@@ -210,11 +215,13 @@ class CharacterCreationView(ctk.CTkFrame):
         self._update_equipment_points_marker()
 
     def _update_favorites_limit_ui(self) -> None:
+        """Update favorites limit UI."""
         advancement_count = self._safe_int(self.inputs["advancements"].get())
         favorite_limit = max_favorite_skills(advancement_count)
         self.skills_header_var.set(f"Skills (15 base points, max favorites: {favorite_limit})")
 
     def _render_advancement_rows(self):
+        """Render advancement rows."""
         existing_choices = self._collect_cached_advancement_choices()
 
         for widget in self.advancement_frame.winfo_children():
@@ -231,6 +238,7 @@ class CharacterCreationView(ctk.CTkFrame):
         # Headless tests may provide a lightweight placeholder instead of a real
         # Tk container. Preserve the data model without requiring widget creation.
         if not hasattr(self.advancement_frame, "tk"):
+            # Handle the branch where not hasattr(advancement_frame, 'tk').
             for idx in range(advancement_count):
                 existing_choice = self._advancement_choices_cache[idx] if idx < len(self._advancement_choices_cache) else {}
                 initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
@@ -254,6 +262,7 @@ class CharacterCreationView(ctk.CTkFrame):
         ).grid(row=0, column=0, columnspan=2, sticky="w", padx=6, pady=(6, 2))
 
         for idx in range(advancement_count):
+            # Process each idx from range(advancement_count).
             row_frame = ctk.CTkFrame(self.advancement_frame)
             row_frame.grid(row=idx + 1, column=0, columnspan=2, sticky="ew", padx=6, pady=3)
             row_frame.grid_columnconfigure(1, weight=1)
@@ -297,6 +306,7 @@ class CharacterCreationView(ctk.CTkFrame):
             )
 
     def _collect_cached_advancement_choices(self) -> list[dict[str, str]]:
+        """Collect cached advancement choices."""
         if not self.advancement_rows:
             return [
                 {
@@ -317,14 +327,17 @@ class CharacterCreationView(ctk.CTkFrame):
         return choices
 
     def _on_advancement_choice_updated(self, *_args):
+        """Handle advancement choice updated."""
         self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
         self._update_equipment_points_marker()
 
     def _collect_current_feats(self) -> list[dict]:
+        """Collect current feats."""
         return self.prowess_editor.get_payload()
 
     def _render_feat_rows(self, existing_feats: list[dict]) -> None:
+        """Render feat rows."""
         advancement_choices = [
             {
                 "type": row["type_var"].get().strip(),
@@ -340,6 +353,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self._update_prowess_points_marker()
 
     def _update_prowess_points_marker(self) -> None:
+        """Update prowess points marker."""
         advancement_choices = [
             {
                 "type": row["type_var"].get().strip(),
@@ -356,10 +370,12 @@ class CharacterCreationView(ctk.CTkFrame):
             self.prowess_points_var.set(f"Prowess points (total/available): {points_total}/{points_available}")
 
     def _add_feat_row(self) -> None:
+        """Internal helper for add feat row."""
         self.extra_feat_count += 1
         self._render_feat_rows(self._collect_current_feats())
 
     def _remove_feat_row(self, feat_index: int) -> None:
+        """Remove feat row."""
         feats = self._collect_current_feats()
         if not (0 <= feat_index < len(feats)):
             return
@@ -371,6 +387,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self._render_feat_rows(feats)
 
     def _refresh_draft_selector(self):
+        """Refresh draft selector."""
         names = self.drafts.list_names()
         self.draft_selector.configure(values=names or [""])
         if names:
@@ -381,6 +398,7 @@ class CharacterCreationView(ctk.CTkFrame):
             self.draft_name_var.set("")
 
     def _save_current_draft(self):
+        """Save current draft."""
         try:
             payload = self._build_payload()
         except ValueError:
@@ -399,6 +417,7 @@ class CharacterCreationView(ctk.CTkFrame):
         messagebox.showinfo("Character Creation", f"Character '{name}' saved in the current campaign.")
 
     def _load_selected_draft(self):
+        """Load selected draft."""
         name = (self.draft_name_var.get() or "").strip()
         if not name:
             messagebox.showerror("Character Creation", "Select a character to load.")
@@ -413,6 +432,7 @@ class CharacterCreationView(ctk.CTkFrame):
         messagebox.showinfo("Character Creation", f"Character '{name}' loaded.")
 
     def _apply_payload(self, payload: dict):
+        """Apply payload."""
         normalized_payload = normalize_draft_payload_for_form(payload)
 
         for key, var in self.inputs.items():
@@ -431,6 +451,7 @@ class CharacterCreationView(ctk.CTkFrame):
         advancement_choices = normalized_payload.get("advancement_choices") or []
         self._render_advancement_rows()
         for idx, row in enumerate(self.advancement_rows):
+            # Process each (idx, row) from enumerate(advancement_rows).
             if idx >= len(advancement_choices):
                 break
             entry = advancement_choices[idx] or {}
@@ -454,6 +475,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self._update_equipment_points_marker()
 
     def _update_equipment_points_marker(self, *_args) -> None:
+        """Update equipment points marker."""
         if self.equipment_editor is None:
             return
 
@@ -466,6 +488,7 @@ class CharacterCreationView(ctk.CTkFrame):
         allocated_map = self.equipment_editor.get_allocated_pe()
         allocated = sum(allocated_map.values())
         for key, value in allocated_map.items():
+            # Process each (key, value) from allocated_map.items().
             pe_key = f"{key}_pe"
             if pe_key in self.inputs:
                 self.inputs[pe_key].set(str(value))
@@ -478,12 +501,14 @@ class CharacterCreationView(ctk.CTkFrame):
         )
 
     def _safe_int(self, raw_value: str) -> int:
+        """Internal helper for safe int."""
         try:
             return int((raw_value or "0").strip())
         except ValueError:
             return 0
 
     def _update_remaining_points_marker(self, *_args) -> None:
+        """Update remaining points marker."""
         base_points = {skill: self._safe_int(var.get()) for skill, var in self.skill_vars.items()}
         bonus_points = {skill: self._safe_int(var.get()) for skill, var in self.bonus_skill_vars.items()}
         favorites = [skill for skill, var in self.favorite_vars.items() if var.get()]
@@ -509,6 +534,7 @@ class CharacterCreationView(ctk.CTkFrame):
         )
 
     def create_character_pdf(self):
+        """Create character PDF."""
         try:
             payload = self._build_payload()
             result = build_character(payload)
@@ -533,6 +559,7 @@ class CharacterCreationView(ctk.CTkFrame):
             return
 
         try:
+            # Keep character PDF resilient if this step fails.
             out, used_backend = export_character_sheet(
                 payload,
                 result,

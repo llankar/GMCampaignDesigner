@@ -1,3 +1,5 @@
+"""Utilities for editor window base."""
+
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE
 
@@ -5,6 +7,7 @@ from modules.generic.editor.styles import EDITOR_PALETTE
 @log_methods
 class GenericEditorWindowBase(ctk.CTkToplevel):
     def __init__(self, master, item, template, model_wrapper, creation_mode=False):
+        """Initialize the GenericEditorWindowBase instance."""
         super().__init__(master)
         self.item = item
         # ``FogMaskPath`` and the token metadata are intentionally hidden from the
@@ -93,6 +96,7 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
 
         candidate_keys = ("Name", "Title", "Label")
         for key in candidate_keys:
+            # Process each key from candidate_keys.
             value = str(self.item.get(key, "")).strip()
             if value:
                 return f"Edit {value}"

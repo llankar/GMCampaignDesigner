@@ -1,3 +1,5 @@
+"""Utilities for campaign dossier exporter."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -45,21 +47,25 @@ class EntityGroup:
 
 
 def _docx2pdf_available() -> bool:
+    """Internal helper for docx2pdf available."""
     return importlib.util.find_spec("docx2pdf") is not None
 
 
 def _normalize_name(record: dict) -> str:
+    """Normalize name."""
     name = record.get("Name") or record.get("Title") or "Unnamed"
     return str(name).strip() or "Unnamed"
 
 
 def _sanitize_filename(value: str) -> str:
+    """Internal helper for sanitize filename."""
     safe = "".join(ch if ch.isalnum() or ch in "-_ " else "_" for ch in value)
     safe = "_".join(safe.split())
     return safe or "entity"
 
 
 def _normalize_rtf_payload(value) -> dict:
+    """Normalize RTF payload."""
     parsed = deserialize_possible_json(value)
     if isinstance(parsed, dict):
         normalized = normalize_rtf_json(parsed)
@@ -71,14 +77,17 @@ def _normalize_rtf_payload(value) -> dict:
 
 
 def _format_rtf_runs(text: str, formatting: dict) -> list[tuple[str, dict]]:
+    """Format RTF runs."""
     if not formatting:
         return [(text, {})]
 
     opens: dict[int, list[str]] = {}
     closes: dict[int, list[str]] = {}
     for tag in ("bold", "italic", "underline"):
+        # Process each tag from ('bold', 'italic', 'underline').
         ranges = formatting.get(tag, []) or []
         for start, end in ranges:
+            # Process each (start, end) from ranges.
             try:
                 start_index = int(start)
                 end_index = int(end)
@@ -96,7 +105,9 @@ def _format_rtf_runs(text: str, formatting: dict) -> list[tuple[str, dict]]:
     current: list[str] = []
 
     for index, char in enumerate(text):
+        # Process each (index, char) from enumerate(text).
         if index in closes or index in opens:
+            # Handle the branch where index is in closes or index is in opens.
             if current:
                 segments.append(
                     (
@@ -130,19 +141,24 @@ def _format_rtf_runs(text: str, formatting: dict) -> list[tuple[str, dict]]:
 
 
 def _format_field_value(value) -> list[tuple[str, dict]]:
+    """Format field value."""
     if value is None:
         return []
     value = deserialize_possible_json(value)
     if isinstance(value, dict):
+        # Handle the branch where isinstance(value, dict).
         if "text" in value or "formatting" in value:
             payload = _normalize_rtf_payload(value)
             return _format_rtf_runs(payload.get("text", ""), payload.get("formatting", {}))
         return [(str(value), {})]
     if isinstance(value, list):
+        # Handle the branch where isinstance(value, list).
         segments: list[tuple[str, dict]] = []
         for item in value:
+            # Process each item from value.
             item_segments = _format_field_value(deserialize_possible_json(item))
             if item_segments:
+                # Continue with this path when item segments is set.
                 if segments:
                     segments.append(("\n", {}))
                 segments.extend(item_segments)
@@ -151,6 +167,7 @@ def _format_field_value(value) -> list[tuple[str, dict]]:
 
 
 def _add_field_paragraph(document, label: str, value) -> None:
+    """Internal helper for add field paragraph."""
     text_parts = _format_field_value(value)
     if not text_parts:
         return
@@ -158,6 +175,7 @@ def _add_field_paragraph(document, label: str, value) -> None:
     label_run = paragraph.add_run(f"{label}: ")
     label_run.bold = True
     for text, formatting in text_parts:
+        # Process each (text, formatting) from text_parts.
         if not text:
             continue
         run = paragraph.add_run(text)
@@ -170,7 +188,9 @@ def _add_field_paragraph(document, label: str, value) -> None:
 
 
 def _add_entity_section(document, record: dict, fields: Iterable[dict]) -> None:
+    """Internal helper for add entity section."""
     for index, field in enumerate(fields):
+        # Process each (index, field) from enumerate(fields).
         if index == 0:
             continue
         name = field.get("name")
@@ -183,9 +203,11 @@ def _add_entity_section(document, record: dict, fields: Iterable[dict]) -> None:
 
 
 def _collect_entities() -> list[EntityGroup]:
+    """Collect entities."""
     definitions = load_entity_definitions()
     groups: list[EntityGroup] = []
     for slug in list_known_entities():
+        # Process each slug from list_known_entities().
         label = definitions.get(slug, {}).get("label") or slug.replace("_", " ").title()
         wrapper = GenericModelWrapper(slug)
         items = wrapper.load_items()
@@ -197,8 +219,10 @@ def _collect_entities() -> list[EntityGroup]:
 
 
 def _add_table_of_contents(document, groups: list[EntityGroup], preset) -> None:
+    """Internal helper for add table of contents."""
     document.add_heading("Table of Contents", level=1)
     for group in groups:
+        # Process each group from groups.
         document.add_paragraph(group.label, style="List Bullet")
         for record in group.items:
             document.add_paragraph(
@@ -209,17 +233,20 @@ def _add_table_of_contents(document, groups: list[EntityGroup], preset) -> None:
 
 
 def _campaign_name() -> str:
+    """Internal helper for campaign name."""
     campaign_dir = Path(ConfigHelper.get_campaign_dir())
     return campaign_dir.name
 
 
 def _style_group_heading(paragraph) -> None:
+    """Internal helper for style group heading."""
     for run in paragraph.runs:
         run.bold = True
         run.font.size = Pt(16)
 
 
 def _build_document(groups: list[EntityGroup], options: DossierExportOptions) -> Document:
+    """Build document."""
     theme_key = get_theme()
     document = Document()
     preset = apply_layout(document, options.layout_key, options.include_branding)
@@ -232,6 +259,7 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
         _add_table_of_contents(document, groups, preset)
 
     for group_index, group in enumerate(groups):
+        # Process each (group_index, group) from enumerate(groups).
         if group_index > 0:
             add_section_divider(document)
         heading = document.add_heading(group.label, level=2)
@@ -240,6 +268,7 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
         fields = template.get("fields", [])
 
         for record_index, record in enumerate(group.items):
+            # Process each (record_index, record) from enumerate(group.items).
             document.add_heading(
                 format_entity_label(preset, group.label, _normalize_name(record)),
                 level=3,
@@ -257,6 +286,7 @@ def _build_document(groups: list[EntityGroup], options: DossierExportOptions) ->
 
 
 def _save_docx(document: Document, path: str) -> None:
+    """Save docx."""
     directory = os.path.dirname(path)
     if directory:
         os.makedirs(directory, exist_ok=True)
@@ -264,6 +294,7 @@ def _save_docx(document: Document, path: str) -> None:
 
 
 def _convert_docx_to_pdf(docx_path: str, pdf_path: str) -> bool:
+    """Internal helper for convert docx to PDF."""
     if not _docx2pdf_available():
         return False
     from docx2pdf import convert
@@ -279,11 +310,13 @@ def _convert_docx_to_pdf(docx_path: str, pdf_path: str) -> bool:
 
 
 def _resolve_output_path(target: str, name: str, output_format: str) -> str:
+    """Resolve output path."""
     ext = ".pdf" if output_format == "pdf" else ".docx"
     return os.path.join(target, f"{_sanitize_filename(name)}{ext}")
 
 
 def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
+    """Export campaign dossier."""
     groups = _collect_entities()
     if not groups:
         return []
@@ -291,12 +324,15 @@ def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
     output_paths: list[str] = []
 
     if options.output_mode == "folder":
+        # Handle the branch where options.output_mode == 'folder'.
         for group in groups:
+            # Process each group from groups.
             group_dir = os.path.join(options.output_target, _sanitize_filename(group.label))
             os.makedirs(group_dir, exist_ok=True)
             template = load_template(group.slug)
             fields = template.get("fields", [])
             for record in group.items:
+                # Process each record from group.items.
                 document = Document()
                 preset = apply_layout(document, options.layout_key, options.include_branding)
                 theme_meta = apply_dossier_theme(document, get_theme())
@@ -311,6 +347,7 @@ def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
                 docx_path = _resolve_output_path(group_dir, _normalize_name(record), "docx")
                 _save_docx(document, docx_path)
                 if options.output_format == "pdf":
+                    # Handle the branch where options.output_format == 'pdf'.
                     pdf_path = _resolve_output_path(group_dir, _normalize_name(record), "pdf")
                     if _convert_docx_to_pdf(docx_path, pdf_path):
                         output_paths.append(pdf_path)
@@ -323,6 +360,7 @@ def export_campaign_dossier(options: DossierExportOptions) -> list[str]:
     document = _build_document(groups, options)
     output_path = options.output_target
     if options.output_format == "pdf":
+        # Handle the branch where options.output_format == 'pdf'.
         docx_path = os.path.splitext(output_path)[0] + ".docx"
         _save_docx(document, docx_path)
         if _convert_docx_to_pdf(docx_path, output_path):

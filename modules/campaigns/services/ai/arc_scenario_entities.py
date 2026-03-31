@@ -1,3 +1,5 @@
+"""Utilities for AI arc scenario entities."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -19,6 +21,7 @@ def load_existing_entity_catalog(entity_types: list[str] | tuple[str, ...] | Non
 
     catalog: dict[str, list[str]] = {}
     for entity_type in entity_types or tuple(ENTITY_WRAPPER_SPECS):
+        # Process each entity_type from entity_types or tuple(ENTITY_WRAPPER_SPECS).
         spec = ENTITY_WRAPPER_SPECS.get(entity_type)
         if not spec:
             continue
@@ -33,6 +36,7 @@ def load_existing_entity_catalog(entity_types: list[str] | tuple[str, ...] | Non
         names: list[str] = []
         seen: set[str] = set()
         for item in items or []:
+            # Process each item from items or [].
             if not isinstance(item, dict):
                 continue
             name = str(item.get(spec["key_field"]) or "").strip()
@@ -56,6 +60,7 @@ def build_existing_entity_lookup(foundation: dict[str, Any]) -> dict[str, set[st
 
     lookup: dict[str, set[str]] = {}
     for entity_type in ENTITY_WRAPPER_SPECS:
+        # Process each entity_type from ENTITY_WRAPPER_SPECS.
         raw_values = raw_catalog.get(entity_type)
         if not isinstance(raw_values, list):
             lookup[entity_type] = set()

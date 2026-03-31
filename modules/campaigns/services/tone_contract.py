@@ -1,3 +1,4 @@
+"""Contracts for campaign tone."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ class CampaignToneContract:
     setting: str
 
     def has_constraints(self) -> bool:
+        """Return whether constraints."""
         return any([self.genre, self.tone, self.setting])
 
 
@@ -70,6 +72,7 @@ def format_tone_contract_guidance(contract: CampaignToneContract) -> str:
 
 
 def _pick_campaign(campaigns: Iterable[dict]) -> Optional[dict]:
+    """Internal helper for pick campaign."""
     candidates = [entry for entry in campaigns if isinstance(entry, dict)]
     if not candidates:
         return None
@@ -89,6 +92,7 @@ def _pick_campaign(campaigns: Iterable[dict]) -> Optional[dict]:
 
 
 def _has_contract_fields(campaign: dict) -> bool:
+    """Return whether contract fields."""
     return any(
         _clean_text(campaign.get(field_name))
         for field_name in ("Genre", "Tone", "Setting")
@@ -96,11 +100,13 @@ def _has_contract_fields(campaign: dict) -> bool:
 
 
 def _status_rank(raw_status: object) -> int:
+    """Internal helper for status rank."""
     normalized = _clean_text(raw_status).lower()
     return _STATUS_PRIORITY.get(normalized, 50)
 
 
 def _clean_text(raw_value: object) -> str:
+    """Internal helper for clean text."""
     if raw_value is None:
         return ""
     return str(raw_value).strip()

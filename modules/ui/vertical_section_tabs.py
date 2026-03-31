@@ -1,3 +1,5 @@
+"""Utilities for vertical section tabs."""
+
 from tkinter import font as tkfont
 
 import customtkinter as ctk
@@ -7,6 +9,7 @@ from modules.generic.detail_ui import get_detail_palette
 
 class VerticalSectionTabs(ctk.CTkFrame):
     def __init__(self, parent, sections, show_section, on_pin_toggle=None, **kwargs):
+        """Initialize the VerticalSectionTabs instance."""
         palette = get_detail_palette()
         kwargs.setdefault("fg_color", palette["surface_card"])
         kwargs.setdefault("corner_radius", 18)
@@ -58,6 +61,7 @@ class VerticalSectionTabs(ctk.CTkFrame):
         self._inactive_border_color = palette["surface_card"]
 
         for section in sections:
+            # Process each section from sections.
             button = ctk.CTkButton(
                 self._button_container,
                 text=section,
@@ -79,9 +83,11 @@ class VerticalSectionTabs(ctk.CTkFrame):
             self._resize_button(section)
 
     def _measure_text(self, text, font):
+        """Internal helper for measure text."""
         return tkfont.Font(font=font).measure(text)
 
     def _resize_button(self, section_name):
+        """Internal helper for resize button."""
         button = self._buttons.get(section_name)
         if button is None:
             return
@@ -91,15 +97,18 @@ class VerticalSectionTabs(ctk.CTkFrame):
         button.configure(width=max(156, text_width + 44))
 
     def _on_pin_toggle(self, section_name):
+        """Handle pin toggle."""
         if self._on_pin_toggle_callback is not None:
             self._on_pin_toggle_callback(section_name)
 
     def _on_select(self, section_name):
+        """Handle select."""
         self.set_active(section_name)
         if self._show_section is not None:
             self._show_section(section_name)
 
     def set_active(self, section_name):
+        """Set active."""
         self._active_section = section_name
         for name, button in self._buttons.items():
             is_active = name == section_name
@@ -112,7 +121,9 @@ class VerticalSectionTabs(ctk.CTkFrame):
             self._resize_button(name)
 
     def set_pinned(self, pinned_sections):
+        """Set pinned."""
         for name in self._buttons:
+            # Process each name from _buttons.
             label = name
             if name in pinned_sections:
                 label = f"📌 {label}"

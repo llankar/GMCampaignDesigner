@@ -1,3 +1,5 @@
+"""Utilities for AI event."""
+
 from __future__ import annotations
 
 from collections import defaultdict, deque
@@ -20,14 +22,17 @@ class AIPipelineEventBus:
     LOCAL_AI_STEP_BUFFER_SIZE = 12
 
     def __init__(self) -> None:
+        """Initialize the AIPipelineEventBus instance."""
         self._subscribers: DefaultDict[str, list[Callable[[AIPipelineEvent], None]]] = defaultdict(list)
         self._recent_local_ai_steps_by_request: dict[str, deque[dict[str, Any]]] = {}
         self._last_request_id = ""
 
     def subscribe(self, event_type: str, callback: Callable[[AIPipelineEvent], None]) -> Callable[[], None]:
+        """Handle subscribe."""
         self._subscribers[event_type].append(callback)
 
         def _unsubscribe() -> None:
+            """Internal helper for unsubscribe."""
             listeners = self._subscribers.get(event_type, [])
             if callback in listeners:
                 listeners.remove(callback)
@@ -35,6 +40,7 @@ class AIPipelineEventBus:
         return _unsubscribe
 
     def emit(self, event: AIPipelineEvent) -> None:
+        """Handle emit."""
         self._track_local_ai_metadata(event)
         for callback in list(self._subscribers.get(event.event_type, [])):
             callback(event)
@@ -42,6 +48,7 @@ class AIPipelineEventBus:
             callback(event)
 
     def get_recent_local_ai_steps(self, request_id: str | None = None) -> list[dict[str, Any]]:
+        """Return recent local AI steps."""
         target_request_id = request_id or self._last_request_id
         if not target_request_id:
             return []
@@ -49,6 +56,7 @@ class AIPipelineEventBus:
         return list(buffered or [])
 
     def _track_local_ai_metadata(self, event: AIPipelineEvent) -> None:
+        """Internal helper for track local AI metadata."""
         metadata = normalize_local_ai_metadata(event.metadata)
         if not metadata.get("feature"):
             return
@@ -83,6 +91,7 @@ LOCAL_AI_METADATA_KEYS = ("prompt_text", "response_text", "model", "duration_ms"
 
 
 def normalize_local_ai_metadata(metadata: dict | None = None, **overrides: Any) -> dict[str, Any]:
+    """Normalize local AI metadata."""
     source: dict[str, Any] = dict(metadata or {})
     source.update(overrides)
     normalized = {key: source.get(key) for key in LOCAL_AI_METADATA_KEYS}
@@ -104,6 +113,7 @@ def publish_local_ai_event(
     metadata: dict | None = None,
     **metadata_overrides: Any,
 ) -> None:
+    """Handle publish local AI event."""
     ai_pipeline_events.emit(
         AIPipelineEvent(
             event_type=event_type,
@@ -122,6 +132,7 @@ def timed_local_ai_chat(
     metadata: dict | None = None,
     **metadata_overrides: Any,
 ) -> tuple[str, dict[str, Any]]:
+    """Handle timed local AI chat."""
     start = perf_counter()
     response_text = chat_callable()
     duration_ms = int((perf_counter() - start) * 1000)

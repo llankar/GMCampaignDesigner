@@ -1,3 +1,5 @@
+"""Repository helpers for library."""
+
 from __future__ import annotations
 
 import copy
@@ -24,6 +26,7 @@ AUDIO_EXTENSIONS: set[str] = {
 
 
 def default_state() -> Dict[str, Dict[str, Any]]:
+    """Handle default state."""
     return {
         "music": {
             "categories": {},
@@ -56,15 +59,18 @@ def default_state() -> Dict[str, Dict[str, Any]]:
 
 class AudioLibraryRepository:
     def __init__(self, path: str = "config/audio_library.json") -> None:
+        """Initialize the AudioLibraryRepository instance."""
         self.path = path
 
     def load(self) -> Dict[str, Dict[str, Any]]:
+        """Load the operation."""
         if not os.path.exists(self.path):
             state = default_state()
             self.save(state)
             return state
 
         try:
+            # Keep load resilient if this step fails.
             with open(self.path, "r", encoding="utf-8") as handle:
                 raw = json.load(handle)
         except Exception as exc:  # pragma: no cover - defensive
@@ -82,21 +88,25 @@ class AudioLibraryRepository:
         return state
 
     def save(self, data: Dict[str, Dict[str, Any]]) -> None:
+        """Save the operation."""
         directory = os.path.dirname(self.path)
         if directory:
             os.makedirs(directory, exist_ok=True)
         try:
+            # Keep save resilient if this step fails.
             with open(self.path, "w", encoding="utf-8") as handle:
                 json.dump(data, handle, indent=2, ensure_ascii=False)
         except Exception as exc:  # pragma: no cover
             log_error(f"AudioLibraryRepository.save - failed to write {self.path}: {exc}")
 
     def compatibility_category_view(self, data: Dict[str, Dict[str, Any]], section: str, category: str) -> Dict[str, Any]:
+        """Handle compatibility category view."""
         payload = self._get_category(data, section, category)
         tracks: List[Dict[str, Any]] = []
         moods = payload.get("moods", {})
         if isinstance(moods, dict):
             for mood_name, bucket in moods.items():
+                # Process each (mood_name, bucket) from moods.items().
                 if not isinstance(bucket, dict):
                     continue
                 bucket_tracks = bucket.get("tracks", [])
@@ -113,9 +123,11 @@ class AudioLibraryRepository:
         }
 
     def _merge_with_defaults(self, raw: Dict[str, Any]) -> tuple[Dict[str, Dict[str, Any]], bool]:
+        """Merge with defaults."""
         state = default_state()
         changed = False
         for section in ("music", "effects"):
+            # Process each section from ('music', 'effects').
             section_raw = raw.get(section, {})
             if not isinstance(section_raw, dict):
                 changed = True
@@ -125,6 +137,7 @@ class AudioLibraryRepository:
             cleaned_categories: Dict[str, Dict[str, Any]] = {}
             if isinstance(categories_raw, dict):
                 for name, payload in categories_raw.items():
+                    # Process each (name, payload) from categories_raw.items().
                     if not isinstance(name, str):
                         changed = True
                         continue
@@ -136,6 +149,7 @@ class AudioLibraryRepository:
 
             settings_raw = section_raw.get("settings", {})
             if isinstance(settings_raw, dict):
+                # Handle the branch where isinstance(settings_raw, dict).
                 defaults = state[section]["settings"]
                 for key in defaults:
                     if key in settings_raw:
@@ -147,6 +161,7 @@ class AudioLibraryRepository:
         return state, changed
 
     def _sanitize_category_payload(self, category: str, payload: Any) -> tuple[Dict[str, Any], bool]:
+        """Internal helper for sanitize category payload."""
         if not isinstance(payload, dict):
             payload = {}
         migrated = False
@@ -162,6 +177,7 @@ class AudioLibraryRepository:
 
         moods_payload = payload.get("moods")
         if isinstance(moods_payload, dict):
+            # Handle the branch where isinstance(moods_payload, dict).
             moods: Dict[str, Dict[str, Any]] = {}
             seen_paths: set[str] = set()
             for mood_name, mood_data in moods_payload.items():
@@ -175,6 +191,7 @@ class AudioLibraryRepository:
 
         legacy_tracks = payload.get("tracks", [])
         if isinstance(legacy_tracks, list) and legacy_tracks:
+            # Continue with this path when isinstance(legacy_tracks, list) and legacy tracks is set.
             migrated = True
             seen_paths = {
                 track.get("path")
@@ -183,6 +200,7 @@ class AudioLibraryRepository:
                 if isinstance(track, dict)
             }
             for entry in legacy_tracks:
+                # Process each entry from legacy_tracks.
                 mood_key = self.sanitize_mood(entry.get("mood", NO_MOOD) if isinstance(entry, dict) else NO_MOOD)
                 moods.setdefault(mood_key, {"tracks": []})
                 sanitized = self.sanitize_track(entry, category=category, forced_mood=mood_key)
@@ -209,10 +227,12 @@ class AudioLibraryRepository:
         mood: str,
         seen_paths: set[str],
     ) -> List[Dict[str, Any]]:
+        """Internal helper for sanitize tracks list."""
         cleaned: List[Dict[str, Any]] = []
         if not isinstance(tracks_raw, list):
             return cleaned
         for entry in tracks_raw:
+            # Process each entry from tracks_raw.
             sanitized = self.sanitize_track(entry, category=category, forced_mood=mood)
             if sanitized is None:
                 continue
@@ -230,6 +250,7 @@ class AudioLibraryRepository:
         category: str,
         forced_mood: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
+        """Handle sanitize track."""
         if not isinstance(data, dict):
             return None
         path = data.get("path")
@@ -252,12 +273,14 @@ class AudioLibraryRepository:
         }
 
     def sanitize_mood(self, value: Any) -> str:
+        """Handle sanitize mood."""
         if not isinstance(value, str):
             return NO_MOOD
         mood = value.strip().casefold()
         return mood or NO_MOOD
 
     def normalize_path(self, value: str) -> str:
+        """Normalize path."""
         try:
             expanded = os.path.expanduser(value)
             absolute = os.path.abspath(expanded)
@@ -266,31 +289,38 @@ class AudioLibraryRepository:
             return value
 
     def get_category_payload(self, data: Dict[str, Dict[str, Any]], section: str, category: str) -> Dict[str, Any]:
+        """Return category payload."""
         return self._get_category(data, section, category)
 
     def get_categories_payload(self, data: Dict[str, Dict[str, Any]], section: str) -> Dict[str, Dict[str, Any]]:
+        """Return categories payload."""
         section_data = self._get_section(data, section)
         categories = section_data.setdefault("categories", {})
         return categories  # type: ignore[return-value]
 
     def _get_section(self, data: Dict[str, Dict[str, Any]], section: str) -> Dict[str, Any]:
+        """Return section."""
         if section not in data:
             raise KeyError(f"Unknown section '{section}'.")
         return data[section]
 
     def _get_category(self, data: Dict[str, Dict[str, Any]], section: str, category: str) -> Dict[str, Any]:
+        """Return category."""
         categories = self.get_categories_payload(data, section)
         if category not in categories:
             raise KeyError(f"Unknown category '{category}' in section '{section}'.")
         return categories[category]
 
     def collect_audio_files(self, directory: str, *, recursive: bool = True) -> List[str]:
+        """Collect audio files."""
         collected: List[str] = []
         if not os.path.isdir(directory):
             return collected
 
         for root, _dirs, files in os.walk(directory):
+            # Process each (root, _dirs, files) from os.walk(directory).
             for filename in files:
+                # Process each filename from files.
                 extension = os.path.splitext(filename)[1].lower()
                 if extension in AUDIO_EXTENSIONS:
                     collected.append(os.path.join(root, filename))

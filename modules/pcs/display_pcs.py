@@ -1,3 +1,5 @@
+"""Utilities for display PCs."""
+
 import customtkinter as ctk
 from modules.helpers import theme_manager
 from modules.helpers.text_helpers import format_multiline_text
@@ -7,9 +9,12 @@ log_module_import(__name__)
 
 
 def display_pcs_in_banner(banner_frame, pcs_items):
+    """Handle display PCs in banner."""
     banner_frame._pcs_items_cache = pcs_items
     if not getattr(banner_frame, "_pcs_theme_listener", None):
+        # Handle the branch where not getattr(banner_frame, '_pcs_theme_listener', None).
         def _refresh(_theme):
+            """Refresh the operation."""
             if not banner_frame.winfo_exists():
                 return
             cached = getattr(banner_frame, "_pcs_items_cache", None)
@@ -21,6 +26,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         banner_frame._pcs_theme_unsub = theme_manager.register_theme_change_listener(_refresh)
 
         def _cleanup(_event):
+            """Internal helper for cleanup."""
             unsub = getattr(banner_frame, "_pcs_theme_unsub", None)
             if unsub:
                 unsub()
@@ -94,6 +100,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
     banner_frame.grid_columnconfigure(0, weight=1)
 
     def _on_mousewheel(event):
+        """Handle mousewheel."""
         delta = event.delta if hasattr(event, "delta") else (120 if event.num == 4 else -120)
         if getattr(event, "state", 0) & 0x0001:
             canvas.xview_scroll(int(-1 * (delta / 120)), "units")
@@ -102,11 +109,13 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         return "break"
 
     def _bind_banner_scroll(_event):
+        """Bind banner scroll."""
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
         canvas.bind_all("<Button-4>", _on_mousewheel)
         canvas.bind_all("<Button-5>", _on_mousewheel)
 
     def _unbind_banner_scroll(_event):
+        """Internal helper for unbind banner scroll."""
         canvas.unbind_all("<MouseWheel>")
         canvas.unbind_all("<Button-4>")
         canvas.unbind_all("<Button-5>")
@@ -117,6 +126,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
     col_idx = 0
 
     def add_header(parent, name):
+        """Handle add header."""
         header = ctk.CTkFrame(
             parent,
             fg_color=colors["header_bg"],
@@ -133,6 +143,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         label.pack(fill="x", padx=8, pady=5)
 
     def add_section(parent, title, content):
+        """Handle add section."""
         if not content:
             return
         frame = ctk.CTkFrame(parent, fg_color="transparent")
@@ -157,6 +168,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         label_content.pack(fill="x", pady=(2, 0))
 
     for pc_name, pc_data in pcs_items.items():
+        # Process each (pc_name, pc_data) from pcs_items.items().
         pc_frame = ctk.CTkFrame(
             scrollable_frame,
             fg_color=colors["card_bg"],
@@ -176,6 +188,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         col_idx += 1
 
     def _fix_scroll():
+        """Internal helper for fix scroll."""
         banner_frame.update_idletasks()
         canvas.configure(scrollregion=canvas.bbox("all"))
 

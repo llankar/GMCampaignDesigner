@@ -1,3 +1,4 @@
+"""Mapping helpers for campaign form."""
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +11,7 @@ def list_campaign_names(campaign_items: list[dict]) -> list[str]:
 
     names: list[str] = []
     for item in campaign_items:
+        # Process each item from campaign_items.
         name = str(item.get("Name") or "").strip()
         if name and name not in names:
             names.append(name)
@@ -46,6 +48,7 @@ def build_form_state_from_campaign(campaign_data: dict) -> tuple[dict, dict, lis
     arcs_data = _coerce_arcs_payload(campaign_data.get("Arcs"))
     arcs: list[dict] = []
     for arc in arcs_data:
+        # Process each arc from arcs_data.
         if not isinstance(arc, dict):
             continue
         arcs.append(
@@ -64,9 +67,11 @@ def build_form_state_from_campaign(campaign_data: dict) -> tuple[dict, dict, lis
 
 
 def _coerce_arcs_payload(raw_arcs: Any) -> list[dict]:
+    """Coerce arcs payload."""
     parsed = deserialize_possible_json(raw_arcs)
 
     if isinstance(parsed, dict):
+        # Handle the branch where isinstance(parsed, dict).
         text_value = parsed.get("text")
         if text_value is not None:
             return _coerce_arcs_payload(text_value)

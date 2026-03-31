@@ -1,3 +1,5 @@
+"""View for web whiteboard."""
+
 import io
 import threading
 import time
@@ -16,6 +18,7 @@ log_module_import(__name__)
 
 
 def open_whiteboard_display(controller, port=None):
+    """Open whiteboard display."""
     if port is None:
         port = int(ConfigHelper.get("WhiteboardServer", "port", fallback=32500))
     if getattr(controller, "_whiteboard_web_thread", None):
@@ -41,6 +44,7 @@ def open_whiteboard_display(controller, port=None):
 
     @app.route("/")
     def index():
+        """Handle index."""
         use_mjpeg = bool(getattr(controller, "_whiteboard_use_mjpeg", True))
         refresh_ms = int(getattr(controller, "_whiteboard_refresh_ms", 200))
         token = getattr(getattr(controller, "remote_access_guard", None), "token", None)
@@ -53,6 +57,7 @@ def open_whiteboard_display(controller, port=None):
 
     @app.route("/board.png")
     def board_png():
+        """Handle board png."""
         controller._update_web_display_whiteboard()
         data = getattr(controller, "_whiteboard_image_bytes", None)
         if not data:
@@ -69,10 +74,12 @@ def open_whiteboard_display(controller, port=None):
 
     @app.route("/stream.mjpg")
     def stream_mjpeg():
+        """Handle stream mjpeg."""
         boundary = "frame"
         interval = max(1, int(getattr(controller, "_whiteboard_refresh_ms", 200))) / 1000.0
 
         def _ensure_rgb(img):
+            """Ensure RGB."""
             if img is None:
                 return None
             if img.mode == "RGB":
@@ -93,10 +100,13 @@ def open_whiteboard_display(controller, port=None):
                 return None
 
         def frame_bytes():
+            """Handle frame bytes."""
             if hasattr(controller, "render_web_whiteboard_image"):
+                # Handle the branch where hasattr(controller, 'render_web_whiteboard_image').
                 img = controller.render_web_whiteboard_image()
             else:
                 try:
+                    # Keep frame bytes resilient if this step fails.
                     viewport_size, origin, zoom_value = controller._web_render_geometry()
                 except Exception:
                     viewport_size = getattr(controller, "board_size", (1920, 1080))
@@ -127,13 +137,16 @@ def open_whiteboard_display(controller, port=None):
                 return None
             buf = io.BytesIO()
             try:
+                # Keep frame bytes resilient if this step fails.
                 img.save(buf, format="JPEG", quality=85)
                 return buf.getvalue()
             finally:
                 buf.close()
 
         def generate():
+            """Handle generate."""
             while True:
+                # Keep looping while True.
                 data = frame_bytes()
                 if data is None:
                     time.sleep(interval)
@@ -148,7 +161,9 @@ def open_whiteboard_display(controller, port=None):
         return Response(generate(), mimetype=f"multipart/x-mixed-replace; boundary={boundary}")
 
     def run_app():
+        """Run app."""
         try:
+            # Keep app resilient if this step fails.
             import logging as _logging
             _logging.getLogger("werkzeug").setLevel(_logging.ERROR)
             try:
@@ -165,11 +180,13 @@ def open_whiteboard_display(controller, port=None):
 
 
 def close_whiteboard_display(controller):
+    """Close whiteboard display."""
     thread = getattr(controller, "_whiteboard_web_thread", None)
     server = getattr(controller, "_whiteboard_server", None)
     if not thread:
         return
     try:
+        # Keep whiteboard display resilient if this step fails.
         if server:
             server.shutdown()
     except Exception:

@@ -1,3 +1,5 @@
+"""Dialog for generic new entity type."""
+
 import os
 import re
 import customtkinter as ctk
@@ -38,6 +40,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
     """Dialog that seeds a new entity template and registers metadata."""
 
     def __init__(self, master, on_created=None):
+        """Initialize the NewEntityTypeDialog instance."""
         super().__init__(master)
         self.title("New Entity Type")
         self.geometry("760x420")
@@ -131,15 +134,18 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self._enter_create_mode()
 
     def _mark_slug_dirty(self):
+        """Internal helper for mark slug dirty."""
         self._slug_dirty = True
 
     def _on_display_name_change(self, *_):
+        """Handle display name change."""
         if self._slug_dirty:
             return
         suggestion = _slugify(self.display_name_var.get())
         self.slug_var.set(suggestion)
 
     def _choose_icon(self):
+        """Internal helper for choose icon."""
         start_dir = ConfigHelper.get_campaign_dir()
         path = filedialog.askopenfilename(
             title="Select Icon",
@@ -153,6 +159,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self.icon_label_var.set(os.path.basename(path))
 
     def _clear_icon(self):
+        """Clear icon."""
         if self._mode == "edit" and self._current_icon_path:
             self._icon_mode = "clear"
         else:
@@ -161,6 +168,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self.icon_label_var.set("(optional)")
 
     def _validate(self, label: str, slug: str, *, allow_existing: bool = False) -> bool:
+        """Validate the operation."""
         if not label.strip():
             messagebox.showwarning("Missing Name", "Please provide a display name for the entity type.")
             return False
@@ -176,12 +184,14 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         return True
 
     def _perform_action(self):
+        """Internal helper for perform action."""
         if self._mode == "edit":
             self._update_entity()
         else:
             self._create_entity()
 
     def _create_entity(self):
+        """Create entity."""
         label = self.display_name_var.get().strip()
         slug = self.slug_var.get().strip().lower()
         if not self._validate(label, slug):
@@ -204,6 +214,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self._enter_edit_mode(slug)
 
     def _update_entity(self):
+        """Update entity."""
         if not self._current_slug:
             return
         label = self.display_name_var.get().strip()
@@ -239,6 +250,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
                 pass
 
     def _refresh_custom_entities(self, preserve_selection: str | None = None):
+        """Refresh custom entities."""
         defs = load_entity_definitions()
         self._existing_slugs = set(defs.keys())
         self._custom_entities = {
@@ -261,6 +273,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         )
 
         if preserve_selection and preserve_selection in self._custom_entities:
+            # Handle the branch where preserve selection is set and preserve selection is in custom entities.
             try:
                 index = self._list_order.index(preserve_selection)
             except ValueError:
@@ -273,6 +286,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
                 return
 
     def _enter_create_mode(self):
+        """Internal helper for enter create mode."""
         self._mode = "create"
         self._current_slug = None
         self._current_icon_path = None
@@ -291,6 +305,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self._slug_dirty = False
 
     def _enter_edit_mode(self, slug: str):
+        """Internal helper for enter edit mode."""
         meta = self._custom_entities.get(slug)
         if not meta:
             self._enter_create_mode()
@@ -314,6 +329,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self.action_button.configure(text="Save Changes")
 
     def _on_entity_select(self, _event=None):
+        """Handle entity select."""
         if not getattr(self, "_list_order", None):
             self._enter_create_mode()
             return
@@ -329,6 +345,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self._enter_edit_mode(slug)
 
     def _delete_selected(self):
+        """Delete selected."""
         selection = self.entity_listbox.curselection()
         if not selection:
             return
@@ -353,6 +370,7 @@ class NewEntityTypeDialog(ctk.CTkToplevel):
         self._enter_create_mode()
 
     def _close(self):
+        """Close the operation."""
         try:
             self.grab_release()
         except Exception:

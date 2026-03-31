@@ -1,3 +1,5 @@
+"""Panel for event detail."""
+
 from datetime import date
 
 import customtkinter as ctk
@@ -11,6 +13,7 @@ class EventDetailPanel(ctk.CTkFrame):
     LINKED_TYPES = ("Places", "NPCs", "Villains", "Creatures", "Objects", "Factions", "Bases", "Maps", "Clues", "Scenarios", "Informations")
 
     def __init__(self, master, *, on_compact_toggle, on_quick_edit, on_open_entity=None, on_event_click=None):
+        """Initialize the EventDetailPanel instance."""
         super().__init__(master)
         self._on_compact_toggle = on_compact_toggle
         self._on_quick_edit = on_quick_edit
@@ -40,6 +43,7 @@ class EventDetailPanel(ctk.CTkFrame):
         ctk.CTkButton(self.editor_frame, text="Enregistrer", width=110, command=self._emit_quick_edit).grid(row=0, column=1, sticky="e")
 
     def set_compact_mode(self, compact):
+        """Set compact mode."""
         self._is_compact = bool(compact)
         if self._is_compact:
             self.events_frame.grid_remove()
@@ -51,11 +55,13 @@ class EventDetailPanel(ctk.CTkFrame):
             self.compact_toggle.deselect()
 
     def render(self, *, active_date, events, show_source=True):
+        """Render the operation."""
         self._events = list(events)
         self.selection_label.configure(text=f"Selected day: {active_date.strftime('%A %d/%m/%Y').capitalize()}")
         self._render_events(show_source=show_source)
 
     def _render_events(self, *, show_source):
+        """Render events."""
         for child in self.events_frame.winfo_children():
             child.destroy()
 
@@ -64,6 +70,7 @@ class EventDetailPanel(ctk.CTkFrame):
             return
 
         for event in self._events:
+            # Process each event from _events.
             title = event.get("title", "Untitled")
             source = event.get("source")
             details = []
@@ -96,6 +103,7 @@ class EventDetailPanel(ctk.CTkFrame):
 
             links_added = False
             for linked_type in self.LINKED_TYPES:
+                # Process each linked_type from LINKED_TYPES.
                 linked_items = event.get(linked_type) or []
                 for linked_name in linked_items:
                     links_added = True
@@ -108,6 +116,7 @@ class EventDetailPanel(ctk.CTkFrame):
 
     @staticmethod
     def _badge_text(event):
+        """Internal helper for badge text."""
         event_date = event.get("date")
         if event_date is None:
             return "upcoming"
@@ -119,19 +128,23 @@ class EventDetailPanel(ctk.CTkFrame):
         return "upcoming"
 
     def _open_link(self, entity_type, entity_name):
+        """Open link."""
         if callable(self._on_open_entity):
             self._on_open_entity(entity_type, entity_name)
 
     def _emit_event_click(self, event):
+        """Internal helper for emit event click."""
         if callable(self._on_event_click):
             self._on_event_click(event)
 
     def _toggle_compact(self):
+        """Toggle compact."""
         self.set_compact_mode(bool(self.compact_toggle.get()))
         if callable(self._on_compact_toggle):
             self._on_compact_toggle(self._is_compact)
 
     def _emit_quick_edit(self):
+        """Internal helper for emit quick edit."""
         new_title = self.quick_title_entry.get().strip()
         if not new_title or not self._events:
             return

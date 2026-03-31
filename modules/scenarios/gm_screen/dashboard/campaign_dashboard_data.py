@@ -1,3 +1,5 @@
+"""Utilities for campaign dashboard data."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -24,6 +26,7 @@ def load_campaign_entities(wrappers: dict[str, Any]) -> list[dict[str, Any]]:
     catalog: list[dict[str, Any]] = []
     seen_names: set[str] = set()
     for raw in items:
+        # Process each raw from items.
         item = raw or {}
         name = coerce_text(item.get(_CAMPAIGN_LABEL_KEY)).strip()
         if not name:
@@ -47,6 +50,7 @@ def _resolve_campaign_wrapper(wrappers: dict[str, Any]) -> Any | None:
         return direct
 
     for key, wrapper in wrappers.items():
+        # Process each (key, wrapper) from wrappers.items().
         normalized = coerce_text(key).strip().lower()
         if normalized in {"campaign", "campaigns"}:
             return wrapper
@@ -55,6 +59,7 @@ def _resolve_campaign_wrapper(wrappers: dict[str, Any]) -> Any | None:
 
 
 def build_campaign_option_index(campaigns: list[dict[str, Any]]) -> tuple[list[str], dict[str, dict[str, Any]]]:
+    """Build campaign option index."""
     options: list[str] = []
     index: dict[str, dict[str, Any]] = {}
     for campaign in campaigns:
@@ -65,6 +70,7 @@ def build_campaign_option_index(campaigns: list[dict[str, Any]]) -> tuple[list[s
 
 
 def extract_campaign_fields(campaign_item: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Extract campaign fields."""
     if not campaign_item:
         return []
 
@@ -72,6 +78,7 @@ def extract_campaign_fields(campaign_item: dict[str, Any] | None) -> list[dict[s
     fields: list[dict[str, Any]] = []
 
     for field in template.get("fields", []):
+        # Process each field from template.get('fields', []).
         field_name = coerce_text(field.get("name")).strip()
         field_type = coerce_text(field.get("type")).strip() or "text"
         if not field_name:
@@ -85,6 +92,7 @@ def extract_campaign_fields(campaign_item: dict[str, Any] | None) -> list[dict[s
             continue
 
         if field_type == "list":
+            # Handle the branch where field_type == 'list'.
             items = [coerce_text(v).strip() for v in (value or []) if coerce_text(v).strip()]
             if not items:
                 continue
@@ -110,6 +118,7 @@ def extract_campaign_fields(campaign_item: dict[str, Any] | None) -> list[dict[s
 
 
 def _is_empty(value: Any) -> bool:
+    """Return whether empty."""
     if value is None:
         return True
     if isinstance(value, str):

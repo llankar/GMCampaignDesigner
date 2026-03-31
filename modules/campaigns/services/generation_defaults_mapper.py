@@ -1,3 +1,4 @@
+"""Mapping helpers for campaign generation defaults."""
 from __future__ import annotations
 
 from typing import Any
@@ -12,6 +13,7 @@ DEFAULT_GENERATION_DEFAULTS_STATE = {
 
 
 def _normalize_string_list(values: Any) -> list[str]:
+    """Normalize string list."""
     if isinstance(values, str):
         values = [values]
     if not isinstance(values, list):
@@ -20,6 +22,7 @@ def _normalize_string_list(values: Any) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
     for value in values:
+        # Process each value from values.
         cleaned = str(value or "").strip()
         if not cleaned:
             continue
@@ -32,6 +35,7 @@ def _normalize_string_list(values: Any) -> list[str]:
 
 
 def generation_defaults_payload_to_state(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Handle generation defaults payload to state."""
     payload = payload or {}
     return {
         "main_pc_factions": _normalize_string_list(payload.get("main_pc_factions")),
@@ -42,6 +46,7 @@ def generation_defaults_payload_to_state(payload: dict[str, Any] | None) -> dict
 
 
 def generation_defaults_state_to_payload(state: dict[str, Any] | None) -> dict[str, Any]:
+    """Handle generation defaults state to payload."""
     normalized = generation_defaults_payload_to_state(state)
     return {
         "main_pc_factions": normalized["main_pc_factions"],

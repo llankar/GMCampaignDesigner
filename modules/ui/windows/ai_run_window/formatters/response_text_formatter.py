@@ -1,3 +1,5 @@
+"""Formatting helpers for AI run window response text."""
+
 from __future__ import annotations
 
 import json
@@ -16,6 +18,7 @@ def format_ai_response_for_humans(response_text: str | None) -> str:
         return payload
 
     if isinstance(parsed, dict):
+        # Handle the branch where isinstance(parsed, dict).
         campaign_like = _format_campaign_payload(parsed)
         if campaign_like:
             return campaign_like
@@ -24,11 +27,13 @@ def format_ai_response_for_humans(response_text: str | None) -> str:
 
 
 def _try_parse_json(payload: str) -> Any | None:
+    """Internal helper for try parse JSON."""
     stripped = payload.strip()
     if not stripped:
         return None
 
     if stripped.startswith("```"):
+        # Handle the branch where stripped.startswith('```').
         stripped = stripped.strip("`").strip()
         if stripped.lower().startswith("json"):
             stripped = stripped[4:].strip()
@@ -43,6 +48,7 @@ def _try_parse_json(payload: str) -> Any | None:
 
 
 def _format_campaign_payload(data: dict[str, Any]) -> str:
+    """Format campaign payload."""
     title = _line_text(data.get("title"))
     summary = _line_text(data.get("summary"))
     secrets = _line_text(data.get("secrets"))
@@ -66,11 +72,13 @@ def _format_campaign_payload(data: dict[str, Any]) -> str:
         lines.append(secrets)
 
     if isinstance(scenes, list):
+        # Handle the branch where isinstance(scenes, list).
         lines.append("")
         lines.append("Scenes")
         lines.append("------")
         for idx, scene in enumerate(scenes, start=1):
             if isinstance(scene, dict):
+                # Handle the branch where isinstance(scene, dict).
                 scene_title = _line_text(scene.get("Title")) or f"Scene {idx}"
                 scene_type = _line_text(scene.get("SceneType"))
                 scene_summary = _line_text(scene.get("Summary"))
@@ -84,6 +92,7 @@ def _format_campaign_payload(data: dict[str, Any]) -> str:
 
 
 def _line_text(value: Any) -> str:
+    """Internal helper for line text."""
     if value is None:
         return ""
     if isinstance(value, str):

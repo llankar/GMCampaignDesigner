@@ -1,3 +1,4 @@
+"""Type definitions for event."""
 from dataclasses import dataclass
 
 
@@ -20,14 +21,17 @@ DEFAULT_EVENT_TYPE = EventType("autre", "Autre", "#7A7A7A")
 
 
 def normalize_event_type_key(value):
+    """Normalize event type key."""
     text = str(value or "").strip().lower()
     return text if text in EVENT_TYPES else DEFAULT_EVENT_TYPE.key
 
 
 def get_event_type(value):
+    """Return event type."""
     key = normalize_event_type_key(value)
     return EVENT_TYPES.get(key, DEFAULT_EVENT_TYPE)
 
 
 def event_type_labels():
+    """Handle event type labels."""
     return [item.label for item in EVENT_TYPES.values()]

@@ -15,6 +15,7 @@ TileCache = MutableMapping[str, ImageTk.PhotoImage]
 
 
 def _resolve_tile(cache: TileCache, canvas, *, cache_key: str = _GRID_TILE_KEY) -> ImageTk.PhotoImage:
+    """Resolve tile."""
     tile = cache.get(cache_key)
     if tile is None:
         tile = create_grid_tile(canvas)

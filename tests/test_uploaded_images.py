@@ -1,3 +1,5 @@
+"""Regression tests for uploaded images."""
+
 from io import BytesIO
 from pathlib import Path
 
@@ -9,11 +11,13 @@ from modules.whiteboard.utils.uploaded_images import save_uploaded_image
 
 class _FakeFileStorage:
     def __init__(self, filename: str, stream: BytesIO):
+        """Initialize the _FakeFileStorage instance."""
         self.filename = filename
         self.stream = stream
 
 
 def test_save_uploaded_image_handles_jpeg(tmp_path, monkeypatch):
+    """Verify that save uploaded image handles jpeg."""
     campaign_dir = tmp_path / "campaign"
     campaign_dir.mkdir()
 

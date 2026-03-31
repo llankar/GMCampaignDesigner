@@ -1,3 +1,5 @@
+"""Utilities for handouts newsletter generator."""
+
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.text_helpers import format_multiline_text, deserialize_possible_json
 from modules.helpers.logging_helper import log_module_import
@@ -55,6 +57,7 @@ def _normalise_scene_entries(raw_scenes):
     if raw_scenes is None:
         return []
     if isinstance(raw_scenes, str):
+        # Handle the branch where isinstance(raw_scenes, str).
         decoded = deserialize_possible_json(raw_scenes)
         if isinstance(decoded, dict) and isinstance(decoded.get("Scenes"), list):
             return decoded.get("Scenes")
@@ -62,6 +65,7 @@ def _normalise_scene_entries(raw_scenes):
             return decoded
         return [raw_scenes]
     if isinstance(raw_scenes, dict):
+        # Handle the branch where isinstance(raw_scenes, dict).
         if isinstance(raw_scenes.get("Scenes"), list):
             return raw_scenes.get("Scenes")
         return [raw_scenes]
@@ -71,6 +75,7 @@ def _normalise_scene_entries(raw_scenes):
 
 
 def _coerce_name_list(value):
+    """Coerce name list."""
     if value is None:
         return []
     if isinstance(value, (list, tuple, set)):
@@ -83,10 +88,13 @@ def _coerce_name_list(value):
 
 
 def _coerce_scene_text(value):
+    """Coerce scene text."""
     value = _decode_longtext_payload(value)
     if isinstance(value, list):
+        # Handle the branch where isinstance(value, list).
         rendered_parts = []
         for part in value:
+            # Process each part from value.
             part = _decode_longtext_payload(part)
             if isinstance(part, dict):
                 rendered_parts.append(format_multiline_text(part))
@@ -99,6 +107,7 @@ def _coerce_scene_text(value):
 
 
 def _extract_display_name(value):
+    """Extract display name."""
     if isinstance(value, dict):
         for key in ("Name", "Title"):
             if value.get(key):
@@ -107,6 +116,7 @@ def _extract_display_name(value):
 
 
 def _get_entity_wrapper(entity_label):
+    """Return entity wrapper."""
     slug = ENTITY_WRAPPER_MAP.get(entity_label.lower())
     if not slug:
         return None
@@ -114,6 +124,7 @@ def _get_entity_wrapper(entity_label):
 
 
 def _build_entity_summary(entity_label, name):
+    """Build entity summary."""
     wrapper = _get_entity_wrapper(entity_label)
     display_name = _extract_display_name(name)
     if not wrapper or not display_name:
@@ -125,6 +136,7 @@ def _build_entity_summary(entity_label, name):
     summary_text = ""
     for key in ("Description", "Summary", "Notes", "Gist", "Background", "Traits", "Role"):
         if resolved.get(key):
+            # Handle the branch where resolved.get(key).
             summary_text = _coerce_scene_text(resolved.get(key))
             if summary_text:
                 break
@@ -135,9 +147,11 @@ def _build_entity_summary(entity_label, name):
 
 
 def _resolve_entity_summaries(entity_label, raw_names):
+    """Resolve entity summaries."""
     names = _coerce_name_list(raw_names)
     summaries = []
     for name in names:
+        # Process each name from names.
         summary = _build_entity_summary(entity_label, name)
         if summary:
             summaries.append(summary)
@@ -145,6 +159,7 @@ def _resolve_entity_summaries(entity_label, raw_names):
 
 
 def _normalise_sections(sections):
+    """Internal helper for normalise sections."""
     if sections is None:
         return []
     if isinstance(sections, dict):
@@ -155,6 +170,7 @@ def _normalise_sections(sections):
 
 
 def _render_summary_section(scenario):
+    """Render summary section."""
     summary = _coerce_scene_text(scenario.get("Summary"))
     if not summary:
         return []
@@ -162,15 +178,18 @@ def _render_summary_section(scenario):
 
 
 def _render_scene_section(scenario):
+    """Render scene section."""
     scenes = _normalise_scene_entries(scenario.get("Scenes"))
     if not scenes:
         return []
     payload = []
     for idx, raw_scene in enumerate(scenes, start=1):
+        # Process each (idx, raw_scene) from enumerate(scenes, start=1).
         scene = raw_scene if isinstance(raw_scene, dict) else {"Text": raw_scene}
         title = ""
         for key in ("Title", "Scene", "Name", "Heading"):
             if scene.get(key):
+                # Handle the branch where scene.get(key).
                 title = str(scene.get(key)).strip()
                 if title:
                     break
@@ -180,12 +199,14 @@ def _render_scene_section(scenario):
         body_text = ""
         for key in ("Text", "Summary", "Description", "Body", "Notes", "Gist"):
             if scene.get(key):
+                # Handle the branch where scene.get(key).
                 body_text = _coerce_scene_text(scene.get(key))
                 if body_text:
                     break
 
         related_payload = {}
         for label in SCENE_RELATED_FIELDS:
+            # Process each label from SCENE_RELATED_FIELDS.
             names = _coerce_name_list(scene.get(label) or scene.get(label.lower()))
             if names:
                 related_payload[label] = _resolve_entity_summaries(label, names)
@@ -200,6 +221,7 @@ def _render_scene_section(scenario):
 
 
 def _render_entity_section(scenario, section_name):
+    """Render entity section."""
     names = _coerce_name_list(scenario.get(section_name) or scenario.get(section_name.lower()))
     if not names:
         return []
@@ -207,6 +229,7 @@ def _render_entity_section(scenario, section_name):
 
 
 def _render_generic_text_section(scenario, section_name):
+    """Render generic text section."""
     value = scenario.get(section_name)
     if value is None:
         return []
@@ -217,6 +240,7 @@ def _render_generic_text_section(scenario, section_name):
 
 
 def _render_base_section(base_text):
+    """Render base section."""
     text = _coerce_scene_text(base_text)
     if not text:
         return []
@@ -231,6 +255,7 @@ def build_newsletter_payload(scenario_title, sections, language, style, base_tex
     scenario_wrapper = GenericModelWrapper("scenarios")
     scenario = scenario_wrapper.load_item_by_key(scenario_title, key_field="Title")
     if not scenario:
+        # Handle the branch where scenario is unavailable.
         payload = {}
         base_items = _render_base_section(base_text)
         if base_items:
@@ -256,6 +281,7 @@ def build_newsletter_payload(scenario_title, sections, language, style, base_tex
     if pc_items:
         payload["PCs"] = pc_items
     for section_name, _config in section_specs:
+        # Process each (section_name, _config) from section_specs.
         section_key = str(section_name or "").strip()
         if not section_key:
             continue

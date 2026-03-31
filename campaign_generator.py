@@ -36,6 +36,7 @@ from modules.campaign_generator import (
 )
 
 def main() -> None:
+    """Run the module entry point."""
     app = CampaignGeneratorApp()
     app.mainloop()
 

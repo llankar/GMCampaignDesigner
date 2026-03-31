@@ -1,3 +1,4 @@
+"""Execution helpers for auto improve command."""
 from __future__ import annotations
 
 import shlex
@@ -13,11 +14,13 @@ class CommandExecutionError(RuntimeError):
 
 class CommandRunner:
     def run_agent(self, command_template: str, prompt: str, workdir: Path) -> str:
+        """Run agent."""
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
             handle.write(prompt)
             prompt_path = Path(handle.name)
 
         try:
+            # Keep agent resilient if this step fails.
             prompt_file_value = self._quote_value(str(prompt_path))
             prompt_value = self._quote_prompt_value(prompt)
 
@@ -47,6 +50,7 @@ class CommandRunner:
 
     @staticmethod
     def _run_shell(command: str, workdir: Path) -> subprocess.CompletedProcess[str]:
+        """Run shell."""
         return subprocess.run(
             command,
             shell=True,
@@ -58,17 +62,20 @@ class CommandRunner:
 
     @staticmethod
     def _quote_value(value: str) -> str:
+        """Internal helper for quote value."""
         if os.name == "nt":
             return subprocess.list2cmdline([value])
         return shlex.quote(value)
 
     @classmethod
     def _quote_prompt_value(cls, prompt: str) -> str:
+        """Internal helper for quote prompt value."""
         flattened = " ".join(prompt.splitlines()).strip()
         return cls._quote_value(flattened)
 
     @staticmethod
     def _build_prompt_fallback_template(command_template: str) -> str:
+        """Build prompt fallback template."""
         fallback = command_template.replace("--input-file {prompt_file}", "{prompt}")
         fallback = fallback.replace("--input-file={prompt_file}", "{prompt}")
         if fallback == command_template:
@@ -77,6 +84,7 @@ class CommandRunner:
 
     @staticmethod
     def _debug_agent_call(command: str, prompt: str, is_fallback: bool = False) -> None:
+        """Internal helper for debug agent call."""
         if not _is_debug_enabled():
             return
         attempt = "fallback" if is_fallback else "primary"
@@ -89,6 +97,7 @@ class CommandRunner:
 
     @staticmethod
     def _debug_agent_result(command: str, return_code: int, output: str) -> None:
+        """Internal helper for debug agent result."""
         if not _is_debug_enabled():
             return
         rendered_output = output.strip() or "<no output>"
@@ -101,6 +110,7 @@ class CommandRunner:
         )
 
     def run_validation(self, command: str, workdir: Path) -> str:
+        """Run validation."""
         result = subprocess.run(
             command,
             shell=True,
@@ -118,5 +128,6 @@ class CommandRunner:
 
 
 def _is_debug_enabled() -> bool:
+    """Return whether debug enabled."""
     value = os.getenv("AUTO_IMPROVE_DEBUG", "").strip().lower()
     return value in {"1", "true", "yes", "on"}

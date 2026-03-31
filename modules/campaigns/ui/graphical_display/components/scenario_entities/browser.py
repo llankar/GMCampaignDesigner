@@ -1,3 +1,4 @@
+"""Browser UI for scenario entities."""
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -50,6 +51,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
         links: Iterable[ScenarioEntityLink],
         on_open_entity: Callable[[str, str], None],
     ):
+        """Initialize the ScenarioEntityBrowser instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=20, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self._scenario_title = scenario_title
         self._groups = group_scenario_entities(links)
@@ -63,6 +65,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
         self._build_body()
 
     def _build_header(self) -> None:
+        """Build header."""
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=16, pady=(14, 10))
         header.grid_columnconfigure(0, weight=1)
@@ -83,6 +86,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
         ).grid(row=1, column=0, sticky="w", pady=(4, 0))
 
     def _build_overview(self) -> None:
+        """Build overview."""
         overview = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18, border_width=1, border_color=DASHBOARD_THEME.card_border)
         overview.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
         for column in range(3):
@@ -104,6 +108,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
             ("Primary pressure", dominant, _entity_color(dominant)),
         ]
         for index, (label, value, accent) in enumerate(metrics):
+            # Process each (index, (label, value, accent)) from enumerate(metrics).
             card = ctk.CTkFrame(overview, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)
             card.grid(row=1, column=index, sticky="nsew", padx=8, pady=(6, 12))
             card.grid_columnconfigure(0, weight=1)
@@ -123,7 +128,9 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
             ).grid(row=1, column=0, sticky="w", padx=12, pady=(0, 10))
 
     def _build_body(self) -> None:
+        """Build body."""
         if not self._groups:
+            # Handle the branch where groups is unavailable.
             empty = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18)
             empty.grid(row=2, column=0, sticky="nsew", padx=16, pady=(0, 16))
             empty.grid_columnconfigure(0, weight=1)
@@ -148,6 +155,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
         body.grid_columnconfigure(0, weight=1)
 
         for row, group in enumerate(self._groups):
+            # Process each (row, group) from enumerate(_groups).
             accent = _entity_color(group["entity_type"])
             section = ctk.CTkFrame(body, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=18, border_width=1, border_color=DASHBOARD_THEME.card_border)
             section.grid(row=row, column=0, sticky="ew", pady=(0, 12))
@@ -193,6 +201,7 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
                 entity_grid.grid_columnconfigure(column, weight=1)
 
             for index, entity_name in enumerate(group["entities"]):
+                # Process each (index, entity_name) from enumerate(group['entities']).
                 card = ctk.CTkFrame(entity_grid, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=14, border_width=1, border_color=DASHBOARD_THEME.card_border)
                 card.grid(row=index // 2, column=index % 2, sticky="ew", padx=(0, 10), pady=(0, 10))
                 card.grid_columnconfigure(0, weight=1)
@@ -217,8 +226,10 @@ class ScenarioEntityBrowser(ctk.CTkFrame):
 
 
 def group_scenario_entities(links: Iterable[ScenarioEntityLink]) -> list[dict[str, object]]:
+    """Group scenario entities."""
     grouped: OrderedDict[str, OrderedDict[str, None]] = OrderedDict()
     for link in links:
+        # Process each link from links.
         entity_type = str(getattr(link, "entity_type", "") or "").strip() or "Other"
         entity_name = str(getattr(link, "name", "") or "").strip()
         if not entity_name:
@@ -236,8 +247,10 @@ def group_scenario_entities(links: Iterable[ScenarioEntityLink]) -> list[dict[st
 
 
 def _entity_color(entity_type: str) -> str:
+    """Internal helper for entity color."""
     return _ENTITY_COLORS.get(entity_type, "#67b6ff")
 
 
 def _entity_glyph(entity_type: str) -> str:
+    """Internal helper for entity glyph."""
     return _ENTITY_GLYPHS.get(entity_type, "✧")

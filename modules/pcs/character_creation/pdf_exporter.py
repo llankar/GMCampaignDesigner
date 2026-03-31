@@ -8,6 +8,7 @@ import fitz  # PyMuPDF
 
 
 def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bold: bool = False) -> None:
+    """Internal helper for write."""
     font = "helv-bold" if bold else "helv"
     try:
         page.insert_text((x, y), text, fontsize=size, fontname=font)
@@ -16,6 +17,7 @@ def _write(page: fitz.Page, x: float, y: float, text: str, size: float = 10, bol
 
 
 def export_character_pdf(character: dict, rules_result, output_path: str) -> str:
+    """Export character PDF."""
     if not output_path:
         raise ValueError("Chemin de sortie PDF invalide.")
 
@@ -40,6 +42,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
     _write(page1, 40, 220, "Compétences", 13, bold=True)
     y = 240
     for skill, die in rules_result.skill_dice.items():
+        # Process each (skill, die) from rules_result.skill_dice.items().
         favorite = "★" if skill in set(character.get("favorites") or []) else " "
         _write(page1, 40, y, f"{favorite} {skill}", 10)
         _write(page1, 260, y, die, 10)
@@ -51,6 +54,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
     _write(page2, 40, 40, "Prouesses", 13, bold=True)
     y = 65
     for idx, feat in enumerate(character.get("feats") or [], start=1):
+        # Process each (idx, feat) from enumerate(character.get('feats') or [], start=1).
         _write(page2, 40, y, f"{idx}. {feat.get('name', f'Prouesse {idx}')}", 11, bold=True)
         y += 16
         for option in feat.get("options") or []:
@@ -73,6 +77,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
     _write(page2, 40, y, "Avancements", 13, bold=True)
     y += 20
     for i in range(1, 41):
+        # Process each i from range(1, 41).
         marker = "X" if i <= int(character.get("advancements", 0)) else " "
         _write(page2, 40, y, f"{i:02d}: [{marker}]", 9)
         y += 14
@@ -80,6 +85,7 @@ def export_character_pdf(character: dict, rules_result, output_path: str) -> str
             break
 
     try:
+        # Keep character PDF resilient if this step fails.
         doc.save(str(output))
     finally:
         doc.close()

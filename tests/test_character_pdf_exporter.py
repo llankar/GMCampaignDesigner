@@ -1,3 +1,5 @@
+"""Regression tests for character PDF exporter."""
+
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +10,7 @@ from modules.pcs.character_creation.pdf_exporter import export_character_pdf
 
 
 def test_export_character_pdf_creates_file(tmp_path):
+    """Verify that export character PDF creates file."""
     character = {
         "name": "Test",
         "player": "Unit",

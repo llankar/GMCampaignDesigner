@@ -1,3 +1,5 @@
+﻿"""Editor helpers for scenario graph."""
+
 import json
 import math
 import customtkinter as ctk
@@ -58,6 +60,7 @@ except AttributeError:  # Pillow < 9.1 fallback
 
 class LinkEditDialog(ctk.CTkToplevel):
     def __init__(self, master, link_record, scene_lookup):
+        """Initialize the LinkEditDialog instance."""
         super().__init__(master)
         self.title("Edit Link")
         self.resizable(False, False)
@@ -118,10 +121,12 @@ class LinkEditDialog(ctk.CTkToplevel):
         self.after(100, self._focus_label_entry)
 
     def _focus_label_entry(self):
+        """Internal helper for focus label entry."""
         self.label_entry.focus_set()
         self.label_entry.icursor("end")
 
     def _initial_target_value(self, link_data):
+        """Internal helper for initial target value."""
         target_tag = self.link_record.get("target_tag") or self.link_record.get("to")
         if target_tag:
             return target_tag
@@ -130,6 +135,7 @@ class LinkEditDialog(ctk.CTkToplevel):
         return ""
 
     def _prepare_initial_metadata(self, link_data):
+        """Internal helper for prepare initial metadata."""
         metadata_value = None
         if isinstance(link_data, dict):
             if link_data.get("conditions") is not None:
@@ -144,6 +150,7 @@ class LinkEditDialog(ctk.CTkToplevel):
             return str(metadata_value)
 
     def _on_submit(self):
+        """Handle submit."""
         text_value = (self.label_var.get() or "").strip()
         if not text_value:
             messagebox.showerror("Validation", "Link label cannot be empty.")
@@ -174,6 +181,7 @@ class LinkEditDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _on_cancel(self):
+        """Handle cancel."""
         self.result = None
         self.destroy()
 
@@ -212,6 +220,7 @@ DETAIL_OVERLAY_EXPANDED_HEIGHT_RATIO = 0.86
 
 
 def clean_longtext(data, max_length=2000):
+    """Handle clean longtext."""
     # First, get the plain text using your existing helper.
     text = format_longtext(data, max_length)
     # Remove curly braces.
@@ -229,6 +238,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 faction_wrapper: Optional[GenericModelWrapper] = None,
                 villain_wrapper: Optional[GenericModelWrapper] = None,
                 *args, **kwargs):
+        """Initialize the ScenarioGraphEditor instance."""
         super().__init__(master, *args, **kwargs)
         self.scenario_wrapper = scenario_wrapper
         self.npc_wrapper = npc_wrapper
@@ -327,6 +337,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         background_path = "assets/images/corkboard_bg.png"
        
         if os.path.exists(background_path):
+            # Handle the branch where os.path.exists(background_path).
             self.background_image = Image.open(background_path)
 
             # Resize the PIL image (e.g. 2x scale)
@@ -373,6 +384,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.bind("<Configure>", self._on_detail_overlay_parent_resize, add="+")
 
     def _sanitize_tag_component(self, value):
+        """Internal helper for sanitize tag component."""
         text = str(value or "")
         text = text.replace(" ", "_")
         text = TAG_SANITIZE_PATTERN.sub("_", text)
@@ -380,6 +392,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return text
 
     def _build_tag(self, prefix, name=None):
+        """Build tag."""
         prefix_part = self._sanitize_tag_component(prefix)
         if name is None:
             return prefix_part
@@ -387,6 +400,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return f"{prefix_part}_{name_part}"
 
     def _on_zoom(self, event):
+        """Handle zoom."""
         if event.delta > 0 or event.num == 4:
             scale = self.zoom_factor
         else:
@@ -403,6 +417,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         # Rescale all node positions
         for tag, (x, y) in self.node_positions.items():
+            # Process each (tag, (x, y)) from node_positions.items().
             dx = x - anchor_x
             dy = y - anchor_y
             new_x = anchor_x + dx * scale_change
@@ -411,6 +426,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
             # Update x/y in the node data as well
             for node in self.graph["nodes"]:
+                # Process each node from graph['nodes'].
                 node_tag = self._build_tag(node.get('type', ''), node.get('name', ''))
                 if node_tag == tag:
                     node["x"], node["y"] = new_x, new_y
@@ -420,10 +436,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         # Optional: zoom font sizes, overlays, etc., here if you want to support them visually
     def reset_zoom(self):
+        """Reset zoom."""
         self.canvas_scale = 1.0
 
         # Restore original node positions
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             if tag in self.original_positions:
                 x, y = self.original_positions[tag]
@@ -439,6 +457,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.draw_graph()
     
     def init_toolbar(self):
+        """Initialize toolbar."""
         toolbar = ctk.CTkFrame(self)
         toolbar.pack(fill="x", padx=5, pady=5)
         ctk.CTkButton(toolbar, text="Select Scenario", command=self.select_scenario).pack(side="left", padx=5)
@@ -447,6 +466,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         ctk.CTkButton(toolbar, text="Reset Zoom", command=self.reset_zoom).pack(side="left", padx=5)
 
     def _init_detail_panel(self):
+        """Initialize detail panel."""
         pad = self.detail_panel_padding
         wrap_length = max(10, self.detail_panel_width - 2 * pad)
         self.detail_panel_title = ctk.CTkLabel(
@@ -480,6 +500,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         if HTMLLabel is not None:
             try:
+                # Keep detail panel resilient if this step fails.
                 panel_bg = self._resolve_panel_background_color()
                 self.detail_html_label = HTMLLabel(
                     self.detail_content_container,
@@ -512,6 +533,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._clear_detail_panel()
 
     def _resolve_panel_background_color(self):
+        """Resolve panel background color."""
         try:
             bg = self.detail_panel.cget("fg_color")
         except Exception:
@@ -523,6 +545,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return bg
 
     def _create_plain_textbox(self):
+        """Create plain textbox."""
         if self.detail_textbox is None or not int(self.detail_textbox.winfo_exists()):
             self.detail_textbox = ctk.CTkTextbox(
                 self.detail_content_container,
@@ -534,8 +557,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.detail_textbox.configure(state="disabled")
 
     def _fallback_to_plain_text(self, text):
+        """Internal helper for fallback to plain text."""
         if self.detail_html_label is not None:
             try:
+                # Keep fallback to plain text resilient if this step fails.
                 self.detail_html_label.pack_forget()
                 self.detail_html_label.destroy()
             except Exception:
@@ -551,8 +576,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.detail_textbox.configure(state="disabled")
 
     def _update_detail_text(self, html_text, plain_text):
+        """Update detail text."""
         if self._rich_renderer_available and self.detail_html_label is not None:
             try:
+                # Keep detail text resilient if this step fails.
                 self.detail_html_label.set_html(html_text)
                 if self.detail_textbox is not None and self.detail_textbox.winfo_manager():
                     self.detail_textbox.pack_forget()
@@ -573,6 +600,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.detail_html_label.pack_forget()
 
     def _rebuild_entity_buttons(self, entities):
+        """Internal helper for rebuild entity buttons."""
         if not hasattr(self, "entity_button_container"):
             return
 
@@ -597,6 +625,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.entity_button_container.pack(fill="x", pady=(0, 8))
 
         for index, entity in enumerate(valid_entities):
+            # Process each (index, entity) from enumerate(valid_entities).
             label_text = self._format_entity_button_label(entity)
             button = ctk.CTkButton(
                 self.entity_button_container,
@@ -613,6 +642,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             button.bind("<space>", lambda _event, btn=button: btn.invoke())
 
     def _format_entity_button_label(self, entity):
+        """Format entity button label."""
         if not isinstance(entity, dict):
             return "Unnamed Entity"
         name = (entity.get("name") or entity.get("Name") or "Unnamed").strip() or "Unnamed"
@@ -622,6 +652,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return name
 
     def _open_entity_editor(self, entity_entry):
+        """Open entity editor."""
         context = self._resolve_entity_editor_context(entity_entry)
         if not context:
             messagebox.showinfo("Entity", "No editor is available for this entity.")
@@ -649,6 +680,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         GenericEditorWindow(None, record, template, wrapper)
 
     def _resolve_entity_editor_context(self, entity_entry):
+        """Resolve entity editor context."""
         if not isinstance(entity_entry, dict):
             return None
 
@@ -685,30 +717,35 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         record = None
 
         if base_type == "npc":
+            # Handle the branch where base_type == 'npc'.
             collection = getattr(self, "npcs", {})
             wrapper = getattr(self, "npc_wrapper", None)
             template_key = "npcs"
             display_type = "NPCs"
             record = self._lookup_entity_by_name("npc", name)
         elif base_type == "villain":
+            # Handle the branch where base_type == 'villain'.
             collection = getattr(self, "villains", {})
             wrapper = getattr(self, "villain_wrapper", None)
             template_key = "villains"
             display_type = "Villains"
             record = self._lookup_from_collection(collection, name)
         elif base_type == "creature":
+            # Handle the branch where base_type == 'creature'.
             collection = getattr(self, "creatures", {})
             wrapper = getattr(self, "creature_wrapper", None)
             template_key = "creatures"
             display_type = "Creatures"
             record = self._lookup_entity_by_name("creature", name)
         elif base_type == "place":
+            # Handle the branch where base_type == 'place'.
             collection = getattr(self, "places", {})
             wrapper = getattr(self, "place_wrapper", None)
             template_key = "places"
             display_type = "Places"
             record = self._lookup_entity_by_name("place", name)
         elif base_type == "faction":
+            # Handle the branch where base_type == 'faction'.
             collection = getattr(self, "factions", {})
             wrapper = getattr(self, "faction_wrapper", None)
             template_key = "factions"
@@ -737,6 +774,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     @staticmethod
     def _lookup_from_collection(collection, name):
+        """Internal helper for lookup from collection."""
         if not isinstance(collection, dict):
             return None
         if name in collection:
@@ -744,6 +782,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         lower = name.lower()
         for key, value in collection.items():
             try:
+                # Keep lookup from collection resilient if this step fails.
                 if str(key).lower() == lower:
                     return value
             except Exception:
@@ -752,6 +791,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     @staticmethod
     def _apply_inline_markup(text):
+        """Apply inline markup."""
         escaped = html.escape(text, quote=False)
         escaped = re.sub(r"\*\*(.+?)\*\*", lambda m: f"<strong>{m.group(1)}</strong>", escaped)
         escaped = re.sub(
@@ -773,6 +813,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return escaped
 
     def _convert_scene_text_to_html(self, text):
+        """Internal helper for convert scene text to HTML."""
         trimmed = (text or "").strip()
         if not trimmed:
             return "<p>No scene notes provided.</p>"
@@ -782,12 +823,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         in_list = False
 
         def close_list():
+            """Close list."""
             nonlocal in_list
             if in_list:
                 html_parts.append("</ul>")
                 in_list = False
 
         def flush_paragraph():
+            """Handle flush paragraph."""
             nonlocal paragraph_lines
             if not paragraph_lines:
                 return
@@ -797,6 +840,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             paragraph_lines = []
 
         for raw_line in trimmed.splitlines():
+            # Process each raw_line from trimmed.splitlines().
             stripped_line = raw_line.strip()
             if not stripped_line:
                 flush_paragraph()
@@ -805,6 +849,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
             bullet_match = re.match(r"^[\-\*]\s+(.*)$", stripped_line)
             if bullet_match:
+                # Continue with this path when bullet match is set.
                 flush_paragraph()
                 if not in_list:
                     html_parts.append("<ul>")
@@ -825,6 +870,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return "\n".join(html_parts)
 
     def _show_detail_panel(self):
+        """Show detail panel."""
         if self._detail_panel_visible:
             return
         self._place_detail_overlay()
@@ -836,17 +882,20 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._detail_panel_visible = True
 
     def _hide_detail_panel(self):
+        """Hide detail panel."""
         if not self._detail_panel_visible:
             return
         self.detail_overlay.place_forget()
         self._detail_panel_visible = False
 
     def _set_detail_panel_expanded(self, expanded):
+        """Set detail panel expanded."""
         self._detail_panel_expanded = bool(expanded)
         if self._detail_panel_visible:
             self._place_detail_overlay()
 
     def _place_detail_overlay(self):
+        """Internal helper for place detail overlay."""
         self.update_idletasks()
         placement_parent = self.main_container if hasattr(self, "main_container") else self
         width = max(1, int(placement_parent.winfo_width()))
@@ -876,10 +925,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.detail_panel_meta.configure(wraplength=wrap_length)
 
     def _on_detail_overlay_parent_resize(self, _event=None):
+        """Handle detail overlay parent resize."""
         if self._detail_panel_visible:
             self._place_detail_overlay()
 
     def _clear_detail_panel(self):
+        """Clear detail panel."""
         self.active_detail_scene_tag = None
         if hasattr(self, "detail_panel_title"):
             self.detail_panel_title.configure(text="Scene Details")
@@ -893,6 +944,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._rebuild_entity_buttons([])
 
     def _show_node_detail(self, node_tag):
+        """Show node detail."""
         if not self._detail_panel_visible:
             return
         if not node_tag or not node_tag.startswith("scene_"):
@@ -909,6 +961,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.active_detail_scene_tag = node_tag
 
     def _populate_detail_panel(self, scene_data):
+        """Internal helper for populate detail panel."""
         title = scene_data.get("title") or scene_data.get("display_name") or scene_data.get("name") or "Scene"
         source_entry = scene_data.get("source_entry") or {}
         scene_color = scene_data.get("color") or "#3B82F6"
@@ -937,7 +990,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._rebuild_entity_buttons(entities)
 
     def _build_scene_payload_from_graph(self, node_tag):
+        """Build scene payload from graph."""
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             name = node.get("name", "")
             tag = self._build_tag(node.get('type', ''), name)
             if tag != node_tag:
@@ -957,6 +1012,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return None
 
     def _measure_text_height(self, text, font_obj, wrap_width):
+        """Internal helper for measure text height."""
         safe_width = max(int(wrap_width), 10)
         temp_id = self.canvas.create_text(
             0,
@@ -973,12 +1029,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return 0
 
     def _summarize_scene_text(self, text, max_lines=4, min_lines=2):
+        """Internal helper for summarize scene text."""
         if not text:
             return ["No scene notes provided."], False
 
         text = deserialize_possible_json(text)
 
         if isinstance(text, Mapping):
+            # Handle the branch where isinstance(text, Mapping).
             candidate = text.get("text") or text.get("Text")
             candidate = deserialize_possible_json(candidate)
             if isinstance(candidate, str) and candidate.strip():
@@ -999,6 +1057,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         normalized = str(text or "").replace("\r", "\n")
 
         def canonical_key(fragment: str) -> str:
+            """Handle canonical key."""
             cleaned = re.sub(r"\s+", " ", fragment or "").strip()
             if not cleaned:
                 return ""
@@ -1011,6 +1070,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         fragments: list[str] = []
         seen_fragment_keys: set[str] = set()
         for frag in raw_fragments:
+            # Process each frag from raw_fragments.
             key = canonical_key(frag)
             if not key or key in seen_fragment_keys:
                 continue
@@ -1018,8 +1078,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             fragments.append(frag)
 
         if len(fragments) < min_lines:
+            # Handle the branch where len(fragments) < min_lines.
             sentences = re.split(r"(?<=[.!?])\s+", normalized)
             for sentence in sentences:
+                # Process each sentence from sentences.
                 cleaned_sentence = sentence.strip()
                 if not cleaned_sentence:
                     continue
@@ -1032,11 +1094,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         cleaned_lines: list[str] = []
         seen_keys: set[str] = set()
         def strip_leading_markers(value: str) -> str:
+            """Handle strip leading markers."""
             without_markers = re.sub(r"^[\-*\u2022•\s]+", "", value or "").strip()
             without_numbers = re.sub(r"^[0-9]+[\.)]\s*", "", without_markers)
             return without_numbers.strip()
 
         for fragment in fragments:
+            # Process each fragment from fragments.
             cleaned = re.sub(r"\s+", " ", fragment).strip()
             key = canonical_key(cleaned)
             if not key or key in seen_keys:
@@ -1051,8 +1115,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return ["No scene notes provided."], False
 
         if len(cleaned_lines) < min_lines:
+            # Handle the branch where len(cleaned_lines) < min_lines.
             wrapped = textwrap.wrap(normalized, width=90)
             for chunk in wrapped:
+                # Process each chunk from wrapped.
                 chunk_clean = re.sub(r"\s+", " ", chunk).strip()
                 key = canonical_key(chunk_clean)
                 if not key or key in seen_keys:
@@ -1072,6 +1138,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return cleaned_lines, truncated
 
     def _truncate_line(self, text, width):
+        """Internal helper for truncate line."""
         if not text:
             return ""
         safe_width = max(int(width), 8)
@@ -1081,11 +1148,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return str(text)
 
     def _dedupe_display_lines(self, lines):
+        """Internal helper for dedupe display lines."""
         if not lines:
             return []
         deduped = []
         seen = set()
         for line in lines:
+            # Process each line from lines.
             cleaned = re.sub(r"\s+", " ", str(line or "")).strip()
             if not cleaned:
                 continue
@@ -1104,6 +1173,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         card_size_key: str,
         scale: float = 1.0,
     ) -> tuple[int, int]:
+        """Internal helper for estimate scene card dimensions."""
         safe_scale = scale or 1.0
         card_size_key = str(card_size_key or "M").upper()
         card_width = int(SCENE_CARD_WIDTHS.get(card_size_key, SCENE_CARD_WIDTHS["M"]) * safe_scale)
@@ -1169,6 +1239,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return card_width, int(card_height)
 
     def _determine_scene_card_size(self, text, entity_count):
+        """Internal helper for determine scene card size."""
         length = len(text or "")
         if entity_count >= 5 or length > 900:
             return "L"
@@ -1177,10 +1248,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return "M"
 
     def _extract_scene_type_label(self, entry, explicit_type=None):
+        """Extract scene type label."""
         if isinstance(explicit_type, str) and explicit_type.strip():
             return explicit_type.strip()
         if isinstance(entry, dict):
             for key in ("SceneType", "Type", "Category", "Mood", "Role"):
+                # Process each key from ('SceneType', 'Type', 'Category', 'Mood', 'Role').
                 value = entry.get(key)
                 if isinstance(value, str) and value.strip():
                     return value.strip()
@@ -1189,6 +1262,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return ""
 
     def _classify_scene_type(self, type_label):
+        """Internal helper for classify scene type."""
         text = (type_label or "").lower()
         if any(token in text for token in ("setup", "intro", "hook", "opening")):
             return "setup"
@@ -1209,6 +1283,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return "scene"
 
     def _resolve_scene_type_style(self, source_entry, fallback_color, explicit_type=None):
+        """Resolve scene type style."""
         raw_label = self._extract_scene_type_label(source_entry, explicit_type)
         canonical = self._classify_scene_type(raw_label)
         style = SCENE_TYPE_STYLE_MAP.get(canonical)
@@ -1219,6 +1294,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return label, color, canonical
 
     def _extract_scene_badges(self, source_entry):
+        """Extract scene badges."""
         if not isinstance(source_entry, dict):
             return []
         badges = []
@@ -1244,6 +1320,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return [badge for badge in badges if badge["value"]]
 
     def _normalize_badge_value(self, value):
+        """Normalize badge value."""
         if value is None:
             return ""
         if isinstance(value, (list, tuple, set)):
@@ -1256,6 +1333,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return self._truncate_line(text, 40)
 
     def _compute_badge_layout(self, texts, font_obj, max_width, badge_height, gap, inner_padding):
+        """Internal helper for compute badge layout."""
         if not texts:
             return 0, []
         safe_width = max(int(max_width), 50)
@@ -1263,6 +1341,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         x_offset = 0
         y_offset = 0
         for text in texts:
+            # Process each text from texts.
             text_width = font_obj.measure(text) + inner_padding * 2
             text_width = min(text_width, safe_width)
             if x_offset > 0 and x_offset + text_width > safe_width:
@@ -1275,10 +1354,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
 
     def show_scene_flow(self):
+        """Show scene flow."""
         if not self.scenario:
             messagebox.showinfo("Select Scenario", "Please select a scenario first to build the scene flow view.")
             return
         if getattr(self, "_scene_flow_window", None) and self._scene_flow_window.winfo_exists():
+            # Handle the branch where getattr(self, '_scene_flow_window', None) and _scene_flow_window.winfo_exists().
             try:
                 self._scene_flow_window.focus()
                 self._scene_flow_window.lift()
@@ -1296,6 +1377,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return
 
         def _on_close():
+            """Handle close."""
             self._scene_flow_window = None
 
         self._scene_flow_window = SceneFlowViewerWindow(
@@ -1309,7 +1391,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         )
 
     def select_scenario(self):
+        """Select scenario."""
         def on_scenario_selected(scenario_name):
+            """Handle scenario selected."""
             # Lookup the full pc dictionary using the pc wrapper.
             scenario_list = self.scenario_wrapper.load_items()
             selected_scenario = None
@@ -1343,7 +1427,8 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
 
     def display_portrait_window(self):
-       #logging.debug("Entering display_portrait_window")
+        """Open the portrait viewer for the selected NPC or creature."""
+        #logging.debug("Entering display_portrait_window")
         if not self.selected_node or not (self.selected_node.startswith("npc_") or self.selected_node.startswith("creature_")):
             messagebox.showerror("Error", "No NPC or Creature selected.")
             return
@@ -1356,7 +1441,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             name_key = self.selected_node.replace("creature_", "").replace("_", " ")
             data_source = self.creatures
 
-       #logging.debug(f"Extracted name: {name_key}")
+        #logging.debug(f"Extracted name: {name_key}")
         entity_data = data_source.get(name_key)
         if not entity_data:
             messagebox.showerror("Error", f"Entity '{name_key}' not found.")
@@ -1372,6 +1457,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         
 
     def load_scenario(self, scenario):
+        """Load scenario."""
         # Use full text; no truncation—wrapping will be handled by canvas.
         summary = scenario.get("Summary", "")
         summary = clean_longtext(summary, max_length=5000)
@@ -1401,11 +1487,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         npcs_list = scenario.get("NPCs", [])
         npcs_count = len(npcs_list)
         if npcs_count > 0:
+            # Fan NPC nodes around the scenario so the center node stays readable.
             arc_start_npcs = 30
             arc_end_npcs = 150
             offset_npcs = 350
 
             for i, npc_name in enumerate(npcs_list):
+                # Skip broken references but keep the remaining NPCs evenly distributed across the arc.
                 if npc_name not in self.npcs:
                     continue
                 angle_deg = (arc_start_npcs if npcs_count == 1
@@ -1440,11 +1528,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         villains_list = scenario.get("Villains") or []
         villains_count = len(villains_list)
         if villains_count > 0:
+            # Mirror the character layout on the opposite side for villain nodes.
             arc_start_villains = -40
             arc_end_villains = 30
             offset_villains = 430
 
             for i, villain_name in enumerate(villains_list):
+                # Skip missing villains so partially stale scenarios can still render cleanly.
                 if villain_name not in self.villains:
                     continue
                 angle_deg = (arc_start_villains if villains_count == 1
@@ -1475,11 +1565,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         places_list = scenario.get("Places", [])
         places_count = len(places_list)
         if places_count > 0:
+            # Anchor locations below the scenario node to separate places from character arcs.
             arc_start_places = 210
             arc_end_places = 330
             offset_places = 350
 
             for j, place_name in enumerate(places_list):
+                # Keep rendering the remaining places even if one linked location no longer exists.
                 if place_name not in self.places:
                     continue
                 angle_deg = (arc_start_places if places_count == 1
@@ -1521,6 +1613,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             offset_creatures = 350
 
             for k, creature_name in enumerate(creatures_list):
+                # Process each (k, creature_name) from enumerate(creatures_list).
                 if creature_name not in self.creatures:
                     continue
                 angle_deg = (arc_start_creatures if creatures_count == 1
@@ -1557,6 +1650,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         # Center view on scenario node (or graph content center)
         if scenario_tag in self.node_positions:
+            # Handle the branch where scenario tag is in node positions.
             x, y = self.node_positions[scenario_tag]
 
             # Get current scrollregion
@@ -1572,6 +1666,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.canvas.yview_moveto(scroll_y_frac)
 
     def load_scenario_scene_flow(self, scenario=None):
+        """Load scenario scene flow."""
         if scenario is not None:
             self.scenario = scenario
         scenario_data = self.scenario
@@ -1591,6 +1686,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         normalized_scenes = []
         for idx, entry in enumerate(scenes_list):
+            # Process each (idx, entry) from enumerate(scenes_list).
             normalized = self._normalize_scene_entry(
                 entry,
                 idx,
@@ -1617,6 +1713,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         card_widths = []
         card_heights = []
         for scene in normalized_scenes:
+            # Process each scene from normalized_scenes.
             text = scene.get("text", "") or ""
             entities = scene.get("entities") or []
             source_entry = scene.get("source_entry") or {}
@@ -1657,12 +1754,15 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         origin_y = max(int(max_card_height * 0.7), int(available_height * 0.16))
 
         def build_rows(col_count):
+            """Build rows."""
             return [normalized_scenes[i:i + col_count] for i in range(0, count, col_count)]
 
         def build_column_widths(rows, col_count):
+            """Build column widths."""
             widths = [0] * col_count
             for row in rows:
                 for col_index in range(col_count):
+                    # Process each col_index from range(col_count).
                     if col_index >= len(row):
                         continue
                     scene = row[col_index]
@@ -1670,8 +1770,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return widths
 
         def build_row_heights(rows):
+            """Build row heights."""
             heights = []
             for row in rows:
+                # Process each row from rows.
                 row_height = 0
                 for scene in row:
                     row_height = max(row_height, scene.get("card_height", max_card_height))
@@ -1679,9 +1781,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return heights
 
         def choose_columns(padding_x):
+            """Handle choose columns."""
             max_cols = max(1, count)
             chosen = 1
             for col_count in range(1, max_cols + 1):
+                # Process each col_count from range(1, max_cols + 1).
                 rows = build_rows(col_count)
                 col_widths = build_column_widths(rows, col_count)
                 total_width = sum(col_widths) + padding_x * max(0, col_count - 1)
@@ -1690,6 +1794,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return chosen
 
         def compute_layout(padding_x, padding_y):
+            """Handle compute layout."""
             col_count = choose_columns(padding_x)
             rows = build_rows(col_count)
             row_count = max(1, len(rows))
@@ -1713,8 +1818,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return col_count, row_count, positions
 
         def layout_has_overlap(positions):
+            """Handle layout has overlap."""
             bboxes = []
             for (x, y), scene in zip(positions, normalized_scenes):
+                # Process each ((x, y), scene) from zip(positions, normalized_scenes).
                 width = scene.get("card_width", max_card_width)
                 height = scene.get("card_height", max_card_height)
                 bbox = (x - width / 2, y - height / 2, x + width / 2, y + height / 2)
@@ -1733,6 +1840,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         padding_y = base_padding_y
         positions = []
         for _ in range(4):
+            # Process each _ from range(4).
             cols, rows, positions = compute_layout(padding_x, padding_y)
             if not layout_has_overlap(positions):
                 break
@@ -1742,6 +1850,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             log_warning("Scene flow layout overlaps detected; padding adjustments were insufficient.")
 
         for idx, scene in enumerate(normalized_scenes):
+            # Process each (idx, scene) from enumerate(normalized_scenes).
             x, y = positions[idx]
 
             display_name = scene.get("display_name") or f"Scene {idx + 1}"
@@ -1773,11 +1882,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         existing_links = set()
         tag_lookup = self.scene_flow_scene_lookup
         for scene in normalized_scenes:
+            # Process each scene from normalized_scenes.
             from_tag = scene.get("tag")
             if not from_tag:
                 continue
             links = list(scene.get("links", []))
             if not links and scene.get("index", 0) < count - 1:
+                # Handle the branch where links is unavailable and scene.get('index', 0) < count - 1.
                 next_scene = normalized_scenes[scene["index"] + 1]
                 if next_scene.get("tag"):
                     links.append(
@@ -1790,6 +1901,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             prepared_links = []
 
             for link in links:
+                # Process each link from links.
                 text_auto_generated = bool(link.get("text_auto_generated"))
                 text = (link.get("text") or "").strip()
                 if (
@@ -1804,6 +1916,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
                 target_tag = link.get("target_tag")
                 if not target_tag:
+                    # Handle the branch where target tag is unavailable.
                     target_index = link.get("target_index")
                     if isinstance(target_index, int):
                         target_tag = index_lookup.get(target_index)
@@ -1841,6 +1954,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             }
 
             for item in prepared_links:
+                # Process each item from prepared_links.
                 pair = (from_tag, item["target_tag"])
                 if item["text_auto_generated"] and pair in pairs_with_explicit:
                     continue
@@ -1869,6 +1983,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         bbox_all = self.canvas.bbox("all")
         target_bbox = bbox_nodes or bbox_all
         if target_bbox:
+            # Continue with this path when target bbox is set.
             x0, y0, x1, y1 = target_bbox
             canvas_width = self.canvas.winfo_width() or 1
             canvas_height = self.canvas.winfo_height() or 1
@@ -1880,15 +1995,18 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.canvas.yview_moveto(max(0.0, min(1.0, (center_y - canvas_height / 2 - y0) / span_y)))
 
     def _coerce_scene_list(self, scenes_raw):
+        """Coerce scene list."""
         if not scenes_raw:
             return []
         if isinstance(scenes_raw, list):
             return scenes_raw
         if isinstance(scenes_raw, dict):
+            # Handle the branch where isinstance(scenes_raw, dict).
             if isinstance(scenes_raw.get("Scenes"), list):
                 return scenes_raw["Scenes"]
             return [scenes_raw]
         if isinstance(scenes_raw, str):
+            # Handle the branch where isinstance(scenes_raw, str).
             text = scenes_raw.strip()
             if not text:
                 return []
@@ -1899,6 +2017,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             if isinstance(parsed, list):
                 return parsed
             if isinstance(parsed, dict):
+                # Handle the branch where isinstance(parsed, dict).
                 if isinstance(parsed.get("Scenes"), list):
                     return parsed["Scenes"]
                 return [parsed]
@@ -1907,12 +2026,15 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return [scenes_raw]
 
     def _normalize_scene_entry(self, entry, index, scenario_npcs, scenario_creatures, scenario_places):
+        """Normalize scene entry."""
         raw_text = ""
         if isinstance(entry, dict):
+            # Handle the branch where isinstance(entry, dict).
             text_fragments: list[str] = []
             fragment_keys: set[str] = set()
 
             def register_fragment(value) -> None:
+                """Register fragment."""
                 if value is None:
                     return
                 fragment = str(value)
@@ -1926,6 +2048,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 text_fragments.append(fragment.strip())
 
             for key in ("Text", "text", "Description", "Summary", "Body", "Details", "Notes", "Gist", "Content"):
+                # Process each key while updating scene entry.
                 value = entry.get(key)
                 if isinstance(value, str):
                     register_fragment(value)
@@ -1941,6 +2064,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                                 register_fragment(item)
             raw_text = "\n\n".join(fragment for fragment in text_fragments if str(fragment).strip())
             if not raw_text:
+                # Handle the branch where raw text is unavailable.
                 alt = entry.get("text")
                 if isinstance(alt, dict):
                     raw_text = alt.get("text", "")
@@ -1954,6 +2078,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         # Keep full scene text for the detail panel and preserve line breaks.
         deserialized_text = deserialize_possible_json(raw_text)
         if isinstance(deserialized_text, Mapping):
+            # Handle the branch where isinstance(deserialized_text, Mapping).
             candidate = deserialized_text.get("text") or deserialized_text.get("Text")
             candidate = deserialize_possible_json(candidate)
             if isinstance(candidate, str):
@@ -1975,6 +2100,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         title_text = ""
         if isinstance(entry, dict):
             for key in ("Title", "Scene", "Heading", "Name", "Label"):
+                # Process each key from ('Title', 'Scene', 'Heading', 'Name', 'Label').
                 val = entry.get(key)
                 if isinstance(val, str) and val.strip():
                     title_text = val.strip()
@@ -1997,6 +2123,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         creature_names = []
         place_names = []
         if isinstance(entry, dict):
+            # Handle the branch where isinstance(entry, dict).
             for field in ("NPCs", "InvolvedNPCs", "Participants", "Allies", "Characters"):
                 npc_names.extend(self._to_list(entry.get(field)))
             for field in ("Creatures", "Monsters", "Enemies", "Foes", "Opponents", "Threats"):
@@ -2008,6 +2135,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             if isinstance(entity_blob, list):
                 for ent in entity_blob:
                     if isinstance(ent, dict):
+                        # Handle the branch where isinstance(ent, dict).
                         ent_type = (ent.get("type") or ent.get("Type") or ent.get("category") or "").lower()
                         ent_name = ent.get("name") or ent.get("Name") or ent.get("title")
                         if ent_name:
@@ -2042,7 +2170,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         seen_pairs = set()
 
         def add_entities(names, ent_type):
+            """Handle add entities."""
             for name in names:
+                # Process each name from names.
                 cleaned = str(name).strip()
                 if not cleaned:
                     continue
@@ -2066,6 +2196,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         raw_links = []
         if isinstance(entry, dict):
+            # Handle the branch where isinstance(entry, dict).
             for field in ("Links", "Transitions", "Choices", "Branches", "Paths", "Outcomes"):
                 raw_links.extend(self._coerce_scene_links(entry.get(field)))
             for field in ("Next", "NextScene", "NextScenes", "LeadsTo", "OnSuccess", "OnFailure", "IfSuccess", "IfFailure"):
@@ -2074,6 +2205,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         normalised_links = []
         seen_links = set()
         for item in raw_links:
+            # Process each item from raw_links.
             if not isinstance(item, dict):
                 continue
             target_value = item.get("target")
@@ -2085,8 +2217,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             if isinstance(target_value, (int, float)):
                 target_index = int(target_value)
             elif isinstance(target_value, str):
+                # Handle the branch where isinstance(target_value, str).
                 stripped = target_value.strip()
                 if stripped.isdigit():
+                    # Handle the branch where stripped.isdigit().
                     target_index = int(stripped)
                 else:
                     match = re.search(r"(scene|act)\s*(\d+)", stripped, re.IGNORECASE)
@@ -2124,8 +2258,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         identifiers.add(self._slugify_scene_identifier(display_title))
         if isinstance(entry, dict):
             for key_name in ("Id", "ID", "SceneId", "Key", "Slug", "Tag", "Reference"):
+                # Process each key_name while updating scene entry.
                 value = entry.get(key_name)
                 if value:
+                    # Continue with this path when value is set.
                     identifiers.add(str(value))
                     norm = self._normalize_scene_identifier_key(value)
                     if norm:
@@ -2149,10 +2285,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         }
 
     def _scene_color_from_entry(self, entry):
+        """Internal helper for scene color from entry."""
         if not isinstance(entry, dict):
             return "#d1a86d"
         type_value = entry.get("Type") or entry.get("type") or entry.get("Category") or entry.get("SceneType") or entry.get("Mood")
         if isinstance(type_value, str):
+            # Handle the branch where isinstance(type_value, str).
             lowered = type_value.lower()
             if any(token in lowered for token in ("combat", "battle", "fight", "skirmish")):
                 return "#b96a55"
@@ -2167,6 +2305,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return "#d1a86d"
 
     def _clean_scene_title(self, text):
+        """Internal helper for clean scene title."""
         if not text:
             return ""
         cleaned = str(text).strip()
@@ -2176,12 +2315,15 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return cleaned.strip()
 
     def _to_list(self, value):
+        """Internal helper for to list."""
         if value is None:
             return []
         if isinstance(value, list):
+            # Handle the branch where isinstance(value, list).
             result = []
             for item in value:
                 if isinstance(item, dict):
+                    # Handle the branch where isinstance(item, dict).
                     name = item.get("Name") or item.get("Title") or item.get("name") or item.get("text")
                     if name:
                         result.append(str(name).strip())
@@ -2193,11 +2335,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if isinstance(value, (set, tuple)):
             return [str(item).strip() for item in value if str(item).strip()]
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             collected = []
             for sub in value.values():
                 collected.extend(self._to_list(sub))
             return collected
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             text = value.strip()
             if not text:
                 return []
@@ -2212,9 +2356,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return [str(value)]
 
     def _dedupe_preserve_order(self, values):
+        """Internal helper for dedupe preserve order."""
         result = []
         seen = set()
         for value in values or []:
+            # Process each value from values or [].
             if value is None:
                 continue
             text = str(value).strip()
@@ -2228,6 +2374,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return result
 
     def _lookup_entity_by_name(self, entity_type, name):
+        """Internal helper for lookup entity by name."""
         if not name:
             return None
         name_text = str(name).strip()
@@ -2250,6 +2397,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return None
 
     def _normalize_synopsis_text(self, value, max_length=240):
+        """Normalize synopsis text."""
         if value is None:
             return ""
         snippet = clean_longtext(value, max_length=max_length)
@@ -2261,6 +2409,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return snippet
 
     def _build_entity_synopsis(self, entity_type, record):
+        """Build entity synopsis."""
         if not isinstance(record, dict):
             return ""
 
@@ -2287,6 +2436,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         fields = type_specific.get(entity_type, []) + fallback_fields
         seen = set()
         for field in fields:
+            # Process each field from fields.
             key = field.lower()
             if key in seen:
                 continue
@@ -2303,6 +2453,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         }
         parts = []
         for label, key in composite_map.get(entity_type, []):
+            # Process each (label, key) from composite_map.get(entity_type, []).
             snippet = self._normalize_synopsis_text(record.get(key), max_length=120)
             if snippet:
                 parts.append(f"{label}: {snippet}")
@@ -2314,6 +2465,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return ""
 
     def _get_entity_synopsis_for_display(self, entity):
+        """Return entity synopsis for display."""
         if not isinstance(entity, dict):
             return ""
         synopsis = entity.get("synopsis")
@@ -2321,6 +2473,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if synopsis:
             return synopsis
         for key in ("Summary", "summary", "Description", "description", "Text", "text", "Notes", "notes"):
+            # Process each key while updating entity synopsis for display.
             value = entity.get(key)
             snippet = self._normalize_synopsis_text(value)
             if snippet:
@@ -2328,6 +2481,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return ""
 
     def _compose_entity_tooltip_text(self, entity_info):
+        """Internal helper for compose entity tooltip text."""
         if not isinstance(entity_info, dict):
             return ""
         name = entity_info.get("name", "") or ""
@@ -2343,6 +2497,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             header = ent_type.title()
 
         if synopsis:
+            # Continue with this path when synopsis is set.
             if header:
                 return f"{header}\n\n{synopsis}"
             return synopsis
@@ -2352,6 +2507,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return fallback
 
     def _load_entity_tooltip_portrait(self, entity_info):
+        """Load entity tooltip portrait."""
         if not isinstance(entity_info, dict):
             return None
 
@@ -2367,6 +2523,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             "token",
             "Token",
         ):
+            # Process each key while updating entity tooltip portrait.
             value = entity_info.get(key)
             if value:
                 portrait_path = value
@@ -2388,6 +2545,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return cached
 
         try:
+            # Keep entity tooltip portrait resilient if this step fails.
             with Image.open(resolved_path) as pil_img:
                 img = pil_img.copy()
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
@@ -2399,7 +2557,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None
 
     def _cancel_entity_tooltip_schedule(self):
+        """Internal helper for cancel entity tooltip schedule."""
         if self._entity_tooltip_after_id:
+            # Continue with this path when entity tooltip after ID is set.
             try:
                 self.after_cancel(self._entity_tooltip_after_id)
             except Exception:
@@ -2408,7 +2568,9 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_pending = None
 
     def _cancel_entity_tooltip_hide(self):
+        """Internal helper for cancel entity tooltip hide."""
         if self._entity_tooltip_hide_after_id:
+            # Continue with this path when entity tooltip hide after ID is set.
             try:
                 self.after_cancel(self._entity_tooltip_hide_after_id)
             except Exception:
@@ -2416,8 +2578,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self._entity_tooltip_hide_after_id = None
 
     def _hide_entity_tooltip(self):
+        """Hide entity tooltip."""
         self._cancel_entity_tooltip_hide()
         if self._entity_tooltip_window:
+            # Continue with this path when entity tooltip window is set.
             try:
                 self._entity_tooltip_window.destroy()
             except Exception:
@@ -2426,16 +2590,19 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_active_tag = None
 
     def _dismiss_entity_tooltip(self):
+        """Internal helper for dismiss entity tooltip."""
         self._cancel_entity_tooltip_schedule()
         self._hide_entity_tooltip()
 
     def _schedule_entity_tooltip_hide(self, tag, delay=ENTITY_TOOLTIP_HIDE_DELAY_MS):
+        """Schedule entity tooltip hide."""
         if tag and self._entity_tooltip_active_tag and tag != self._entity_tooltip_active_tag:
             return
         self._cancel_entity_tooltip_hide()
         self._entity_tooltip_hide_after_id = self.after(delay, self._dismiss_entity_tooltip)
 
     def _schedule_entity_tooltip(self, root_x, root_y, entity_info, tag):
+        """Schedule entity tooltip."""
         self._cancel_entity_tooltip_schedule()
         self._entity_tooltip_pending = (root_x, root_y, entity_info, tag)
         self._entity_tooltip_after_id = self.after(
@@ -2444,6 +2611,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         )
 
     def _show_entity_tooltip_at(self, root_x, root_y, entity_info, tag):
+        """Show entity tooltip at."""
         self._entity_tooltip_after_id = None
         self._entity_tooltip_pending = None
         text = self._compose_entity_tooltip_text(entity_info)
@@ -2498,6 +2666,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_window = tw
 
     def _on_entity_hover_enter(self, event, entity_info, tag):
+        """Handle entity hover enter."""
         root_x = self.canvas.winfo_rootx() + event.x
         root_y = self.canvas.winfo_rooty() + event.y
         self._entity_tooltip_active_tag = tag
@@ -2505,9 +2674,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._schedule_entity_tooltip(root_x, root_y, entity_info, tag)
 
     def _on_entity_hover_leave(self, event=None, tag=None):
+        """Handle entity hover leave."""
         self._schedule_entity_tooltip_hide(tag)
 
     def _bind_entity_tooltip(self, tag, entity_info):
+        """Bind entity tooltip."""
         if not self.canvas:
             return
         self.canvas.tag_bind(
@@ -2520,11 +2691,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.tag_bind(tag, "<ButtonPress>", lambda event, t=tag: self._on_entity_hover_leave(event, t), add="+")
 
     def _find_mentions(self, text, candidates):
+        """Find mentions."""
         if not text or not candidates:
             return []
         lower_text = text.lower()
         matches = []
         for candidate in candidates:
+            # Process each candidate from candidates.
             if not candidate:
                 continue
             candidate_text = str(candidate).strip()
@@ -2535,14 +2708,17 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return matches
 
     def _coerce_scene_links(self, value):
+        """Coerce scene links."""
         links = []
         if value is None:
             return links
         if isinstance(value, list):
+            # Handle the branch where isinstance(value, list).
             for item in value:
                 links.extend(self._coerce_scene_links(item))
             return links
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             target = None
             text = None
             for key in ("target", "Target", "to", "To", "scene", "Scene", "next", "Next", "id", "Id", "goto", "GoTo"):
@@ -2557,8 +2733,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 links.append({"target": target, "text": text})
             else:
                 for key, sub in value.items():
+                    # Process each (key, sub) from value.items().
                     sub_links = self._coerce_scene_links(sub)
                     if sub_links:
+                        # Continue with this path when sub links is set.
                         for link in sub_links:
                             if not link.get("text") and isinstance(key, str):
                                 link["text"] = key
@@ -2570,6 +2748,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             links.append({"target": int(value), "text": ""})
             return links
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             text_value = value.strip()
             if not text_value:
                 return links
@@ -2595,6 +2774,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return str(value)
 
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             for key in (
                 "text",
                 "Text",
@@ -2657,9 +2837,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return False
 
     def _build_scene_lookup(self, scenes):
+        """Build scene lookup."""
         lookup = {}
         index_lookup = {}
         for scene in scenes:
+            # Process each scene from scenes.
             tag = scene.get("tag")
             raw_index = scene.get("index", 0)
             try:
@@ -2670,6 +2852,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 index_lookup.setdefault(index, tag)
                 index_lookup.setdefault(index + 1, tag)
             for ident in scene.get("identifiers", []) or []:
+                # Process each ident from scene.get('identifiers', []) or [].
                 norm = self._normalize_scene_identifier_key(ident)
                 if norm and norm not in lookup:
                     lookup[norm] = tag
@@ -2679,17 +2862,22 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return lookup, index_lookup
 
     def _resolve_scene_reference(self, reference, lookup, index_lookup):
+        """Resolve scene reference."""
         if reference is None:
             return None
         if isinstance(reference, dict):
+            # Handle the branch where isinstance(reference, dict).
             for key in ("target", "Target", "Scene", "scene", "Next", "next", "Id", "id"):
                 if key in reference:
+                    # Handle the branch where key is in reference.
                     resolved = self._resolve_scene_reference(reference[key], lookup, index_lookup)
                     if resolved:
                         return resolved
             return None
         if isinstance(reference, list):
+            # Handle the branch where isinstance(reference, list).
             for item in reference:
+                # Process each item from reference.
                 resolved = self._resolve_scene_reference(item, lookup, index_lookup)
                 if resolved:
                     return resolved
@@ -2697,16 +2885,19 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if isinstance(reference, (int, float)):
             return index_lookup.get(int(reference))
         if isinstance(reference, str):
+            # Handle the branch where isinstance(reference, str).
             ref = reference.strip()
             if not ref:
                 return None
             if ref.isdigit():
+                # Handle the branch where ref.isdigit().
                 target = index_lookup.get(int(ref))
                 if target:
                     return target
             lowered = ref.lower()
             match = re.search(r"(scene|act)\s*(\d+)", lowered)
             if match:
+                # Continue with this path when match is set.
                 num = int(match.group(2))
                 target = index_lookup.get(num)
                 if target:
@@ -2716,10 +2907,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             if cleaned and cleaned != lowered:
                 candidates.append(cleaned)
             if ":" in ref:
+                # Handle the branch where ':' is in ref.
                 prefix = ref.split(":", 1)[0].strip()
                 if prefix:
                     candidates.append(prefix)
             for candidate in candidates:
+                # Process each candidate from candidates.
                 norm = self._normalize_scene_identifier_key(candidate)
                 if norm and norm in lookup:
                     return lookup[norm]
@@ -2729,6 +2922,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return None
 
     def _normalize_scene_identifier_key(self, value):
+        """Normalize scene identifier key."""
         if value is None:
             return ""
         if isinstance(value, (int, float)):
@@ -2741,6 +2935,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return text
 
     def _slugify_scene_identifier(self, value):
+        """Internal helper for slugify scene identifier."""
         if value is None:
             return ""
         if isinstance(value, (int, float)):
@@ -2750,6 +2945,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return slug.strip('-')
 
     def draw_graph(self):
+        """Handle draw graph."""
         self._dismiss_entity_tooltip()
         self.canvas.delete("node")
         self.canvas.delete("link")
@@ -2776,37 +2972,44 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.tag_raise("node")  # Bring nodes to the top
 
     def _extract_entity_image(self, record, entity_type):
+        """Extract entity image."""
         if not isinstance(record, dict):
             return ""
         priority_keys = ["Portrait", "portrait", "Image", "image", "TokenImage", "tokenImage", "Token", "token"]
         if entity_type == "place":
             priority_keys = ["Image", "image", "Portrait", "portrait", "TokenImage", "tokenImage", "Token", "token"]
         for key in priority_keys:
+            # Process each key from priority_keys.
             value = record.get(key)
             if value:
                 return value
         return ""
 
     def _resolve_scene_entity_portrait(self, entity):
+        """Resolve scene entity portrait."""
         if not isinstance(entity, dict):
             return ""
         for key in ("portrait", "Portrait", "image", "Image", "tokenImage", "TokenImage", "token", "Token"):
+            # Process each key while updating scene entity portrait.
             value = entity.get(key)
             if value:
                 return value
         return ""
 
     def _iter_image_candidates(self, value):
+        """Internal helper for iter image candidates."""
         if value is None:
             return
 
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             for key in ("path", "Path", "file", "File", "image", "Image", "portrait", "Portrait", "value", "Value", "text", "Text"):
                 if key in value:
                     yield from self._iter_image_candidates(value[key])
             return
 
         if isinstance(value, (list, tuple, set)):
+            # Handle the branch where isinstance(value, (list, tuple, set)).
             for item in value:
                 yield from self._iter_image_candidates(item)
             return
@@ -2820,17 +3023,21 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         yield normalized
 
         if not os.path.isabs(normalized):
+            # Handle the branch where not os.path.isabs(normalized).
             campaign_dir = ConfigHelper.get_campaign_dir()
             if campaign_dir:
                 yield os.path.join(campaign_dir, normalized)
             if PORTRAIT_FOLDER:
+                # Also try portraits stored under the shared portrait folder when the path is project-relative.
                 normalized_lower = normalized.replace("\\", "/").lower()
                 if not normalized_lower.startswith("assets/"):
                     yield os.path.join(PORTRAIT_FOLDER, normalized)
 
     def _resolve_existing_image_path(self, portrait_path):
+        """Resolve existing image path."""
         seen = set()
         for candidate in self._iter_image_candidates(portrait_path):
+            # Test each normalized candidate until one resolves to an existing file on disk.
             if not candidate:
                 continue
             normalized = os.path.normpath(candidate)
@@ -2842,10 +3049,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return None
 
     def load_portrait(self, portrait_path, node_tag):
+        """Load portrait."""
         resolved_path = self._resolve_existing_image_path(portrait_path)
         if not resolved_path:
             return None, (0, 0)
         try:
+            # Copy the source image before resizing so the file handle can be closed immediately.
             with Image.open(resolved_path) as pil_img:
                 img = pil_img.copy()
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
@@ -2858,10 +3067,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None, (0, 0)
 
     def load_portrait_scaled(self, portrait_path, node_tag, scale=1.0):
+        """Load portrait scaled."""
         resolved_path = self._resolve_existing_image_path(portrait_path)
         if not resolved_path:
             return None, (0, 0)
         try:
+            # Reopen from the source image so each scaled portrait starts from the best available pixels.
             with Image.open(resolved_path) as pil_img:
                 img = pil_img.copy()
             size = int(MAX_PORTRAIT_SIZE[0] * scale), int(MAX_PORTRAIT_SIZE[1] * scale)
@@ -2875,10 +3086,12 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None, (0, 0)
 
     def load_thumbnail(self, portrait_path, cache_key, size):
+        """Load thumbnail."""
         resolved_path = self._resolve_existing_image_path(portrait_path)
         if not resolved_path:
             return None
         try:
+            # Build thumbnails from a fresh image handle so cached previews stay independent.
             with Image.open(resolved_path) as pil_img:
                 img = pil_img.copy()
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
@@ -2891,6 +3104,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None
 
     def _entity_placeholder_color(self, entity_type):
+        """Internal helper for entity placeholder color."""
         base = (entity_type or "").lower()
         color_map = {
             "npc": "#3f6fb5",
@@ -2902,15 +3116,18 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return color_map.get(base, "#666666")
 
     def _load_default_type_icons(self):
+        """Load default type icons."""
         self.type_icons.clear()
         self._scaled_type_icons.clear()
         for icon_type, path in self.type_icon_paths.items():
+            # Process each (icon_type, path) from type_icon_paths.items().
             icon = self.load_icon(path, 32, 0.6)
             if icon:
                 self.type_icons[icon_type] = icon
                 self._scaled_type_icons[(icon_type, 32)] = icon
 
     def _get_scaled_type_icon(self, entity_type, size):
+        """Return scaled type icon."""
         entity_key = (entity_type or "").lower()
         if not entity_key:
             return None
@@ -2932,6 +3149,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return icon
 
     def draw_nodes(self):
+        """Draw the visible scenario graph nodes on the canvas."""
 
         scale = self.canvas_scale
 
@@ -2945,6 +3163,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.node_bboxes.clear()
 
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             node_type = node["type"]
             node_name = node["name"]
             node_tag = self._build_tag(node_type, node_name)
@@ -2959,14 +3178,17 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             entity_entries = []
 
             if node_type == "scenario":
+                # Handle the branch where node_type == 'scenario'.
                 summary = data.get("Summary", "")
                 secret  = data.get("Secret", "")
                 body_text = f"{summary}\nSecrets: {secret}" if secret else summary
             elif node_type == "scene":
+                # Handle the branch where node_type == 'scene'.
                 raw_text = data.get("Text") or data.get("text") or ""
                 body_text = clean_longtext(raw_text, max_length=1200)
                 body_text = body_text.strip()
                 if len(body_text) > 700:
+                    # Handle the branch where len(body_text) > 700.
                     trimmed = body_text[:700]
                     cut = trimmed.rfind(" ")
                     if cut > 400:
@@ -2980,6 +3202,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 else:
                     entity_entries = []
             elif node_type == "place":
+                # Handle the branch where node_type == 'place'.
                 desc   = data.get("Description", "")
                 secret = data.get("Secret", "")
                 body_text = f"{desc}\nSecret: {secret}" if secret else desc
@@ -2994,6 +3217,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 body_text = f"{traits}\nSecret: {secret}" if secret else traits
 
             if node_type == "scene" and entity_entries:
+                # Continue with this path when node_type == 'scene' and entity entries is set.
                 max_entities = 8
                 if len(entity_entries) > max_entities:
                     entity_entries = entity_entries[:max_entities]
@@ -3048,6 +3272,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
             # === BACKGROUND IMAGE: Post-it ===
             if self.postit_base:
+                # Continue with this path when postit base is set.
                 orig_w, orig_h = self.postit_base.size
 
                 # scale so the post-it is at least as big as our minimum box
@@ -3155,11 +3380,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             )
 
             if entity_entries:
+                # Continue with this path when entity entries is set.
                 text_bottom = text_top + title_h + gap + body_h + 10
                 row_width = icon_row_width
                 row_left = x - row_width / 2
                 icons_y = text_bottom + GAP + icons_height / 2
                 for idx, entity in enumerate(entity_entries):
+                    # Process each (idx, entity) from enumerate(entity_entries).
                     name = entity.get("name") or entity.get("Name") or ""
                     portrait_path = self._resolve_scene_entity_portrait(entity)
                     resolved_portrait_path = (
@@ -3174,6 +3401,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     entity_type_value = entity.get("type") or entity.get("Type") or ""
                     entity_type = (entity_type_value or "").lower()
                     if icon is None:
+                        # Handle the branch where icon is missing.
                         icon = self._get_scaled_type_icon(entity_type, thumb_size)
                         if icon is not None:
                             self.node_images[thumb_key] = icon
@@ -3190,6 +3418,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                     entity_tag = f"{node_tag}_entity_{idx}"
                     icon_x = row_left + idx * (thumb_size + thumb_gap) + thumb_size / 2
                     if icon is not None:
+                        # Handle the branch where icon is available.
                         self.canvas.create_image(
                             icon_x,
                             icons_y,
@@ -3231,6 +3460,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             )
 
     def draw_links(self):
+        """Handle draw links."""
         self.canvas_link_items = {}
         for link in self.graph["links"]:
             self.draw_one_link(link)
@@ -3238,6 +3468,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.tag_raise("link_label")
 
     def _draw_scene_card(self, node, scale):
+        """Internal helper for draw scene card."""
         node_name = node.get("name", "Scene")
         node_tag = self._build_tag("scene", node_name)
         x, y = node.get("x", 0), node.get("y", 0)
@@ -3423,11 +3654,13 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         current_y = body_top + body_height
 
         if chip_count:
+            # Continue with this path when chip count is set.
             chips_top = body_top + body_height
             chip_center_y = chips_top + chip_vertical_padding + chip_size / 2
             row_width = chip_count * chip_size + (chip_count - 1) * chip_gap
             chip_left = x - row_width / 2
             for idx, entity in enumerate(chip_entities[:chip_count]):
+                # Process each (idx, entity) from enumerate(chip_entities[:chip_count]).
                 chip_x = chip_left + idx * (chip_size + chip_gap) + chip_size / 2
                 entity_tag = f"{node_tag}_entity_{idx}"
                 portrait_path = entity.get("portrait") or self._resolve_scene_entity_portrait(entity)
@@ -3450,6 +3683,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 if portrait_path:
                     icon = self.load_thumbnail(portrait_path, thumb_key, (chip_size, chip_size))
                 if icon:
+                    # Continue with this path when icon is set.
                     self.node_images[thumb_key] = icon
                     self.canvas.create_image(
                         chip_x,
@@ -3494,9 +3728,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 self._bind_entity_tooltip(entity_tag, tooltip_info)
 
         if badge_positions:
+            # Continue with this path when badge positions is set.
             badge_area_left = left + padding_x
             badge_area_top = bottom - footer_height + footer_padding
             for (offset_x, offset_y, badge_width), badge_text in zip(badge_positions, badge_texts):
+                # Process each ((offset_x, offset_y, badge_width), badge_text) from zip(badge_positions, badge_texts).
                 rect_left = badge_area_left + offset_x
                 rect_top = badge_area_top + offset_y
                 rect_right = rect_left + badge_width
@@ -3524,6 +3760,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.node_bboxes[node_tag] = (left, top, right, bottom)
 
     def draw_one_link(self, link):
+        """Handle draw one link."""
         tag_from = link["from"]
         tag_to = link["to"]
         x1, y1 = self.node_positions.get(tag_from, (0, 0))
@@ -3550,6 +3787,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
         text = (link.get("text") or "").strip()
         if text:
+            # Continue with this path when text is set.
             mid_x = (x1 + x2) / 2
             mid_y = (y1 + y2) / 2
             dx = x2 - x1
@@ -3564,6 +3802,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
             font_spec = link.get("label_font") or link.get("font")
             if isinstance(font_spec, (tuple, list)) and font_spec:
+                # Continue with this path when isinstance(font_spec, (tuple, list)) and font spec is set.
                 family = font_spec[0]
                 size = None
                 weight = None
@@ -3604,6 +3843,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.canvas_link_items[label_id] = link
 
     def start_drag(self, event):
+        """Start drag."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         items = self.canvas.find_closest(x, y)
@@ -3637,6 +3877,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.drag_start = None
 
     def on_drag(self, event):
+        """Handle drag."""
         if not self.selected_node or not self.drag_start:
             return
         # Ensure the selected node is a tracked node
@@ -3668,6 +3909,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         new_pos = (old_x + dx, old_y + dy)
         self.node_positions[self.selected_node] = new_pos
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             if tag == self.selected_node:
                 node["x"], node["y"] = new_pos
@@ -3686,6 +3928,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.drag_start = (x, y)
 
     def on_double_click(self, event):
+        """Handle double click."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         items = self.canvas.find_closest(x, y)
@@ -3704,27 +3947,32 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if not node_tag:
             return
         if node_tag.startswith("scenario_"):
+            # Handle the branch where node_tag.startswith('scenario_').
             entity_type = "scenarios"
             entity_name = node_tag.replace("scenario_", "").replace("_", " ")
             entity = self.scenario
             wrapper=self.scenario_wrapper
         elif node_tag.startswith("npc_"):
+            # Handle the branch where node_tag.startswith('npc_').
             entity_type = "NPCs"
             entity_name = node_tag.replace("npc_", "").replace("_", " ")
             entity = self.npcs.get(entity_name)
             wrapper=self.npc_wrapper
         elif node_tag.startswith("creature_"):
+            # Handle the branch where node_tag.startswith('creature_').
             entity_type = "Creatures"
             entity_name = node_tag.replace("creature_", "").replace("_", " ")
             entity = self.creatures.get(entity_name)
             wrapper=self.creature_wrapper
             
         elif node_tag.startswith("place_"):
+            # Handle the branch where node_tag.startswith('place_').
             entity_type = "Places"
             entity_name = node_tag.replace("place_", "").replace("_", " ")
             entity = self.places.get(entity_name)
             wrapper=self.place_wrapper
         elif node_tag.startswith("faction_"):
+            # Handle the branch where node_tag.startswith('faction_').
             entity_type = "Factions"
             entity_name = node_tag.replace("faction_", "").replace("_", " ")
             entity = self.factions.get(entity_name)
@@ -3745,6 +3993,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         GenericEditorWindow(None, entity, template,wrapper)
 
     def on_right_click(self, event):
+        """Handle right click."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         items = self.canvas.find_closest(x, y)
@@ -3765,6 +4014,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.show_node_menu(x, y)
 
     def _on_mousewheel_y(self, event):
+        """Handle mousewheel y."""
         if self.canvas.yview() == (0.0, 1.0):  # No scrolling available
             return
         if event.num == 4 or event.delta > 0:
@@ -3773,6 +4023,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.canvas.yview_scroll(1, "units")
 
     def _on_mousewheel_x(self, event):
+        """Handle mousewheel x."""
         if self.canvas.xview() == (0.0, 1.0):  # No scrolling available
             return
         if event.num == 4 or event.delta > 0:
@@ -3781,22 +4032,27 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             self.canvas.xview_scroll(1, "units")
 
     def _start_canvas_pan(self, event):
+        """Start canvas pan."""
         self._is_panning = True
         self.canvas.scan_mark(event.x, event.y)
 
     def _do_canvas_pan(self, event):
+        """Internal helper for do canvas pan."""
         if not self._is_panning:
             return
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
     def _end_canvas_pan(self, _event):
+        """Internal helper for end canvas pan."""
         self._is_panning = False
 
     def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
+        """Load portrait menu image."""
         resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
         if not resolved:
             return None
         try:
+            # Keep portrait menu image resilient if this step fails.
             img = Image.open(resolved)
             img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
             photo = ImageTk.PhotoImage(img)
@@ -3810,6 +4066,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return None
 
     def show_node_menu(self, x, y):
+        """Show node menu."""
         node_menu = Menu(self.canvas, tearoff=0)
         self._portrait_menu_images = []
         node_menu.add_command(label="Delete Node", command=self.delete_node)
@@ -3819,9 +4076,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         entity_name = None
         if self.selected_node:
             if self.selected_node.startswith("npc_"):
+                # Handle the branch where selected_node.startswith('npc_').
                 entity_name = self.selected_node.replace("npc_", "").replace("_", " ")
                 record = self.npcs.get(entity_name, {})
             elif self.selected_node.startswith("creature_"):
+                # Handle the branch where selected_node.startswith('creature_').
                 entity_name = self.selected_node.replace("creature_", "").replace("_", " ")
                 record = self.creatures.get(entity_name, {})
             elif self.selected_node.startswith("place_"):
@@ -3830,6 +4089,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         if record and entity_name and (
             self.selected_node.startswith("npc_") or self.selected_node.startswith("creature_")
         ):
+            # Only expose portrait actions when the selected entity has at least one resolvable portrait.
             portrait_paths = [
                 path
                 for path in parse_portrait_value(record.get("Portrait", ""))
@@ -3837,6 +4097,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             ]
             if portrait_paths:
                 if len(portrait_paths) == 1:
+                    # Handle the branch where len(portrait_paths) == 1.
                     node_menu.add_command(
                         label="Display Portrait",
                         command=lambda p=portrait_paths[0], n=entity_name: show_portrait(p, n),
@@ -3844,6 +4105,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 else:
                     portrait_menu = Menu(node_menu, tearoff=0)
                     for index, path in enumerate(portrait_paths, start=1):
+                        # Process each (index, path) from enumerate(portrait_paths, start=1).
                         portrait_image = self._load_portrait_menu_image(path)
                         if portrait_image:
                             portrait_menu.add_command(
@@ -3869,9 +4131,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         node_menu.post(int(x), int(y))
 
     def _get_entity_audio(self, record):
+        """Return entity audio."""
         return get_entity_audio_value(record)
 
     def _play_entity_audio(self, record, name):
+        """Internal helper for play entity audio."""
         audio_value = self._get_entity_audio(record)
         if not audio_value:
             messagebox.showinfo("Audio", "No audio file configured for this entity.")
@@ -3881,6 +4145,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             messagebox.showwarning("Audio", f"Unable to play audio for {label}.")
 
     def show_color_menu(self, x, y):
+        """Show color menu."""
         COLORS = [
             "red", "green", "blue", "yellow", "purple",
             "orange", "pink", "cyan", "magenta", "lightgray"
@@ -3891,12 +4156,14 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         color_menu.post(int(x), int(y))
 
     def change_node_color(self, color):
+        """Handle change node color."""
         if not self.selected_node:
             return
         rect_id = self.node_rectangles.get(self.selected_node)
         if rect_id:
             self.canvas.itemconfig(rect_id, fill=color)
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             tag = self._build_tag(node.get('type', ''), node.get('name', ''))
             if tag == self.selected_node:
                 node["color"] = color
@@ -3904,6 +4171,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.draw_graph()
 
     def delete_node(self):
+        """Delete node."""
         if not self.selected_node:
             return
         node_name = self.selected_node.split("_", 1)[-1].replace("_", " ")
@@ -3915,6 +4183,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.draw_graph()
 
     def edit_link_text(self, item_id):
+        """Handle edit link text."""
         link_record = self.canvas_link_items.get(item_id)
         if not link_record:
             return
@@ -3973,8 +4242,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             messagebox.showerror("Save Error", f"Failed to update link text: {exc}")
 
     def _get_scenario_scenes_list(self):
+        """Return scenario scenes list."""
         scenes_raw = self.scenario.get("Scenes") if self.scenario else None
         if isinstance(scenes_raw, dict):
+            # Handle the branch where isinstance(scenes_raw, dict).
             if isinstance(scenes_raw.get("Scenes"), list):
                 return scenes_raw["Scenes"]
             scenes_raw["Scenes"] = []
@@ -3991,8 +4262,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return self.scenario["Scenes"]
 
     def _ensure_scene_entry(self, index):
+        """Ensure scene entry."""
         scenes_list = self._get_scenario_scenes_list()
         while len(scenes_list) <= index:
+            # Keep looping while len(scenes_list) <= index.
             scenes_list.append({})
         entry = scenes_list[index]
         if not isinstance(entry, dict):
@@ -4001,16 +4274,19 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return entry
 
     def _persist_scene_links(self):
+        """Persist scene links."""
         if not isinstance(self.scene_flow_scenes, list):
             return
         tag_lookup = self.scene_flow_scene_lookup or {}
         for scene in self.scene_flow_scenes:
+            # Process each scene from scene_flow_scenes.
             idx = scene.get("index")
             if idx is None:
                 continue
             entry = self._ensure_scene_entry(idx)
             links_payload = []
             for link in scene.get("links", []):
+                # Process each link from scene.get('links', []).
                 text_val = (link.get("text") or "").strip()
                 link_record = {}
                 target_scene = None
@@ -4024,6 +4300,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                         None,
                     )
                 if target_scene:
+                    # Continue with this path when target scene is set.
                     target_title = target_scene.get("title") or target_scene.get("display_name")
                     if target_title:
                         link_record["Target"] = target_title
@@ -4042,9 +4319,11 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             entry["Links"] = links_payload
 
     def _save_scenario_changes(self):
+        """Save scenario changes."""
         if not self.scenario_wrapper or not self.scenario:
             return
         try:
+            # Keep scenario changes resilient if this step fails.
             items = self.scenario_wrapper.load_items()
             title = self.scenario.get("Title")
             saved = False
@@ -4060,8 +4339,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             raise RuntimeError(exc)
 
     def save_graph(self):
+        """Save graph."""
         file_path = filedialog.asksaveasfilename(defaultextension=".json")
         if file_path:
+            # Continue with this path when file path is set.
             for node in self.graph["nodes"]:
                 node_tag = self._build_tag(node.get('type', ''), node.get('name', ''))
                 x, y = self.node_positions.get(node_tag, (node["x"], node["y"]))
@@ -4070,8 +4351,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 json.dump(self.graph, f, indent=2)
 
     def load_graph(self):
+        """Load graph."""
         file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
         if file_path:
+            # Continue with this path when file path is set.
             with open(file_path, "r", encoding="utf-8") as f:
                 self.graph = json.load(f)
             self.node_positions.clear()
@@ -4093,6 +4376,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         # Try to find the scenario node and set self.scenario
         scenario_node = next((n for n in self.graph["nodes"] if n["type"] == "scenario"), None)
         if scenario_node:
+            # Continue with this path when scenario node is set.
             title = scenario_node["name"]
             all_scenarios = self.scenario_wrapper.load_items()
             matched = next((s for s in all_scenarios if s.get("Title") == title), None)
@@ -4108,8 +4392,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self.canvas.update_idletasks()
         scenario_node = next((n for n in self.graph["nodes"] if n["type"] == "scenario"), None)
         if scenario_node:
+            # Continue with this path when scenario node is set.
             tag = self._build_tag("scenario", scenario_node.get('name', ''))
             if tag in self.node_positions:
+                # Handle the branch where tag is in node positions.
                 x, y = self.node_positions[tag]
 
                 # Get canvas scroll region and view dimensions
@@ -4126,16 +4412,19 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         
         
     def get_state(self):
+        """Return state."""
         return {
             "graph": self.graph,
             "node_positions": self.node_positions,
         }
 
     def set_state(self, state):
+        """Set state."""
         self.graph = state.get("graph", {})
         self.node_positions = state.get("node_positions", {})
         self.draw_graph()
     def load_icon(self, path, size, opacity):
+        """Load icon."""
         if not path or not os.path.exists(path):
             return None
         img = Image.open(path).convert("RGBA").resize((size, size), Image.Resampling.LANCZOS)
@@ -4144,6 +4433,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         return ImageTk.PhotoImage(img, master=self.canvas)
         
 def make_watermarked_postit(base_path, icon_path, size=(200,200), icon_size=32, margin=8, opacity=80):
+        """Handle make watermarked postit."""
         # 1) load base
         base = Image.open(base_path).convert("RGBA")
         base = base.resize(size, Image.ANTIALIAS)

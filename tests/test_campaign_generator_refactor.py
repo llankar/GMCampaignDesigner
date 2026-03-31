@@ -1,3 +1,5 @@
+"""Regression tests for campaign generator refactor."""
+
 from __future__ import annotations
 
 import json
@@ -11,6 +13,7 @@ from modules.campaign_generator.services import (
 
 
 def _sample_campaign() -> dict[str, str]:
+    """Internal helper for sample campaign."""
     return {
         "Starting Location": "Tavern – The party meets in a tavern.",
         "Quest": "Rescue Hostage – Save the missing diplomat.",
@@ -28,6 +31,7 @@ def _sample_campaign() -> dict[str, str]:
 
 
 def test_campaign_generator_facade_preserves_public_symbols():
+    """Verify that campaign generator facade preserves public symbols."""
     assert callable(campaign_generator.generate_fantasy_campaign)
     assert callable(campaign_generator.generate_scifi_campaign)
     assert callable(campaign_generator.generate_modern_campaign)
@@ -44,6 +48,7 @@ def test_campaign_generator_facade_preserves_public_symbols():
 
 
 def test_build_scenario_export_payload_keeps_legacy_shape():
+    """Verify that build scenario export payload keeps legacy shape."""
     payload = build_scenario_export_payload(_sample_campaign())
 
     assert payload["Title"] == "Rescue Hostage"
@@ -55,6 +60,7 @@ def test_build_scenario_export_payload_keeps_legacy_shape():
 
 
 def test_append_scenario_to_json_file_writes_scenarios_wrapper(tmp_path):
+    """Verify that append scenario to JSON file writes scenarios wrapper."""
     output = tmp_path / "campaign.json"
 
     append_scenario_to_json_file(_sample_campaign(), str(output))
@@ -68,6 +74,7 @@ def test_append_scenario_to_json_file_writes_scenarios_wrapper(tmp_path):
 
 
 def test_export_to_docx_creates_word_document(tmp_path):
+    """Verify that export to docx creates word document."""
     output = tmp_path / "campaign.docx"
 
     campaign_generator.export_to_docx(_sample_campaign(), str(output))

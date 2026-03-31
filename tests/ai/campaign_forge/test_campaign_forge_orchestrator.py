@@ -1,3 +1,5 @@
+"""Regression tests for campaign forge orchestrator."""
+
 import pytest
 
 from modules.ai.campaign_forge.contracts import CampaignForgeRequest
@@ -7,18 +9,22 @@ from modules.ai.campaign_forge.validators import CampaignForgeValidationError
 
 class _FakeScenarioWrapper:
     def __init__(self, items=None):
+        """Initialize the _FakeScenarioWrapper instance."""
         self.items = list(items or [])
 
     def load_items(self):
+        """Load items."""
         return list(self.items)
 
 
 class _FakeArcGenerationService:
     def __init__(self, ai_client, scenario_wrapper):
+        """Initialize the _FakeArcGenerationService instance."""
         self.ai_client = ai_client
         self.scenario_wrapper = scenario_wrapper
 
     def generate_arcs(self, foundation):
+        """Handle generate arcs."""
         return {
             "arcs": [
                 {
@@ -37,11 +43,13 @@ class _FakeArcScenarioExpansionService:
     instances = []
 
     def __init__(self, ai_client):
+        """Initialize the _FakeArcScenarioExpansionService instance."""
         self.ai_client = ai_client
         self.calls = []
         _FakeArcScenarioExpansionService.instances.append(self)
 
     def generate_scenarios(self, foundation, arcs, *, existing_scenarios=None):
+        """Handle generate scenarios."""
         self.calls.append(
             {
                 "foundation": dict(foundation),
@@ -64,6 +72,7 @@ class _FakeArcScenarioExpansionService:
 
 
 def _foundation():
+    """Internal helper for foundation."""
     return {
         "name": "Stormfront",
         "genre": "Noir",
@@ -78,6 +87,7 @@ def _foundation():
 
 
 def test_orchestrator_uses_provided_arcs_and_db_aware_existing_scenarios(monkeypatch):
+    """Verify that orchestrator uses provided arcs and DB aware existing scenarios."""
     from modules.ai.campaign_forge import orchestrator as orchestrator_module
 
     _FakeArcScenarioExpansionService.instances = []
@@ -113,6 +123,7 @@ def test_orchestrator_uses_provided_arcs_and_db_aware_existing_scenarios(monkeyp
 
 
 def test_orchestrator_generates_arcs_when_none_are_provided(monkeypatch):
+    """Verify that orchestrator generates arcs when none are provided."""
     from modules.ai.campaign_forge import orchestrator as orchestrator_module
 
     _FakeArcScenarioExpansionService.instances = []
@@ -128,10 +139,12 @@ def test_orchestrator_generates_arcs_when_none_are_provided(monkeypatch):
 
 
 def test_orchestrator_rejects_invalid_generated_structure(monkeypatch):
+    """Verify that orchestrator rejects invalid generated structure."""
     from modules.ai.campaign_forge import orchestrator as orchestrator_module
 
     class _BrokenExpansionService(_FakeArcScenarioExpansionService):
         def generate_scenarios(self, foundation, arcs, *, existing_scenarios=None):
+            """Handle generate scenarios."""
             return {"arcs": [{"arc_name": arcs[0]["name"], "scenarios": [{"Title": "Broken"}]}]}
 
     monkeypatch.setattr(orchestrator_module, "ArcGenerationService", _FakeArcGenerationService)

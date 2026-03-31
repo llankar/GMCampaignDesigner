@@ -1,3 +1,5 @@
+"""Regression tests for proposal catalog."""
+
 from pathlib import Path
 
 from modules.auto_improve.catalog.idea_generation_service import IdeaGenerationService
@@ -6,15 +8,18 @@ from modules.auto_improve.command_runner import CommandRunner
 
 class SequenceRunner(CommandRunner):
     def __init__(self, outputs: list[str]):
+        """Initialize the SequenceRunner instance."""
         self.outputs = outputs
         self.prompts: list[str] = []
 
     def run_agent(self, command_template: str, prompt: str, workdir: Path) -> str:
+        """Run agent."""
         self.prompts.append(prompt)
         return self.outputs.pop(0)
 
 
 def test_generation_service_parses_json_array(tmp_path):
+    """Verify that generation service parses JSON array."""
     runner = SequenceRunner(
         [
             '[{"slug":"npc-memory-ledger","title":"NPC Memory Ledger","summary":"Track NPC memory shifts.",'
@@ -30,6 +35,7 @@ def test_generation_service_parses_json_array(tmp_path):
 
 
 def test_generation_service_avoids_immediate_repeat_via_prompt_exclusions(tmp_path):
+    """Verify that generation service avoids immediate repeat via prompt exclusions."""
     runner = SequenceRunner(
         [
             '[{"slug":"faction-pressure-tracker","title":"Faction Pressure Tracker","summary":"Track tension.",'
@@ -48,6 +54,7 @@ def test_generation_service_avoids_immediate_repeat_via_prompt_exclusions(tmp_pa
 
 
 def test_generation_service_parses_json_when_logs_include_brackets(tmp_path):
+    """Verify that generation service parses JSON when logs include brackets."""
     runner = SequenceRunner(
         [
             "[INFO] auto improve launch\n"

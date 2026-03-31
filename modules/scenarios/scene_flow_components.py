@@ -29,6 +29,7 @@ def normalise_scene_links(scene: dict, split_to_list: Callable[[Any], list[str]]
     if isinstance(raw_links, list):
         for item in raw_links:
             if isinstance(item, dict):
+                # Handle the branch where isinstance(item, dict).
                 target = str(
                     item.get("target")
                     or item.get("Scene")
@@ -40,6 +41,7 @@ def normalise_scene_links(scene: dict, split_to_list: Callable[[Any], list[str]]
                 text = str(item.get("text") or target).strip()
                 cleaned.append({"target": target, "text": text})
             elif isinstance(item, str):
+                # Handle the branch where isinstance(item, str).
                 target = item.strip()
                 if target:
                     cleaned.append({"target": target, "text": target})
@@ -50,6 +52,7 @@ def normalise_scene_links(scene: dict, split_to_list: Callable[[Any], list[str]]
     deduped = []
     seen = set()
     for link in cleaned:
+        # Process each link from cleaned.
         target = link["target"]
         text = link.get("text") or target
         key = (target.lower(), text.lower())
@@ -78,6 +81,7 @@ class SceneFlowPreview(ctk.CTkFrame):
     CARD_BOTTOM_PADDING = 18
 
     def __init__(self, master, *, on_select: Optional[Callable[[int], None]] = None):
+        """Initialize the SceneFlowPreview instance."""
         super().__init__(master, corner_radius=16, fg_color=(SCENE_FLOW_BG, SCENE_FLOW_BG))
         self.on_select = on_select
         self.scenes: list[dict[str, Any]] = []
@@ -97,11 +101,13 @@ class SceneFlowPreview(ctk.CTkFrame):
         self.canvas.bind("<ButtonRelease-2>", self._on_middle_release)
 
     def render(self, scenes, selected_index):
+        """Render the operation."""
         self.scenes = scenes or []
         self.selected_index = selected_index if isinstance(selected_index, int) else None
         self._draw()
 
     def _draw(self, *_args, **_kwargs):
+        """Internal helper for draw."""
         if not hasattr(self, "canvas"):
             return
         width = max(self.canvas.winfo_width(), 1)
@@ -139,11 +145,13 @@ class SceneFlowPreview(ctk.CTkFrame):
 
         title_lookup = {}
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             title = (scene.get("Title") or f"Scene {idx + 1}").strip().lower()
             if title:
                 title_lookup[title] = idx
 
         def resolve_target(reference):
+            """Resolve target."""
             if reference is None:
                 return None
             ref = str(reference).strip()
@@ -153,6 +161,7 @@ class SceneFlowPreview(ctk.CTkFrame):
             if lowered in title_lookup:
                 return title_lookup[lowered]
             if lowered.startswith("scene "):
+                # Handle the branch where lowered.startswith('scene ').
                 try:
                     number = int(lowered.split()[1])
                 except (ValueError, IndexError):
@@ -160,6 +169,7 @@ class SceneFlowPreview(ctk.CTkFrame):
                 if number and 1 <= number <= len(self.scenes):
                     return number - 1
             if ref.isdigit():
+                # Handle the branch where ref.isdigit().
                 number = int(ref)
                 if 1 <= number <= len(self.scenes):
                     return number - 1
@@ -171,8 +181,10 @@ class SceneFlowPreview(ctk.CTkFrame):
         ]
 
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             start = positions[idx]
             for target in scene.get("NextScenes") or []:
+                # Process each target from scene.get('NextScenes') or [].
                 resolved = resolve_target(target)
                 if resolved is None or resolved >= len(positions):
                     continue
@@ -195,6 +207,7 @@ class SceneFlowPreview(ctk.CTkFrame):
                 )
 
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             x, y = positions[idx]
             selected = idx == self.selected_index
             model = card_models[idx]
@@ -240,6 +253,7 @@ class SceneFlowPreview(ctk.CTkFrame):
 
             scene_type = model["scene_type"]
             if scene_type:
+                # Continue with this path when scene type is set.
                 max_chip_width = self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING
                 type_width = min(
                     max_chip_width,
@@ -283,6 +297,7 @@ class SceneFlowPreview(ctk.CTkFrame):
 
             summary = model["summary"]
             if summary:
+                # Continue with this path when summary is set.
                 current_y += self.TITLE_SUMMARY_GAP
                 summary_id = self.canvas.create_text(
                     current_x,
@@ -300,9 +315,11 @@ class SceneFlowPreview(ctk.CTkFrame):
 
             entity_lines = model["entity_lines"]
             if entity_lines:
+                # Continue with this path when entity lines is set.
                 current_y += self.SUMMARY_ENTITY_GAP
                 entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
                 for line_index, line in enumerate(entity_lines):
+                    # Process each (line_index, line) from enumerate(entity_lines).
                     entity_id = self.canvas.create_text(
                         current_x,
                         current_y,
@@ -321,11 +338,13 @@ class SceneFlowPreview(ctk.CTkFrame):
 
             badges = model["badges"]
             if badges:
+                # Continue with this path when badges is set.
                 current_y += self.ICON_SECTION_GAP
                 spacing = 12
                 total_width = len(badges) * self.ICON_SIZE + (len(badges) - 1) * spacing
                 start_x = x2 - total_width - self.HORIZONTAL_PADDING
                 for offset, (label_char, active) in enumerate(badges):
+                    # Process each (offset, (label_char, active)) from enumerate(badges).
                     ix1 = start_x + offset * (self.ICON_SIZE + spacing)
                     iy1 = current_y
                     ix2 = ix1 + self.ICON_SIZE
@@ -370,25 +389,30 @@ class SceneFlowPreview(ctk.CTkFrame):
             self.canvas.configure(scrollregion=(0, 0, width, height))
 
     def _handle_click(self, event):
+        """Internal helper for handle click."""
         for x1, y1, x2, y2, idx in self.node_regions:
             if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+                # Handle the branch where x1 <= event.x <= x2 and y1 <= event.y <= y2.
                 if callable(self.on_select):
                     self.on_select(idx)
                 break
 
     def _on_middle_press(self, event):
+        """Handle middle press."""
         self._is_panning = True
         self.canvas.scan_mark(event.x, event.y)
         self.canvas.configure(cursor="fleur")
         return "break"
 
     def _on_middle_drag(self, event):
+        """Handle middle drag."""
         if not self._is_panning:
             return
         self.canvas.scan_dragto(event.x, event.y, gain=1)
         return "break"
 
     def _on_middle_release(self, _event):
+        """Handle middle release."""
         if not self._is_panning:
             return
         self._is_panning = False
@@ -398,6 +422,7 @@ class SceneFlowPreview(ctk.CTkFrame):
     def _build_card_model(
         self, scene: dict[str, Any], index: int, selected: bool
     ) -> dict[str, Any]:
+        """Build card model."""
         title_raw = scene.get("Title") or scene.get("title") or ""
         title_default = f"Scene {index + 1}" if index >= 0 else "Scene"
         title = str(title_raw).strip() or title_default
@@ -437,6 +462,7 @@ class SceneFlowPreview(ctk.CTkFrame):
         badge_count: int,
         selected: bool,
     ) -> float:
+        """Internal helper for compute card half height."""
         width = self.CARD_WIDTH - 2 * self.HORIZONTAL_PADDING
         total_height = self.TITLE_TOP_PADDING
         if has_type:
@@ -450,9 +476,11 @@ class SceneFlowPreview(ctk.CTkFrame):
                 self.canvas, summary, ("Segoe UI", 10), width
             )
         if entity_lines:
+            # Continue with this path when entity lines is set.
             total_height += self.SUMMARY_ENTITY_GAP
             entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
             for index, line in enumerate(entity_lines):
+                # Process each (index, line) from enumerate(entity_lines).
                 total_height += self._measure_text_height(
                     self.canvas, line, entity_font, width
                 )
@@ -465,6 +493,7 @@ class SceneFlowPreview(ctk.CTkFrame):
         return total_height / 2.0
 
     def _prepare_summary(self, scene: dict[str, Any]) -> str:
+        """Internal helper for prepare summary."""
         summary_sources = (
             scene.get("Summary"),
             scene.get("SceneSummary"),
@@ -478,6 +507,7 @@ class SceneFlowPreview(ctk.CTkFrame):
             scene.get("Notes"),
         )
         for candidate in summary_sources:
+            # Process each candidate from summary_sources.
             text = coerce_text(candidate).strip()
             if text:
                 try:
@@ -487,9 +517,11 @@ class SceneFlowPreview(ctk.CTkFrame):
         return "Click to outline this beat."
 
     def _prepare_entity_lines(self, scene: dict[str, Any]) -> list[str]:
+        """Internal helper for prepare entity lines."""
         lines: list[str] = []
         display_order = getattr(SceneCanvas, "ENTITY_DISPLAY_ORDER", ())
         for label_key in display_order:
+            # Process each label_key from display_order.
             items = scene.get(label_key)
             if not items:
                 continue
@@ -513,9 +545,11 @@ class SceneFlowPreview(ctk.CTkFrame):
         return lines
 
     def _prepare_icon_badges(self, scene: dict[str, Any]) -> list[tuple[str, bool]]:
+        """Internal helper for prepare icon badges."""
         badges: list[tuple[str, bool]] = []
         icon_labels = getattr(SceneCanvas, "ICON_LABELS", {})
         for key, label_char in icon_labels.items():
+            # Process each (key, label_char) from icon_labels.items().
             items = scene.get(key)
             if isinstance(items, str):
                 active = bool(items.strip())
@@ -531,6 +565,7 @@ class SceneFlowPreview(ctk.CTkFrame):
     def _measure_text_height(
         self, canvas: tk.Canvas, text: str, font: tuple, width: int
     ) -> float:
+        """Internal helper for measure text height."""
         if not text:
             return 0.0
         text_id = canvas.create_text(
@@ -583,6 +618,7 @@ class SceneCanvas(ctk.CTkFrame):
         on_link_text_edit: Optional[Callable[[int, int, Any, tuple[float, float, float, float]], None]] = None,
         available_entity_types: Optional[tuple[str, ...] | list[str]] = None,
     ):
+        """Initialize the SceneCanvas instance."""
         super().__init__(master, corner_radius=16, fg_color=SCENE_FLOW_BG)
         self.on_select = on_select
         self.on_move = on_move
@@ -636,6 +672,7 @@ class SceneCanvas(ctk.CTkFrame):
         self.canvas.bind("<ButtonRelease-2>", self._on_middle_release)
 
     def set_scenes(self, scenes, selected_index=None):
+        """Set scenes."""
         self.scenes = scenes or []
         self.selected_index = selected_index if isinstance(selected_index, int) else None
         self._ensure_positions()
@@ -647,12 +684,14 @@ class SceneCanvas(ctk.CTkFrame):
         return self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
 
     def _ensure_positions(self):
+        """Ensure positions."""
         if not self.scenes:
             return
         spacing_x = self.CARD_W + 160
         spacing_y = self.CARD_MIN_H + 140
         cols = max(1, int(len(self.scenes) ** 0.5))
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             layout = scene.setdefault("_canvas", {})
             if "x" in layout and "y" in layout:
                 continue
@@ -662,6 +701,7 @@ class SceneCanvas(ctk.CTkFrame):
             layout["y"] = 160 + row * spacing_y
 
     def _draw(self, *_args, **_kwargs):
+        """Internal helper for draw."""
         c = getattr(self, "canvas", None)
         if c is None:
             return
@@ -690,6 +730,7 @@ class SceneCanvas(ctk.CTkFrame):
         title_lookup = {}
         self._positions = {}
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             layout = scene.get("_canvas", {})
             x = layout.get("x", width / 2)
             y = layout.get("y", height / 2)
@@ -700,6 +741,7 @@ class SceneCanvas(ctk.CTkFrame):
         # links
         self._link_regions = []
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             start = positions.get(idx)
             if not start:
                 continue
@@ -707,16 +749,19 @@ class SceneCanvas(ctk.CTkFrame):
             if not isinstance(links, list) or not links:
                 links = [{"target": target, "text": target} for target in scene.get("NextScenes", [])]
             for link in links:
+                # Process each link from links.
                 target_value = link.get("target")
                 if target_value is None:
                     continue
                 target_idx = None
                 if isinstance(target_value, int):
+                    # Handle the branch where isinstance(target_value, int).
                     if 1 <= target_value <= len(self.scenes):
                         target_idx = target_value - 1
                 else:
                     target_str = str(target_value).strip()
                     if target_str.isdigit():
+                        # Handle the branch where target_str.isdigit().
                         num = int(target_str)
                         if 1 <= num <= len(self.scenes):
                             target_idx = num - 1
@@ -752,6 +797,7 @@ class SceneCanvas(ctk.CTkFrame):
                 )
                 label_text = str(link.get("text") or target_value).strip()
                 if label_text:
+                    # Continue with this path when label text is set.
                     text_id = c.create_text(
                         mx,
                         my - 14,
@@ -771,6 +817,7 @@ class SceneCanvas(ctk.CTkFrame):
         self._move_regions = []
         self._icon_regions = []
         for idx, scene in enumerate(self.scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             selected = idx == self.selected_index
             x, y = positions[idx]
             title = scene.get("Title") or f"Scene {idx + 1}"
@@ -848,6 +895,7 @@ class SceneCanvas(ctk.CTkFrame):
             self._move_regions.append((x1, y1, x2, title_bottom, idx))
             current_y = title_bottom
             if summary_display:
+                # Continue with this path when summary display is set.
                 current_y += self.TITLE_SUMMARY_GAP
                 summary_id = c.create_text(
                     content_x,
@@ -863,9 +911,11 @@ class SceneCanvas(ctk.CTkFrame):
                 if summary_bbox:
                     current_y = summary_bbox[3]
             if entity_lines:
+                # Continue with this path when entity lines is set.
                 current_y += self.SUMMARY_ENTITY_GAP
                 entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
                 for line_index, line in enumerate(entity_lines):
+                    # Process each (line_index, line) from enumerate(entity_lines).
                     entity_id = c.create_text(
                         content_x,
                         current_y,
@@ -883,6 +933,7 @@ class SceneCanvas(ctk.CTkFrame):
                         current_y += self.ENTITY_LINE_GAP
             icon_spacing = 10
             if icon_types:
+                # Continue with this path when icon types is set.
                 current_y += self.ICON_SECTION_GAP
                 total_width = (
                     len(icon_types) * self.ICON_SIZE
@@ -890,6 +941,7 @@ class SceneCanvas(ctk.CTkFrame):
                 )
                 icon_start = x2 - total_width - self.HORIZONTAL_PADDING
                 for offset, (etype, label_char) in enumerate(icon_types):
+                    # Process each (offset, (etype, label_char)) from enumerate(icon_types).
                     ix1 = icon_start + offset * (self.ICON_SIZE + icon_spacing)
                     iy1 = current_y
                     ix2 = ix1 + self.ICON_SIZE
@@ -930,24 +982,28 @@ class SceneCanvas(ctk.CTkFrame):
             c.configure(scrollregion=(0, 0, width, height))
 
     def _hit_test(self, x, y):
+        """Internal helper for hit test."""
         for x1, y1, x2, y2, idx in reversed(self._regions):
             if x1 <= x <= x2 and y1 <= y <= y2:
                 return idx
         return None
 
     def _hit_icon(self, x, y):
+        """Internal helper for hit icon."""
         for x1, y1, x2, y2, idx, etype in self._icon_regions:
             if x1 <= x <= x2 and y1 <= y <= y2:
                 return idx, etype
         return None, None
 
     def get_card_bbox(self, index):
+        """Return card bbox."""
         for x1, y1, x2, y2, idx in self._regions:
             if idx == index:
                 return x1, y1, x2, y2
         return None
 
     def _get_link_anchor(self, idx):
+        """Return link anchor."""
         position = self._positions.get(idx)
         if not position:
             return 0, 0
@@ -955,6 +1011,7 @@ class SceneCanvas(ctk.CTkFrame):
         return x + self.CARD_W / 2 - 12, y
 
     def _truncate_inline_summary(self, text: str) -> str:
+        """Internal helper for truncate inline summary."""
         collapsed = text.strip()
         if not collapsed:
             return ""
@@ -966,8 +1023,10 @@ class SceneCanvas(ctk.CTkFrame):
             return collapsed[: self.SUMMARY_MAX_CHARS - 3] + "..."
 
     def _prepare_entity_lines(self, scene: dict[str, Any]) -> list[str]:
+        """Internal helper for prepare entity lines."""
         lines: list[str] = []
         for label_key in self.ENTITY_DISPLAY_ORDER:
+            # Process each label_key from ENTITY_DISPLAY_ORDER.
             items = scene.get(label_key)
             if not items:
                 continue
@@ -987,6 +1046,7 @@ class SceneCanvas(ctk.CTkFrame):
         return lines
 
     def _measure_text_height(self, canvas: tk.Canvas, text: str, font: tuple, width: int) -> float:
+        """Internal helper for measure text height."""
         if not text:
             return 0.0
         text_id = canvas.create_text(
@@ -1014,6 +1074,7 @@ class SceneCanvas(ctk.CTkFrame):
         *,
         selected: bool,
     ) -> float:
+        """Internal helper for compute card height."""
         width = self.CARD_W - 2 * self.HORIZONTAL_PADDING
         height = self.TITLE_TOP_PADDING
         height += self._measure_text_height(canvas, title, ("Segoe UI", 13, "bold"), width)
@@ -1021,9 +1082,11 @@ class SceneCanvas(ctk.CTkFrame):
             height += self.TITLE_SUMMARY_GAP
             height += self._measure_text_height(canvas, summary_text, ("Segoe UI", 10), width)
         if entity_lines:
+            # Continue with this path when entity lines is set.
             height += self.SUMMARY_ENTITY_GAP
             entity_font = ("Segoe UI", 9, "bold" if selected else "normal")
             for index, line in enumerate(entity_lines):
+                # Process each (index, line) from enumerate(entity_lines).
                 height += self._measure_text_height(canvas, line, entity_font, width)
                 if index < len(entity_lines) - 1:
                     height += self.ENTITY_LINE_GAP
@@ -1033,7 +1096,9 @@ class SceneCanvas(ctk.CTkFrame):
         return max(self.CARD_MIN_H, height)
 
     def _select_index(self, idx, redraw_on_none=True):
+        """Select index."""
         if self.selected_index != idx:
+            # Handle the branch where selected_index != idx.
             self.selected_index = idx
             if callable(self.on_select):
                 self.on_select(idx)
@@ -1043,6 +1108,7 @@ class SceneCanvas(ctk.CTkFrame):
             self._draw()
 
     def _on_middle_press(self, event):
+        """Handle middle press."""
         if self._link_preview_line is not None:
             self.canvas.delete(self._link_preview_line)
             self._link_preview_line = None
@@ -1056,12 +1122,14 @@ class SceneCanvas(ctk.CTkFrame):
         return "break"
 
     def _on_middle_drag(self, event):
+        """Handle middle drag."""
         if not self._is_panning:
             return
         self.canvas.scan_dragto(event.x, event.y, gain=1)
         return "break"
 
     def _on_middle_release(self, _event):
+        """Handle middle release."""
         if not self._is_panning:
             return
         self._is_panning = False
@@ -1069,11 +1137,13 @@ class SceneCanvas(ctk.CTkFrame):
         return "break"
 
     def _on_click(self, event):
+        """Handle click."""
         # Allow direct link label editing on single click for better accessibility
         event_x, event_y = self._event_coords(event)
 
         for x1, y1, x2, y2, source_idx, target_idx, target_value in self._link_regions:
             if x1 <= event_x <= x2 and y1 <= event_y <= y2:
+                # Handle the branch where x1 <= event_x <= x2 and y1 <= event_y <= y2.
                 if callable(self.on_link_text_edit):
                     self.on_link_text_edit(
                         source_idx,
@@ -1085,6 +1155,7 @@ class SceneCanvas(ctk.CTkFrame):
 
         icon_idx, icon_type = self._hit_icon(event_x, event_y)
         if icon_idx is not None:
+            # Handle the branch where icon idx is available.
             self._select_index(icon_idx)
             if callable(self.on_add_entity):
                 self.on_add_entity(icon_idx, icon_type)
@@ -1098,8 +1169,10 @@ class SceneCanvas(ctk.CTkFrame):
         self._link_source_index = None
         self._link_preview_active = False
         if idx is not None:
+            # Handle the branch where idx is available.
             region = next((r for r in self._regions if r[4] == idx), None)
             if region:
+                # Continue with this path when region is set.
                 x1, y1, x2, y2, _ = region
                 move_region = next((r for r in self._move_regions if r[4] == idx), None)
                 if move_region and move_region[1] <= event_y <= move_region[3]:
@@ -1118,15 +1191,19 @@ class SceneCanvas(ctk.CTkFrame):
         self._select_index(idx)
 
     def _on_drag(self, event):
+        """Handle drag."""
         event_x, event_y = self._event_coords(event)
         if self._drag_mode == "move" and self._drag_index is not None:
+            # Handle the branch where _drag_mode == 'move' and drag index is available.
             layout = self.scenes[self._drag_index].setdefault("_canvas", {})
             layout["x"] = event_x - self._drag_offset[0]
             layout["y"] = event_y - self._drag_offset[1]
             self._draw()
         elif self._drag_mode == "link" and self._link_source_index is not None:
+            # Handle the branch where _drag_mode == 'link' and link source index is available.
             anchor = self._get_link_anchor(self._link_source_index)
             if not self._link_preview_active:
+                # Handle the branch where link preview active is unavailable.
                 self._link_preview_active = True
                 self._link_preview_line = self.canvas.create_line(
                     anchor[0],
@@ -1151,16 +1228,20 @@ class SceneCanvas(ctk.CTkFrame):
             return
 
     def _on_release(self, event):
+        """Handle release."""
         event_x, event_y = self._event_coords(event)
         if self._drag_mode == "move" and self._drag_index is not None:
+            # Handle the branch where _drag_mode == 'move' and drag index is available.
             layout = self.scenes[self._drag_index].get("_canvas", {})
             if callable(self.on_move):
                 self.on_move(self._drag_index, layout.get("x"), layout.get("y"))
         elif self._drag_mode == "link" and self._link_source_index is not None:
+            # Handle the branch where _drag_mode == 'link' and link source index is available.
             if self._link_preview_line is not None:
                 self.canvas.delete(self._link_preview_line)
             self._link_preview_line = None
             if self._link_preview_active:
+                # Continue with this path when link preview active is set.
                 target_idx = self._hit_test(event_x, event_y)
                 if (
                     target_idx is not None
@@ -1174,9 +1255,11 @@ class SceneCanvas(ctk.CTkFrame):
         self._link_preview_active = False
 
     def _on_double_click(self, event):
+        """Handle double click."""
         event_x, event_y = self._event_coords(event)
         for x1, y1, x2, y2, source_idx, target_idx, target_value in self._link_regions:
             if x1 <= event_x <= x2 and y1 <= event_y <= y2:
+                # Handle the branch where x1 <= event_x <= x2 and y1 <= event_y <= y2.
                 if callable(self.on_link_text_edit):
                     self.on_link_text_edit(
                         source_idx,
@@ -1187,11 +1270,13 @@ class SceneCanvas(ctk.CTkFrame):
                 return
         idx = self._hit_test(event_x, event_y)
         if idx is not None:
+            # Handle the branch where idx is available.
             self._select_index(idx)
             if callable(self.on_edit):
                 self.on_edit(idx)
 
     def _on_right_click(self, event):
+        """Handle right click."""
         event_x, event_y = self._event_coords(event)
         idx = self._hit_test(event_x, event_y)
         if idx is not None:

@@ -1,3 +1,5 @@
+"""Regression tests for campaign forge persistence."""
+
 from __future__ import annotations
 
 from modules.campaigns.services.campaign_forge_persistence import (
@@ -10,13 +12,16 @@ from tests.campaigns.fixtures.campaign_forge_payloads import generated_scenario_
 
 class _FakeScenarioWrapper:
     def __init__(self, items=None):
+        """Initialize the _FakeScenarioWrapper instance."""
         self.items = list(items or [])
 
     def load_items(self):
+        """Load items."""
         return list(self.items)
 
 
 def _arcs_with_existing_links() -> list[dict]:
+    """Internal helper for arcs with existing links."""
     return [
         {
             "name": "Arc Alpha",
@@ -30,6 +35,7 @@ def _arcs_with_existing_links() -> list[dict]:
 
 
 def test_duplicate_scenario_title_collisions_are_renamed():
+    """Verify that duplicate scenario title collisions are renamed."""
     wrapper = _FakeScenarioWrapper(items=[{"Title": "Rainmarket Ultimatum"}])
     persistence = CampaignForgePersistence(scenario_wrapper=wrapper)
 
@@ -65,6 +71,7 @@ def test_duplicate_scenario_title_collisions_are_renamed():
 
 
 def test_merge_vs_replace_behavior_for_arc_link_updates():
+    """Verify that merge vs replace behavior for arc link updates."""
     wrapper = _FakeScenarioWrapper(items=[{"Title": "Legacy Lead"}])
     persistence = CampaignForgePersistence(scenario_wrapper=wrapper)
 

@@ -1,3 +1,5 @@
+"""Utilities for scenes guided scene planner."""
+
 import customtkinter as ctk
 
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import GUIDED_BOUNDARY_FLOW
@@ -9,6 +11,7 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
 
 class GuidedScenePlanner(ctk.CTkFrame):
     def __init__(self, master, *, entity_selector_callbacks=None):
+        """Initialize the GuidedScenePlanner instance."""
         super().__init__(master, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -29,6 +32,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._container.grid_columnconfigure(0, weight=1)
 
     def _new_card_data(self, *, title="", summary="", scene_type="Choice", stage="", canvas=None, extra_fields=None, entities=None):
+        """Internal helper for new card data."""
         card = {
             "stage": stage or "Scene",
             "Title": title,
@@ -45,6 +49,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
         return card
 
     def _card_heading(self, index):
+        """Internal helper for card heading."""
         total = len(self._cards)
         if index == 0:
             return f"1. {GUIDED_BOUNDARY_FLOW[0][0]} (required)"
@@ -53,6 +58,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
         return f"{index + 1}. Middle scene"
 
     def _normalise_card_data(self, card, index, total):
+        """Internal helper for normalise card data."""
         payload = card if isinstance(card, dict) else {}
         if index == 0:
             stage, scene_type = GUIDED_BOUNDARY_FLOW[0]
@@ -72,11 +78,13 @@ class GuidedScenePlanner(ctk.CTkFrame):
         )
 
     def _render_cards(self):
+        """Render cards."""
         for child in self._container.winfo_children():
             child.destroy()
 
         total = len(self._cards)
         for idx, payload in enumerate(self._cards):
+            # Process each (idx, payload) from enumerate(_cards).
             payload = self._normalise_card_data(payload, idx, total)
             self._cards[idx] = payload
 
@@ -131,6 +139,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
 
             entity_vars = {}
             for row_offset, field_name in enumerate(SCENE_ENTITY_FIELDS, start=1):
+                # Process each (row_offset, field_name) from enumerate(SCENE_ENTITY_FIELDS, start=1).
                 row = ctk.CTkFrame(entities_section, fg_color="transparent")
                 row.grid(row=row_offset, column=0, sticky="ew", padx=10, pady=(0, 6))
                 row.grid_columnconfigure(1, weight=1)
@@ -153,6 +162,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
             payload["entity_vars"] = entity_vars
 
     def _open_entity_selector(self, field_name, entity_var):
+        """Open entity selector."""
         selector = self._entity_selector_callbacks.get(field_name)
         if not callable(selector):
             return
@@ -163,9 +173,11 @@ class GuidedScenePlanner(ctk.CTkFrame):
         entity_var.set(", ".join(normalise_entity_list(selected)))
 
     def _snapshot_ui(self):
+        """Internal helper for snapshot UI."""
         snapshot = []
         total = len(self._cards)
         for idx, payload in enumerate(self._cards):
+            # Process each (idx, payload) from enumerate(_cards).
             title_var = payload.get("title_var")
             summary_widget = payload.get("summary_widget")
             title = title_var.get().strip() if title_var is not None else str(payload.get("Title") or "").strip()
@@ -175,6 +187,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
             base["Summary"] = summary
             entity_vars = payload.get("entity_vars") or {}
             for field_name in SCENE_ENTITY_FIELDS:
+                # Process each field_name from SCENE_ENTITY_FIELDS.
                 field_var = entity_vars.get(field_name)
                 if field_var is not None:
                     base[field_name] = normalise_entity_list(field_var.get())
@@ -182,12 +195,14 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._cards = snapshot
 
     def _insert_scene_after(self, index):
+        """Internal helper for insert scene after."""
         self._snapshot_ui()
         insert_at = max(1, min(index + 1, len(self._cards) - 1))
         self._cards.insert(insert_at, self._new_card_data(title=f"Scene {insert_at + 1}", scene_type="Choice", stage=f"Scene {insert_at + 1}"))
         self._render_cards()
 
     def _move_scene(self, index, delta):
+        """Move scene."""
         self._snapshot_ui()
         target = index + delta
         if not (0 < index < len(self._cards) - 1):
@@ -198,6 +213,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._render_cards()
 
     def _remove_scene(self, index):
+        """Remove scene."""
         self._snapshot_ui()
         if not (0 < index < len(self._cards) - 1):
             return
@@ -205,6 +221,7 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._render_cards()
 
     def load_cards(self, cards):
+        """Load cards."""
         payload = [card for card in (cards or []) if isinstance(card, dict)]
         if not payload:
             payload = [{}, {}]
@@ -215,5 +232,6 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._render_cards()
 
     def export_cards(self):
+        """Export cards."""
         self._snapshot_ui()
         return [self._normalise_card_data(card, idx, len(self._cards)) for idx, card in enumerate(self._cards)]

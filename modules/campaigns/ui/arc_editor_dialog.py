@@ -1,3 +1,5 @@
+"""Dialog for campaign arc editor."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -13,6 +15,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
     """Modal dialog used by campaign wizard to create/update one campaign arc."""
 
     def __init__(self, master, scenarios: list[str], initial_data: dict | None = None):
+        """Initialize the ArcEditorDialog instance."""
         super().__init__(master)
         self.title("Campaign Arc")
         self.geometry("860x940")
@@ -54,6 +57,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         position_window_at_top(self)
 
     def _build_hero(self, parent: ctk.CTkFrame, *, scenario_count: int, initial: dict) -> None:
+        """Build hero."""
         hero = ctk.CTkFrame(
             parent,
             fg_color=ARC_EDITOR_PALETTE.hero_gradient_start,
@@ -109,6 +113,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         ).pack(padx=20, pady=(0, 14))
 
     def _build_identity_section(self, parent: ctk.CTkScrollableFrame) -> None:
+        """Build identity section."""
         section = FormSection(
             parent,
             title="Arc identity",
@@ -169,6 +174,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         self.status_hint.grid(row=3, column=1, sticky="ew", padx=(8, 0))
 
     def _build_story_section(self, parent: ctk.CTkScrollableFrame, initial: dict) -> None:
+        """Build story section."""
         section = FormSection(
             parent,
             title="Story brief",
@@ -189,6 +195,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         self.objective_box.insert("1.0", initial.get("objective", ""))
 
     def _build_scenarios_section(self, parent: ctk.CTkScrollableFrame, scenarios: list[str], initial: dict) -> None:
+        """Build scenarios section."""
         section = FormSection(
             parent,
             title="Scenario links",
@@ -219,6 +226,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         ).grid(row=1, column=0, sticky="ew", pady=(12, 0))
 
     def _build_footer(self, parent: ctk.CTkFrame) -> None:
+        """Build footer."""
         footer = ctk.CTkFrame(parent, fg_color="transparent")
         footer.grid(row=2, column=0, sticky="ew", pady=(14, 0))
         footer.grid_columnconfigure(0, weight=1)
@@ -251,6 +259,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         ).pack(side="right")
 
     def _create_field_label(self, parent: ctk.CTkFrame, row: int, column: int, text: str) -> None:
+        """Create field label."""
         padx = (0, 8) if column == 0 else (8, 0)
         ctk.CTkLabel(
             parent,
@@ -261,6 +270,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
         ).grid(row=row, column=column, sticky="w", padx=padx, pady=(0, 6))
 
     def _create_textbox(self, parent: ctk.CTkFrame, *, height: int) -> ctk.CTkTextbox:
+        """Create textbox."""
         return ctk.CTkTextbox(
             parent,
             height=height,
@@ -273,11 +283,13 @@ class ArcEditorDialog(ctk.CTkToplevel):
         )
 
     def _update_status_hint(self, *_args) -> None:
+        """Update status hint."""
         self.status_hint_var.set(
             ARC_EDITOR_STATUS_HINTS.get(self.status_var.get(), ARC_EDITOR_STATUS_HINTS["Planned"])
         )
 
     def _save(self):
+        """Save the operation."""
         name = self.name_var.get().strip()
         if not name:
             messagebox.showwarning("Missing Name", "Arc name is required.", parent=self)
@@ -298,6 +310,7 @@ class ArcEditorDialog(ctk.CTkToplevel):
 
     @staticmethod
     def validate_generation_requirements(arc: dict) -> str | None:
+        """Validate generation requirements."""
         name = str((arc or {}).get("name") or "").strip() or "Unnamed arc"
         linked_scenarios = [str(title).strip() for title in ((arc or {}).get("scenarios") or []) if str(title).strip()]
         if not linked_scenarios:

@@ -1,3 +1,5 @@
+"""Utilities for graph tabs dialogs."""
+
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 import customtkinter as ctk
@@ -7,6 +9,7 @@ from .model import build_default_tab, ensure_graph_tabs, get_active_tab, set_act
 
 class ManageGraphTabsDialog(ctk.CTkToplevel):
     def __init__(self, master, graph, on_update):
+        """Initialize the ManageGraphTabsDialog instance."""
         super().__init__(master)
         self.title("Manage Tabs")
         self.graph = graph
@@ -43,6 +46,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self._refresh_list()
 
     def _refresh_list(self):
+        """Refresh list."""
         self.tab_list.delete(0, tk.END)
         active_id = self.graph.get("active_tab_id")
         for idx, tab in enumerate(self.graph.get("tabs", [])):
@@ -51,10 +55,12 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
             self.tab_list.insert(idx, f"{marker}{name}")
 
     def _selected_index(self):
+        """Internal helper for selected index."""
         selection = self.tab_list.curselection()
         return selection[0] if selection else None
 
     def _on_tab_selected(self, _event=None):
+        """Handle tab selected."""
         tab = self._selected_tab()
         if not tab:
             return
@@ -65,21 +71,25 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _selected_tab(self):
+        """Internal helper for selected tab."""
         idx = self._selected_index()
         if idx is None:
             return None
         return self.graph.get("tabs", [])[idx]
 
     def _unique_name(self, base_name, current_tab=None):
+        """Internal helper for unique name."""
         existing = {tab.get("name") for tab in self.graph.get("tabs", []) if tab is not current_tab}
         name = base_name
         suffix = 2
         while name in existing:
+            # Keep looping while name is in existing.
             name = f"{base_name} ({suffix})"
             suffix += 1
         return name
 
     def _add_tab(self):
+        """Internal helper for add tab."""
         name = simpledialog.askstring("Add Tab", "Tab name:", parent=self)
         if not name:
             return
@@ -92,6 +102,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _rename_tab(self):
+        """Internal helper for rename tab."""
         tab = self._selected_tab()
         if not tab:
             messagebox.showinfo("Rename Tab", "Select a tab to rename.")
@@ -104,6 +115,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _delete_tab(self):
+        """Delete tab."""
         tabs = self.graph.get("tabs", [])
         if len(tabs) <= 1:
             messagebox.showwarning("Delete Tab", "At least one tab must remain.")
@@ -121,6 +133,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _move_up(self):
+        """Move up."""
         idx = self._selected_index()
         if idx is None or idx == 0:
             return
@@ -131,6 +144,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _move_down(self):
+        """Move down."""
         idx = self._selected_index()
         tabs = self.graph.get("tabs", [])
         if idx is None or idx >= len(tabs) - 1:
@@ -141,6 +155,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _set_active(self):
+        """Set active."""
         tab = self._selected_tab()
         if not tab:
             messagebox.showinfo("Set Active", "Select a tab to activate.")
@@ -150,6 +165,7 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         self.on_update()
 
     def _edit_subset(self):
+        """Internal helper for edit subset."""
         tab = self._selected_tab()
         if not tab:
             messagebox.showinfo("Edit Subset", "Select a tab to edit.")
@@ -157,15 +173,18 @@ class ManageGraphTabsDialog(ctk.CTkToplevel):
         GraphTabSubsetDialog(self, self.graph, tab, on_save=self._on_subset_save)
 
     def _on_subset_save(self):
+        """Handle subset save."""
         self.on_update()
 
     def _close(self):
+        """Close the operation."""
         self.on_update()
         self.destroy()
 
 
 class GraphTabSubsetDialog(ctk.CTkToplevel):
     def __init__(self, master, graph, tab, on_save):
+        """Initialize the GraphTabSubsetDialog instance."""
         super().__init__(master)
         self.title("Edit Tab Subset")
         self.graph = graph
@@ -210,14 +229,17 @@ class GraphTabSubsetDialog(ctk.CTkToplevel):
         ctk.CTkButton(button_row, text="Cancel", command=self.destroy).pack(side="right", padx=4)
 
     def _use_all_nodes(self):
+        """Internal helper for use all nodes."""
         self.node_list.selection_clear(0, tk.END)
         self.search_var.set("")
 
     def _save(self):
+        """Save the operation."""
         selected_indices = self.node_list.curselection()
         selected_tags = [self.node_tags[idx] for idx in selected_indices if idx < len(self.node_tags)]
         search = self.search_var.get().strip()
         if not selected_tags and not search:
+            # Handle the branch where selected tags is unavailable and search is unavailable.
             self.tab["subsetDefinition"] = {"mode": "all"}
         else:
             subset = {"mode": "subset", "node_tags": selected_tags}

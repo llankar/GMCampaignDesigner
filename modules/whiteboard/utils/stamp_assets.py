@@ -1,3 +1,5 @@
+"""Utilities for whiteboard stamp assets."""
+
 import os
 from functools import lru_cache
 from typing import List, Tuple
@@ -11,16 +13,20 @@ ASSET_ROOTS = [
 
 
 def _is_image_file(path: str) -> bool:
+    """Return whether image file."""
     ext = os.path.splitext(path)[1].lower()
     return ext in {".png", ".jpg", ".jpeg"}
 
 
 def available_stamp_assets() -> List[str]:
+    """Handle available stamp assets."""
     discovered: List[str] = []
     for root in ASSET_ROOTS:
+        # Process each root from ASSET_ROOTS.
         if not os.path.isdir(root):
             continue
         for name in os.listdir(root):
+            # Process each name from os.listdir(root).
             candidate = os.path.join(root, name)
             if os.path.isfile(candidate) and _is_image_file(candidate):
                 discovered.append(candidate)
@@ -30,6 +36,7 @@ def available_stamp_assets() -> List[str]:
 
 @lru_cache(maxsize=64)
 def load_pil_asset(path: str, size: int) -> Image.Image:
+    """Load pil asset."""
     img = Image.open(path).convert("RGBA")
     size_px = max(8, int(size))
     return img.resize((size_px, size_px), Image.LANCZOS)
@@ -37,11 +44,13 @@ def load_pil_asset(path: str, size: int) -> Image.Image:
 
 @lru_cache(maxsize=64)
 def load_tk_asset(path: str, size: int) -> ImageTk.PhotoImage:
+    """Load tk asset."""
     pil_img = load_pil_asset(path, size)
     return ImageTk.PhotoImage(pil_img)
 
 
 def reset_cache():
+    """Reset cache."""
     load_pil_asset.cache_clear()
     load_tk_asset.cache_clear()
 

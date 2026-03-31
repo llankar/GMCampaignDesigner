@@ -1,3 +1,5 @@
+"""Window for puzzles puzzle display."""
+
 import os
 import subprocess
 import sys
@@ -24,6 +26,7 @@ except AttributeError:  # Pillow < 9.1 fallback
 
 
 def _resolve_handout_path(handout_value: str) -> str:
+    """Resolve handout path."""
     if not handout_value:
         return ""
     if os.path.isabs(handout_value):
@@ -32,9 +35,11 @@ def _resolve_handout_path(handout_value: str) -> str:
 
 
 def _open_handout_file(path: str) -> None:
+    """Open handout file."""
     if not path:
         return
     try:
+        # Keep handout file resilient if this step fails.
         if sys.platform.startswith("win"):
             os.startfile(path)  # type: ignore[attr-defined]
         elif sys.platform == "darwin":
@@ -54,6 +59,7 @@ def _open_handout_file(path: str) -> None:
 
 
 def _show_handout_on_second_screen(path: str, title: str | None = None) -> None:
+    """Show handout on second screen."""
     if not path:
         return
     resolved = _resolve_handout_path(path)
@@ -61,6 +67,7 @@ def _show_handout_on_second_screen(path: str, title: str | None = None) -> None:
         messagebox.showerror("Handout", f"Handout not found: {path}")
         return
     try:
+        # Keep handout on second screen resilient if this step fails.
         with Image.open(resolved) as img:
             img.verify()
         show_portrait(resolved, title=title)
@@ -72,10 +79,12 @@ ParentWidget = Union[ctk.CTkFrame, ctk.CTkScrollableFrame, ctk.CTkToplevel]
 
 
 def _add_section_title(parent: ParentWidget, title: str) -> None:
+    """Internal helper for add section title."""
     ctk.CTkLabel(parent, text=title, font=("Arial", 18, "bold")).pack(anchor="w", pady=(12, 4))
 
 
 def _add_short_text(parent: ParentWidget, label: str, value: Any) -> None:
+    """Internal helper for add short text."""
     ctk.CTkLabel(parent, text=f"{label}:", font=("Arial", 14, "bold")).pack(anchor="w")
     ctk.CTkLabel(
         parent,
@@ -87,12 +96,14 @@ def _add_short_text(parent: ParentWidget, label: str, value: Any) -> None:
 
 
 def _add_longtext(parent: ParentWidget, label: str, value: Any) -> None:
+    """Internal helper for add longtext."""
     ctk.CTkLabel(parent, text=f"{label}:", font=("Arial", 14, "bold")).pack(anchor="w")
     box = ctk.CTkTextbox(parent, wrap="word")
     render_rtf_to_text_widget(box, value)
     box.pack(fill="x", padx=10, pady=(0, 8))
 
     def update_height() -> None:
+        """Update height."""
         text_widget = getattr(box, "_textbox", box)
         lines = int(text_widget.count("1.0", "end", "lines")[0])
         font = tkfont.Font(font=text_widget.cget("font"))
@@ -109,6 +120,7 @@ def _add_handout_section(
     handout_value: str,
     title: str | None = None,
 ) -> None:
+    """Internal helper for add handout section."""
     ctk.CTkLabel(parent, text="Handout:", font=("Arial", 14, "bold")).pack(anchor="w")
     if not handout_value:
         ctk.CTkLabel(parent, text="No handout file assigned.", font=("Arial", 13)).pack(
@@ -128,6 +140,7 @@ def _add_handout_section(
 
     image_obj = None
     try:
+        # Keep add handout section resilient if this step fails.
         with Image.open(resolved) as img:
             image_obj = img.copy()
         image_obj.thumbnail((900, 700), RESAMPLE_MODE)
@@ -135,6 +148,7 @@ def _add_handout_section(
         image_obj = None
 
     if image_obj is not None:
+        # Handle the branch where image obj is available.
         preview_frame = ctk.CTkScrollableFrame(parent, height=360)
         preview_frame.pack(fill="both", expand=True, padx=10, pady=(0, 8))
         ctk_image = ctk.CTkImage(light_image=image_obj, dark_image=image_obj, size=image_obj.size)
@@ -185,6 +199,7 @@ def create_puzzle_display_frame(
     *,
     scrollable: bool = True,
 ) -> ctk.CTkFrame:
+    """Create puzzle display frame."""
     puzzle_item = puzzle_item or {}
     name = puzzle_item.get("Name") or "Puzzle"
     content_parent = ctk.CTkScrollableFrame if scrollable else ctk.CTkFrame
@@ -222,6 +237,7 @@ def create_puzzle_display_frame(
 
 
 def open_puzzle_display(parent: ParentWidget, puzzle_item: dict) -> ctk.CTkToplevel | None:
+    """Open puzzle display."""
     if not puzzle_item:
         return None
 

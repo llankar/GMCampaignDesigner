@@ -1,3 +1,5 @@
+"""Panel for object loot generator."""
+
 import random
 from typing import Dict, List, Optional
 
@@ -26,6 +28,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
         template: Optional[dict] = None,
         **kwargs,
     ):
+        """Initialize the LootGeneratorPanel instance."""
         super().__init__(master, **kwargs)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=1)
@@ -43,7 +46,9 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _load_objects(self) -> List[dict]:
+        """Load objects."""
         try:
+            # Keep objects resilient if this step fails.
             items = self.wrapper.load_items()
             log_info(
                 f"Loaded {len(items)} objects for loot generation",
@@ -64,6 +69,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _build_ui(self):
+        """Build UI."""
         config_frame = ctk.CTkFrame(self)
         config_frame.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
         config_frame.columnconfigure(0, weight=1)
@@ -130,10 +136,12 @@ class LootGeneratorPanel(ctk.CTkFrame):
         numeric_container.columnconfigure(0, weight=1)
         numeric_fields = self._discover_numeric_fields()
         if numeric_fields:
+            # Continue with this path when numeric fields is set.
             ctk.CTkLabel(numeric_container, text="Numeric field filters").grid(
                 row=0, column=0, sticky="w", pady=(0, 6)
             )
             for idx, field_name in enumerate(numeric_fields, start=1):
+                # Process each (idx, field_name) from enumerate(numeric_fields, start=1).
                 row = ctk.CTkFrame(numeric_container)
                 row.grid(row=idx, column=0, sticky="ew", pady=4)
                 row.columnconfigure(1, weight=1)
@@ -177,8 +185,10 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _collect_categories(self) -> List[str]:
+        """Collect categories."""
         discovered = {cat for cat in OBJECT_CATEGORY_ALLOWED}
         for obj in self.objects:
+            # Process each obj from objects.
             cat = (obj.get("Category") or "").strip()
             if cat:
                 discovered.add(cat)
@@ -186,9 +196,11 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _discover_numeric_fields(self) -> List[str]:
+        """Internal helper for discover numeric fields."""
         numeric_types = {"int", "float", "number"}
         fields = []
         for field in self.template_fields:
+            # Process each field from template_fields.
             try:
                 name = str(field.get("name"))
             except Exception:
@@ -202,16 +214,19 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _select_all_categories(self):
+        """Select all categories."""
         for var in self.category_vars.values():
             var.set(True)
 
     # ------------------------------------------------------------------
     def _clear_categories(self):
+        """Clear categories."""
         for var in self.category_vars.values():
             var.set(False)
 
     # ------------------------------------------------------------------
     def _parse_count(self) -> int:
+        """Parse count."""
         raw = (self.count_var.get() or "").strip()
         try:
             value = int(raw)
@@ -225,6 +240,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _keyword_list(self, var: ctk.StringVar) -> List[str]:
+        """Internal helper for keyword list."""
         raw = (var.get() or "").strip()
         if not raw:
             return []
@@ -232,8 +248,10 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _numeric_filter_values(self) -> Dict[str, Dict[str, float]]:
+        """Internal helper for numeric filter values."""
         filters: Dict[str, Dict[str, float]] = {}
         for field_name, pair in self.numeric_fields.items():
+            # Process each (field_name, pair) from numeric_fields.items().
             min_raw = (pair["min"].get() or "").strip()
             max_raw = (pair["max"].get() or "").strip()
             min_val = self._parse_float(min_raw) if min_raw else None
@@ -255,6 +273,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
     # ------------------------------------------------------------------
     @staticmethod
     def _parse_float(raw: str) -> Optional[float]:
+        """Parse float."""
         try:
             return float(raw)
         except ValueError:
@@ -263,11 +282,13 @@ class LootGeneratorPanel(ctk.CTkFrame):
     # ------------------------------------------------------------------
     @staticmethod
     def _coerce_numeric(value) -> Optional[float]:
+        """Coerce numeric."""
         if value is None:
             return None
         if isinstance(value, (int, float)):
             return float(value)
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             raw = value.strip()
             if not raw:
                 return None
@@ -289,6 +310,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _filter_objects(self) -> List[dict]:
+        """Internal helper for filter objects."""
         selected_categories = [cat for cat, var in self.category_vars.items() if var.get()]
         include_keywords = self._keyword_list(self.include_var)
         exclude_keywords = self._keyword_list(self.exclude_var)
@@ -296,6 +318,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
         filtered = []
         for obj in self.objects:
+            # Process each obj from objects.
             category = (obj.get("Category") or "").strip()
             if selected_categories and category not in selected_categories:
                 continue
@@ -316,6 +339,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
             numeric_ok = True
             for field_name, bounds in numeric_filters.items():
+                # Process each (field_name, bounds) from numeric_filters.items().
                 value = self._coerce_numeric(obj.get(field_name))
                 if value is None:
                     numeric_ok = False
@@ -335,6 +359,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _generate_loot(self):
+        """Internal helper for generate loot."""
         if not self.objects:
             self.status_var.set("No objects available to generate loot.")
             return
@@ -348,10 +373,12 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
         count = self._parse_count()
         if count <= len(filtered):
+            # Handle the branch where count <= len(filtered).
             results = random.sample(filtered, count)
         else:
             results = []
             while len(results) < count:
+                # Keep looping while len(results) < count.
                 results.append(random.choice(filtered))
         self.generated_results = results
         self._render_results()
@@ -359,6 +386,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _render_results(self):
+        """Render results."""
         for child in self.results_frame.winfo_children():
             child.destroy()
 
@@ -370,6 +398,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
             return
 
         for idx, item in enumerate(self.generated_results):
+            # Process each (idx, item) from enumerate(generated_results).
             card = ctk.CTkFrame(self.results_frame)
             card.grid(row=idx, column=0, sticky="ew", padx=6, pady=6)
             card.columnconfigure(0, weight=1)
@@ -404,6 +433,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _copy_to_clipboard(self):
+        """Copy to clipboard."""
         if not self.generated_results:
             messagebox.showinfo(
                 "Loot Generator",
@@ -412,6 +442,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
             return
         lines = []
         for item in self.generated_results:
+            # Process each item from generated_results.
             name = item.get("Name") or item.get("Title") or "Unnamed Object"
             category = item.get("Category")
             header = name if not category else f"{name} ({category})"
@@ -425,6 +456,7 @@ class LootGeneratorPanel(ctk.CTkFrame):
             lines.append("")
         text = "\n".join(lines).strip()
         try:
+            # Keep to clipboard resilient if this step fails.
             self.clipboard_clear()
             self.clipboard_append(text)
             self.status_var.set("Copied loot summary to clipboard.")

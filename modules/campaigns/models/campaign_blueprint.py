@@ -1,3 +1,4 @@
+"""Blueprint helpers for campaign."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ class CampaignArc:
     scenarios: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
+        """Handle as dict."""
         return {
             "name": self.name,
             "summary": self.summary,
@@ -45,6 +47,7 @@ class CampaignBlueprint:
     arcs: list[CampaignArc] = field(default_factory=list)
 
     def to_entity_payload(self) -> dict[str, Any]:
+        """Handle to entity payload."""
         arc_data = [arc.as_dict() for arc in self.arcs]
         linked_scenarios: list[str] = []
         for arc in arc_data:

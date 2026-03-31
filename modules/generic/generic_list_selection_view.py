@@ -1,3 +1,5 @@
+"""View for generic list selection."""
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import customtkinter as ctk
@@ -22,6 +24,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         double_click_action=None,
         **kwargs,
     ):
+        """Initialize the GenericListSelectionView instance."""
         super().__init__(master, *args, **kwargs)
         self.entity_type = entity_type
         self.model_wrapper = model_wrapper
@@ -133,6 +136,7 @@ class GenericListSelectionView(ctk.CTkFrame):
 
         # --- Center the window if master is a Toplevel ---
         if isinstance(self.master, tk.Toplevel):
+            # Handle the branch where isinstance(master, tk.Toplevel).
             self.master.update_idletasks()
             min_width, min_height = 1100, 720
             width = max(self.master.winfo_width(), self.master.winfo_reqwidth(), min_width)
@@ -145,6 +149,7 @@ class GenericListSelectionView(ctk.CTkFrame):
             self.master.minsize(min_width, min_height)
 
     def refresh_list(self):
+        """Refresh list."""
         self.tree.delete(*self.tree.get_children())
         self.item_by_id = {}
         for item in self.filtered_items:
@@ -154,6 +159,7 @@ class GenericListSelectionView(ctk.CTkFrame):
             iid = base_id
             suffix = 1
             while iid in self.item_by_id:
+                # Keep looping while iid is in item_by_id.
                 iid = f"{base_id}_{suffix}"
                 suffix += 1
 
@@ -164,6 +170,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         self._clear_selection_indicator()
 
     def sort_column(self, column_name):
+        """Sort column."""
         # Initialize sort directions dict on first use
         if not hasattr(self, "sort_directions"):
             self.sort_directions = {}
@@ -182,6 +189,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.refresh_list()
 
     def filter_items(self):
+        """Handle filter items."""
         query = self.search_var.get().strip().lower()
         if not query:
             self.filtered_items = self.items.copy()
@@ -192,6 +200,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.refresh_list()
 
     def on_double_click(self, event):
+        """Handle double click."""
         # Prefer the row under the cursor; fall back to focus
         item_id = self.tree.identify_row(event.y) or self.tree.focus()
         if not item_id:
@@ -207,9 +216,11 @@ class GenericListSelectionView(ctk.CTkFrame):
             self._emit_selection(selected_item)
 
     def open_selected(self):
+        """Open selected."""
         selection_ids = list(self.tree.selection())
 
         if self.allow_multi_select:
+            # Continue with this path when allow multi select is set.
             if not selection_ids:
                 messagebox.showwarning("No Selection", f"No {self.entity_type} selected.")
                 return
@@ -228,6 +239,7 @@ class GenericListSelectionView(ctk.CTkFrame):
             return
 
         if selection_ids:
+            # Continue with this path when selection ids is set.
             selected_item = self.item_by_id.get(selection_ids[0])
             if selected_item:
                 self.select_entity(selected_item)
@@ -240,6 +252,7 @@ class GenericListSelectionView(ctk.CTkFrame):
             messagebox.showwarning("No Selection", f"No {self.entity_type} available to select.")
 
     def select_entity(self, item):
+        """Select entity."""
         self._emit_selection(item)
         # Selection views are commonly hosted inside a transient dialog that is
         # waiting on the toplevel, not the embedded frame. Closing only the
@@ -249,6 +262,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         target.destroy()
 
     def _emit_selection(self, item):
+        """Internal helper for emit selection."""
         if not self.on_select_callback:
             return
         entity_name = self._resolve_entity_name(item)
@@ -258,21 +272,25 @@ class GenericListSelectionView(ctk.CTkFrame):
             self.on_select_callback(self.entity_type, entity_name)
 
     def _resolve_entity_name(self, item):
+        """Resolve entity name."""
         is_scenario = str(self.entity_type or "").strip().lower() == "scenarios"
         primary_key, fallback_key = ("Title", "Name") if is_scenario else ("Name", "Title")
         entity_name = str(item.get(primary_key) or item.get(fallback_key) or "").strip()
         return entity_name or "Unnamed"
 
     def _clean_value(self, val):
+        """Internal helper for clean value."""
         if val is None:
             return ""
         if isinstance(val, dict):
+            # Handle the branch where isinstance(val, dict).
             if "text" in val:
                 return self._clean_value(val.get("text", ""))
             if "Label" in val or "label" in val:
                 label = val.get("Label", val.get("label", ""))
                 return str(label).strip()
             if "Path" in val or "path" in val:
+                # Handle the branch where 'Path' is in val or 'path' is in val.
                 start = val.get("StartPage") or val.get("start_page")
                 end = val.get("EndPage") or val.get("end_page")
                 if isinstance(val.get("page_range"), (list, tuple)) and len(val["page_range"]) >= 2:
@@ -290,9 +308,11 @@ class GenericListSelectionView(ctk.CTkFrame):
         return str(val).replace("{", "").replace("}", "").strip()
 
     def sanitize_id(self, s):
+        """Handle sanitize ID."""
         return re.sub(r'[^a-zA-Z0-9]+', '_', str(s)).strip('_')
 
     def _on_select_all(self, _event=None):
+        """Handle select all."""
         if not self.allow_multi_select:
             return "break"
         item_ids = self.tree.get_children()
@@ -301,6 +321,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         return "break"
 
     def _on_tree_select_change(self, _event=None):
+        """Handle tree select change."""
         current_ids = set(self.tree.selection())
         to_clear = self._indicator_item_ids - current_ids
         for iid in list(to_clear):
@@ -312,6 +333,7 @@ class GenericListSelectionView(ctk.CTkFrame):
         self._indicator_item_ids = current_ids
 
     def _clear_selection_indicator(self):
+        """Clear selection indicator."""
         for iid in list(self._indicator_item_ids):
             if self.tree.exists(iid):
                 self.tree.item(iid, image="")

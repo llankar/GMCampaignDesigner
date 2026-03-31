@@ -1,3 +1,5 @@
+"""Campaign Generator package."""
+
 from .exporters import export_to_docx
 from .services import (
     GENERATOR_FUNCTIONS,

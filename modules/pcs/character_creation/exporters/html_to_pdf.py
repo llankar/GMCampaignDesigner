@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 def html_to_pdf(html_content: str, output_path: str) -> str:
+    """Handle HTML to PDF."""
     fitz_spec = importlib.util.find_spec("fitz")
     if fitz_spec is None:
         raise RuntimeError("Backend HTML indisponible: PyMuPDF (fitz) n'est pas installé.")
@@ -24,6 +25,7 @@ def html_to_pdf(html_content: str, output_path: str) -> str:
     rect = fitz.Rect(40, 40, 555, 802)
     page.insert_textbox(rect, plain_text, fontsize=10, fontname="helv")
     try:
+        # Keep HTML to PDF resilient if this step fails.
         doc.save(str(output))
     finally:
         doc.close()

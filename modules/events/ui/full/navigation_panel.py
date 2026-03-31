@@ -1,3 +1,5 @@
+"""Panel for event navigation."""
+
 import calendar
 from datetime import date
 
@@ -28,6 +30,7 @@ class NavigationPanel(ctk.CTkFrame):
         on_date_selected,
         on_filter_changed,
     ):
+        """Initialize the NavigationPanel instance."""
         super().__init__(master)
         self._on_new_event = on_new_event
         self._on_open_timeline_simulator = on_open_timeline_simulator
@@ -52,6 +55,7 @@ class NavigationPanel(ctk.CTkFrame):
         self._build_controls()
 
     def _build_controls(self):
+        """Build controls."""
         ctk.CTkButton(self, text="New event", command=self._on_new_event).grid(
             row=0, column=0, sticky="ew", padx=10, pady=(10, 6)
         )
@@ -82,6 +86,7 @@ class NavigationPanel(ctk.CTkFrame):
 
         self._month_cells = []
         for week_idx in range(6):
+            # Process each week_idx from range(6).
             row = []
             for day_idx in range(7):
                 btn = ctk.CTkButton(
@@ -125,6 +130,7 @@ class NavigationPanel(ctk.CTkFrame):
         self._agenda_window.set("7 days")
 
     def set_filters(self, filters):
+        """Set filters."""
         if not isinstance(filters, dict):
             return
 
@@ -149,6 +155,7 @@ class NavigationPanel(ctk.CTkFrame):
         self._agenda_window.set("30 days" if agenda_days == 30 else "7 days")
 
     def set_filter_options(self, *, types, entities, statuses):
+        """Set filter options."""
         self._type_options = [""] + [item for item in types if item]
         self._entity_options = [""] + [item for item in entities if item]
         self._status_options = [""] + [item for item in statuses if item]
@@ -158,6 +165,7 @@ class NavigationPanel(ctk.CTkFrame):
         self._status_menu.configure(values=["All statuses"] + self._status_options[1:])
 
     def set_state(self, *, active_date, anchor_date, view_mode):
+        """Set state."""
         self._active_date = active_date
         self._anchor_date = anchor_date
         self.period_label.configure(text=anchor_date.strftime("%B %Y").capitalize())
@@ -167,12 +175,15 @@ class NavigationPanel(ctk.CTkFrame):
         self._render_month_grid()
 
     def _render_month_grid(self):
+        """Render month grid."""
         matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(self._anchor_date.year, self._anchor_date.month)
         self._month_matrix = matrix
 
         for week_idx, week in enumerate(self._month_cells):
+            # Process each (week_idx, week) from enumerate(_month_cells).
             week_dates = matrix[week_idx] if week_idx < len(matrix) else [None] * 7
             for day_idx, btn in enumerate(week):
+                # Process each (day_idx, btn) from enumerate(week).
                 day_date = week_dates[day_idx]
                 if day_date is None:
                     btn.configure(text="", state="disabled")
@@ -187,16 +198,19 @@ class NavigationPanel(ctk.CTkFrame):
                 )
 
     def _handle_view_change(self, selected_label):
+        """Internal helper for handle view change."""
         reverse = {value: key for key, value in self.VIEW_LABELS.items()}
         selected_mode = reverse.get(selected_label, "month")
         if callable(self._on_view_change):
             self._on_view_change(selected_mode)
 
     def _open_timeline_simulator(self):
+        """Open timeline simulator."""
         if callable(self._on_open_timeline_simulator):
             self._on_open_timeline_simulator()
 
     def _select_cell(self, week_index, day_index):
+        """Select cell."""
         if week_index >= len(self._month_matrix):
             return
         selected_date = self._month_matrix[week_index][day_index]
@@ -204,6 +218,7 @@ class NavigationPanel(ctk.CTkFrame):
             self._on_date_selected(selected_date)
 
     def _emit_filter_change(self):
+        """Internal helper for emit filter change."""
         if not callable(self._on_filter_changed):
             return
 

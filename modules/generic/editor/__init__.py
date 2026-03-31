@@ -4,6 +4,7 @@ __all__ = ["SmartEditorToolbar", "prioritize_fields"]
 
 
 def __getattr__(name):
+    """Handle getattr."""
     if name in __all__:
         from .smart_ui import SmartEditorToolbar, prioritize_fields
 

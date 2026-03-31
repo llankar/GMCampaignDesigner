@@ -1,3 +1,5 @@
+"""Utilities for event schedule widgets."""
+
 import calendar
 from datetime import date, datetime
 import tkinter as tk
@@ -6,6 +8,7 @@ import customtkinter as ctk
 
 
 def parse_event_date(value):
+    """Parse event date."""
     if isinstance(value, date):
         return value
 
@@ -22,6 +25,7 @@ def parse_event_date(value):
 
 
 def format_event_date(value):
+    """Format event date."""
     parsed = parse_event_date(value)
     if parsed is not None:
         return parsed.isoformat()
@@ -29,6 +33,7 @@ def format_event_date(value):
 
 
 def normalize_event_time(value):
+    """Normalize event time."""
     text = str(value or "").strip()
     if not text:
         return ""
@@ -37,10 +42,13 @@ def normalize_event_time(value):
     minute = None
 
     if text.isdigit():
+        # Handle the branch where text.isdigit().
         if len(text) <= 2:
+            # Handle the branch where len(text) <= 2.
             hour = int(text)
             minute = 0
         elif len(text) == 3:
+            # Handle the branch where len(text) == 3.
             hour = int(text[0])
             minute = int(text[1:])
         elif len(text) == 4:
@@ -49,8 +57,10 @@ def normalize_event_time(value):
     else:
         cleaned = text.replace(".", ":").replace("h", ":").replace("H", ":")
         if ":" in cleaned:
+            # Handle the branch where ':' is in cleaned.
             parts = [part for part in cleaned.split(":") if part != ""]
             if len(parts) == 1 and parts[0].isdigit():
+                # Handle the branch where len(parts) == 1 and parts[0].isdigit().
                 hour = int(parts[0])
                 minute = 0
             elif len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
@@ -65,6 +75,7 @@ def normalize_event_time(value):
 
 
 def _friendly_date_label(value):
+    """Internal helper for friendly date label."""
     parsed = parse_event_date(value)
     if parsed is None:
         return "No date selected"
@@ -72,6 +83,7 @@ def _friendly_date_label(value):
 
 
 def _position_popup_near_widget(popup, widget, width, height):
+    """Position popup near widget."""
     popup.update_idletasks()
     x = widget.winfo_rootx()
     y = widget.winfo_rooty() + widget.winfo_height() + 4
@@ -80,6 +92,7 @@ def _position_popup_near_widget(popup, widget, width, height):
 
 class EventCalendarPopup(ctk.CTkToplevel):
     def __init__(self, master, *, initial_date=None, on_select=None, title="Choose date"):
+        """Initialize the EventCalendarPopup instance."""
         super().__init__(master)
         self.title(title)
         self.resizable(False, False)
@@ -96,6 +109,7 @@ class EventCalendarPopup(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_ui(self):
+        """Build UI."""
         self.grid_columnconfigure(tuple(range(7)), weight=1)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
@@ -121,6 +135,7 @@ class EventCalendarPopup(ctk.CTkToplevel):
             ctk.CTkLabel(self, text=name).grid(row=1, column=idx, padx=4, pady=(0, 4))
 
         for week_index in range(6):
+            # Process each week_index from range(6).
             row_buttons = []
             for day_index in range(7):
                 button = ctk.CTkButton(
@@ -140,6 +155,7 @@ class EventCalendarPopup(ctk.CTkToplevel):
         ctk.CTkButton(footer, text="Cancel", fg_color="transparent", command=self.destroy).pack(side="right")
 
     def _show_previous_month(self):
+        """Show previous month."""
         year = self._visible_month.year
         month = self._visible_month.month - 1
         if month == 0:
@@ -149,6 +165,7 @@ class EventCalendarPopup(ctk.CTkToplevel):
         self._render_month()
 
     def _show_next_month(self):
+        """Show next month."""
         year = self._visible_month.year
         month = self._visible_month.month + 1
         if month == 13:
@@ -158,25 +175,30 @@ class EventCalendarPopup(ctk.CTkToplevel):
         self._render_month()
 
     def _select_today(self):
+        """Select today."""
         self._select_date(date.today())
 
     def _select_date(self, selected):
+        """Select date."""
         if callable(self._on_select):
             self._on_select(selected)
         self.destroy()
 
     def _render_month(self):
+        """Render month."""
         self.month_label.configure(text=self._visible_month.strftime("%B %Y"))
         month_matrix = calendar.Calendar(firstweekday=0).monthdatescalendar(
             self._visible_month.year,
             self._visible_month.month,
         )
         while len(month_matrix) < len(self._day_buttons):
+            # Keep looping while len(month_matrix) < len(_day_buttons).
             month_matrix.append([None] * 7)
         today = date.today()
 
         for week_index, week in enumerate(month_matrix):
             for day_index, day_value in enumerate(week):
+                # Process each (day_index, day_value) from enumerate(week).
                 button = self._day_buttons[week_index][day_index]
                 if day_value is None:
                     button.configure(
@@ -224,6 +246,7 @@ class EventDatePickerField(ctk.CTkFrame):
         clear_button_style=None,
         hint_text_color="#A8A8A8",
     ):
+        """Initialize the EventDatePickerField instance."""
         super().__init__(master, fg_color="transparent")
         self._empty_hint_text = empty_hint_text
         self._value_var = tk.StringVar()
@@ -276,6 +299,7 @@ class EventDatePickerField(ctk.CTkFrame):
         self.set(initial_value)
 
     def _open_calendar(self):
+        """Open calendar."""
         EventCalendarPopup(
             self.entry,
             initial_date=self.get(),
@@ -283,9 +307,11 @@ class EventDatePickerField(ctk.CTkFrame):
         )
 
     def _set_today(self):
+        """Set today."""
         self.set(date.today())
 
     def _on_focus_out(self, _event=None):
+        """Handle focus out."""
         current = self._value_var.get()
         parsed = parse_event_date(current)
         if parsed is not None:
@@ -293,24 +319,29 @@ class EventDatePickerField(ctk.CTkFrame):
         self._refresh_hint()
 
     def _refresh_hint(self):
+        """Refresh hint."""
         value = self._value_var.get().strip()
         self.hint_label.configure(text=_friendly_date_label(value) if value else self._empty_hint_text)
 
     def clear(self):
+        """Clear the operation."""
         self._value_var.set("")
         self._refresh_hint()
 
     def set(self, value):
+        """Set the operation."""
         formatted = format_event_date(value)
         self._value_var.set(formatted)
         self._refresh_hint()
 
     def get(self):
+        """Return the operation."""
         return format_event_date(self._value_var.get())
 
 
 class EventTimePickerPopup(ctk.CTkToplevel):
     def __init__(self, master, *, initial_value="", on_select=None, title="Choose time"):
+        """Initialize the EventTimePickerPopup instance."""
         super().__init__(master)
         self.title(title)
         self.resizable(False, False)
@@ -332,6 +363,7 @@ class EventTimePickerPopup(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_ui(self):
+        """Build UI."""
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
         container.grid_columnconfigure((0, 1), weight=1)
@@ -353,6 +385,7 @@ class EventTimePickerPopup(ctk.CTkToplevel):
         ctk.CTkButton(footer, text="Apply", command=self._apply).pack(side="right")
 
     def _apply(self):
+        """Apply the operation."""
         hour = self.hour_var.get()
         minute = self.minute_var.get()
         if hour == "--" or minute == "--":
@@ -361,6 +394,7 @@ class EventTimePickerPopup(ctk.CTkToplevel):
         self._submit(f"{hour}:{minute}")
 
     def _submit(self, value):
+        """Submit the operation."""
         if callable(self._on_select):
             self._on_select(value)
         self.destroy()
@@ -377,6 +411,7 @@ class EventTimePickerField(ctk.CTkFrame):
         clear_button_text="Clear",
         empty_hint_text="No time selected",
     ):
+        """Initialize the EventTimePickerField instance."""
         super().__init__(master, fg_color="transparent")
         self._empty_hint_text = empty_hint_text
         self._value_var = tk.StringVar()
@@ -405,6 +440,7 @@ class EventTimePickerField(ctk.CTkFrame):
         self.set(initial_value)
 
     def _open_picker(self):
+        """Open picker."""
         EventTimePickerPopup(
             self.entry,
             initial_value=self.get(),
@@ -412,6 +448,7 @@ class EventTimePickerField(ctk.CTkFrame):
         )
 
     def _set_now(self):
+        """Set now."""
         now = datetime.now().replace(second=0, microsecond=0)
         rounded_minute = int(round(now.minute / 5.0) * 5)
         if rounded_minute == 60:
@@ -422,6 +459,7 @@ class EventTimePickerField(ctk.CTkFrame):
         self.set(f"{now.hour:02d}:{rounded_minute:02d}")
 
     def _on_focus_out(self, _event=None):
+        """Handle focus out."""
         current = self._value_var.get()
         normalized = normalize_event_time(current)
         if normalized != current.strip():
@@ -429,18 +467,22 @@ class EventTimePickerField(ctk.CTkFrame):
         self._refresh_hint()
 
     def _refresh_hint(self):
+        """Refresh hint."""
         value = self._value_var.get().strip()
         self.hint_label.configure(text=value if value else self._empty_hint_text)
 
     def clear(self):
+        """Clear the operation."""
         self._value_var.set("")
         self._refresh_hint()
 
     def set(self, value):
+        """Set the operation."""
         normalized = normalize_event_time(value)
         display_value = normalized if normalized or not str(value or "").strip() else str(value).strip()
         self._value_var.set(display_value)
         self._refresh_hint()
 
     def get(self):
+        """Return the operation."""
         return normalize_event_time(self._value_var.get())

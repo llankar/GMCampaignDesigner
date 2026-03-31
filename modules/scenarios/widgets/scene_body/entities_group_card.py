@@ -1,3 +1,5 @@
+"""Utilities for scenario entities group card."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -15,6 +17,7 @@ def create_entities_group_card(
     open_entity_callback=None,
     visible_limit=DEFAULT_VISIBLE_CHIPS,
 ):
+    """Create entities group card."""
     card = ctk.CTkFrame(
         parent,
         fg_color=palette["surface_overlay"],
@@ -87,16 +90,19 @@ def create_entities_group_card(
     )
 
     def _pack_toggle_button():
+        """Pack toggle button."""
         toggle_button.pack_forget()
         toggle_button.pack(side="left", padx=(0, 6), pady=(0, 6))
 
     def _show_less():
+        """Show less."""
         for hidden_chip in hidden_chips:
             hidden_chip.pack_forget()
         toggle_button.configure(text=f"+{len(hidden_chips)} more", command=_show_more)
         _pack_toggle_button()
 
     def _show_more():
+        """Show more."""
         toggle_button.pack_forget()
         for hidden_chip in hidden_chips:
             hidden_chip.pack(side="left", padx=(0, 6), pady=(0, 6))

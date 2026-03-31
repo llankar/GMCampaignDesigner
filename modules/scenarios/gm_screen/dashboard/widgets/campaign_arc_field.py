@@ -1,3 +1,5 @@
+"""Field helpers for dashboard campaign arc."""
+
 from __future__ import annotations
 
 from typing import Any, Callable
@@ -27,6 +29,7 @@ class CampaignArcField(ctk.CTkFrame):
         raw_value: Any,
         open_scenario_callback: Callable[[str], None],
     ):
+        """Initialize the CampaignArcField instance."""
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
         self._open_scenario_callback = open_scenario_callback
@@ -46,6 +49,7 @@ class CampaignArcField(ctk.CTkFrame):
             self._render_arc_card(arc, row)
 
     def _render_arc_card(self, arc: dict[str, Any], row: int) -> None:
+        """Render arc card."""
         arc_name = str(arc.get("name") or f"Arc {row + 1}").strip() or f"Arc {row + 1}"
         status_text = canonicalize_arc_status(arc.get("status"))
         status_color = self._STATUS_COLOR.get(status_text, DASHBOARD_THEME.accent_soft)
@@ -98,8 +102,10 @@ class CampaignArcField(ctk.CTkFrame):
         self._render_scenario_actions(block, scenarios, start_row=3)
 
     def _render_arc_meta(self, block: ctk.CTkFrame, arc: dict[str, Any], *, start_row: int) -> None:
+        """Render arc meta."""
         row = start_row
         for label, key in (("Summary", "summary"), ("Objective", "objective")):
+            # Process each (label, key) while updating arc meta.
             value = str(arc.get(key) or "").strip()
             if not value:
                 continue
@@ -114,6 +120,7 @@ class CampaignArcField(ctk.CTkFrame):
             row += 1
 
     def _render_scenario_actions(self, block: ctk.CTkFrame, scenarios: list[str], *, start_row: int) -> None:
+        """Render scenario actions."""
         if not scenarios:
             return
         ctk.CTkLabel(
@@ -142,6 +149,7 @@ class CampaignArcField(ctk.CTkFrame):
         scenario_wrap.grid_columnconfigure(1, weight=1)
 
     def _estimate_completion(self, status_text: str, scenarios: list[str]) -> int:
+        """Internal helper for estimate completion."""
         status = canonicalize_arc_status(status_text)
         total = max(len(scenarios), 1)
         if status == "Completed":

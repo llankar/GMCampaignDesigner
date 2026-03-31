@@ -24,6 +24,7 @@ def parse_random_table_text(raw_text: str) -> List[dict]:
 
     entries: List[dict] = []
     for line in (raw_text or "").splitlines():
+        # Process each line from (raw_text or '').splitlines().
         stripped = line.strip()
         if not stripped:
             continue
@@ -38,6 +39,7 @@ def parse_random_table_text(raw_text: str) -> List[dict]:
 
 
 def _split_name_and_description(text: str) -> tuple[str, str]:
+    """Internal helper for split name and description."""
     if not text:
         return "", ""
     if " " not in text:
@@ -47,10 +49,12 @@ def _split_name_and_description(text: str) -> tuple[str, str]:
 
 
 def _parse_single_line(line: str) -> dict:
+    """Parse single line."""
     match = re.match(
         r"^(?P<min>\d+)\s*[-–]\s*(?P<max>\d+)\s*[:.)-]?\s*(?P<rest>.+)$", line
     )
     if match:
+        # Continue with this path when match is set.
         min_val = int(match.group("min"))
         max_val = int(match.group("max"))
         if min_val > max_val:
@@ -70,6 +74,7 @@ def _parse_single_line(line: str) -> dict:
 
 
 def _build_entry(min_val: int, max_val: int, rest: str) -> dict:
+    """Build entry."""
     if not rest:
         raise RandomTableImportError("Entry text cannot be empty.")
 

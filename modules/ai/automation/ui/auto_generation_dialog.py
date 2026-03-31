@@ -1,3 +1,5 @@
+"""Dialog for automation auto generation."""
+
 import threading
 import customtkinter as ctk
 from tkinter import messagebox
@@ -14,6 +16,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
     _STORY_ARC_LABEL = "Story arc (scenarios)"
 
     def __init__(self, parent, *, default_entity: str | None = None, on_complete=None):
+        """Initialize the AutoGenerationDialog instance."""
         super().__init__(parent)
         self.title("Auto Generation")
         self.geometry("700x500")
@@ -38,6 +41,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         self._apply_entity_mode()
 
     def _build_layout(self):
+        """Build layout."""
         header = ctk.CTkLabel(self, text="AI Auto-Generation", font=("Arial", 18, "bold"))
         header.pack(pady=(12, 8))
 
@@ -89,17 +93,20 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         ctk.CTkButton(btn_row, text="Close", command=self.destroy).pack(side="right", padx=4)
 
     def _on_entity_label_selected(self, label: str):
+        """Handle entity label selected."""
         slug = self._label_to_slug.get(label)
         if slug:
             self.entity_var.set(slug)
         self._apply_entity_mode()
 
     def _apply_entity_mode(self):
+        """Apply entity mode."""
         is_story_arc = self.entity_var.get() == self._STORY_ARC_SLUG
         self.count_label.configure(text="Scenario count" if is_story_arc else "Count")
         self.include_linked_checkbox.configure(state="normal")
 
     def _start_generation(self):
+        """Start generation."""
         if self._running:
             return
         entity_slug = self.entity_var.get().strip()
@@ -134,7 +141,9 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         thread.start()
 
     def _run_generation(self, entity_slug: str, count: int, prompt: str, include_linked: bool):
+        """Run generation."""
         try:
+            # Keep generation resilient if this step fails.
             if entity_slug == self._STORY_ARC_SLUG:
                 self._service.generate_story_arc_and_save(count, prompt, include_linked=include_linked)
             else:
@@ -150,6 +159,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
         self.after(0, self._on_success)
 
     def _on_success(self):
+        """Handle success."""
         self.status_var.set("Done. The entities have been created.")
         self.run_button.configure(state="normal")
         self._running = False
@@ -160,6 +170,7 @@ class AutoGenerationDialog(ctk.CTkToplevel):
                 pass
 
     def _on_error(self, exc: Exception):
+        """Handle error."""
         self.status_var.set("Error during generation.")
         self.run_button.configure(state="normal")
         self._running = False

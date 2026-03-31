@@ -1,3 +1,5 @@
+"""Utilities for pipeline editor chat service."""
+
 from __future__ import annotations
 
 from modules.ai.runtime import AIPipelineRunner

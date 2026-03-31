@@ -1,3 +1,5 @@
+"""Dialog for event timeline simulator."""
+
 from datetime import date, timedelta
 from tkinter import messagebox
 
@@ -9,6 +11,7 @@ from modules.helpers.window_helper import position_window_at_top
 
 
 def format_timeline_result_summary(result: TimelineSimulationResult) -> str:
+    """Format timeline result summary."""
     lines = [
         f"Timeline advanced from {result.start_date.isoformat()} to {result.end_date.isoformat()}.",
         f"Days advanced: {result.days_advanced}",
@@ -36,6 +39,7 @@ class TimelineSimulatorDialog(ctk.CTkToplevel):
         initial_target_date: date | None = None,
         on_run=None,
     ):
+        """Initialize the TimelineSimulatorDialog instance."""
         super().__init__(master)
         self.title("Advance Timeline")
         self.geometry("620x720")
@@ -54,6 +58,7 @@ class TimelineSimulatorDialog(ctk.CTkToplevel):
         position_window_at_top(self)
 
     def _build_ui(self, initial_target_date: date):
+        """Build UI."""
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -150,14 +155,17 @@ class TimelineSimulatorDialog(ctk.CTkToplevel):
         self._update_mode_visibility()
 
     def _refresh_current_date_label(self):
+        """Refresh current date label."""
         self.current_date_label.configure(text=f"Current campaign date: {self._current_date.isoformat()}")
 
     def _on_mode_changed(self, selected_mode):
+        """Handle mode changed."""
         self._mode = selected_mode or self.MODE_TARGET_DATE
         self._update_mode_visibility()
         self._refresh_preview()
 
     def _update_mode_visibility(self):
+        """Update mode visibility."""
         if self._mode == self.MODE_ADVANCE_DAYS:
             self.target_date_frame.grid_remove()
             self.days_frame.grid()
@@ -166,12 +174,15 @@ class TimelineSimulatorDialog(ctk.CTkToplevel):
             self.target_date_frame.grid()
 
     def _set_days(self, amount: int):
+        """Set days."""
         self.days_entry.delete(0, "end")
         self.days_entry.insert(0, str(max(0, int(amount))))
         self._refresh_preview()
 
     def _resolve_target_date(self):
+        """Resolve target date."""
         if self._mode == self.MODE_ADVANCE_DAYS:
+            # Handle the branch where _mode == MODE_ADVANCE_DAYS.
             raw_days = self.days_entry.get().strip()
             if not raw_days:
                 raise ValueError("Enter the number of days to advance.")
@@ -186,6 +197,7 @@ class TimelineSimulatorDialog(ctk.CTkToplevel):
         return resolved
 
     def _refresh_preview(self):
+        """Refresh preview."""
         try:
             target_date = self._resolve_target_date()
         except Exception as exc:
@@ -208,12 +220,14 @@ class TimelineSimulatorDialog(ctk.CTkToplevel):
         self.preview_label.configure(text=text)
 
     def _set_summary(self, text: str):
+        """Set summary."""
         self.summary_text.configure(state="normal")
         self.summary_text.delete("1.0", "end")
         self.summary_text.insert("1.0", text)
         self.summary_text.configure(state="disabled")
 
     def _run_simulation(self):
+        """Run simulation."""
         if not callable(self._on_run):
             return
 

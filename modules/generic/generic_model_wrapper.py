@@ -1,3 +1,5 @@
+"""Utilities for generic model wrapper."""
+
 import sqlite3
 import json
 from db.db import get_connection, load_schema_from_json
@@ -7,19 +9,23 @@ log_module_import(__name__)
 
 class GenericModelWrapper:
     def __init__(self, entity_type, db_path=None):
+        """Initialize the GenericModelWrapper instance."""
         self.entity_type = entity_type
         # Assume your table name is the same as the entity type (e.g., "npcs")
         self.table = entity_type
         self._db_path = db_path
 
     def _get_connection(self):
+        """Return connection."""
         if self._db_path:
             return sqlite3.connect(self._db_path)
         return get_connection()
 
     def _deserialize_row(self, row):
+        """Deserialize row."""
         item = {}
         for key in row.keys():
+            # Process each key from row.keys().
             value = row[key]
             if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
                 try:
@@ -31,6 +37,7 @@ class GenericModelWrapper:
         return item
 
     def _infer_key_field(self, key_field=None):
+        """Internal helper for infer key field."""
         if key_field:
             return key_field
         if self.entity_type in {"scenarios", "books"}:
@@ -38,6 +45,7 @@ class GenericModelWrapper:
         return "Name"
 
     def load_items(self):
+        """Load items."""
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row  # This makes rows behave like dictionaries.
         cursor = conn.cursor()
@@ -48,10 +56,12 @@ class GenericModelWrapper:
         return items
 
     def load_item_by_key(self, key_value, key_field=None):
+        """Load item by key."""
         key_field = self._infer_key_field(key_field)
         conn = self._get_connection()
         conn.row_factory = sqlite3.Row
         try:
+            # Keep item by key resilient if this step fails.
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT * FROM {self.table} WHERE {key_field} = ?",
@@ -78,6 +88,7 @@ class GenericModelWrapper:
 
         for item in items:
             for key, value in item.items():
+                # Process each (key, value) from item.items().
                 if key in existing_columns:
                     continue
 
@@ -97,6 +108,7 @@ class GenericModelWrapper:
                         column_type = "TEXT"
 
                 try:
+                    # Keep schema resilient if this step fails.
                     cursor.execute(
                         f"ALTER TABLE {self.table} ADD COLUMN {key} {column_type}"
                     )
@@ -110,16 +122,19 @@ class GenericModelWrapper:
         return existing_columns
 
     def save_items(self, items, *, replace=True):
+        """Save items."""
         conn = self._get_connection()
         conn.execute("PRAGMA busy_timeout = 5000")
         cursor = conn.cursor()
 
         try:
+            # Keep items resilient if this step fails.
             existing_columns = self._ensure_schema(cursor, items)
 
             # Determine the unique field to use based on entity semantics first.
             unique_field = self._infer_key_field()
             if items and unique_field not in items[0]:
+                # Handle the branch where items is set and unique field is not in items[0].
                 sample_item = items[0]
                 if "Name" in sample_item:
                     unique_field = "Name"
@@ -130,9 +145,11 @@ class GenericModelWrapper:
 
             # Insert or update (INSERT OR REPLACE)
             for item in items:
+                # Process each item from items.
                 keys = [key for key in item.keys() if key in existing_columns]
                 values = []
                 for key in keys:
+                    # Process each key from keys.
                     val = item[key]
                     if isinstance(val, (list, dict)):
                         val = json.dumps(val)
@@ -162,6 +179,7 @@ class GenericModelWrapper:
             conn.close()
 
     def save_item(self, item, *, key_field=None, original_key_value=None):
+        """Save item."""
         if not isinstance(item, dict):
             raise TypeError("item must be a dictionary")
 
@@ -170,6 +188,7 @@ class GenericModelWrapper:
         cursor = conn.cursor()
 
         try:
+            # Keep item resilient if this step fails.
             existing_columns = self._ensure_schema(cursor, [item])
             key_field = self._infer_key_field(key_field)
             key_value = item.get(key_field)
@@ -177,6 +196,7 @@ class GenericModelWrapper:
             keys = [key for key in item.keys() if key in existing_columns]
             values = []
             for key in keys:
+                # Process each key from keys.
                 val = item[key]
                 if isinstance(val, (list, dict)):
                     val = json.dumps(val)
@@ -190,6 +210,7 @@ class GenericModelWrapper:
                 and key_value not in (None, "")
                 and original_key_value != key_value
             ):
+                # Handle this branch separately before continuing.
                 set_clause = ", ".join(f"{key} = ?" for key in keys)
                 update_sql = (
                     f"UPDATE {self.table} SET {set_clause} WHERE {key_field} = ?"

@@ -1,3 +1,5 @@
+"""Import helpers for creature."""
+
 import json
 import os
 import threading
@@ -30,6 +32,7 @@ def _normalize_creature_payload(payload):
         return payload
     if isinstance(payload, dict):
         for key in ("creatures", "Creatures"):
+            # Process each key from ('creatures', 'Creatures').
             value = payload.get(key)
             if isinstance(value, list):
                 return value
@@ -47,6 +50,7 @@ def import_creature_records(payload) -> int:
     existing = wrapper.load_items()
     new_items = []
     for raw in creatures:
+        # Process each raw from creatures.
         if not isinstance(raw, dict):
             continue
         item = {
@@ -80,6 +84,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
     """Window allowing AI-assisted import of creature data from PDFs or pasted text."""
 
     def __init__(self, master=None):
+        """Initialize the CreatureImportWindow instance."""
         super().__init__(master)
         self.import_mode = ctk.StringVar(value="Creature")
         self.title("Import NPCs/Creatures from PDF")
@@ -127,6 +132,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         self._on_mode_change()
 
     def _get_mode_config(self) -> dict:
+        """Return mode config."""
         mode = self.import_mode.get()
         if mode == "NPC":
             return {
@@ -141,6 +147,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         }
 
     def _on_mode_change(self, *_):
+        """Handle mode change."""
         config = self._get_mode_config()
         self.title(f"Import {config['plural']} from PDF")
         self.instruction_label.configure(
@@ -151,6 +158,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         )
 
     def import_pasted_json(self):
+        """Import pasted JSON."""
         config = self._get_mode_config()
         text = self.textbox.get("1.0", "end-1c").strip()
         if not text:
@@ -160,6 +168,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
             )
             return
         try:
+            # Keep pasted JSON resilient if this step fails.
             self._set_status(f"Importing {config['plural'].lower()} from JSON...")
             self._busy(True)
             if config["slug"] == "npcs":
@@ -177,6 +186,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
             self._set_status("Idle")
 
     def import_pdf_via_ai(self):
+        """Import PDF via AI."""
         config = self._get_mode_config()
         try:
             path = filedialog.askopenfilename(
@@ -190,7 +200,9 @@ class CreatureImportWindow(ctk.CTkToplevel):
             return
 
         def worker():
+            """Handle worker."""
             try:
+                # Keep worker resilient if this step fails.
                 self._set_status("Extracting PDF text...")
                 pages = self._extract_pdf_text(path)
                 if not pages or not any(page.strip() for page in pages):
@@ -210,6 +222,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     def ai_parse_textarea(self):
+        """Handle AI parse textarea."""
         config = self._get_mode_config()
         raw = self.textbox.get("1.0", "end-1c").strip()
         if not raw:
@@ -220,7 +233,9 @@ class CreatureImportWindow(ctk.CTkToplevel):
             return
 
         def worker():
+            """Handle worker."""
             try:
+                # Keep worker resilient if this step fails.
                 self._ai_extract_and_import(raw, source_label="Pasted Text")
             except Exception as exc:
                 self._error("AI Parse Error", str(exc))
@@ -234,13 +249,16 @@ class CreatureImportWindow(ctk.CTkToplevel):
 
     # --- Internal helpers -------------------------------------------------
     def _extract_pdf_text(self, path: str) -> list[str]:
+        """Extract PDF text."""
         try:
+            # Keep PDF text resilient if this step fails.
             try:
                 import PyPDF2 as pypdf  # type: ignore
             except Exception:
                 import pypdf as pypdf  # type: ignore
             chunks = []
             with open(path, "rb") as handle:
+                # Keep this resource scoped to PDF text.
                 reader = pypdf.PdfReader(handle)
                 for page in reader.pages:
                     try:
@@ -256,10 +274,12 @@ class CreatureImportWindow(ctk.CTkToplevel):
             raise
 
     def _review_extracted_pages(self, pages: list[str], source_name: str) -> str | None:
+        """Internal helper for review extracted pages."""
         selection: dict[str, str | None] = {"text": None}
         event = threading.Event()
 
         def _open_dialog():
+            """Open dialog."""
             dialog = PDFReviewDialog(self, pages, title=f"Review {source_name}")
             self.wait_window(dialog)
             chosen = dialog.selected_pages
@@ -271,6 +291,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         return selection["text"]
 
     def _ai_extract_and_import(self, raw_text: str, source_label: str = ""):
+        """Internal helper for AI extract and import."""
         config = self._get_mode_config()
         log_info(
             f"Running {config['label'].lower()} AI import for {source_label or 'input'}",
@@ -280,6 +301,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         client = LocalAIClient()
 
         if config["slug"] == "npcs":
+            # Handle the branch where config['slug'] == 'npcs'.
             prompt = build_npc_prompt(raw_text, source_label)
             response = client.chat([
                 {"role": "system", "content": "Extract structured NPC information as strict JSON."},
@@ -301,6 +323,7 @@ class CreatureImportWindow(ctk.CTkToplevel):
         existing = wrapper.load_items()
         stats_examples = []
         for entry in existing:
+            # Process each entry from existing.
             stats_val = entry.get("Stats")
             if isinstance(stats_val, dict):
                 stats_val = stats_val.get("text", "")
@@ -356,7 +379,9 @@ class CreatureImportWindow(ctk.CTkToplevel):
         )
 
     def _set_text(self, value: str):
+        """Set text."""
         def _do():
+            """Internal helper for do."""
             try:
                 self.textbox.delete("1.0", "end")
                 self.textbox.insert("1.0", value)
@@ -365,7 +390,9 @@ class CreatureImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _set_status(self, text: str):
+        """Set status."""
         def _do():
+            """Internal helper for do."""
             try:
                 self.status_label.configure(text=text)
             except Exception:
@@ -373,8 +400,11 @@ class CreatureImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _busy(self, active: bool):
+        """Internal helper for busy."""
         def _do():
+            """Internal helper for do."""
             try:
+                # Keep do resilient if this step fails.
                 if active:
                     self.progress.start()
                 else:
@@ -390,10 +420,13 @@ class CreatureImportWindow(ctk.CTkToplevel):
         self.after(0, _do)
 
     def _info(self, title: str, message: str):
+        """Internal helper for info."""
         self.after(0, lambda: messagebox.showinfo(title, message))
 
     def _warn(self, title: str, message: str):
+        """Internal helper for warn."""
         self.after(0, lambda: messagebox.showwarning(title, message))
 
     def _error(self, title: str, message: str):
+        """Internal helper for error."""
         self.after(0, lambda: messagebox.showerror(title, message))

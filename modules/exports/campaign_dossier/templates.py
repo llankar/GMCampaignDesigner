@@ -1,3 +1,4 @@
+"""Templates for campaign dossier."""
 from docx.shared import Pt, RGBColor
 
 from modules.helpers.theme_manager import THEME_DEFAULT, THEME_MEDIEVAL, THEME_SF
@@ -28,10 +29,12 @@ MIN_FONT_SIZE_PT = 14
 
 
 def _apply_font_size(font, size_pt: float) -> None:
+    """Apply font size."""
     font.size = Pt(max(size_pt, MIN_FONT_SIZE_PT))
 
 
 def apply_dossier_theme(document, theme_key: str) -> dict:
+    """Apply dossier theme."""
     style = THEME_STYLES.get(theme_key) or THEME_STYLES[THEME_DEFAULT]
 
     normal = document.styles["Normal"]
@@ -39,6 +42,7 @@ def apply_dossier_theme(document, theme_key: str) -> dict:
     _apply_font_size(normal.font, 9)
 
     for level in range(1, 4):
+        # Process each level from range(1, 4).
         style_name = f"Heading {level}"
         try:
             heading = document.styles[style_name]

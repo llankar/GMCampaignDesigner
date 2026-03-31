@@ -1,9 +1,12 @@
+"""Regression tests for event calendar refresh signal."""
+
 from types import SimpleNamespace
 
 from modules.generic.generic_list_view import GenericListView
 
 
 def test_notify_calendar_event_change_calls_main_window_callback():
+    """Verify that notify calendar event change calls main window callback."""
     calls = []
     view = object.__new__(GenericListView)
     view.model_wrapper = SimpleNamespace(entity_type="events")
@@ -17,6 +20,7 @@ def test_notify_calendar_event_change_calls_main_window_callback():
 
 
 def test_notify_calendar_event_change_ignores_non_event_entities():
+    """Verify that notify calendar event change ignores non event entities."""
     calls = []
     view = object.__new__(GenericListView)
     view.model_wrapper = SimpleNamespace(entity_type="npcs")

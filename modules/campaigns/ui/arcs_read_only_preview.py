@@ -1,3 +1,5 @@
+"""Utilities for campaign arcs read only preview."""
+
 from __future__ import annotations
 
 import ast
@@ -11,6 +13,7 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
     """Read-only, human-friendly rendering of campaign arc data."""
 
     def __init__(self, parent, raw_value: Any):
+        """Initialize the ReadOnlyArcsPreview instance."""
         super().__init__(parent)
         self._raw_value = raw_value
         self._formatted_text = self._format_arcs(raw_value)
@@ -35,12 +38,14 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
         return self._raw_value
 
     def _format_arcs(self, raw_value: Any) -> str:
+        """Format arcs."""
         arcs = self._coerce_to_arc_list(raw_value)
         if not arcs:
             return "No arcs configured."
 
         lines: list[str] = []
         for index, arc in enumerate(arcs, start=1):
+            # Process each (index, arc) from enumerate(arcs, start=1).
             if not isinstance(arc, dict):
                 continue
 
@@ -59,8 +64,10 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
 
             scenarios = arc.get("scenarios")
             if isinstance(scenarios, list) and scenarios:
+                # Continue with this path when isinstance(scenarios, list) and scenarios is set.
                 lines.append("   Scenarios:")
                 for scenario in scenarios:
+                    # Process each scenario from scenarios.
                     scenario_name = str(scenario).strip()
                     if scenario_name:
                         lines.append(f"     - {scenario_name}")
@@ -72,7 +79,9 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
 
     @staticmethod
     def _coerce_to_arc_list(raw_value: Any) -> list[dict[str, Any]]:
+        """Coerce to arc list."""
         def _from_dict(payload: dict[str, Any]) -> list[dict[str, Any]]:
+            """Internal helper for from dict."""
             arcs_value = payload.get("arcs")
             if isinstance(arcs_value, list):
                 return [arc for arc in arcs_value if isinstance(arc, dict)]
@@ -94,6 +103,7 @@ class ReadOnlyArcsPreview(ctk.CTkFrame):
             return _from_dict(raw_value)
 
         if isinstance(raw_value, str):
+            # Handle the branch where isinstance(raw_value, str).
             parsed: Any = None
             try:
                 parsed = json.loads(raw_value)

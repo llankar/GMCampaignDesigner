@@ -1,3 +1,5 @@
+"""View for map fullscreen."""
+
 import tkinter as tk
 from PIL import ImageTk, Image
 from screeninfo import get_monitors
@@ -7,6 +9,7 @@ from modules.maps.utils.text_items import TextFontCache
 log_module_import(__name__)
 
 def open_fullscreen(self):
+    """Open fullscreen."""
     monitors = get_monitors()
     if len(monitors) < 2:
         return
@@ -33,6 +36,7 @@ def _update_fullscreen_map(self):
         return
 
     try:
+        # Keep fullscreen map resilient if this step fails.
         if not fs_canvas.winfo_exists():
             return
     except tk.TclError:
@@ -56,7 +60,9 @@ def _update_fullscreen_map(self):
     # Clear existing token/shape representations on fs_canvas before redrawing
     # This prevents duplicates if fs_canvas_ids were not properly cleaned up or if items are removed.
     for item_to_clear in self.tokens:
+        # Process each item_to_clear from tokens.
         if 'fs_canvas_ids' in item_to_clear:
+            # Handle the branch where 'fs_canvas_ids' is in item to clear.
             for fs_id in item_to_clear['fs_canvas_ids']:
                 if fs_id: # Check if fs_id is not None
                     try:
@@ -68,6 +74,7 @@ def _update_fullscreen_map(self):
             del item_to_clear['fs_canvas_ids']
         
         if 'fs_cross_ids' in item_to_clear: # For dead token markers
+            # Handle the branch where 'fs_cross_ids' is in item to clear.
             for fs_id in item_to_clear['fs_cross_ids']:
                 if fs_id:
                     try:
@@ -79,6 +86,7 @@ def _update_fullscreen_map(self):
         item_to_clear.pop('fs_tk', None) # Remove old PhotoImage reference to allow GC
 
     for item in self.tokens:
+        # Process each item from tokens.
         item_type = item.get("type", "token")
         xw, yw = item.get('position', (0,0)) # Use .get() for position as well for safety
         sx = int(xw * self.zoom + self.pan_x)
@@ -88,6 +96,7 @@ def _update_fullscreen_map(self):
             continue
 
         if item_type == "token":
+            # Handle the branch where item_type == 'token'.
             if not bool(item.get('player_visible', True)):
                 continue
             source = item.get('source_image')
@@ -106,6 +115,7 @@ def _update_fullscreen_map(self):
                 size_px = max(1, int(getattr(self, 'token_size', 64)))
 
             if source is not None:
+                # Handle the branch where source is available.
                 nw = nh = max(1, int(size_px * self.zoom))
                 if nw <= 0 or nh <= 0:
                     continue
@@ -129,6 +139,7 @@ def _update_fullscreen_map(self):
             # Token border, image, and name
             fs_canvas_ids = item.get('fs_canvas_ids')
             if fs_canvas_ids and len(fs_canvas_ids) == 3: # Expecting (border_id, image_id, text_id)
+                # Handle the branch where fs canvas ids is set and len(fs_canvas_ids) == 3.
                 b_id, i_id, t_id = fs_canvas_ids
                 self.fs_canvas.coords(b_id, sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                 self.fs_canvas.itemconfig(b_id, outline=item.get('border_color', '#0000ff'))
@@ -148,6 +159,7 @@ def _update_fullscreen_map(self):
             hp = item.get("hp", 0)
             if hp <= 0:
                 if 'fs_cross_ids' not in item:
+                    # Handle the branch where 'fs_cross_ids' is not in item.
                     tl = (sx, sy)
                     br = (sx + nw, sy + nh)
                     tr = (sx + nw, sy)
@@ -157,11 +169,13 @@ def _update_fullscreen_map(self):
                     item['fs_cross_ids'] = (line1, line2)
             else: # HP > 0, remove cross if it exists
                 if 'fs_cross_ids' in item:
+                    # Handle the branch where 'fs_cross_ids' is in item.
                     for x_id in item['fs_cross_ids']:
                         self.fs_canvas.delete(x_id)
                     del item['fs_cross_ids']
 
         elif item_type in ["rectangle", "oval"]:
+            # Handle the branch where item type is in ['rectangle', 'oval'].
             shape_width_unscaled = item.get("width", 50) # Default if missing
             shape_height_unscaled = item.get("height", 50) # Default if missing
 
@@ -178,6 +192,7 @@ def _update_fullscreen_map(self):
             fs_shape_id = fs_shape_id_tuple[0] if fs_shape_id_tuple and len(fs_shape_id_tuple) > 0 else None
 
             if fs_shape_id:
+                # Continue with this path when fs shape ID is set.
                 if item_type == "rectangle":
                     self.fs_canvas.coords(fs_shape_id, sx, sy, sx + shape_width, sy + shape_height)
                 elif item_type == "oval":
@@ -194,6 +209,7 @@ def _update_fullscreen_map(self):
                 if new_fs_shape_id:
                     item['fs_canvas_ids'] = (new_fs_shape_id,)
         elif item_type == "whiteboard":
+            # Handle the branch where item_type == 'whiteboard'.
             points = item.get("points") or []
             if len(points) < 2:
                 continue
@@ -205,6 +221,7 @@ def _update_fullscreen_map(self):
             line_id = None
             fs_ids = item.get("fs_canvas_ids") or ()
             if fs_ids:
+                # Continue with this path when fs ids is set.
                 line_id = fs_ids[0]
                 try:
                     self.fs_canvas.coords(line_id, *screen_points)
@@ -213,6 +230,7 @@ def _update_fullscreen_map(self):
                     line_id = None
             if not line_id:
                 try:
+                    # Keep fullscreen map resilient if this step fails.
                     line_id = self.fs_canvas.create_line(
                         *screen_points,
                         fill=color,
@@ -225,6 +243,7 @@ def _update_fullscreen_map(self):
                 except tk.TclError:
                     item["fs_canvas_ids"] = ()
         elif item_type == "text":
+            # Handle the branch where item_type == 'text'.
             text_value = item.get("text", "")
             color = item.get("color", "#FF0000")
             size = int(item.get("text_size", getattr(self, "text_size", 24)))
@@ -236,6 +255,7 @@ def _update_fullscreen_map(self):
             text_id = None
             fs_ids = item.get("fs_canvas_ids") or ()
             if fs_ids:
+                # Continue with this path when fs ids is set.
                 text_id = fs_ids[0]
                 try:
                     self.fs_canvas.coords(text_id, sx, sy)
@@ -253,6 +273,7 @@ def _update_fullscreen_map(self):
         try:
             # Ensure sw and sh for mask are valid (same as base_img scaled dimensions)
             if sw > 0 and sh > 0:
+                # Handle the branch where sw > 0 and sh > 0.
                 mask_copy = self.mask_img.copy()
                 # split out alpha channel
                 _, _, _, alpha_channel = mask_copy.split() # Renamed to avoid conflict if alpha was a var

@@ -1,3 +1,5 @@
+"""Palette definitions for theme arc editor."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -91,6 +93,7 @@ class _ArcEditorPaletteProxy:
     """Resolve palette values from the currently active application theme."""
 
     def __getattr__(self, item: str):
+        """Handle getattr."""
         return getattr(get_arc_editor_palette(), item)
 
 

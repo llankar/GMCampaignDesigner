@@ -8,6 +8,7 @@ from ..prowess import calculate_feat_points_from_options
 
 
 def _read_equipment_values(payload: dict) -> dict:
+    """Internal helper for read equipment values."""
     equipment = payload.get("equipment") or {}
     legacy_equipment = payload.get("equipement") or {}
     return {
@@ -18,6 +19,7 @@ def _read_equipment_values(payload: dict) -> dict:
 
 
 def _read_equipment_pe_values(payload: dict) -> dict:
+    """Internal helper for read equipment pe values."""
     equipment_pe = payload.get("equipment_pe") or {}
     legacy_equipment_pe = payload.get("equipement_pe") or {}
     return {
@@ -28,6 +30,7 @@ def _read_equipment_pe_values(payload: dict) -> dict:
 
 
 def _normalize_feats(payload: dict) -> list[dict]:
+    """Normalize feats."""
     feats = payload.get("feats") or []
     normalized_feats: list[dict] = []
     for feat in feats:

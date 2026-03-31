@@ -27,7 +27,9 @@ def normalize_audio_reference(value: Any) -> str:
     if not value:
         return ""
     if isinstance(value, Mapping):
+        # Handle the branch where isinstance(value, Mapping).
         for key in ("path", "text", "value", "url"):
+            # Process each key from ('path', 'text', 'value', 'url').
             candidate = value.get(key)
             if candidate:
                 try:
@@ -50,6 +52,7 @@ def get_entity_audio_value(record: Any) -> str:
 
 
 def _get_player() -> AudioPlayer:
+    """Return player."""
     global _ENTITY_PLAYER
     if _ENTITY_PLAYER is None:
         _ENTITY_PLAYER = AudioPlayer()

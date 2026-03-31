@@ -1,3 +1,5 @@
+"""Timer package."""
+
 from __future__ import annotations
 
 from typing import Optional
@@ -8,6 +10,7 @@ _timer_service: Optional[TimerService] = None
 
 
 def get_timer_service(scheduler: Optional[TkAfterScheduler] = None) -> TimerService:
+    """Return timer service."""
     global _timer_service
     if _timer_service is None:
         _timer_service = TimerService(scheduler=scheduler)

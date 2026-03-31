@@ -1,3 +1,5 @@
+"""Loading helpers for map icon."""
+
 from modules.helpers.template_loader import load_template
 from PIL import Image
 import customtkinter as ctk
@@ -6,6 +8,7 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 def load_icon(self, path, size=(32,32)):
+    """Load icon."""
     #Load & resize with PIL
     pil_img = Image.open(path).resize(size, resample=Image.LANCZOS)
     # Wrap in a CTkImage so CustomTkinter buttons get the right type

@@ -1,3 +1,5 @@
+"""Loading helpers for random table."""
+
 import json
 import os
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -15,6 +17,7 @@ class RandomTableLoader:
     """Load and validate random tables from a JSON file or directory."""
 
     def __init__(self, base_path: Optional[str] = None):
+        """Initialize the RandomTableLoader instance."""
         self.base_path = base_path or self.default_data_path()
         self.categories: List[dict] = []
         self.tables: Dict[str, dict] = {}
@@ -48,10 +51,12 @@ class RandomTableLoader:
 
     # ------------------------------------------------------------------
     def load(self) -> Dict[str, dict]:
+        """Load the operation."""
         self.categories = []
         self.tables = {}
 
         for source in self._iter_sources(self.base_path):
+            # Process each source from _iter_sources(base_path).
             data = self._read_source(source)
             if not data:
                 continue
@@ -60,10 +65,12 @@ class RandomTableLoader:
             theme = self._coerce_str(data.get("theme"))
 
             for raw_category in data.get("categories") or []:
+                # Process each raw_category from data.get('categories') or [].
                 cat_id = self._coerce_id(raw_category.get("id") or raw_category.get("name") or f"category_{len(self.categories)+1}")
                 category = self._get_or_create_category(cat_id, raw_category.get("name"))
 
                 for raw_table in raw_category.get("tables") or []:
+                    # Process each raw_table from raw_category.get('tables') or [].
                     normalized = self._normalize_table(raw_table, category["id"], system, biome, theme, source)
                     if not normalized:
                         continue
@@ -80,15 +87,19 @@ class RandomTableLoader:
         return {"categories": self.categories, "tables": self.tables}
 
     def get_table(self, table_id: str) -> Optional[dict]:
+        """Return table."""
         return self.tables.get(table_id)
 
     def list_tables(self) -> List[dict]:
+        """Handle list tables."""
         return list(self.tables.values())
 
     # ------------------------------------------------------------------
     def _iter_sources(self, path: str) -> Iterable[str]:
+        """Internal helper for iter sources."""
         if os.path.isdir(path):
             for name in sorted(os.listdir(path)):
+                # Process each name from sorted(os.listdir(path)).
                 if not name.lower().endswith(".json"):
                     continue
                 yield os.path.join(path, name)
@@ -98,7 +109,9 @@ class RandomTableLoader:
             log_info(f"Random tables path not found: {path}", func_name="RandomTableLoader._iter_sources")
 
     def _read_source(self, source: str) -> dict:
+        """Internal helper for read source."""
         try:
+            # Keep read source resilient if this step fails.
             with open(source, "r", encoding="utf-8") as handle:
                 data = json.load(handle)
             if not isinstance(data, dict):
@@ -110,6 +123,7 @@ class RandomTableLoader:
             return {}
 
     def _get_or_create_category(self, cat_id: str, name: Optional[str]) -> dict:
+        """Return or create category."""
         for category in self.categories:
             if category.get("id") == cat_id:
                 return category
@@ -120,6 +134,7 @@ class RandomTableLoader:
     def _normalize_table(
         self, table: dict, category_id: str, system: Optional[str], biome: Optional[str], theme: Optional[str], source: str
     ) -> Optional[dict]:
+        """Normalize table."""
         title = self._coerce_str(table.get("title") or table.get("name"))
         table_id = self._coerce_id(table.get("id") or title or f"table_{len(self.tables)+1}")
         dice = self._coerce_str(table.get("dice"))
@@ -148,8 +163,10 @@ class RandomTableLoader:
         }
 
     def _normalize_entries(self, entries: List[dict]) -> List[dict]:
+        """Normalize entries."""
         normalized: List[dict] = []
         for idx, raw in enumerate(entries, start=1):
+            # Process each (idx, raw) from enumerate(entries, start=1).
             result = self._coerce_str(raw.get("result") or raw.get("text") or f"Entry {idx}")
             rng = raw.get("range")
             if rng is None and "min" in raw and "max" in raw:
@@ -166,8 +183,10 @@ class RandomTableLoader:
         return normalized
 
     def _parse_range(self, range_text: str) -> Tuple[int, int]:
+        """Parse range."""
         text = (range_text or "").strip()
         if "-" in text:
+            # Handle the branch where '-' is in text.
             start, end = text.split("-", 1)
             try:
                 return int(start), int(end)
@@ -181,11 +200,13 @@ class RandomTableLoader:
 
     @staticmethod
     def _coerce_id(value: str) -> str:
+        """Coerce ID."""
         text = str(value or "").strip()
         return text.replace(" ", "_") if text else "table"
 
     @staticmethod
     def _coerce_str(value: Optional[str]) -> Optional[str]:
+        """Coerce str."""
         if value is None:
             return None
         text = str(value).strip()
@@ -193,11 +214,13 @@ class RandomTableLoader:
 
 
 def plot_twist_data_path() -> str:
+    """Handle plot twist data path."""
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     return os.path.join(project_root, "static", "data", "random_tables", "Plot twists.json")
 
 
 def load_plot_twist_table(table_id: str = PLOT_TWIST_TABLE_ID) -> Optional[dict]:
+    """Load plot twist table."""
     loader = RandomTableLoader(plot_twist_data_path())
     data = loader.load()
     table = (data.get("tables") or {}).get(table_id)

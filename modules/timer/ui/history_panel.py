@@ -1,3 +1,5 @@
+"""Panel for timer history."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,6 +18,7 @@ class HistoryEntry:
 
 class HistoryPanel(ctk.CTkFrame):
     def __init__(self, parent, max_entries: int = 200):
+        """Initialize the HistoryPanel instance."""
         super().__init__(parent)
         self._entries: List[HistoryEntry] = []
         self._max_entries = max(20, int(max_entries))
@@ -30,16 +33,20 @@ class HistoryPanel(ctk.CTkFrame):
         self._box.configure(state="disabled")
 
     def add_lap(self, timer_name: str, lap_seconds: float) -> None:
+        """Handle add lap."""
         self._append("Lap", f"{timer_name}: {self._format_seconds(lap_seconds)}")
 
     def add_finished(self, timer_name: str) -> None:
+        """Handle add finished."""
         self._append("Finished", timer_name)
 
     def clear(self) -> None:
+        """Clear the operation."""
         self._entries.clear()
         self._render()
 
     def _append(self, label: str, value: str) -> None:
+        """Append the operation."""
         self._entries.append(
             HistoryEntry(timestamp=datetime.now().strftime("%H:%M:%S"), label=label, value=value)
         )
@@ -48,6 +55,7 @@ class HistoryPanel(ctk.CTkFrame):
         self._render()
 
     def _render(self) -> None:
+        """Render the operation."""
         self._box.configure(state="normal")
         self._box.delete("1.0", "end")
         for entry in self._entries:
@@ -57,6 +65,7 @@ class HistoryPanel(ctk.CTkFrame):
 
     @staticmethod
     def _format_seconds(seconds: float) -> str:
+        """Format seconds."""
         total = max(0, int(seconds))
         hours, rem = divmod(total, 3600)
         minutes, sec = divmod(rem, 60)

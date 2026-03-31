@@ -1,3 +1,5 @@
+"""Dialog for arc studio scenario picker."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -10,6 +12,7 @@ class ScenarioPickerDialog(ctk.CTkToplevel):
     """Simple searchable picker used to choose one scenario title."""
 
     def __init__(self, master, scenarios: list[str]):
+        """Initialize the ScenarioPickerDialog instance."""
         super().__init__(master)
         self.title("Choose Scenario")
         self.geometry("520x460")
@@ -30,6 +33,7 @@ class ScenarioPickerDialog(ctk.CTkToplevel):
         position_window_at_top(self)
 
     def _build_ui(self) -> None:
+        """Build UI."""
         root = ctk.CTkFrame(self, fg_color="transparent")
         root.pack(fill="both", expand=True, padx=12, pady=12)
         root.grid_columnconfigure(0, weight=1)
@@ -86,6 +90,7 @@ class ScenarioPickerDialog(ctk.CTkToplevel):
         self.add_button.grid(row=0, column=2, padx=(8, 0))
 
     def _refresh_list(self) -> None:
+        """Refresh list."""
         for child in self.list_widget.winfo_children():
             child.destroy()
 
@@ -116,16 +121,19 @@ class ScenarioPickerDialog(ctk.CTkToplevel):
             button.grid(row=row_index, column=0, sticky="ew", padx=4, pady=3)
 
     def _select(self, scenario: str) -> None:
+        """Select the operation."""
         self.selected_scenario = scenario
         self.add_button.configure(state="normal")
 
     def _confirm_selection(self) -> None:
+        """Internal helper for confirm selection."""
         if not self.selected_scenario:
             return
         self.destroy()
 
 
 def choose_scenario(master, scenarios: list[str]) -> str | None:
+    """Handle choose scenario."""
     dialog = ScenarioPickerDialog(master, scenarios)
     dialog.wait_window()
     return dialog.selected_scenario

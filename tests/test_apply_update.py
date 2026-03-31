@@ -1,3 +1,5 @@
+"""Regression tests for apply update."""
+
 from pathlib import Path
 
 import pytest
@@ -6,6 +8,7 @@ import scripts.apply_update as apply_update
 
 
 def test_copy_release_tree_preserves_campaigns_casefold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that copy release tree preserves campaigns casefold."""
     monkeypatch.setattr(
         apply_update,
         "_normalize_parts",
@@ -40,12 +43,14 @@ def test_copy_release_tree_preserves_campaigns_casefold(tmp_path: Path, monkeypa
 
 
 def test_wait_for_pid_permission_error_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify that wait for pid permission error windows."""
     monkeypatch.setattr(apply_update.os, "name", "nt", raising=False)
     monkeypatch.setattr(apply_update, "_is_pid_alive_windows", lambda pid: None)
 
     kill_calls = {"count": 0}
 
     def fake_kill(pid: int, signal: int) -> None:
+        """Handle fake kill."""
         kill_calls["count"] += 1
         exc = PermissionError()
         setattr(exc, "winerror", 5)
@@ -55,13 +60,16 @@ def test_wait_for_pid_permission_error_windows(monkeypatch: pytest.MonkeyPatch) 
 
     class FakeClock:
         def __init__(self) -> None:
+            """Initialize the FakeClock instance."""
             self.current = 0.0
             self.sleeps: list[float] = []
 
         def time(self) -> float:
+            """Handle time."""
             return self.current
 
         def sleep(self, amount: float) -> None:
+            """Handle sleep."""
             self.sleeps.append(amount)
             self.current += amount
 

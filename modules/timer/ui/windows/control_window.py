@@ -1,3 +1,5 @@
+"""Window for timer control."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -18,6 +20,7 @@ class TimerControlWindow(ctk.CTkToplevel):
         on_delete_timer: Callable[[], None],
         on_close: Callable[[], None],
     ):
+        """Initialize the TimerControlWindow instance."""
         super().__init__(parent)
         self.title("Timer Controls")
         self.geometry("280x190")
@@ -49,6 +52,7 @@ class TimerControlWindow(ctk.CTkToplevel):
         ctk.CTkButton(frame, text="Delete", command=on_delete_timer).pack(fill="x", pady=(6, 0))
 
     def show(self) -> None:
+        """Show the operation."""
         self.deiconify()
         self.lift()
         self.focus_force()

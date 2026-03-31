@@ -1,3 +1,5 @@
+"""Regression tests for arc editor theme."""
+
 import importlib.util
 import sys
 import types
@@ -22,6 +24,7 @@ theme_manager = module.theme_manager
 
 
 def test_arc_editor_palette_matches_default_theme_tokens():
+    """Verify that arc editor palette matches default theme tokens."""
     palette = get_arc_editor_palette(theme_manager.THEME_DEFAULT)
 
     assert palette.window_bg == "#10151d"
@@ -31,6 +34,7 @@ def test_arc_editor_palette_matches_default_theme_tokens():
 
 
 def test_arc_editor_palette_switches_to_medieval_theme():
+    """Verify that arc editor palette switches to medieval theme."""
     palette = get_arc_editor_palette(theme_manager.THEME_MEDIEVAL)
 
     assert palette.window_bg == "#17120f"
@@ -40,6 +44,7 @@ def test_arc_editor_palette_switches_to_medieval_theme():
 
 
 def test_arc_editor_palette_switches_to_scifi_theme():
+    """Verify that arc editor palette switches to scifi theme."""
     palette = get_arc_editor_palette(theme_manager.THEME_SF)
 
     assert palette.window_bg == "#0d1711"

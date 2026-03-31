@@ -1,3 +1,4 @@
+"""Metrics helpers for campaign scenario."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -8,6 +9,7 @@ from .pill import OutlinedPill
 
 class ScenarioMetricChip(ctk.CTkFrame):
     def __init__(self, parent, *, label: str, value: str, accent: str = "#66c0ff"):
+        """Initialize the ScenarioMetricChip instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -28,6 +30,7 @@ class ScenarioMetricChip(ctk.CTkFrame):
 
 class ScenarioTagRow(ctk.CTkFrame):
     def __init__(self, parent, *, tags: list[str], accent: str = "#7dd3fc"):
+        """Initialize the ScenarioTagRow instance."""
         super().__init__(parent, fg_color="transparent")
         for index, tag in enumerate(tags):
             OutlinedPill(

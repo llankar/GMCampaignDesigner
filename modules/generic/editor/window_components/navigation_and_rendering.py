@@ -1,3 +1,5 @@
+"""Utilities for window components navigation and rendering."""
+
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, section_style
 from modules.campaigns.ui.arcs_read_only_preview import ReadOnlyArcsPreview
@@ -5,6 +7,7 @@ from modules.campaigns.ui.arcs_read_only_preview import ReadOnlyArcsPreview
 
 class GenericEditorWindowNavigationAndRendering:
     def _mark_dirty(self, event=None):
+        """Internal helper for mark dirty."""
         if self._dirty:
             return
         if event is not None and getattr(event, "keysym", "") in {"Control_L", "Control_R", "Shift_L", "Shift_R", "Escape"}:
@@ -13,6 +16,7 @@ class GenericEditorWindowNavigationAndRendering:
         if getattr(self, "toolbar", None):
             self.toolbar.set_dirty(True)
     def _register_field_section(self, field_name: str):
+        """Register field section."""
         section = ctk.CTkFrame(self.scroll_frame, **section_style())
         self._field_sections[field_name] = section
         self._field_section_order.append(field_name)
@@ -20,6 +24,7 @@ class GenericEditorWindowNavigationAndRendering:
         return section
 
     def _target_column_for_field(self, field_name: str) -> int:
+        """Internal helper for target column for field."""
         media_fields = {"Portrait", "Image"}
         if field_name in media_fields:
             return 1
@@ -31,6 +36,7 @@ class GenericEditorWindowNavigationAndRendering:
         return 0 if position % 2 == 0 else 1
 
     def _layout_visible_sections(self):
+        """Internal helper for layout visible sections."""
         visible_fields = [
             name for name in self._field_section_order
             if name not in getattr(self, "_hidden_field_sections", set())
@@ -43,6 +49,7 @@ class GenericEditorWindowNavigationAndRendering:
             return
 
         for field_name in self._field_section_order:
+            # Process each field_name from _field_section_order.
             section = self._field_sections.get(field_name)
             if section is None:
                 continue
@@ -50,6 +57,7 @@ class GenericEditorWindowNavigationAndRendering:
             section.grid_forget()
 
         for field_name in visible_fields:
+            # Process each field_name from visible_fields.
             section = self._field_sections.get(field_name)
             if section is None:
                 continue
@@ -57,12 +65,14 @@ class GenericEditorWindowNavigationAndRendering:
             target_column = right_column if column_index == 1 else left_column
             section.pack(in_=target_column, fill="x", padx=4, pady=3)
     def _filter_visible_fields(self, query: str):
+        """Internal helper for filter visible fields."""
         query = (query or "").strip().lower()
         total = len(self._field_section_order)
         visible = 0
         self._hidden_field_sections = set()
 
         for field_name in self._field_section_order:
+            # Process each field_name from _field_section_order.
             should_show = (not query) or (query in field_name.lower())
             if should_show:
                 visible += 1
@@ -72,12 +82,14 @@ class GenericEditorWindowNavigationAndRendering:
         self._layout_visible_sections()
         self.toolbar.update_visible_count(visible, total)
     def _jump_to_field(self, field_name: str):
+        """Internal helper for jump to field."""
         section = self._field_sections.get(field_name)
         if section is None:
             return
         section.focus_set()
         self.after(10, lambda: self._scroll_to_widget(section))
     def _scroll_to_widget(self, widget):
+        """Internal helper for scroll to widget."""
         canvas = getattr(self.scroll_frame, "_parent_canvas", None)
         if canvas is None:
             return
@@ -88,12 +100,15 @@ class GenericEditorWindowNavigationAndRendering:
         except Exception:
             return
     def _get_ai(self):
+        """Return AI."""
         if self._ai_client is None:
             self._ai_client = LocalAIClient()
         return self._ai_client
     def _field_parent(self):
+        """Internal helper for field parent."""
         return getattr(self, "_active_field_parent", None) or self.scroll_frame
     def _render_standard_field(self, field):
+        """Render standard field."""
         field_name = str(field.get("name", ""))
         field_type = str(field.get("type", "")).lower()
 
@@ -147,6 +162,7 @@ class GenericEditorWindowNavigationAndRendering:
 
         data = initial_text
         if isinstance(data, str):
+            # Handle the branch where isinstance(data, str).
             parsed_data = None
             try:
                 parsed_data = json.loads(data)
@@ -178,6 +194,7 @@ class GenericEditorWindowNavigationAndRendering:
         editor.pack(fill="x", pady=5)
         return editor
     def create_longtext_field(self, field):
+        """Create longtext field."""
         raw = self.item.get(field["name"], "")
         if field["name"] == "ExtractedText":
             preview = ReadOnlyLongTextPreview(

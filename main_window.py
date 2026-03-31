@@ -1,4 +1,6 @@
-﻿import os
+﻿"""Main application window and startup orchestration."""
+
+import os
 import sys
 import json
 import sqlite3
@@ -120,6 +122,7 @@ _HEX_COLOR_PATTERN = re.compile(r"^#?[0-9a-fA-F]{6}$")
 
 
 def normalize_hex_color(value, fallback="#4F8EF7"):
+    """Normalize hex color."""
     text = str(value or "").strip()
     if not text:
         return fallback
@@ -139,6 +142,7 @@ SWARMUI_PROCESS = None
 @log_methods
 class MainWindow(ctk.CTk):
     def __init__(self):
+        """Initialize the MainWindow instance."""
         configure_ui_defaults()
         super().__init__()
 
@@ -198,6 +202,7 @@ class MainWindow(ctk.CTk):
         self.after(800, self._auto_open_campaign_overview)
 
     def _bind_global_shortcuts(self):
+        """Bind global shortcuts."""
         root = self.winfo_toplevel()
         root.bind_all("<F1>", lambda _event: self.open_gm_screen())
         root.bind_all("<F2>", lambda _event: self.map_tool())
@@ -211,6 +216,7 @@ class MainWindow(ctk.CTk):
         root.bind_all("<F12>", lambda _event: self.destroy())
 
     def open_ai_settings(self):
+        """Open AI settings."""
         log_info("Opening AI settings dialog", func_name="main_window.MainWindow.open_ai_settings")
         top = ctk.CTkToplevel(self)
         top.title("AI Settings")
@@ -235,6 +241,7 @@ class MainWindow(ctk.CTk):
         form.pack(fill="both", expand=True, padx=12, pady=12)
 
         def row(label, widget):
+            """Handle row."""
             r = ctk.CTkFrame(form)
             r.pack(fill="x", pady=6)
             ctk.CTkLabel(r, text=label, width=140, anchor="w").pack(side="left")
@@ -250,6 +257,7 @@ class MainWindow(ctk.CTk):
         btns.pack(fill="x", padx=12, pady=(0,12))
 
         def save():
+            """Save the operation."""
             try:
                 # Basic normalization
                 _ = float(v_temp.get())
@@ -271,6 +279,7 @@ class MainWindow(ctk.CTk):
             messagebox.showinfo("Saved", "AI settings saved.")
 
         def reset_defaults():
+            """Reset defaults."""
             v_base.set("http://localhost:8080")
             v_model.set("gpt-oss")
             v_temp.set("0.7")
@@ -289,6 +298,7 @@ class MainWindow(ctk.CTk):
     # Setup and Layout Methods
     # ---------------------------
     def set_window_icon(self):
+        """Set window icon."""
         icon_path = os.path.join("assets", "GMCampaignDesigner.ico")
         if os.path.exists(icon_path):
             self.iconbitmap(icon_path)
@@ -296,14 +306,17 @@ class MainWindow(ctk.CTk):
         self.tk.call('wm', 'iconphoto', self._w, icon_image)
 
     def create_layout(self):
+        """Create layout."""
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(fill="both", expand=True)
 
     def create_menu_bar(self):
+        """Create menu bar."""
         self.menu_bar = AppMenuBar(self)
         self.menu_bar.attach()
 
     def load_icons(self):
+        """Load icons."""
         log_debug("Loading sidebar icons", func_name="main_window.MainWindow.load_icons")
         base_icons = {
             "change_db": "database_icon.png",
@@ -357,7 +370,9 @@ class MainWindow(ctk.CTk):
             self.icons[icon_key] = icon_image or default_entity_icon
 
     def open_custom_fields_editor(self):
+        """Open custom fields editor."""
         try:
+            # Keep custom fields editor resilient if this step fails.
             log_info("Opening Custom Fields Editor", func_name="main_window.MainWindow.open_custom_fields_editor")
             top = CustomFieldsEditor(self)
             top.transient(self)
@@ -368,7 +383,9 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Custom Fields Editor:\n{e}")
 
     def open_system_manager_dialog(self):
+        """Open system manager dialog."""
         try:
+            # Keep system manager dialog resilient if this step fails.
             log_info("Opening System Manager dialog", func_name="main_window.MainWindow.open_system_manager_dialog")
             dialog = SystemManagerDialog(self)
             dialog.transient(self)
@@ -382,7 +399,9 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open System Manager dialog:\n{exc}")
 
     def open_cross_campaign_asset_library(self):
+        """Open cross campaign asset library."""
         try:
+            # Keep cross campaign asset library resilient if this step fails.
             if self._asset_library_window and self._asset_library_window.winfo_exists():
                 self._asset_library_window.lift()
                 self._asset_library_window.focus_force()
@@ -404,7 +423,9 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open asset library window:\n{exc}")
 
     def open_new_entity_type_dialog(self):
+        """Open new entity type dialog."""
         try:
+            # Keep new entity type dialog resilient if this step fails.
             log_info("Opening New Entity Type dialog", func_name="main_window.MainWindow.open_new_entity_type_dialog")
             dlg = NewEntityTypeDialog(self, on_created=self.refresh_entities)
             dlg.transient(self)
@@ -417,7 +438,9 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open New Entity Type dialog:\n{exc}")
 
     def open_auto_improve_panel(self):
+        """Open auto improve panel."""
         try:
+            # Keep auto improve panel resilient if this step fails.
             log_info("Opening Auto-improvement panel", func_name="main_window.MainWindow.open_auto_improve_panel")
             panel = AutoImprovePanel(self)
             panel.transient(self)
@@ -431,11 +454,13 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Auto-improvement panel:\n{exc}")
 
     def load_icon(self, file_name, size=(60, 60)):
+        """Load icon."""
         if not file_name:
             return None
 
         candidates = []
         if os.path.isabs(file_name):
+            # Handle the branch where os.path.isabs(file_name).
             candidates.append(file_name)
         else:
             if os.path.exists(file_name):
@@ -449,6 +474,7 @@ class MainWindow(ctk.CTk):
 
         seen = set()
         for path in candidates:
+            # Process each path from candidates.
             if not path or path in seen:
                 continue
             seen.add(path)
@@ -472,7 +498,9 @@ class MainWindow(ctk.CTk):
         return None
 
     def create_sidebar(self, force: bool = False):
+        """Create sidebar."""
         if not self.show_sidebar:
+            # Tear down any existing sidebar widgets when this layout runs without a sidebar.
             existing_sidebar = getattr(self, "sidebar_frame", None)
             if existing_sidebar is not None and existing_sidebar.winfo_exists():
                 try:
@@ -488,6 +516,7 @@ class MainWindow(ctk.CTk):
         first_time = getattr(self, "sidebar_frame", None) is None or force
 
         if first_time:
+            # Build the sidebar shell and persistent widgets on first render or an explicit rebuild.
             self._ensure_sidebar_hotspot()
             # If forcing a rebuild, drop the existing sidebar completely
             if force and hasattr(self, "sidebar_frame"):
@@ -499,6 +528,7 @@ class MainWindow(ctk.CTk):
             pack_kwargs = {"side": "left", "fill": "y", "padx": 5, "pady": 5}
             if force and hasattr(self, "content_frame"):
                 try:
+                    # Preserve the pack order so the rebuilt sidebar still lands beside the content frame.
                     if self.content_frame.winfo_manager() == "pack":
                         pack_kwargs["before"] = self.content_frame
                 except Exception:
@@ -584,10 +614,10 @@ class MainWindow(ctk.CTk):
             self.sidebar_sections_container = ctk.CTkFrame(self.sidebar_inner, fg_color="transparent")
             self.sidebar_sections_container.pack(fill="both", expand=True, padx=5, pady=5)
         else:
-            # Refresh top metadata styles to pick up new theme tokens
+            # Re-skin the existing sidebar widgets instead of rebuilding the whole container tree.
             try:
                 tokens = theme_manager.get_tokens()
-                # Update border color on DB container if present
+                # Refresh the framed widgets that emulate the database badge border.
                 for child in self.sidebar_inner.winfo_children():
                     try:
                         if isinstance(child, ctk.CTkFrame) and getattr(child, "border_width", 0):
@@ -617,6 +647,7 @@ class MainWindow(ctk.CTk):
 
 
     def update_sidebar_metadata(self):
+        """Update sidebar metadata."""
         db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
         db_name = os.path.splitext(os.path.basename(db_path))[0]
 
@@ -655,8 +686,10 @@ class MainWindow(ctk.CTk):
             system_tooltip.text = tooltip_text
 
     def open_system_selector(self):
+        """Open system selector."""
         existing = getattr(self, "_system_selector_dialog", None)
         if existing is not None and existing.winfo_exists():
+            # Reuse the existing selector window instead of opening a duplicate dialog.
             try:
                 existing.lift()
                 existing.focus_force()
@@ -669,6 +702,7 @@ class MainWindow(ctk.CTk):
         self._system_selector_dialog = dialog
 
     def _on_system_selector_destroyed(self, event=None):
+        """Handle system selector destroyed."""
         if event is None:
             self._system_selector_dialog = None
             return
@@ -676,6 +710,7 @@ class MainWindow(ctk.CTk):
             self._system_selector_dialog = None
 
     def _on_theme_changed(self, _theme_key: str) -> None:
+        """Rebuild theme-sensitive UI after the active theme changes."""
         # Reapply palette and rebuild widgets that used tokenized colors
         # Track which floating windows are currently open so we can recreate them
         reopen_audio_bar = False
@@ -683,7 +718,9 @@ class MainWindow(ctk.CTk):
         reopen_dice_roller = False
         reopen_sound_manager = False
         try:
+            # Track open floating tool windows so they can be recreated with refreshed colors.
             if getattr(self, "audio_bar_window", None) is not None and self.audio_bar_window.winfo_exists():
+                # Reopen the audio bar after the theme swap instead of hot-patching its widget tree.
                 reopen_audio_bar = True
                 try:
                     self.audio_bar_window.destroy()
@@ -692,7 +729,9 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
         try:
+            # Apply the same rebuild flow to the dice bar when it is already open.
             if getattr(self, "dice_bar_window", None) is not None and self.dice_bar_window.winfo_exists():
+                # Destroy it now and recreate it after the new tokens are active.
                 reopen_dice_bar = True
                 try:
                     self.dice_bar_window.destroy()
@@ -701,7 +740,9 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
         try:
+            # Recreate the 3D dice window so its canvas assets pick up the new theme cleanly.
             if getattr(self, "dice_roller_window", None) is not None and self.dice_roller_window.winfo_exists():
+                # Tear down the current dice roller before the delayed reopen below.
                 reopen_dice_roller = True
                 try:
                     self.dice_roller_window.destroy()
@@ -710,7 +751,9 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
         try:
+            # The sound manager also gets recreated so its nested panels refresh together.
             if getattr(self, "sound_manager_window", None) is not None and self.sound_manager_window.winfo_exists():
+                # Tear it down now and reopen it once the shared palette has been updated.
                 reopen_sound_manager = True
                 try:
                     self.sound_manager_window.destroy()
@@ -724,27 +767,32 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
         try:
+            # Refresh the menu bar after the palette swap so top-level actions match the new tokens.
             if getattr(self, "menu_bar", None) is not None:
                 self.menu_bar.refresh_theme()
         except Exception:
             pass
         # Re-open floating bars/windows to pick up the new palette immediately
         try:
+            # Reopen the audio bar once the main window has finished rebuilding theme-driven widgets.
             if reopen_audio_bar:
                 self.after(25, self.open_audio_bar)
         except Exception:
             pass
         try:
+            # Reopen the dice bar on the next tick so it is recreated against the updated palette.
             if reopen_dice_bar:
                 self.after(25, self.open_dice_bar)
         except Exception:
             pass
         try:
+            # Delay the dice roller slightly more to avoid racing the other floating-window rebuilds.
             if reopen_dice_roller:
                 self.after(50, self.open_dice_roller)
         except Exception:
             pass
         try:
+            # Recreate the sound manager last because it rebuilds the largest floating tool tree.
             if reopen_sound_manager:
                 self.after(75, self.open_sound_manager)
         except Exception:
@@ -769,6 +817,7 @@ class MainWindow(ctk.CTk):
         queue = [current_view]
         visited: set[int] = set()
         while queue:
+            # Keep looping while queue.
             widget = queue.pop(0)
             widget_id = id(widget)
             if widget_id in visited:
@@ -790,6 +839,7 @@ class MainWindow(ctk.CTk):
                     continue
 
     def _refresh_theme_buttons(self, tokens: dict) -> None:
+        """Refresh theme buttons."""
         button_fg = tokens.get("button_fg")
         button_hover = tokens.get("button_hover")
         button_border = tokens.get("button_border")
@@ -797,6 +847,7 @@ class MainWindow(ctk.CTk):
             return
 
         def _walk(widget):
+            """Internal helper for walk."""
             yield widget
             for child in widget.winfo_children():
                 yield from _walk(child)
@@ -804,6 +855,7 @@ class MainWindow(ctk.CTk):
         root = self.winfo_toplevel()
         roots = []
         if root is not None:
+            # Handle the branch where root is available.
             roots.append(root)
             for child in root.winfo_children():
                 if isinstance(child, (ctk.CTkToplevel, tk.Toplevel)):
@@ -813,9 +865,11 @@ class MainWindow(ctk.CTk):
 
         for root_widget in roots:
             for widget in _walk(root_widget):
+                # Process each widget from _walk(root_widget).
                 if not isinstance(widget, ctk.CTkButton):
                     continue
                 try:
+                    # Keep theme buttons resilient if this step fails.
                     updates = {}
                     if button_fg is not None:
                         updates["fg_color"] = button_fg
@@ -829,6 +883,7 @@ class MainWindow(ctk.CTk):
                     continue
 
     def create_accordion_sidebar(self):
+        """Create accordion sidebar."""
         container = getattr(self, "sidebar_sections_container", None)
         if container is None:
             return
@@ -840,6 +895,7 @@ class MainWindow(ctk.CTk):
         active_section = {"sec": None}
 
         def make_section(parent, title, buttons):
+            """Handle make section."""
             sec = ctk.CTkFrame(parent)
             sec.pack(fill="x", pady=(4, 6))
 
@@ -861,6 +917,7 @@ class MainWindow(ctk.CTk):
                 btn.grid(row=r, column=c, padx=2, pady=2, sticky="ew")
 
             def expand():
+                """Handle expand."""
                 if state["open"]:
                     return
                 state["open"] = True
@@ -870,6 +927,7 @@ class MainWindow(ctk.CTk):
                     pass
 
             def collapse():
+                """Collapse the operation."""
                 if not state["open"]:
                     return
                 state["open"] = False
@@ -879,12 +937,15 @@ class MainWindow(ctk.CTk):
                     pass
 
             def toggle(_event=None):
+                """Toggle the operation."""
                 if state["open"]:
+                    # Handle the branch where state['open'].
                     collapse()
                     if active_section["sec"] is sec:
                         active_section["sec"] = None
                 else:
                     for meta in sections:
+                        # Process each meta from sections.
                         if meta["sec"] is sec:
                             continue
                         meta["collapse"]()
@@ -962,6 +1023,7 @@ class MainWindow(ctk.CTk):
         # Open the default section by default
         for meta in sections:
             if meta.get("title") == default_title:
+                # Handle the branch where meta.get('title') == default_title.
                 default_meta = meta
                 try:
                     meta["expand"]()
@@ -971,6 +1033,7 @@ class MainWindow(ctk.CTk):
                 break
 
     def _ensure_sidebar_hotspot(self):
+        """Ensure sidebar hotspot."""
         if getattr(self, "sidebar_hotspot", None) is not None:
             return
         self.sidebar_hotspot = ctk.CTkFrame(self.main_frame, width=8, fg_color="transparent")
@@ -981,10 +1044,12 @@ class MainWindow(ctk.CTk):
             pass
 
     def _bind_sidebar_hover_events(self):
+        """Bind sidebar hover events."""
         frame = getattr(self, "sidebar_frame", None)
         if frame is None:
             return
         try:
+            # Keep sidebar hover events resilient if this step fails.
             frame.bind("<Enter>", self._restore_sidebar)
             frame.bind("<Leave>", self._collapse_sidebar)
             if getattr(self, "sidebar_inner", None) is not None:
@@ -994,6 +1059,7 @@ class MainWindow(ctk.CTk):
             pass
 
     def _cancel_sidebar_animation(self):
+        """Internal helper for cancel sidebar animation."""
         if self._sidebar_animation_job is not None:
             try:
                 self.after_cancel(self._sidebar_animation_job)
@@ -1003,6 +1069,7 @@ class MainWindow(ctk.CTk):
         self._sidebar_animating = False
 
     def _animate_sidebar_width(self, target_width: int, on_complete=None):
+        """Internal helper for animate sidebar width."""
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
             self._sidebar_animating = False
@@ -1013,6 +1080,7 @@ class MainWindow(ctk.CTk):
 
         # Immediately set the target width to remove the animation effect
         try:
+            # Keep animate sidebar width resilient if this step fails.
             frame.configure(width=target_width)
         except Exception:
             self._sidebar_animating = False
@@ -1025,13 +1093,16 @@ class MainWindow(ctk.CTk):
             on_complete()
 
     def _restore_sidebar(self, _event=None):
+        """Restore sidebar."""
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
             return
         self._cancel_sidebar_animation()
 
         if not frame.winfo_manager():
+            # Handle the branch where not frame.winfo_manager().
             if self._sidebar_pack_kwargs is None:
+                # Handle the branch where sidebar pack kwargs is missing.
                 self._sidebar_pack_kwargs = {"side": "left", "fill": "y", "padx": 5, "pady": 5}
                 if getattr(self, "sidebar_hotspot", None) is not None:
                     self._sidebar_pack_kwargs["after"] = self.sidebar_hotspot
@@ -1045,6 +1116,7 @@ class MainWindow(ctk.CTk):
         target_width = self.sidebar_default_width
 
         def finalize():
+            """Handle finalize."""
             self._sidebar_collapsed = False
             try:
                 frame.configure(width=target_width)
@@ -1080,6 +1152,7 @@ class MainWindow(ctk.CTk):
         return False
 
     def _collapse_sidebar(self, _event=None, immediate: bool = False):
+        """Collapse sidebar."""
         frame = getattr(self, "sidebar_frame", None)
         if frame is None or not frame.winfo_exists():
             return
@@ -1092,6 +1165,7 @@ class MainWindow(ctk.CTk):
                 return
 
         def finalize():
+            """Handle finalize."""
             try:
                 frame.pack_forget()
             except Exception:
@@ -1106,6 +1180,7 @@ class MainWindow(ctk.CTk):
         self._animate_sidebar_width(0, on_complete=finalize)
 
     def create_content_area(self):
+        """Create content area."""
         self.content_frame = ctk.CTkFrame(self.main_frame)
         self.content_frame.pack(side="right", fill="both", expand=True, padx=10, pady=(0, 10))
 
@@ -1132,11 +1207,13 @@ class MainWindow(ctk.CTk):
         self.current_open_view = None
 
     def _get_calendar_dock_if_alive(self):
+        """Return calendar dock if alive."""
         dock = getattr(self, "calendar_dock", None)
         if dock is None:
             return None
 
         try:
+            # Keep calendar dock if alive resilient if this step fails.
             if not dock.winfo_exists():
                 return None
         except Exception:
@@ -1145,8 +1222,10 @@ class MainWindow(ctk.CTk):
         return dock
 
     def _toggle_calendar_dock(self):
+        """Toggle calendar dock."""
         dock = self._get_calendar_dock_if_alive()
         if dock is None:
+            # Handle the branch where dock is missing.
             self._calendar_dock_visible = False
             try:
                 self.calendar_dock_toggle_btn.configure(text="Calendar ▶")
@@ -1167,16 +1246,19 @@ class MainWindow(ctk.CTk):
 
 
     def _on_calendar_campaign_today_changed(self, campaign_today):
+        """Handle calendar campaign today changed."""
         self._calendar_ui_state["active_date"] = campaign_today
         self._calendar_ui_state["view_mode"] = "agenda"
         self._refresh_calendar_dock(campaign_today)
         self.open_calendar_view(target_date=campaign_today, view_mode="agenda")
 
     def _on_calendar_date_selected(self, selected_date):
+        """Handle calendar date selected."""
         self._refresh_calendar_dock(selected_date)
         self.open_calendar_view(target_date=selected_date, view_mode=self._calendar_ui_state.get("view_mode", "month"))
 
     def open_calendar_view(self, target_date=None, view_mode=None):
+        """Open calendar view."""
         target = target_date or self._calendar_ui_state.get("active_date") or CampaignTimelineSimulator.current_campaign_date()
         mode = (view_mode or self._calendar_ui_state.get("view_mode") or "month")
         saved_filters = dict(self._calendar_ui_state.get("filters") or {})
@@ -1184,6 +1266,7 @@ class MainWindow(ctk.CTk):
 
         window = getattr(self, "_calendar_full_window", None)
         if window is None or not window.winfo_exists():
+            # Handle the branch where window is missing or not window.winfo_exists().
             from modules.events.ui.full import CalendarWindow
 
             window = CalendarWindow(
@@ -1215,6 +1298,7 @@ class MainWindow(ctk.CTk):
         return window
 
     def _on_calendar_full_state_change(self, state):
+        """Handle calendar full state change."""
         if not isinstance(state, dict):
             return
 
@@ -1244,6 +1328,7 @@ class MainWindow(ctk.CTk):
         self._refresh_calendar_dock(active_date)
 
     def _open_linked_calendar_entity(self, entity_type, entity_name):
+        """Open linked calendar entity."""
         if not entity_type or not entity_name:
             return
 
@@ -1256,6 +1341,7 @@ class MainWindow(ctk.CTk):
         open_entity_window(entity_type, entity_name)
 
     def _refresh_calendar_dock(self, selected_date=None):
+        """Refresh calendar dock."""
         dock = self._get_calendar_dock_if_alive()
         if dock is None:
             self._calendar_dock_visible = False
@@ -1270,9 +1356,11 @@ class MainWindow(ctk.CTk):
         dock.set_month_event_map(month_events)
 
     def _invalidate_calendar_events_cache(self):
+        """Invalidate calendar events cache."""
         self._calendar_events_cache = None
 
     def notify_calendar_events_changed(self, target_date=None):
+        """Notify calendar events changed."""
         parsed_target = self._parse_event_date(target_date)
         self._invalidate_calendar_events_cache()
         self._refresh_calendar_dock(parsed_target)
@@ -1287,6 +1375,7 @@ class MainWindow(ctk.CTk):
             return
 
     def open_timeline_simulator_dialog(self, parent=None, target_date=None):
+        """Open timeline simulator dialog."""
         dialog_parent = parent or self
         current_date = CampaignTimelineSimulator.current_campaign_date()
         initial_target = self._parse_event_date(target_date) or current_date
@@ -1300,6 +1389,7 @@ class MainWindow(ctk.CTk):
         )
 
     def _run_timeline_simulation(self, *, target_date):
+        """Run timeline simulation."""
         with self._busy_operation("Advancing campaign timeline..."):
             simulator = CampaignTimelineSimulator(wrappers=self.entity_wrappers)
             result = simulator.advance_to(target_date)
@@ -1309,6 +1399,7 @@ class MainWindow(ctk.CTk):
         return result
 
     def _refresh_open_entity_views(self):
+        """Refresh open entity views."""
         container = getattr(self, "current_open_view", None)
         if container is None:
             return
@@ -1324,9 +1415,11 @@ class MainWindow(ctk.CTk):
                     continue
 
     def _get_events_for_day(self, target_date):
+        """Return events for day."""
         return [event for event in self._collect_calendar_events() if event.get("date") == target_date]
 
     def _get_events_for_range(self, start_date, end_date):
+        """Return events for range."""
         return [
             event
             for event in self._collect_calendar_events()
@@ -1334,6 +1427,7 @@ class MainWindow(ctk.CTk):
         ]
 
     def _get_upcoming_events(self, from_date, limit=12):
+        """Return upcoming events."""
         upcoming = [
             event
             for event in self._collect_calendar_events()
@@ -1343,8 +1437,10 @@ class MainWindow(ctk.CTk):
         return upcoming[:limit]
 
     def _get_month_events(self, year, month):
+        """Return month events."""
         month_events = {}
         for event in self._collect_calendar_events():
+            # Process each event from _collect_calendar_events().
             event_date = event.get("date")
             if event_date is None or event_date.year != year or event_date.month != month:
                 continue
@@ -1354,6 +1450,7 @@ class MainWindow(ctk.CTk):
         return month_events
 
     def _create_calendar_event(self, payload):
+        """Create calendar event."""
         if not isinstance(payload, dict):
             return None
 
@@ -1427,6 +1524,7 @@ class MainWindow(ctk.CTk):
 
 
     def _update_calendar_event(self, event, target_date, target_time=None, payload=None):
+        """Update calendar event."""
         if not isinstance(event, dict):
             return False
 
@@ -1453,6 +1551,7 @@ class MainWindow(ctk.CTk):
 
         matched = None
         for item in items:
+            # Process each item from items.
             item_title = self._extract_event_title(item, fallback=slug)
             item_date = self._extract_event_date(item)
             item_time = self._extract_event_time(item)
@@ -1466,6 +1565,7 @@ class MainWindow(ctk.CTk):
         matched["Date"] = target.isoformat()
         matched["StartTime"] = new_time
         if isinstance(payload, dict):
+            # Handle the branch where isinstance(payload, dict).
             updated_title = str(payload.get("title") or title).strip() or title
             matched["Title"] = updated_title
             matched["EndTime"] = self._normalize_event_time(payload.get("end_time"), fallback=matched.get("EndTime") or "")
@@ -1500,6 +1600,7 @@ class MainWindow(ctk.CTk):
         return True
 
     def _resolve_calendar_event_wrapper(self):
+        """Resolve calendar event wrapper."""
         wrappers = getattr(self, "entity_wrappers", {}) or {}
         event_slug = next((slug for slug in wrappers if "event" in slug.lower()), None)
         if event_slug is None:
@@ -1513,6 +1614,7 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _normalize_event_time(value, fallback="09:00"):
+        """Normalize event time."""
         if value is None:
             return fallback
         text = str(value).strip()
@@ -1530,6 +1632,7 @@ class MainWindow(ctk.CTk):
         return fallback
 
     def _collect_calendar_events(self):
+        """Collect calendar events."""
         if self._calendar_events_cache is not None:
             return [dict(event) for event in self._calendar_events_cache]
 
@@ -1539,6 +1642,7 @@ class MainWindow(ctk.CTk):
         seen = set()
 
         for slug in ordered_slugs:
+            # Process each slug from ordered_slugs.
             wrapper = wrappers.get(slug)
             if wrapper is None:
                 continue
@@ -1548,6 +1652,7 @@ class MainWindow(ctk.CTk):
                 continue
 
             for item in items:
+                # Process each item from items.
                 event_date = self._extract_event_date(item)
                 if event_date is None:
                     continue
@@ -1589,7 +1694,9 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _extract_event_title(item, fallback="event"):
+        """Extract event title."""
         for key in ("Title", "title", "Name", "name", "Event", "event"):
+            # Process each key while updating event title.
             value = item.get(key)
             if isinstance(value, str) and value.strip():
                 return value.strip()
@@ -1597,6 +1704,7 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _extract_event_date(item):
+        """Extract event date."""
         candidate_keys = (
             "Date",
             "date",
@@ -1610,6 +1718,7 @@ class MainWindow(ctk.CTk):
         )
 
         for key in candidate_keys:
+            # Process each key from candidate_keys.
             if key not in item:
                 continue
             parsed = MainWindow._parse_event_date(item.get(key))
@@ -1619,7 +1728,9 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _extract_event_time(item):
+        """Extract event time."""
         for key in ("StartTime", "start_time", "startTime", "Time", "time"):
+            # Process each key while updating event time.
             if key not in item:
                 continue
             return MainWindow._normalize_event_time(item.get(key), fallback="")
@@ -1627,6 +1738,7 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _parse_event_date(value):
+        """Parse event date."""
         if value is None:
             return None
         if isinstance(value, datetime):
@@ -1634,6 +1746,7 @@ class MainWindow(ctk.CTk):
         if isinstance(value, date):
             return value
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             text = value.strip()
             if not text:
                 return None
@@ -1691,9 +1804,12 @@ class MainWindow(ctk.CTk):
             pass
 
     def _toggle_banner(self):
+        """Toggle banner."""
         # GM Screen mode: reposition content and toggle banner without recreating views
         if getattr(self, "_gm_mode", False):
+            # Handle the branch where getattr(self, '_gm_mode', False).
             if self.banner_visible:
+                # Continue with this path when banner visible is set.
                 if self.banner_frame.winfo_exists():
                     try:
                         self.banner_frame.grid_remove()
@@ -1738,7 +1854,9 @@ class MainWindow(ctk.CTk):
             return
         # --- GENERIC VIEW MODE (e.g., whiteboard) ---
         if self.current_open_entity is None and getattr(self, "current_open_view", None) is not None:
+            # Handle the branch where current open entity is missing and getattr(self, 'current_open_view', None) is available.
             if self.banner_visible:
+                # Continue with this path when banner visible is set.
                 if self.banner_frame.winfo_exists():
                     try:
                         self.banner_frame.grid_remove()
@@ -1790,6 +1908,7 @@ class MainWindow(ctk.CTk):
 
             # hide or show banner + inner frames
             if self.banner_visible:
+                # Continue with this path when banner visible is set.
                 self.banner_frame.grid_remove()
                 self.inner_content_frame.grid_remove()
                 self.content_frame.grid_rowconfigure(0, weight=1)
@@ -1822,6 +1941,7 @@ class MainWindow(ctk.CTk):
 
             # re‐instantiate the proper editor type, then restore its state
             if self._graph_type == 'character':
+                # Handle the branch where _graph_type == 'character'.
                 from modules.characters.character_graph_editor import CharacterGraphEditor
 
                 editor = CharacterGraphEditor(
@@ -1936,6 +2056,7 @@ class MainWindow(ctk.CTk):
             self.inner_content_frame.grid_columnconfigure(0, weight=1)
 
             if self.current_open_view:
+                # Continue with this path when current open view is set.
                 entity = self.current_open_entity
                 self.current_open_view.destroy()
 
@@ -1981,6 +2102,7 @@ class MainWindow(ctk.CTk):
             return self.content_frame
 
     def create_exit_button(self):
+        """Create exit button."""
         self.exit_button = self.menu_bar.create_action_button(
             text="✕",
             command=self.destroy,
@@ -2008,6 +2130,7 @@ class MainWindow(ctk.CTk):
        
 
     def _apply_cursor_recursive(self, widget, cursor):
+        """Apply cursor recursive."""
         try:
             widget.configure(cursor=cursor)
         except (tk.TclError, AttributeError):
@@ -2016,6 +2139,7 @@ class MainWindow(ctk.CTk):
             self._apply_cursor_recursive(child, cursor)
 
     def _set_wait_cursor(self, enable):
+        """Set wait cursor."""
         cursor = "wait" if sys.platform.startswith("win") else "watch"
         target = cursor if enable else ""
         try:
@@ -2030,8 +2154,10 @@ class MainWindow(ctk.CTk):
         self.update_idletasks()
 
     def _show_busy_modal(self, message):
+        """Show busy modal."""
         if self._busy_modal and self._busy_modal.winfo_exists():
             try:
+                # Keep busy modal resilient if this step fails.
                 label = getattr(self._busy_modal, "_message_label", None)
                 if label is not None:
                     label.configure(text=message)
@@ -2056,6 +2182,7 @@ class MainWindow(ctk.CTk):
         modal.update_idletasks()
         self.update_idletasks()
         try:
+            # Keep busy modal resilient if this step fails.
             width = modal.winfo_width()
             height = modal.winfo_height()
             root_x = self.winfo_rootx()
@@ -2074,7 +2201,9 @@ class MainWindow(ctk.CTk):
         self._set_wait_cursor(True)
 
     def _hide_busy_modal(self):
+        """Hide busy modal."""
         try:
+            # Keep busy modal resilient if this step fails.
             if self._busy_modal and self._busy_modal.winfo_exists():
                 self._busy_modal.destroy()
         except tk.TclError:
@@ -2085,13 +2214,16 @@ class MainWindow(ctk.CTk):
 
     @contextmanager
     def _busy_operation(self, message):
+        """Internal helper for busy operation."""
         self._show_busy_modal(message)
         try:
+            # Keep busy operation resilient if this step fails.
             yield
         finally:
             self._hide_busy_modal()
 
     def load_model_config(self):
+        """Load model config."""
         startup_config = load_startup_model_config()
         self.models_path = startup_config.models_path
         self.model_options = startup_config.model_options
@@ -2105,6 +2237,7 @@ class MainWindow(ctk.CTk):
         )
 
     def init_wrappers(self):
+        """Initialize wrappers."""
         self.entity_wrappers = build_entity_wrappers()
         self._invalidate_calendar_events_cache()
 
@@ -2122,6 +2255,7 @@ class MainWindow(ctk.CTk):
         }
 
         for slug, attrs in attr_map.items():
+            # Process each (slug, attrs) from attr_map.items().
             wrapper = self.entity_wrappers.get(slug)
             if wrapper is None:
                 wrapper = GenericModelWrapper(slug)
@@ -2152,6 +2286,7 @@ class MainWindow(ctk.CTk):
         unique_candidates = []
         seen = set()
         for candidate in campaign_dir_candidates:
+            # Process each candidate from campaign_dir_candidates.
             candidate_str = str(candidate)
             if candidate_str and candidate_str not in seen:
                 unique_candidates.append(candidate)
@@ -2160,6 +2295,7 @@ class MainWindow(ctk.CTk):
         path_fields = ("Portrait", "portrait", "Image", "image", "TokenImage", "tokenImage", "Token", "token")
 
         for slug, wrapper in self.entity_wrappers.items():
+            # Process each (slug, wrapper) from entity_wrappers.items().
             try:
                 items = wrapper.load_items()
             except Exception as exc:
@@ -2171,15 +2307,18 @@ class MainWindow(ctk.CTk):
 
             updated = False
             for item in items:
+                # Process each item from items.
                 if not isinstance(item, dict):
                     continue
 
                 for field in path_fields:
+                    # Process each field from path_fields.
                     if field not in item:
                         continue
 
                     current_value = item.get(field, "")
                     if field.lower() == "portrait":
+                        # Handle the branch where field.lower() == 'portrait'.
                         portraits = parse_portrait_value(current_value)
                         normalized = []
                         changed = False
@@ -2203,6 +2342,7 @@ class MainWindow(ctk.CTk):
 
             if updated:
                 try:
+                    # Keep entity media paths resilient if this step fails.
                     wrapper.save_items(items)
                     log_info(
                         f"Normalized media paths for entity '{slug}'",
@@ -2229,6 +2369,7 @@ class MainWindow(ctk.CTk):
         changed = normalized != raw
 
         if not self._is_absolute_path(normalized):
+            # Handle the branch where not _is_absolute_path(normalized).
             if normalized.startswith("./"):
                 normalized = normalized[2:]
                 changed = True
@@ -2237,6 +2378,7 @@ class MainWindow(ctk.CTk):
         path_obj = Path(normalized)
 
         for base in base_candidates:
+            # Process each base from base_candidates.
             base_str = str(base).replace("\\", "/").rstrip("/")
             if not base_str:
                 continue
@@ -2259,6 +2401,7 @@ class MainWindow(ctk.CTk):
 
         lowered = normalized.lower()
         for marker in ("/assets/", "/static/", "/images/"):
+            # Process each marker from ('/assets/', '/static/', '/images/').
             idx = lowered.find(marker)
             if idx != -1:
                 rel_path = normalized[idx + 1 :]
@@ -2272,6 +2415,7 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _is_absolute_path(path_value: str) -> bool:
+        """Return whether absolute path."""
         if not path_value:
             return False
 
@@ -2287,6 +2431,7 @@ class MainWindow(ctk.CTk):
         return False
 
     def refresh_entities(self, *_):
+        """Refresh entities."""
         self.entity_definitions = load_entity_definitions()
         self.load_icons()
         self.init_wrappers()
@@ -2295,6 +2440,7 @@ class MainWindow(ctk.CTk):
 
 
     def open_faction_graph_editor(self):
+        """Open faction graph editor."""
         self._graph_type = 'faction'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2319,9 +2465,11 @@ class MainWindow(ctk.CTk):
     # Methods Called by Icon Buttons (Event Handlers)
     # =============================================================
     def clear_current_content(self):
+        """Clear current content."""
         self._teardown_whiteboard_controller()
         # Always clear children of the inner content container
         try:
+            # Keep current content resilient if this step fails.
             for widget in self.inner_content_frame.winfo_children():
                 widget.destroy()
         except Exception:
@@ -2357,10 +2505,12 @@ class MainWindow(ctk.CTk):
         self.current_gm_view = None
 
     def _teardown_whiteboard_controller(self):
+        """Tear down whiteboard controller."""
         controller = getattr(self, "whiteboard_controller", None)
         if controller is None:
             return
         try:
+            # Keep whiteboard controller resilient if this step fails.
             controller.close()
         except Exception:
             log_exception("Error while closing whiteboard", func_name="main_window.MainWindow._teardown_whiteboard_controller")
@@ -2370,6 +2520,7 @@ class MainWindow(ctk.CTk):
     def move_current_view(self):
         """Move the current open view to the correct container based on banner state."""
         if self.current_open_view is not None:
+            # Handle the branch where current open view is available.
             try:
                 self.current_open_view.grid_forget()
             except tk.TclError:
@@ -2382,6 +2533,7 @@ class MainWindow(ctk.CTk):
             self.current_open_view.grid(row=0, column=0, sticky="nsew")
 
     def open_entity(self, entity):
+        """Open entity."""
         self.clear_current_content()
         target_parent = self.get_content_container()
         self.banner_toggle_btn._state="normal"
@@ -2417,6 +2569,7 @@ class MainWindow(ctk.CTk):
         save_btn.pack(side="right", padx=(5,5))
 
     def save_items_to_json(self, view, entity_name):
+        """Save items to JSON."""
         display_label = self.entity_definitions.get(entity_name, {}).get(
             "label", entity_name.replace("_", " ").title()
         )
@@ -2431,11 +2584,14 @@ class MainWindow(ctk.CTk):
 
         items = []
         try:
+            # Keep items to JSON resilient if this step fails.
             with self._busy_operation(f"Saving {display_label}..."):
+                # Keep this resource scoped to items to JSON.
                 try:
                     items = view.get_items()
                 except AttributeError:
                     try:
+                        # Keep items to JSON resilient if this step fails.
                         items = view.items
                     except Exception:
                         wrapper = self.entity_wrappers.get(entity_name) or GenericModelWrapper(entity_name)
@@ -2453,6 +2609,7 @@ class MainWindow(ctk.CTk):
 
 
     def load_items_from_json(self, view, entity_name):
+        """Load items from JSON."""
         display_label = self.entity_definitions.get(entity_name, {}).get(
             "label", entity_name.replace("_", " ").title()
         )
@@ -2464,7 +2621,9 @@ class MainWindow(ctk.CTk):
             return
         items = []
         try:
+            # Keep items from JSON resilient if this step fails.
             with self._busy_operation(f"Loading {display_label}..."):
+                # Keep this resource scoped to items from JSON.
                 with open(file_path, "r", encoding="utf-8") as file:
                     data = json.load(file)
                 items = data.get(entity_name, [])
@@ -2490,6 +2649,7 @@ class MainWindow(ctk.CTk):
         self._auto_open_campaign_overview()
 
     def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
+        """Open GM screen."""
         # 1) Clear any existing content
         self.clear_current_content()
         self._gm_mode = True
@@ -2498,6 +2658,7 @@ class MainWindow(ctk.CTk):
         self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
         scenarios = scenario_wrapper.load_items()
         if not scenarios:
+            # Handle the branch where scenarios is unavailable.
             if show_empty_message:
                 messagebox.showwarning("No Scenarios", "No scenarios available.")
             else:
@@ -2516,6 +2677,7 @@ class MainWindow(ctk.CTk):
 
         # 3) Ensure the PC‐banner is shown and up to date
         if getattr(self, 'banner_frame', None) and self.banner_frame.winfo_exists():
+            # Handle the branch where getattr(self, 'banner_frame', None) and banner_frame.winfo_exists().
             if not self.banner_frame.winfo_ismapped():
                 self.banner_frame.pack(fill='x')
         else:
@@ -2539,10 +2701,12 @@ class MainWindow(ctk.CTk):
         layout_menu.pack(side="left", pady=5)
 
         def _resolve_scenario_title(scenario):
+            """Resolve scenario title."""
             return str((scenario or {}).get("Title") or (scenario or {}).get("Name") or "").strip()
 
         # 5) Callback to open a selected scenario in detail
         def _show_selected_scenario(selected):
+            """Show selected scenario."""
             for w in parent.winfo_children():
                 w.destroy()
             detail_container = ctk.CTkFrame(parent)
@@ -2565,7 +2729,9 @@ class MainWindow(ctk.CTk):
             default_layout = layout_manager.get_scenario_default(view.scenario_name)
             has_saved_layout = bool(resolved_layout or default_layout)
             if not has_saved_layout:
+                # Handle the branch where has saved layout is unavailable.
                 def _open_default_tabs():
+                    """Open default tabs."""
                     scenario_tab = view.tabs.get(view.scenario_name)
                     if not scenario_tab:
                         view.after(50, _open_default_tabs)
@@ -2584,6 +2750,7 @@ class MainWindow(ctk.CTk):
                 view.after_idle(_open_default_tabs)
 
         def on_scenario_select(entity_type, entity_name):
+            """Handle scenario select."""
             selected = next(
                 (s for s in scenarios if _resolve_scenario_title(s) == entity_name),
                 None
@@ -2594,7 +2761,9 @@ class MainWindow(ctk.CTk):
             _show_selected_scenario(selected)
 
         def _finalize_gm_shell():
+            """Internal helper for finalize GM shell."""
             def _safe_update_banner_toggle(**kwargs):
+                """Internal helper for safe update banner toggle."""
                 button = getattr(self, "banner_toggle_btn", None)
                 if button is None:
                     return
@@ -2624,6 +2793,7 @@ class MainWindow(ctk.CTk):
             _safe_update_banner_toggle(text="▲", state="normal")
 
         if scenario_name:
+            # Continue with this path when scenario name is set.
             selected = next((s for s in scenarios if _resolve_scenario_title(s) == str(scenario_name).strip()), None)
             if not selected:
                 messagebox.showwarning("Not Found", f"Scenario '{scenario_name}' not found.")
@@ -2645,6 +2815,7 @@ class MainWindow(ctk.CTk):
         _finalize_gm_shell()
 
     def open_character_graph_editor(self):
+        """Open character graph editor."""
         from modules.characters.character_graph_editor import CharacterGraphEditor
 
         self._graph_type = 'character'
@@ -2672,6 +2843,7 @@ class MainWindow(ctk.CTk):
         self.current_open_entity = None
 
     def open_villain_graph_editor(self):
+        """Open villain graph editor."""
         from modules.characters.character_graph_editor import CharacterGraphEditor
 
         self._graph_type = 'villain'
@@ -2708,6 +2880,7 @@ class MainWindow(ctk.CTk):
         log_info("Opening World Map window", func_name="main_window.MainWindow.open_world_map")
         # If a GM screen is active, open as a tab instead
         try:
+            # Keep world map resilient if this step fails.
             if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
                 self.current_gm_view.open_world_map_tab()
                 return
@@ -2722,6 +2895,7 @@ class MainWindow(ctk.CTk):
             return
 
         try:
+            # Keep world map resilient if this step fails.
             from modules.maps.world_map_view import WorldMapWindow
 
             window = WorldMapWindow(self)
@@ -2738,6 +2912,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open World Map window:\n{exc}")
 
     def open_scenario_graph_editor(self):
+        """Open scenario graph editor."""
         from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 
         self._graph_type = 'scenario'
@@ -2765,15 +2940,18 @@ class MainWindow(ctk.CTk):
         self.current_open_entity = None
 
     def open_scene_flow_viewer(self):
+        """Open scene flow viewer."""
         from modules.scenarios.scene_flow_viewer import SceneFlowViewerWindow
         # If a GM screen is active, open as a tab instead
         try:
+            # Keep scene flow viewer resilient if this step fails.
             if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
                 self.current_gm_view.open_scene_flow_tab()
                 return
         except Exception:
             pass
         if getattr(self, "_scene_flow_window", None) and self._scene_flow_window.winfo_exists():
+            # Handle the branch where getattr(self, '_scene_flow_window', None) and _scene_flow_window.winfo_exists().
             try:
                 self._scene_flow_window.focus()
                 self._scene_flow_window.lift()
@@ -2782,6 +2960,7 @@ class MainWindow(ctk.CTk):
             return
 
         def _on_close():
+            """Handle close."""
             self._scene_flow_window = None
 
         window = SceneFlowViewerWindow(
@@ -2795,7 +2974,9 @@ class MainWindow(ctk.CTk):
         self._scene_flow_window = window
 
     def export_foundry(self):
+        """Export foundry."""
         try:
+            # Keep foundry resilient if this step fails.
             from modules.generic.export_for_foundry import preview_and_export_foundry
 
             preview_and_export_foundry(self)
@@ -2807,6 +2988,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to export for Foundry:\n{exc}")
 
     def _queue_update_check(self, *, force: bool = False):
+        """Internal helper for queue update check."""
         try:
             updates_enabled = ConfigHelper.getboolean("Updates", "enabled", fallback=True)
         except Exception:
@@ -2823,6 +3005,7 @@ class MainWindow(ctk.CTk):
         self._update_thread.start()
 
     def _async_check_for_updates(self, *, force: bool = False):
+        """Internal helper for async check for updates."""
         channel = ConfigHelper.get("Updates", "channel", fallback="stable") or "stable"
         preferred_asset = ConfigHelper.get("Updates", "asset_name", fallback="") or None
         try:
@@ -2834,6 +3017,7 @@ class MainWindow(ctk.CTk):
         last_check_raw = ConfigHelper.get("Updates", "last_check", fallback="") or ""
         if last_check_raw and not force:
             try:
+                # Keep async check for updates resilient if this step fails.
                 last_check_ts = float(last_check_raw)
             except (TypeError, ValueError):
                 last_check_ts = 0.0
@@ -2845,6 +3029,7 @@ class MainWindow(ctk.CTk):
                     )
                     return
         try:
+            # Keep async check for updates resilient if this step fails.
             current_version, candidate = update_helper.check_for_update(
                 channel=channel,
                 preferred_asset=preferred_asset,
@@ -2868,6 +3053,7 @@ class MainWindow(ctk.CTk):
         self.after(0, lambda: self._prompt_update(str(current_version), candidate))
 
     def _prompt_update(self, current_version: str, candidate: update_helper.UpdateCandidate):
+        """Internal helper for prompt update."""
         release_notes = (candidate.release_notes or "").strip()
         if len(release_notes) > 800:
             release_notes = release_notes[:800].rstrip() + "\u2026"
@@ -2886,6 +3072,7 @@ class MainWindow(ctk.CTk):
         self._begin_update_download(candidate)
 
     def _begin_update_download(self, candidate: update_helper.UpdateCandidate):
+        """Internal helper for begin update download."""
         log_info(
             f"Preparing download for update {candidate.version}",
             func_name="main_window.MainWindow._begin_update_download",
@@ -2899,6 +3086,7 @@ class MainWindow(ctk.CTk):
         preserve = ["Campaigns", "config/config.ini"]
 
         def worker(progress_cb):
+            """Handle worker."""
             stage_root, payload_root = update_helper.prepare_staging_area(
                 candidate,
                 progress_callback=progress_cb,
@@ -2914,6 +3102,7 @@ class MainWindow(ctk.CTk):
             return {"installer_pid": getattr(process, "pid", None)}
 
         def detail_builder(result):
+            """Handle detail builder."""
             pid = result.get("installer_pid") if isinstance(result, dict) else None
             detail = (
                 "An installer helper is waiting for GMCampaignDesigner to close before copying the new files."
@@ -2931,6 +3120,7 @@ class MainWindow(ctk.CTk):
         )
 
     def _run_progress_task(self, title, worker, success_message, detail_builder=None):
+        """Run progress task."""
         progress_win = ctk.CTkToplevel(self)
         progress_win.title(title)
         progress_win.geometry("420x180")
@@ -2948,7 +3138,9 @@ class MainWindow(ctk.CTk):
         progress_bar.set(0.0)
 
         def update(message: str, fraction: float) -> None:
+            """Update the operation."""
             def _apply():
+                """Apply the operation."""
                 progress_label.configure(text=message)
                 try:
                     progress_bar.set(max(0.0, min(1.0, float(fraction))))
@@ -2958,7 +3150,9 @@ class MainWindow(ctk.CTk):
             self.after(0, _apply)
 
         def close_window():
+            """Close window."""
             if progress_win.winfo_exists():
+                # Handle the branch where progress_win.winfo_exists().
                 try:
                     progress_win.grab_release()
                 except Exception:
@@ -2966,10 +3160,12 @@ class MainWindow(ctk.CTk):
                 progress_win.destroy()
 
         def handle_error(title: str, detail: str) -> None:
+            """Handle handle error."""
             close_window()
             messagebox.showerror(title, detail)
 
         def on_success(result):
+            """Handle success."""
             close_window()
             detail = detail_builder(result) if detail_builder else None
             message = success_message or "Operation completed."
@@ -2978,7 +3174,9 @@ class MainWindow(ctk.CTk):
             messagebox.showinfo("Success", message)
 
         def run_worker():
+            """Run worker."""
             try:
+                # Keep worker resilient if this step fails.
                 result = worker(update)
             except PermissionError as exc:
                 detail = str(exc)
@@ -3006,6 +3204,7 @@ class MainWindow(ctk.CTk):
         threading.Thread(target=run_worker, daemon=True).start()
 
     def _format_backup_summary(self, manifest: dict | None, *, include_target: bool) -> str:
+        """Format backup summary."""
         if not manifest:
             return ""
 
@@ -3023,6 +3222,7 @@ class MainWindow(ctk.CTk):
             lines.append(f"Archive: {archive_path}")
 
         if include_target:
+            # Continue with this path when include target is set.
             target = manifest.get("restored_to")
             if target:
                 lines.append(f"Restored to: {target}")
@@ -3038,6 +3238,7 @@ class MainWindow(ctk.CTk):
         return "\n".join(lines)
 
     def prompt_campaign_backup(self):
+        """Handle prompt campaign backup."""
         campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve()
         if not campaign_dir.exists():
             messagebox.showerror(
@@ -3079,11 +3280,13 @@ class MainWindow(ctk.CTk):
 
     @staticmethod
     def _sanitize_campaign_name(name: str) -> str:
+        """Internal helper for sanitize campaign name."""
         safe = "".join(ch for ch in name.strip() if ch.isalnum() or ch in ("_", "-", " "))
         safe = safe.strip().replace(" ", "_")
         return safe
 
     def prompt_campaign_restore(self):
+        """Handle prompt campaign restore."""
         campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve()
         if campaign_dir.exists():
             initial_dir = campaign_dir
@@ -3111,6 +3314,7 @@ class MainWindow(ctk.CTk):
 
         default_name = manifest.get("campaign_name") or ""
         if not default_name:
+            # Handle the branch where default name is unavailable.
             db_path = manifest.get("database_path")
             if isinstance(db_path, str) and db_path:
                 default_name = Path(db_path).stem
@@ -3120,6 +3324,7 @@ class MainWindow(ctk.CTk):
         base_dir = campaign_dir.parent if campaign_dir.parent != campaign_dir else campaign_dir
 
         while True:
+            # Keep looping while True.
             new_name = simpledialog.askstring(
                 "Restore Campaign",
                 "Enter a name for the restored campaign:",
@@ -3156,6 +3361,7 @@ class MainWindow(ctk.CTk):
         new_db_path = destination_dir / db_filename
 
         def detail_builder(manifest_data: dict | None) -> str:
+            """Handle detail builder."""
             if manifest_data:
                 ConfigHelper.set("Database", "path", str(new_db_path))
             return self._format_backup_summary(manifest_data, include_target=True)
@@ -3174,13 +3380,16 @@ class MainWindow(ctk.CTk):
         )
 
     def open_scenario_importer(self):
+        """Open scenario importer."""
         self.clear_current_content()
         container = ctk.CTkFrame(self.content_frame)
         container.grid(row=0, column=0, sticky="nsew")
         ScenarioImportWindow(container)
 
     def _on_scenario_built(self):
+        """Handle scenario built."""
         try:
+            # Keep on scenario built resilient if this step fails.
             if self.current_open_entity == "scenarios" and self.current_open_view is not None:
                 for child in self.current_open_view.winfo_children():
                     if isinstance(child, GenericListView):
@@ -3193,6 +3402,7 @@ class MainWindow(ctk.CTk):
             )
 
     def open_creature_importer(self):
+        """Open creature importer."""
         from modules.creatures.creature_importer import CreatureImportWindow
 
         self.clear_current_content()
@@ -3201,12 +3411,14 @@ class MainWindow(ctk.CTk):
         CreatureImportWindow(container)
 
     def open_object_importer(self):
+        """Open object importer."""
         self.clear_current_content()
         container = ctk.CTkFrame(self.content_frame)
         container.grid(row=0, column=0, sticky="nsew")
         ObjectImportWindow(container)
 
     def open_scenario_generator(self):
+        """Open scenario generator."""
         self.clear_current_content()
         parent = self.get_content_container()
         container = ScenarioGeneratorView(parent)
@@ -3217,7 +3429,9 @@ class MainWindow(ctk.CTk):
         self.current_open_entity = None
 
     def open_scenario_builder(self):
+        """Open scenario builder."""
         try:
+            # Keep scenario builder resilient if this step fails.
             from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
 
             wizard = ScenarioBuilderWizard(self, on_saved=self._on_scenario_built)
@@ -3231,7 +3445,9 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
 
     def open_campaign_builder(self):
+        """Open campaign builder."""
         try:
+            # Keep campaign builder resilient if this step fails.
             from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
 
             campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
@@ -3260,6 +3476,7 @@ class MainWindow(ctk.CTk):
         built = content_factory(container)
         if built is not None and built is not container:
             try:
+                # Keep hidden main content resilient if this step fails.
                 if not built.winfo_manager():
                     built.pack(fill="both", expand=True)
             except Exception:
@@ -3269,7 +3486,9 @@ class MainWindow(ctk.CTk):
         return container
 
     def open_campaign_graph_view(self):
+        """Open campaign graph view."""
         try:
+            # Keep campaign graph view resilient if this step fails.
             campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
             self.entity_wrappers.setdefault("campaigns", campaign_wrapper)
 
@@ -3305,6 +3524,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Campaign Graph view:\n{exc}")
 
     def open_character_creation(self):
+        """Open character creation."""
         self.clear_current_content()
         parent = self.get_content_container()
         container = ctk.CTkFrame(parent)
@@ -3316,7 +3536,9 @@ class MainWindow(ctk.CTk):
         self.current_open_entity = None
 
     def open_random_table_editor(self):
+        """Open random table editor."""
         try:
+            # Keep random table editor resilient if this step fails.
             dialog = RandomTableEditorDialog(self)
             dialog.grab_set()
             dialog.focus_force()
@@ -3328,6 +3550,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Random Tables", f"Unable to open editor:\n{exc}")
 
     def change_database_storage(self):
+        """Handle change database storage."""
         current_path = ConfigHelper.get("Database", "path", fallback="") or None
 
         if self._database_manager_dialog is not None:
@@ -3339,10 +3562,12 @@ class MainWindow(ctk.CTk):
                 self._database_manager_dialog = None
 
         def _on_selected(path: str, is_new: bool) -> None:
+            """Handle selected."""
             self._database_manager_dialog = None
             self._apply_database_selection(path, is_new)
 
         def _on_cancelled() -> None:
+            """Handle cancelled."""
             self._database_manager_dialog = None
 
         dialog = DatabaseManagerDialog(
@@ -3354,6 +3579,7 @@ class MainWindow(ctk.CTk):
         self._database_manager_dialog = dialog
 
     def _apply_database_selection(self, new_db_path: str, is_new_db: bool) -> None:
+        """Apply database selection."""
         if not new_db_path:
             return
 
@@ -3381,6 +3607,7 @@ class MainWindow(ctk.CTk):
         self._reload_active_campaign_system()
 
         with sqlite3.connect(normalized_path) as conn:
+            # Keep this resource scoped to database selection.
             for entity in load_entity_definitions().keys():
                 ensure_entity_schema(entity)
             ensure_campaign_support_tables(conn)
@@ -3393,6 +3620,7 @@ class MainWindow(ctk.CTk):
             db_name_label.configure(text=db_name)
 
         try:
+            # Keep database selection resilient if this step fails.
             full_path = os.path.abspath(normalized_path)
             if db_name_label is not None and db_name_label.winfo_exists():
                 if getattr(self, "db_tooltip", None) is None:
@@ -3405,12 +3633,14 @@ class MainWindow(ctk.CTk):
             self.db_tooltip = None
 
     def select_swarmui_path(self):
+        """Select swarmui path."""
         folder = filedialog.askdirectory(title="Select SwarmUI Path")
         if folder:
             ConfigHelper.set("Paths", "swarmui_path", folder)
             messagebox.showinfo("SwarmUI Path Set", f"SwarmUI path set to:\n{folder}")
 
     def launch_swarmui(self):
+        """Launch swarmui."""
         global SWARMUI_PROCESS
         swarmui_path = ConfigHelper.get("Paths", "swarmui_path", fallback=r"E:\SwarmUI\SwarmUI")
         SWARMUI_CMD = os.path.join(swarmui_path, "launch-windows.bat")
@@ -3418,6 +3648,7 @@ class MainWindow(ctk.CTk):
         env.pop('VIRTUAL_ENV', None)
         if SWARMUI_PROCESS is None or SWARMUI_PROCESS.poll() is not None:
             try:
+                # Keep swarmui resilient if this step fails.
                 SWARMUI_PROCESS = subprocess.Popen(
                     SWARMUI_CMD,
                     shell=True,
@@ -3429,6 +3660,7 @@ class MainWindow(ctk.CTk):
                 messagebox.showerror("Error", f"Failed to launch SwarmUI: {e}")
 
     def cleanup_swarmui(self):
+        """Handle cleanup swarmui."""
         global SWARMUI_PROCESS
         if SWARMUI_PROCESS is not None and SWARMUI_PROCESS.poll() is None:
             SWARMUI_PROCESS.terminate()
@@ -3437,6 +3669,7 @@ class MainWindow(ctk.CTk):
     # Unified Generate Portraits for NPCs and Creatures
     # ------------------------------------------------------
     def generate_missing_portraits(self):
+        """Handle generate missing portraits."""
         top = ctk.CTkToplevel(self)
         top.title("Generate Portraits")
         top.geometry("300x150")
@@ -3448,6 +3681,7 @@ class MainWindow(ctk.CTk):
         ctk.CTkRadioButton(top, text="NPCs", variable=selection, value="NPC").pack(pady=5)
         ctk.CTkRadioButton(top, text="Creatures", variable=selection, value="Creature").pack(pady=5)
         def on_confirm():
+            """Handle confirm."""
             choice = selection.get()
             top.destroy()
             if choice == "NPC":
@@ -3457,7 +3691,9 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(top, text="Continue", command=on_confirm).pack(pady=10)
 
     def generate_missing_npc_portraits(self):
+        """Handle generate missing NPC portraits."""
         def confirm_model_and_continue():
+            """Handle confirm model and continue."""
             ConfigHelper.set("LastUsed", "model", self.selected_model.get())
             top.destroy()
             self.generate_portraits_continue_npcs()
@@ -3477,6 +3713,7 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(top, text="Continue", command=confirm_model_and_continue).pack(pady=10)
 
     def generate_portraits_continue_npcs(self):
+        """Handle generate portraits continue NPCs."""
         db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -3485,8 +3722,10 @@ class MainWindow(ctk.CTk):
         npc_rows = cursor.fetchall()
         modified = False
         for npc in npc_rows:
+            # Process each npc from npc_rows.
             portrait = npc["Portrait"] if npc["Portrait"] is not None else ""
             if not portrait.strip():
+                # Handle the branch where not portrait.strip().
                 npc_dict = dict(npc)
                 self.generate_portrait_for_npc(npc_dict)
                 if npc_dict.get("Portrait"):
@@ -3500,7 +3739,9 @@ class MainWindow(ctk.CTk):
         conn.close()
 
     def generate_missing_creature_portraits(self):
+        """Handle generate missing creature portraits."""
         def confirm_model_and_continue():
+            """Handle confirm model and continue."""
             ConfigHelper.set("LastUsed", "model", self.selected_model.get())
             top.destroy()
             self.generate_portraits_continue_creatures()
@@ -3519,6 +3760,7 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(top, text="Continue", command=confirm_model_and_continue).pack(pady=10)
 
     def generate_portraits_continue_creatures(self):
+        """Handle generate portraits continue creatures."""
         db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -3527,8 +3769,10 @@ class MainWindow(ctk.CTk):
         creature_rows = cursor.fetchall()
         modified = False
         for creature in creature_rows:
+            # Process each creature from creature_rows.
             portrait = creature["Portrait"] if creature["Portrait"] is not None else ""
             if not portrait.strip():
+                # Handle the branch where not portrait.strip().
                 creature_dict = dict(creature)
                 self.generate_portrait_for_creature(creature_dict)
                 if creature_dict.get("Portrait"):
@@ -3542,11 +3786,13 @@ class MainWindow(ctk.CTk):
         conn.close()
 
     def generate_portrait_for_npc(self, npc):
+        """Handle generate portrait for NPC."""
         import requests
 
         self.launch_swarmui()
         SWARM_API_URL = "http://127.0.0.1:7801"
         try:
+            # Keep generate portrait for NPC resilient if this step fails.
             session_url = f"{SWARM_API_URL}/API/GetNewSession"
             session_response = requests.post(session_url, json={}, headers={"Content-Type": "application/json"})
             session_data = session_response.json()
@@ -3599,11 +3845,13 @@ class MainWindow(ctk.CTk):
             print(f"Error generating portrait for NPC '{npc.get('Name', 'Unknown')}': {e}")
 
     def generate_portrait_for_creature(self, creature):
+        """Handle generate portrait for creature."""
         import requests
 
         self.launch_swarmui()
         SWARM_API_URL = "http://127.0.0.1:7801"
         try:
+            # Keep generate portrait for creature resilient if this step fails.
             session_url = f"{SWARM_API_URL}/API/GetNewSession"
             session_response = requests.post(session_url, json={}, headers={"Content-Type": "application/json"})
             session_data = session_response.json()
@@ -3655,6 +3903,7 @@ class MainWindow(ctk.CTk):
             print(f"Error generating portrait for Creature '{creature.get('Name', 'Unknown')}': {e}")
 
     def copy_and_resize_portrait(self, entity, src_path):
+        """Copy and resize portrait."""
         campaign_dir = ConfigHelper.get_campaign_dir()
         PORTRAIT_FOLDER = os.path.join(campaign_dir, "assets", "portraits")
         MAX_PORTRAIT_SIZE = (1024, 1024)
@@ -3681,6 +3930,7 @@ class MainWindow(ctk.CTk):
         self.portrait_importer.import_portraits_from_directory()
 
     def preview_and_export_scenarios(self):
+        """Handle preview and export scenarios."""
         scenario_wrapper = GenericModelWrapper("scenarios")
         scenario_items = scenario_wrapper.load_items()
         if not scenario_items:
@@ -3713,6 +3963,7 @@ class MainWindow(ctk.CTk):
         layout_menu.set(default_label)
         layout_menu.pack(side="right", fill="x", expand=True, padx=(8, 0))
         def export_selected():
+            """Export selected."""
             selected_indices = listbox.curselection()
             if not selected_indices:
                 messagebox.showwarning("No Selection", "Please select at least one scenario to export.")
@@ -3723,6 +3974,7 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(selection_window, text="Export Selected", command=export_selected).pack(pady=5)
 
     def preview_and_save(self, selected_scenarios, layout_key=DEFAULT_LAYOUT_KEY):
+        """Handle preview and save."""
         creature_items = {creature["Name"]: creature for creature in self.creature_wrapper.load_items()}
         place_items = {place["Name"]: place for place in self.place_wrapper.load_items()}
         npc_items = {npc["Name"]: npc for npc in self.npc_wrapper.load_items()}
@@ -3737,6 +3989,7 @@ class MainWindow(ctk.CTk):
             return
 
         try:
+            # Keep preview and save resilient if this step fails.
             from docx import Document
 
             doc = Document()
@@ -3751,6 +4004,7 @@ class MainWindow(ctk.CTk):
         preset = apply_layout(doc, layout_key)
         doc.add_heading("Campaign Scenarios", level=1)
         for scenario in selected_scenarios:
+            # Process each scenario from selected_scenarios.
             title = scenario.get("Title", "Unnamed Scenario")
             summary = scenario.get("Summary", "No description provided.")
             secrets = scenario.get("Secrets", "No secrets provided.")
@@ -3773,8 +4027,10 @@ class MainWindow(ctk.CTk):
                 doc.add_paragraph(str(secrets))
             scenes = scenario.get("Scenes") or []
             if scenes:
+                # Continue with this path when scenes is set.
                 doc.add_heading("Scenes", level=3)
                 for scene in scenes:
+                    # Process each scene from scenes.
                     scene_title = ""
                     text_payload = scene
                     links_payload = []
@@ -3799,6 +4055,7 @@ class MainWindow(ctk.CTk):
             # Places Section
             doc.add_heading("Places", level=3)
             for place_name in scenario.get("Places", []):
+                # Process each place_name from scenario.get('Places', []).
                 place = place_items.get(place_name, {"Name": place_name, "Description": "Unknown Place"})
                 if isinstance(place["Description"], dict):
                     description_text = place["Description"].get("text", "Unknown Place")
@@ -3809,6 +4066,7 @@ class MainWindow(ctk.CTk):
             # NPCs Section
             doc.add_heading("NPCs", level=3)
             for npc_name in scenario.get("NPCs", []):
+                # Process each npc_name from scenario.get('NPCs', []).
                 npc = npc_items.get(npc_name, {"Name": npc_name, "Role": "Unknown",
                                                 "Description": {"text": "Unknown NPC", "formatting": {}}})
                 p = doc.add_paragraph(f"- {npc['Name']} ({npc['Role']}, {npc.get('Faction', 'Unknown')}): ")
@@ -3822,8 +4080,10 @@ class MainWindow(ctk.CTk):
             # Villains Section
             villains = scenario.get("Villains", []) or []
             if villains:
+                # Continue with this path when villains is set.
                 doc.add_heading("Villains", level=3)
                 for villain_name in villains:
+                    # Process each villain_name from villains.
                     villain = villain_items.get(villain_name, {
                         "Name": villain_name,
                         "Title": "",
@@ -3842,6 +4102,7 @@ class MainWindow(ctk.CTk):
             # Creatures Section
             doc.add_heading("Creatures", level=3)
             for creature_name in scenario.get("Creatures", []):
+                # Process each creature_name from scenario.get('Creatures', []).
                 creature = creature_items.get(creature_name, {
                     "Name": creature_name,
                     "Stats": {"text": "No Stats", "formatting": {}},
@@ -3869,7 +4130,9 @@ class MainWindow(ctk.CTk):
         messagebox.showinfo("Export Successful", f"Scenario exported successfully to:\n{file_path}")
 
     def open_campaign_dossier_exporter(self):
+        """Open campaign dossier exporter."""
         try:
+            # Keep campaign dossier exporter resilient if this step fails.
             from modules.exports.campaign_dossier.dialog import (
                 open_campaign_dossier_exporter as open_campaign_dossier_exporter_dialog,
             )
@@ -3883,6 +4146,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open campaign dossier exporter:\n{exc}")
 
     def apply_formatting(self, run, formatting):
+        """Apply formatting."""
         if formatting.get('bold'):
             run.bold = True
         if formatting.get('italic'):
@@ -3891,6 +4155,7 @@ class MainWindow(ctk.CTk):
             run.underline = True
 
     def normalize_name(self, name):
+        """Normalize name."""
         if name is None:
             return ""
         text = unicodedata.normalize("NFKD", str(name))
@@ -3900,6 +4165,7 @@ class MainWindow(ctk.CTk):
         return " ".join(text.split())
 
     def build_portrait_mapping(self):
+        """Build portrait mapping."""
         mapping = {}
         campaign_dir = ConfigHelper.get_campaign_dir()
         dir_txt_path = os.path.join(campaign_dir, "assets", "portraits", "dir.txt")
@@ -3908,6 +4174,7 @@ class MainWindow(ctk.CTk):
             return mapping
         with open(dir_txt_path, "r", encoding="cp1252") as f:
             for line in f:
+                # Process each line from f.
                 line = line.strip()
                 if not line.lower().endswith(".png"):
                     continue
@@ -3919,6 +4186,7 @@ class MainWindow(ctk.CTk):
                 parts = base_name.split("_")
                 filtered_parts = []
                 for part in parts:
+                    # Process each part from parts.
                     if part.lower() == "portrait" or part.isdigit():
                         continue
                     filtered_parts.append(part)
@@ -3929,6 +4197,7 @@ class MainWindow(ctk.CTk):
         return mapping
 
     def associate_npc_portraits(self):
+        """Handle associate NPC portraits."""
         portrait_mapping = self.build_portrait_mapping()
         if not portrait_mapping:
             print("No portrait mapping was built.")
@@ -3941,9 +4210,11 @@ class MainWindow(ctk.CTk):
         npc_rows = cursor.fetchall()
         modified = False
         for npc in npc_rows:
+            # Process each npc from npc_rows.
             npc_name = npc["Name"].strip()
             normalized_npc = self.normalize_name(npc_name)
             if normalized_npc in portrait_mapping:
+                # Handle the branch where normalized NPC is in portrait mapping.
                 portrait_file = portrait_mapping[normalized_npc]
                 if not npc["Portrait"] or npc["Portrait"].strip() == "":
                     campaign_dir = ConfigHelper.get_campaign_dir()
@@ -3966,11 +4237,13 @@ class MainWindow(ctk.CTk):
 
 
     def open_audio_bar(self):
+        """Open audio bar."""
         try:
             window = self.audio_bar_window
         except AttributeError:
             window = None
         try:
+            # Keep audio bar resilient if this step fails.
             if window is None or not window.winfo_exists():
                 from modules.audio.audio_bar_window import AudioBarWindow
 
@@ -3982,20 +4255,25 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Audio Controls Bar:\n{exc}")
 
     def _on_audio_bar_destroyed(self, event=None):
+        """Handle audio bar destroyed."""
         if event is None or event.widget is self.audio_bar_window:
+            # Handle the branch where event is missing or event.widget is audio_bar_window.
             self.audio_bar_window = None
             try:
+                # Keep on audio bar destroyed resilient if this step fails.
                 if self.dice_bar_window and self.dice_bar_window.winfo_exists():
                     self.dice_bar_window._apply_geometry()
             except Exception:
                 pass
 
     def open_dice_bar(self):
+        """Open dice bar."""
         try:
             window = self.dice_bar_window
         except AttributeError:
             window = None
         try:
+            # Keep dice bar resilient if this step fails.
             if window is None or not window.winfo_exists():
                 self.dice_bar_window = DiceBarWindow(self)
                 self.dice_bar_window.bind("<Destroy>", self._on_dice_bar_destroyed)
@@ -4005,6 +4283,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Dice Bar:\n{exc}")
 
     def _on_dice_bar_destroyed(self, event=None):
+        """Handle dice bar destroyed."""
         if event is None:
             self.dice_bar_window = None
             return
@@ -4023,6 +4302,7 @@ class MainWindow(ctk.CTk):
             )
 
         try:
+            # Keep on system changed resilient if this step fails.
             window = getattr(self, "dice_bar_window", None)
             if window is not None and window.winfo_exists():
                 window.refresh_system_settings()
@@ -4033,6 +4313,7 @@ class MainWindow(ctk.CTk):
             )
 
         try:
+            # Keep on system changed resilient if this step fails.
             roller = getattr(self, "dice_roller_window", None)
             if roller is not None and roller.winfo_exists():
                 roller.refresh_system_settings()
@@ -4061,6 +4342,7 @@ class MainWindow(ctk.CTk):
             )
         # Apply campaign-specific theme when DB changes
         try:
+            # Keep reload active campaign system resilient if this step fails.
             from modules.helpers import theme_manager
             theme_key = theme_manager.get_theme()
             theme_manager.apply_theme(theme_key)
@@ -4069,9 +4351,11 @@ class MainWindow(ctk.CTk):
             pass
 
     def destroy(self) -> None:
+        """Handle destroy."""
         listener = getattr(self, "_system_listener_unsub", None)
         if callable(listener):
             try:
+                # Keep destroy resilient if this step fails.
                 listener()
             except Exception as exc:
                 log_warning(
@@ -4083,11 +4367,13 @@ class MainWindow(ctk.CTk):
         super().destroy()
 
     def open_sound_manager(self):
+        """Open sound manager."""
         try:
             window = self.sound_manager_window
         except AttributeError:
             window = None
         try:
+            # Keep sound manager resilient if this step fails.
             if window is None or not window.winfo_exists():
                 from modules.audio.sound_manager_window import SoundManagerWindow
 
@@ -4099,6 +4385,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Sound & Music Manager:\n{exc}")
 
     def _on_sound_manager_destroyed(self, event=None):
+        """Handle sound manager destroyed."""
         if event is None:
             self.sound_manager_window = None
             return
@@ -4106,7 +4393,9 @@ class MainWindow(ctk.CTk):
             self.sound_manager_window = None
 
     def open_dice_roller(self):
+        """Open dice roller."""
         try:
+            # Keep dice roller resilient if this step fails.
             window = self.dice_roller_window
             if window is None or not window.winfo_exists():
                 self.dice_roller_window = DiceRollerWindow(self)
@@ -4116,6 +4405,7 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Dice Roller:\n{exc}")
 
     def _on_dice_window_destroyed(self, event=None):
+        """Handle dice window destroyed."""
         if event is None:
             self.dice_roller_window = None
             return
@@ -4123,7 +4413,9 @@ class MainWindow(ctk.CTk):
             self.dice_roller_window = None
 
     def open_timer_window(self):
+        """Open timer window."""
         try:
+            # Keep timer window resilient if this step fails.
             window = self.timer_window
             if window is None:
                 from modules.timer.ui.timer_window import TimerWindow
@@ -4140,12 +4432,15 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Session Timers:\n{exc}")
 
     def _on_timer_window_destroyed(self, event=None):
+        """Handle timer window destroyed."""
         if event is None or event.widget is self.timer_window:
             self.timer_window = None
 
     def open_whiteboard(self):
+        """Open whiteboard."""
         log_info("Opening Whiteboard", func_name="main_window.MainWindow.open_whiteboard")
         try:
+            # Keep whiteboard resilient if this step fails.
             self.clear_current_content()
             parent = self.get_content_container()
 
@@ -4162,6 +4457,7 @@ class MainWindow(ctk.CTk):
             self.whiteboard_controller = WhiteboardController(board_frame, root_app=self)
 
             def _on_destroy(_event=None):
+                """Handle destroy."""
                 self._teardown_whiteboard_controller()
 
             container.bind("<Destroy>", _on_destroy)
@@ -4175,12 +4471,14 @@ class MainWindow(ctk.CTk):
             messagebox.showerror("Error", f"Failed to open Whiteboard:\n{exc}")
 
     def map_tool(self, map_name=None):
+        """Map tool."""
         log_info(
             f"Opening Map Tool (map={map_name})",
             func_name="main_window.MainWindow.map_tool",
         )
         # If a GM screen is active, open as a tab instead
         try:
+            # Keep tool resilient if this step fails.
             if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
                 self.current_gm_view.open_map_tool_tab(map_name)
                 return
@@ -4189,6 +4487,7 @@ class MainWindow(ctk.CTk):
 
         existing = getattr(self, "_map_tool_window", None)
         if existing is not None and existing.winfo_exists():
+            # Handle the branch where existing is available and existing.winfo_exists().
             existing.lift()
             existing.focus_force()
             existing.attributes("-topmost", True)
@@ -4200,6 +4499,7 @@ class MainWindow(ctk.CTk):
             return
 
         try:
+            # Keep tool resilient if this step fails.
             maps_wrapper = GenericModelWrapper("maps")
 
             top = ctk.CTkToplevel(self)
@@ -4226,7 +4526,9 @@ class MainWindow(ctk.CTk):
                 self.map_controller.open_map_by_name(map_name)
 
             def _on_close():
+                """Handle close."""
                 try:
+                    # Keep on close resilient if this step fails.
                     controller = getattr(self, "map_controller", None)
                     if controller is not None:
                         controller.close_web_display()

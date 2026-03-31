@@ -1,3 +1,5 @@
+"""Dialog for handouts newsletter."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -30,6 +32,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         scenario_title: str,
         on_generate: Callable[[Dict[str, object]], None] | None = None,
     ) -> None:
+        """Initialize the NewsletterConfigDialog instance."""
         super().__init__(parent)
         self.title("Newsletter - Settings")
         self.geometry("520x780")
@@ -52,10 +55,12 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         position_window_at_top(self)
 
     def _load_pcs(self) -> None:
+        """Load PCs."""
         wrapper = GenericModelWrapper("pcs")
         pcs = wrapper.load_items()
         summaries: List[Dict[str, str]] = []
         for pc in pcs or []:
+            # Process each pc from pcs or [].
             name = str(pc.get("Name") or "").strip()
             if not name:
                 continue
@@ -63,6 +68,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self._pc_summaries = sorted(summaries, key=lambda item: item["name"].lower())
 
     def _build_ui(self) -> None:
+        """Build UI."""
         header = ctk.CTkLabel(
             self,
             text=f"Newsletter: {self._scenario_title}",
@@ -139,6 +145,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         ai_checkbox.pack(anchor="w", padx=10, pady=8)
 
         if self._pc_summaries:
+            # Continue with this path when PC summaries is set.
             pc_frame = ctk.CTkFrame(self)
             pc_frame.pack(fill="both", expand=False, padx=20, pady=(5, 10))
             pc_label = ctk.CTkLabel(
@@ -180,6 +187,7 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         cancel_button.grid(row=0, column=1, padx=8, sticky="ew")
 
     def _handle_generate(self) -> None:
+        """Internal helper for handle generate."""
         sections = [
             key for key, var in self._section_vars.items() if var.get()
         ]
@@ -213,21 +221,25 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _handle_cancel(self) -> None:
+        """Internal helper for handle cancel."""
         self.destroy()
 
     def _schedule_safe_destroy(self) -> None:  # pragma: no cover - UI teardown
+        """Schedule safe destroy."""
         if self._destroy_scheduled:
             return
 
         self._destroy_scheduled = True
 
         try:
+            # Keep safe destroy resilient if this step fails.
             if self.winfo_exists():
                 self.withdraw()
         except Exception:
             pass
 
         def _finalize() -> None:
+            """Internal helper for finalize."""
             try:
                 super(NewsletterConfigDialog, self).destroy()
             except Exception:
@@ -239,10 +251,13 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
             _finalize()
 
     def destroy(self) -> None:  # pragma: no cover - UI teardown
+        """Handle destroy."""
         self._schedule_safe_destroy()
 
     def focus_set(self) -> None:  # pragma: no cover - UI focus handling
+        """Handle focus set."""
         try:
+            # Keep focus set resilient if this step fails.
             if not self.winfo_exists():
                 return
         except Exception:
@@ -254,7 +269,9 @@ class NewsletterConfigDialog(ctk.CTkToplevel):
             pass
 
     def focus_force(self) -> None:  # pragma: no cover - UI focus handling
+        """Handle focus force."""
         try:
+            # Keep focus force resilient if this step fails.
             if not self.winfo_exists():
                 return
         except Exception:

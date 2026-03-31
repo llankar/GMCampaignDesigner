@@ -1,3 +1,5 @@
+"""Regression tests for story forge orchestrator."""
+
 from modules.ai.story_forge.contracts import StoryForgeRequest
 from modules.ai.story_forge.orchestrator import StoryForgeOrchestrator
 from modules.core.ai import (
@@ -11,19 +13,23 @@ from modules.core.ai import (
 
 class _FakeAIClient:
     def __init__(self, responses):
+        """Initialize the _FakeAIClient instance."""
         self._responses = list(responses)
 
     def chat(self, _messages):
+        """Handle chat."""
         return self._responses.pop(0)
 
 
 
 def _request() -> StoryForgeRequest:
+    """Internal helper for request."""
     return StoryForgeRequest(brief="A broken city and a silent witness")
 
 
 
 def test_story_forge_orchestrator_emits_pipeline_events(monkeypatch):
+    """Verify that story forge orchestrator emits pipeline events."""
     from modules.ai.story_forge import orchestrator as orchestrator_module
 
     monkeypatch.setattr(orchestrator_module, "build_rewrite_options_prompt", lambda _r: "rewrite")
@@ -52,6 +58,7 @@ def test_story_forge_orchestrator_emits_pipeline_events(monkeypatch):
     events = []
     unsubscribe = ai_pipeline_events.subscribe("*", events.append)
     try:
+        # Keep test story forge orchestrator emits pipeline events resilient if this step fails.
         orchestrator = StoryForgeOrchestrator(ai_client=_FakeAIClient([{"options": []}, {"entities": {}}, {}]))
         response = orchestrator.run(_request(), request_id="req-story-forge-1")
     finally:
@@ -75,6 +82,7 @@ def test_story_forge_orchestrator_emits_pipeline_events(monkeypatch):
 
 
 def test_story_forge_orchestrator_emits_failed_event_on_error(monkeypatch):
+    """Verify that story forge orchestrator emits failed event on error."""
     from modules.ai.story_forge import orchestrator as orchestrator_module
 
     monkeypatch.setattr(orchestrator_module, "build_rewrite_options_prompt", lambda _r: "rewrite")
@@ -82,6 +90,7 @@ def test_story_forge_orchestrator_emits_failed_event_on_error(monkeypatch):
     events = []
     unsubscribe = ai_pipeline_events.subscribe("*", events.append)
     try:
+        # Keep test story forge orchestrator emits failed event on error resilient if this step fails.
         orchestrator = StoryForgeOrchestrator(ai_client=_FakeAIClient([]))
         try:
             orchestrator.run(_request(), request_id="req-story-forge-fail")

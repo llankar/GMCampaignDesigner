@@ -1,3 +1,5 @@
+"""Regression tests for campaign forge preview mapping."""
+
 from __future__ import annotations
 
 from modules.campaigns.ui.campaign_forge_preview.models import CampaignForgeScenarioPreview
@@ -6,13 +8,16 @@ from modules.campaigns.ui.campaign_forge_preview_dialog import CampaignForgePrev
 
 class _FakeVar:
     def __init__(self, value):
+        """Initialize the _FakeVar instance."""
         self.value = value
 
     def get(self):
+        """Return the operation."""
         return self.value
 
 
 def test_build_arc_previews_maps_metadata_and_scenario_warnings():
+    """Verify that build arc previews maps metadata and scenario warnings."""
     dialog = CampaignForgePreviewDialog.__new__(CampaignForgePreviewDialog)
     dialog._validation = type(
         "Validation",
@@ -54,6 +59,7 @@ def test_build_arc_previews_maps_metadata_and_scenario_warnings():
 
 
 def test_accept_supports_partial_selection_from_preview_dialog():
+    """Verify that accept supports partial selection from preview dialog."""
     dialog = CampaignForgePreviewDialog.__new__(CampaignForgePreviewDialog)
     dialog._generated_payload = {
         "arcs": [

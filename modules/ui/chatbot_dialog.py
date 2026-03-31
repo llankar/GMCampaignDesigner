@@ -39,9 +39,11 @@ class RichTextValue:
     formatting: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
 
     def has_content(self) -> bool:
+        """Return whether content."""
         return bool(self.text and self.text.strip())
 
     def cleaned(self) -> "RichTextValue":
+        """Handle cleaned."""
         if not self.text:
             return self
         stripped = self.text.rstrip()
@@ -53,8 +55,10 @@ class RichTextValue:
         adjusted: dict[str, list[tuple[int, int]]] = {}
         end_limit = len(stripped)
         for tag, ranges in self.formatting.items():
+            # Process each (tag, ranges) from formatting.items().
             clipped: list[tuple[int, int]] = []
             for start, end in ranges:
+                # Process each (start, end) from ranges.
                 if end <= 0 or start >= end_limit:
                     continue
                 clipped.append((max(0, start), min(end_limit, end)))
@@ -63,14 +67,18 @@ class RichTextValue:
         return RichTextValue(stripped, adjusted)
 
     def clone(self) -> "RichTextValue":
+        """Clone the operation."""
         return RichTextValue(self.text, {tag: ranges.copy() for tag, ranges in self.formatting.items()})
 
 
 def _coerce_formatting(data: Mapping[str, Any]) -> dict[str, list[tuple[int, int]]]:
+    """Coerce formatting."""
     coerced: dict[str, list[tuple[int, int]]] = {}
     for tag, ranges in data.items():
+        # Process each (tag, ranges) from data.items().
         result: list[tuple[int, int]] = []
         for start, end in ranges:
+            # Process each (start, end) from ranges.
             try:
                 s = int(start)
                 e = int(end)
@@ -99,6 +107,7 @@ def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
     text_key: str | None = None
     fmt_key: str | None = None
     for key in value.keys():
+        # Process each key from value.keys().
         lowered = str(key).lower()
         if lowered == "text" and text_key is None:
             text_key = key  # preserve original casing for retrieval
@@ -108,6 +117,7 @@ def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
     # If we have a 'text'/'Text' key and its value is itself a mapping that
     # looks like an RTF-JSON payload, unwrap it recursively.
     if text_key is not None:
+        # Handle the branch where text key is available.
         raw_text_value = value.get(text_key, "")
         if isinstance(raw_text_value, MappingABC):
             return _from_rtf_json(raw_text_value)
@@ -115,6 +125,7 @@ def _from_rtf_json(value: Mapping[str, Any]) -> RichTextValue:
     # Assemble a canonical candidate mapping for normalization.
     candidate: Mapping[str, Any]
     if text_key is None:
+        # Handle the branch where text key is missing.
         candidate = value
     else:
         formatting_value: Any = value.get(fmt_key, {}) if fmt_key is not None else {}
@@ -149,6 +160,7 @@ def _parse_structured_text(raw: str) -> Any | None:
 
 
 def _apply_line_prefix(value: RichTextValue, first_prefix: str, later_prefix: str | None = None) -> RichTextValue:
+    """Apply line prefix."""
     if later_prefix is None:
         later_prefix = first_prefix
     base = value.text or ""
@@ -162,6 +174,7 @@ def _apply_line_prefix(value: RichTextValue, first_prefix: str, later_prefix: st
     total_added = 0
 
     for idx, line in enumerate(lines):
+        # Process each (idx, line) from enumerate(lines).
         prefix = first_prefix if idx == 0 else later_prefix
         if prefix:
             new_parts.append(prefix)
@@ -178,12 +191,14 @@ def _apply_line_prefix(value: RichTextValue, first_prefix: str, later_prefix: st
     adjusted: dict[str, list[tuple[int, int]]] = {}
 
     def _delta(pos: int) -> int:
+        """Internal helper for delta."""
         idx = bisect.bisect_right(inserts, (pos, float("inf")))
         if idx == 0:
             return 0
         return inserts[idx - 1][1]
 
     for tag, ranges in value.formatting.items():
+        # Process each (tag, ranges) from value.formatting.items().
         updates: list[tuple[int, int]] = []
         for start, end in ranges:
             delta_start = _delta(start)
@@ -466,6 +481,7 @@ _IGNORED_FIELDS = {
 # Data helpers
 # ---------------------------------------------------------------------------
 def get_default_chatbot_wrappers() -> dict[str, GenericModelWrapper]:
+    """Return default chatbot wrappers."""
     wrappers: dict[str, GenericModelWrapper] = {}
     for label, key in _DEFAULT_WRAPPER_FACTORIES:
         try:
@@ -476,6 +492,7 @@ def get_default_chatbot_wrappers() -> dict[str, GenericModelWrapper]:
 
 
 def _normalize_value(value: Any) -> RichTextValue | None:
+    """Normalize value."""
     preview = repr(value)
     if len(preview) > 200:
         preview = preview[:197] + "..."
@@ -492,6 +509,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
     if isinstance(value, RichTextValue):
         return value
     if isinstance(value, str):
+        # Handle the branch where isinstance(value, str).
         stripped = value.strip()
         if stripped.lower() in _EMPTY_STRING_MARKERS:
             log_debug(
@@ -501,6 +519,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
             return None
         parsed = _parse_structured_text(stripped)
         if parsed is not None:
+            # Handle the branch where parsed is available.
             normalized = _normalize_value(parsed)
             if normalized is None:
                 return None
@@ -509,6 +528,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
     if isinstance(value, Mapping):
         # Common case: RTF-JSON payload with a text key (any casing)
         if any(str(key).lower() == "text" for key in value.keys()):
+            # Handle the branch where any((str(key).lower() == 'text' for key in value.keys())).
             normalized = _from_rtf_json(value)
             text = (normalized.text or "").strip()
             if text.lower() in _EMPTY_STRING_MARKERS:
@@ -522,6 +542,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
         # Container case (e.g. {"Scenes": [...]}) — focus the primary list
         for key in value.keys():
             if str(key).lower() == "scenes":
+                # Handle the branch where str(key).lower() == 'scenes'.
                 inner = value.get(key)
                 normalized = _normalize_value(inner)
                 if normalized and normalized.has_content():
@@ -540,6 +561,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
         )
         lowered_map = {str(k).lower(): k for k in value.keys()}
         for lk in preferred_keys:
+            # Process each lk from preferred_keys.
             actual = lowered_map.get(lk)
             if actual is None:
                 continue
@@ -549,6 +571,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
                 return normalized
         parts: list[str] = []
         for key, val in value.items():
+            # Process each (key, val) from value.items().
             if val in (None, ""):
                 continue
             parts.append(f"{key}: {val}")
@@ -560,8 +583,10 @@ def _normalize_value(value: Any) -> RichTextValue | None:
             return None
         return RichTextValue("\n".join(parts))
     if isinstance(value, (list, tuple, set)):
+        # Handle the branch where isinstance(value, (list, tuple, set)).
         bullets: list[RichTextValue] = []
         for item in value:
+            # Process each item from value.
             normalized = _normalize_value(item)
             if not normalized or not normalized.has_content():
                 continue
@@ -576,6 +601,7 @@ def _normalize_value(value: Any) -> RichTextValue | None:
         joined_runs: dict[str, list[tuple[int, int]]] = {}
         cursor = 0
         for idx, bullet in enumerate(bullets):
+            # Process each (idx, bullet) from enumerate(bullets).
             if idx > 0:
                 joined_text.append("\n")
                 cursor += 1
@@ -599,10 +625,12 @@ def _clip_snippet(
     query_len: int,
     max_chars: int,
 ) -> tuple[str, bool, bool]:
+    """Internal helper for clip snippet."""
     if max_chars <= 0 or len(snippet) <= max_chars:
         return snippet, False, False
 
     if match_pos < 0:
+        # Handle the branch where match_pos < 0.
         clipped = snippet[:max_chars].rstrip()
         if " " in clipped and len(clipped) == max_chars:
             clipped = clipped.rsplit(" ", 1)[0]
@@ -630,6 +658,7 @@ def _extract_paragraph_snippet(
     max_chars: int = 2000,
     fallback_window: int = 240,
 ) -> str:
+    """Extract paragraph snippet."""
     if match_index < 0 or match_index >= len(text):
         return ""
 
@@ -690,6 +719,7 @@ def _extract_paragraph_snippet(
 
 
 def _highlight_snippet(snippet: str, query: str) -> RichTextValue:
+    """Internal helper for highlight snippet."""
     value = RichTextValue(snippet)
     query_text = (query or "").strip()
     if not query_text:
@@ -700,6 +730,7 @@ def _highlight_snippet(snippet: str, query: str) -> RichTextValue:
     start = 0
     matches: list[tuple[int, int]] = []
     while True:
+        # Keep looping while True.
         idx = snippet_lower.find(query_lower, start)
         if idx == -1:
             break
@@ -711,10 +742,12 @@ def _highlight_snippet(snippet: str, query: str) -> RichTextValue:
 
 
 def _extract_text_from_pdf(path: str) -> str:
+    """Extract text from PDF."""
     if not path:
         return ""
 
     try:
+        # Keep text from PDF resilient if this step fails.
         _, full_text, page_texts = extract_text_from_book(
             path, campaign_dir=ConfigHelper.get_campaign_dir()
         )
@@ -739,7 +772,9 @@ def _extract_text_from_pdf(path: str) -> str:
 
 
 def _normalize_page_number(value: Any) -> int | None:
+    """Normalize page number."""
     try:
+        # Keep page number resilient if this step fails.
         if value is None:
             return None
         if isinstance(value, str) and not value.strip():
@@ -752,12 +787,15 @@ def _normalize_page_number(value: Any) -> int | None:
 
 
 def _label_for_excerpt(page: Mapping[str, Any], default_index: int) -> str:
+    """Internal helper for label for excerpt."""
     for key in ("Label", "label"):
+        # Process each key from ('Label', 'label').
         raw_label = page.get(key)
         if isinstance(raw_label, str) and raw_label.strip():
             return raw_label.strip()
 
     for key in ("Page", "page", "PageNumber", "pagenumber", "Index", "index"):
+        # Process each key while updating label for excerpt.
         normalized = _normalize_page_number(page.get(key))
         if normalized is not None:
             return f"Page {normalized}"
@@ -772,6 +810,7 @@ def _label_for_excerpt(page: Mapping[str, Any], default_index: int) -> str:
     start_num = _normalize_page_number(start)
     end_num = _normalize_page_number(end)
     if start_num is not None and end_num is not None:
+        # Handle the branch where start num is available and end num is available.
         if start_num == end_num:
             return f"Page {start_num}"
         return f"Pages {start_num}-{end_num}"
@@ -780,6 +819,7 @@ def _label_for_excerpt(page: Mapping[str, Any], default_index: int) -> str:
 
     path_value = page.get("Path") or page.get("path")
     if isinstance(path_value, str) and path_value.strip():
+        # Handle the branch where isinstance(path_value, str) and path_value.strip().
         basename = os.path.basename(path_value.strip())
         if basename:
             return basename
@@ -788,6 +828,7 @@ def _label_for_excerpt(page: Mapping[str, Any], default_index: int) -> str:
 
 
 def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[str, RichTextValue]]:
+    """Collect book excerpts."""
     query_text = (query or "").strip()
     query_lower = query_text.lower()
     if not query_lower:
@@ -806,10 +847,13 @@ def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[
             if isinstance(page, str) and page.strip():
                 candidates.append((f"Page {idx + 1}", page))
             elif isinstance(page, Mapping):
+                # Handle the branch where isinstance(page, Mapping).
                 text = page.get("Text") or page.get("text") or page.get("Content") or page.get("content")
                 if not isinstance(text, str) or not text.strip():
+                    # Handle the branch where not isinstance(text, str) or not text.strip().
                     path_value = page.get("Path") or page.get("path")
                     if isinstance(path_value, str) and path_value.strip():
+                        # Handle the branch where isinstance(path_value, str) and path_value.strip().
                         cached_text = extracted_cache.get(path_value)
                         if cached_text is None:
                             recovered = _extract_text_from_pdf(path_value)
@@ -832,16 +876,19 @@ def _collect_book_excerpts(record: Mapping[str, Any], query: str) -> list[tuple[
     excerpts: list[tuple[str, RichTextValue]] = []
 
     for raw_label, text in candidates:
+        # Process each (raw_label, text) from candidates.
         normalized_label = str(raw_label or "").strip()
         normalized = _normalize_excerpt_source(text)
         lowered = normalized.lower()
         start = 0
         while True:
+            # Keep looping while True.
             match_index = lowered.find(query_lower, start)
             if match_index == -1:
                 break
             snippet = _extract_paragraph_snippet(normalized, match_index, query_lower)
             if snippet:
+                # Continue with this path when snippet is set.
                 snippet_key = snippet.strip().lower()
                 dedupe_key = (normalized_label, snippet_key)
                 if dedupe_key not in seen:
@@ -868,10 +915,12 @@ class ChatbotDialog(ctk.CTkToplevel):
         title: str = "Campaign Chatbot",
         geometry: str = "1920x1080+0+0",
     ) -> None:
+        """Initialize the ChatbotDialog instance."""
         super().__init__(master)
         self.title(title)
         self.geometry(geometry)
         try:
+            # Keep init resilient if this step fails.
             if master is not None and isinstance(master, (tk.Tk, tk.Toplevel, ctk.CTk)):
                 self.transient(master)
         except Exception:
@@ -919,6 +968,7 @@ class ChatbotDialog(ctk.CTkToplevel):
     # UI helpers
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build UI."""
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
 
@@ -1041,6 +1091,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self.selection_label.grid(row=2, column=0, sticky="ew", pady=(10, 4))
 
         def _update_selection_wrap(_event=None):
+            """Update selection wrap."""
             try:
                 self.selection_label.configure(wraplength=max(280, results_frame.winfo_width() - 24))
             except Exception:
@@ -1136,6 +1187,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_navigation_state()
 
     def _build_source_filter_controls(self, parent: ctk.CTkFrame) -> None:
+        """Build source filter controls."""
         filter_frame = ctk.CTkFrame(
             parent,
             corner_radius=10,
@@ -1170,6 +1222,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             switch.grid(row=row, column=column, sticky="w", padx=6, pady=4)
 
     def _configure_notes_interaction(self) -> None:
+        """Internal helper for configure notes interaction."""
         widget = self._notes_widget
         if widget is None:
             return
@@ -1184,11 +1237,13 @@ class ChatbotDialog(ctk.CTkToplevel):
         widget.bind("<Control-A>", self._select_all_notes, add="+")
 
     def _suppress_note_edit(self, _event=None):
+        """Internal helper for suppress note edit."""
         if self._notes_readonly:
             return "break"
         return None
 
     def _handle_notes_keypress(self, event: tk.Event) -> str | None:
+        """Internal helper for handle notes keypress."""
         widget = self._notes_widget
         if widget is None:
             return None
@@ -1225,6 +1280,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         return "break"
 
     def _select_all_notes(self, _event=None):
+        """Select all notes."""
         widget = self._notes_widget
         if widget is None:
             return "break"
@@ -1236,12 +1292,14 @@ class ChatbotDialog(ctk.CTkToplevel):
     # Event handlers
     # ------------------------------------------------------------------
     def _focus_query_entry(self) -> None:
+        """Internal helper for focus query entry."""
         try:
             self.query_entry.focus_set()
         except Exception:
             pass
 
     def _focus_results(self, _event=None):
+        """Internal helper for focus results."""
         if self.result_list.size() == 0:
             return "break"
         self.result_list.focus_set()
@@ -1253,28 +1311,33 @@ class ChatbotDialog(ctk.CTkToplevel):
         return "break"
 
     def _maybe_focus_query(self, _event=None):
+        """Internal helper for maybe focus query."""
         if self.result_list.curselection() == (0,):
             self.query_entry.focus_set()
             return "break"
         return None
 
     def _on_scope_changed(self) -> None:
+        """Handle scope changed."""
         query = self.query_entry.get().strip().lower()
         self._populate(initial=(query == ""), query=query)
 
     def _on_query_submit(self, _event=None):
+        """Handle query submit."""
         query = self.query_entry.get().strip().lower()
         self._populate(initial=(query == ""), query=query)
         if _event is not None:
             return "break"
 
     def _on_submit(self, _event=None) -> None:
+        """Handle submit."""
         self._display_selected_note()
 
     # ------------------------------------------------------------------
     # Data interaction
     # ------------------------------------------------------------------
     def _populate(self, *, initial: bool, query: str = "") -> None:
+        """Internal helper for populate."""
         self._active_query = query
         log_info(
             f"ChatbotDialog._populate - Refreshing results (initial={initial}, query={query!r})",
@@ -1294,6 +1357,7 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         active_sources: set[str] | None = None
         if self._source_filter_vars:
+            # Continue with this path when source filter vars is set.
             active_sources = {
                 name for name, var in self._source_filter_vars.items() if bool(var.get())
             }
@@ -1312,10 +1376,13 @@ class ChatbotDialog(ctk.CTkToplevel):
                 return
 
         for entity_type, wrapper in self._wrappers.items():
+            # Process each (entity_type, wrapper) from _wrappers.items().
             if active_sources is not None and entity_type not in active_sources:
                 continue
             if entity_type not in self._item_cache:
+                # Handle the branch where entity type is not in item cache.
                 try:
+                    # Keep populate resilient if this step fails.
                     items = list(wrapper.load_items())
                 except Exception:
                     log_exception(
@@ -1336,6 +1403,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                 self._search_cache[entity_type] = search_blobs
             name_field = self._name_field_overrides.get(entity_type, "Name")
             try:
+                # Keep populate resilient if this step fails.
                 count = len(items)  # type: ignore[arg-type]
                 log_debug(
                     f"ChatbotDialog._populate - Loaded {count} records for {entity_type} (name field: {name_field})",
@@ -1348,6 +1416,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                 )
             added_for_entity = 0
             for idx, record in enumerate(items):
+                # Process each (idx, record) from enumerate(items).
                 name = str(record.get(name_field, ""))
                 if not name:
                     log_debug(
@@ -1367,6 +1436,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             )
 
         if self.result_list.size() > 0:
+            # Handle the branch where result_list.size() > 0.
             self.result_list.selection_clear(0, tk.END)
             self.result_list.selection_set(0)
             self.result_list.activate(0)
@@ -1383,51 +1453,61 @@ class ChatbotDialog(ctk.CTkToplevel):
                 self._render_text(RichTextValue("No records available to display."))
 
     def _build_search_blob(self, entity_type: str, record: Mapping[str, Any]) -> str:
+        """Build search blob."""
         parts: list[str] = []
 
         def append_chunked_text(text: str, *, chunk_size: int = 1200) -> None:
+            """Append chunked text."""
             stripped = text.strip()
             if not stripped:
                 return
             for start_idx in range(0, len(stripped), chunk_size):
+                # Process each start_idx from range(0, len(stripped), chunk_size).
                 chunk = stripped[start_idx:start_idx + chunk_size]
                 if chunk:
                     parts.append(chunk.lower())
 
         def visit(value: Any) -> None:
+            """Handle visit."""
             if value is None:
                 return
             if isinstance(value, str):
                 append_chunked_text(value)
                 return
             if isinstance(value, Mapping):
+                # Handle the branch where isinstance(value, Mapping).
                 for key, inner in value.items():
                     parts.append(str(key).lower())
                     visit(inner)
                 return
             if isinstance(value, (list, tuple, set)):
+                # Handle the branch where isinstance(value, (list, tuple, set)).
                 for item in value:
                     visit(item)
                 return
             parts.append(str(value).lower())
 
         def visit_extracted(value: Any) -> None:
+            """Handle visit extracted."""
             if value is None:
                 return
             if isinstance(value, str):
                 append_chunked_text(value)
                 return
             if isinstance(value, Mapping):
+                # Handle the branch where isinstance(value, Mapping).
                 for inner in value.values():
                     visit_extracted(inner)
                 return
             if isinstance(value, (list, tuple, set)):
+                # Handle the branch where isinstance(value, (list, tuple, set)).
                 for item in value:
                     visit_extracted(item)
                 return
             append_chunked_text(str(value))
 
         for key, val in record.items():
+            # Process each (key, val) from record.items().
             parts.append(str(key).lower())
             if entity_type == "Books" and key in {"ExtractedText", "ExtractedPages"}:
                 visit_extracted(val)
@@ -1442,6 +1522,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         return blob
 
     def _update_excerpt_status(self) -> None:
+        """Update excerpt status."""
         if self._excerpt_status_label is None:
             return
         if (
@@ -1449,6 +1530,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             and self._active_entity[0] == "Books"
             and self._book_excerpts
         ):
+            # Continue with this path when active entity is set and _active_entity[0] == 'Books' and book excerpts is set.
             total = len(self._book_excerpts)
             index = self._active_excerpt_index
             if index < 0:
@@ -1464,6 +1546,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             self._excerpt_status_label.configure(text="")
 
     def _reset_active_record(self) -> None:
+        """Reset active record."""
         self._active_entity = None
         self._active_record = None
         self._base_sections = None
@@ -1474,8 +1557,10 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_navigation_state()
 
     def _display_selected_note(self, _event=None) -> None:
+        """Internal helper for display selected note."""
         selection = self.result_list.curselection()
         if not selection:
+            # Handle the branch where selection is unavailable.
             self._reset_active_record()
             if self.result_list.size() == 0:
                 self._render_text(RichTextValue("No matches yet. Try refining your query."))
@@ -1503,6 +1588,7 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         sections = self._collate_sections(entity_type, record)
         if entity_type == "Books":
+            # Handle the branch where entity_type == 'Books'.
             self._base_sections = [(title, list(entries)) for title, entries in sections]
             raw_query = self.query_entry.get() if hasattr(self, "query_entry") else ""
             query_for_excerpts = raw_query if raw_query.strip() else self._active_query
@@ -1542,9 +1628,11 @@ class ChatbotDialog(ctk.CTkToplevel):
         sections: Sequence[tuple[str, list[tuple[str, RichTextValue]]]],
         excerpt: tuple[str, RichTextValue] | None,
     ) -> list[tuple[str, list[tuple[str, RichTextValue]]]]:
+        """Internal helper for focus book sections."""
         focused: list[tuple[str, list[tuple[str, RichTextValue]]]] = []
         replacement_label = replacement_value = None
         if excerpt is not None:
+            # Handle the branch where excerpt is available.
             replacement_label, replacement_value = excerpt
             if replacement_label:
                 replacement_label = f"{replacement_label} (excerpt)"
@@ -1553,6 +1641,7 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         replaced = False
         for title, entries in sections:
+            # Process each (title, entries) from sections.
             copied_entries = list(entries)
             if replacement_label is not None and title == "Content":
                 copied_entries = [(replacement_label, replacement_value)]
@@ -1569,10 +1658,12 @@ class ChatbotDialog(ctk.CTkToplevel):
         return focused
 
     def _render_active_book_excerpt(self) -> None:
+        """Render active book excerpt."""
         if self._base_sections is None:
             return
         excerpt: tuple[str, RichTextValue] | None = None
         if self._book_excerpts:
+            # Continue with this path when book excerpts is set.
             if self._active_excerpt_index < 0:
                 self._active_excerpt_index = 0
             total = len(self._book_excerpts)
@@ -1583,6 +1674,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._render_sections(sections)
 
     def _section_layout(self, entity_type: str) -> Sequence[tuple[str, tuple[str, ...]]]:
+        """Internal helper for section layout."""
         base = self._section_overrides.get(entity_type, self._section_overrides["default"])
         if self._note_fields == _NOTE_FIELD_CANDIDATES:
             return base
@@ -1599,6 +1691,7 @@ class ChatbotDialog(ctk.CTkToplevel):
     def _collate_sections(
         self, entity_type: str, record: Mapping[str, Any]
     ) -> list[tuple[str, list[tuple[str, RichTextValue]]]]:
+        """Internal helper for collate sections."""
         available_fields = sorted(str(key) for key in record.keys())
         log_debug(
             f"ChatbotDialog._collate_sections - Starting collation for {entity_type} with fields: {available_fields}",
@@ -1609,12 +1702,14 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         case_insensitive_keys: dict[str, str] = {}
         for key in record.keys():
+            # Process each key from record.keys().
             if not isinstance(key, str):
                 continue
             lowered = key.casefold()
             case_insensitive_keys.setdefault(lowered, key)
 
         def resolve_field(field_name: str) -> tuple[str, Any] | None:
+            """Resolve field."""
             if field_name in record:
                 return field_name, record.get(field_name)
             lowered = field_name.casefold()
@@ -1624,8 +1719,10 @@ class ChatbotDialog(ctk.CTkToplevel):
             return actual_key, record.get(actual_key)
 
         for title, field_names in self._section_layout(entity_type):
+            # Process each (title, field_names) from _section_layout(entity_type).
             entries: list[tuple[str, RichTextValue]] = []
             for field in field_names:
+                # Process each field from field_names.
                 resolved = resolve_field(field)
                 if resolved is None:
                     log_debug(
@@ -1662,6 +1759,7 @@ class ChatbotDialog(ctk.CTkToplevel):
 
         additional: list[tuple[str, RichTextValue]] = []
         for key, value in record.items():
+            # Process each (key, value) from record.items().
             if key in used or key in _IGNORED_FIELDS:
                 continue
             normalized = _normalize_value(value)
@@ -1691,6 +1789,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         return sections
 
     def _set_notes_state(self, state: str) -> None:
+        """Set notes state."""
         try:
             self.notes_box.configure(state=state)
         except Exception:
@@ -1698,9 +1797,11 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._notes_readonly = state != "normal"
         if self._notes_widget is not None:
             try:
+                # Keep notes state resilient if this step fails.
                 self._notes_widget.configure(state="normal")
                 theme = getattr(self, "_notes_theme", None)
                 if isinstance(theme, MappingABC):
+                    # Handle the branch where isinstance(theme, MappingABC).
                     select_kwargs: dict[str, Any] = {}
                     if "sel_bg" in theme:
                         select_kwargs["selectbackground"] = theme["sel_bg"]
@@ -1723,8 +1824,10 @@ class ChatbotDialog(ctk.CTkToplevel):
 
     @contextmanager
     def _temporarily_enable_notes(self):
+        """Internal helper for temporarily enable notes."""
         widgets: list[tuple[Any, str]] = []
         for target in (getattr(self, "notes_box", None), self._notes_widget):
+            # Process each target from (getattr(self, 'notes_box', None), _notes_widget).
             if target is None:
                 continue
             try:
@@ -1739,6 +1842,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             except Exception:
                 continue
         try:
+            # Keep temporarily enable notes resilient if this step fails.
             yield
         finally:
             for target, state in widgets:
@@ -1748,10 +1852,12 @@ class ChatbotDialog(ctk.CTkToplevel):
                     pass
 
     def _refresh_search_highlights(self) -> None:
+        """Refresh search highlights."""
         widget = self._notes_widget
         if widget is None:
             return
         with self._temporarily_enable_notes():
+            # Keep this resource scoped to search highlights.
             widget.tag_remove("search_highlight", "1.0", tk.END)
             widget.tag_remove("search_active", "1.0", tk.END)
             self._match_ranges.clear()
@@ -1762,6 +1868,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                 return
             start_index = "1.0"
             while True:
+                # Keep looping while True.
                 match = widget.search(query, start_index, nocase=True, stopindex=tk.END)
                 if not match:
                     break
@@ -1772,13 +1879,16 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_navigation_state()
 
     def _focus_match(self, delta: int) -> None:
+        """Internal helper for focus match."""
         total_matches = len(self._match_ranges)
         if total_matches:
+            # Continue with this path when total matches is set.
             if self._active_match_index < 0 or self._active_match_index >= total_matches:
                 self._active_match_index = total_matches - 1 if delta < 0 else 0
                 self._apply_active_match(scroll=True)
                 return
             if delta:
+                # Continue with this path when delta is set.
                 new_index = self._active_match_index + delta
                 if 0 <= new_index < total_matches:
                     self._active_match_index = new_index
@@ -1802,6 +1912,7 @@ class ChatbotDialog(ctk.CTkToplevel):
             and self._active_entity[0] == "Books"
             and self._book_excerpts
         ):
+            # Continue with this path when delta is set and active entity is set and _active_entity[0] == 'Books' and book excerpts is set.
             if self._active_excerpt_index < 0:
                 self._active_excerpt_index = 0
             total_excerpts = len(self._book_excerpts)
@@ -1817,12 +1928,15 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_navigation_state()
 
     def _apply_active_match(self, *, scroll: bool) -> None:
+        """Apply active match."""
         widget = self._notes_widget
         if widget is None:
             return
         with self._temporarily_enable_notes():
+            # Keep this resource scoped to active match.
             widget.tag_remove("search_active", "1.0", tk.END)
             if 0 <= self._active_match_index < len(self._match_ranges):
+                # Handle the branch where 0 <= _active_match_index < len(_match_ranges).
                 start, end = self._match_ranges[self._active_match_index]
                 widget.tag_add("search_active", start, end)
                 widget.tag_raise("search_active")
@@ -1833,6 +1947,7 @@ class ChatbotDialog(ctk.CTkToplevel):
                         pass
 
     def _update_navigation_state(self) -> None:
+        """Update navigation state."""
         has_excerpts = (
             self._active_entity is not None
             and self._active_entity[0] == "Books"
@@ -1852,14 +1967,17 @@ class ChatbotDialog(ctk.CTkToplevel):
         self._update_excerpt_status()
 
     def _on_next_match(self, _event=None):
+        """Handle next match."""
         self._focus_match(1)
         return "break"
 
     def _on_prev_match(self, _event=None):
+        """Handle prev match."""
         self._focus_match(-1)
         return "break"
 
     def _render_text(self, value: RichTextValue) -> None:
+        """Render text."""
         widget = self._notes_widget
         if widget is None:
             return
@@ -1870,9 +1988,11 @@ class ChatbotDialog(ctk.CTkToplevel):
             text += "\n"
         widget.insert("1.0", text)
         for tag, ranges in value.formatting.items():
+            # Process each (tag, ranges) from value.formatting.items().
             if tag not in {"bold", "italic", "underline"}:
                 continue
             for start, end in ranges:
+                # Process each (start, end) from ranges.
                 if end <= start:
                     continue
                 start_index = f"1.0+{start}c"
@@ -1887,6 +2007,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         )
 
     def _render_sections(self, sections: Sequence[tuple[str, list[tuple[str, RichTextValue]]]]) -> None:
+        """Render sections."""
         widget = self._notes_widget
         if widget is None:
             return
@@ -1900,6 +2021,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         cursor = 0
 
         for section_index, (title, entries) in enumerate(sections):
+            # Process each (section_index, (title, entries)) from enumerate(sections).
             if section_index > 0:
                 text_parts.append("\n")
                 cursor += 1
@@ -1910,12 +2032,14 @@ class ChatbotDialog(ctk.CTkToplevel):
             section_runs.append((section_start, section_start + len(title)))
 
             for entry_index, (label, value) in enumerate(entries):
+                # Process each (entry_index, (label, value)) from enumerate(entries).
                 if entry_index > 0:
                     text_parts.append("\n")
                     cursor += 1
                 value_text = value.text or ""
                 multiline = "\n" in value_text
                 if multiline:
+                    # Continue with this path when multiline is set.
                     line = f"{label}:\n"
                     text_parts.append(line)
                     field_runs.append((cursor, cursor + len(label) + 1))
@@ -1961,9 +2085,11 @@ class ChatbotDialog(ctk.CTkToplevel):
             widget.tag_add("field_label", f"1.0+{start}c", f"1.0+{end}c")
 
         for tag, runs in tag_runs.items():
+            # Process each (tag, runs) from tag_runs.items().
             if tag not in {"bold", "italic", "underline"}:
                 continue
             for start, end in runs:
+                # Process each (start, end) from runs.
                 if end <= start:
                     continue
                 widget.tag_add(tag, f"1.0+{start}c", f"1.0+{end}c")
@@ -1978,6 +2104,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         )
 
     def _derive_listbox_theme(self) -> dict[str, str]:
+        """Internal helper for derive listbox theme."""
         entry = self.query_entry
         raw_bg = entry.cget("fg_color")
         raw_fg = entry.cget("text_color")
@@ -1985,11 +2112,13 @@ class ChatbotDialog(ctk.CTkToplevel):
         idx = 1 if appearance == "Dark" else 0
 
         def _resolve(value: str | Sequence[str], fallback: str) -> str:
+            """Resolve the operation."""
             chosen: str | None = None
             if isinstance(value, (list, tuple)):
                 if value:
                     chosen = value[idx if idx < len(value) else 0]
             elif isinstance(value, str):
+                # Handle the branch where isinstance(value, str).
                 parts = value.split()
                 if parts:
                     chosen = parts[idx if idx < len(parts) else 0]
@@ -2010,6 +2139,7 @@ class ChatbotDialog(ctk.CTkToplevel):
         return {"bg": bg, "fg": fg, "sel_bg": sel_bg}
 
     def _derive_text_theme(self) -> dict[str, str]:
+        """Internal helper for derive text theme."""
         base = self._derive_listbox_theme()
         bg = base["bg"]
         fg = base["fg"]
@@ -2028,6 +2158,7 @@ def open_chatbot_dialog(
     name_field_overrides: Mapping[str, str] | None = None,
     note_field_candidates: Iterable[str] | None = None,
 ) -> ChatbotDialog:
+    """Open chatbot dialog."""
     dialog = ChatbotDialog(
         master,
         wrappers=wrappers,

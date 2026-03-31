@@ -1,3 +1,5 @@
+"""Management helpers for theme."""
+
 import customtkinter as ctk
 from typing import Callable, List
 
@@ -27,6 +29,7 @@ def get_theme() -> str:
     """
     # Try campaign-local settings first
     try:
+        # Keep theme resilient if this step fails.
         cfg = ConfigHelper.load_campaign_config()
         if cfg is not None and cfg.has_section("UI") and cfg.has_option("UI", "theme"):
             theme = (cfg.get("UI", "theme") or THEME_DEFAULT)
@@ -59,11 +62,13 @@ def apply_theme(theme: str | None = None) -> None:
         else:
             ctk.set_default_color_theme("blue")
         try:
+            # Keep theme resilient if this step fails.
             from customtkinter.windows.widgets.theme import ThemeManager
 
             tokens = get_tokens(key)
             button_theme = ThemeManager.theme.get("CTkButton")
             if button_theme:
+                # Continue with this path when button theme is set.
                 button_fg = tokens.get("button_fg")
                 button_hover = tokens.get("button_hover")
                 button_border = tokens.get("button_border")
@@ -90,6 +95,7 @@ def set_theme(theme: str) -> None:
         key = THEME_DEFAULT
     # Persist to campaign-local settings.ini so theme follows the DB
     try:
+        # Keep theme resilient if this step fails.
         path = ConfigHelper.get_campaign_settings_path()
         cfg = configparser.ConfigParser()
         if os.path.exists(path):
@@ -167,6 +173,7 @@ def register_theme_change_listener(callback: Callable[[str], None]) -> Callable[
     _THEME_LISTENERS.append(callback)
 
     def _unsub() -> None:
+        """Internal helper for unsub."""
         try:
             _THEME_LISTENERS.remove(callback)
         except ValueError:

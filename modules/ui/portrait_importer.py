@@ -1,3 +1,5 @@
+"""Import helpers for portrait."""
+
 import os
 import re
 import sqlite3
@@ -19,6 +21,7 @@ class PortraitPreview(ctk.CTkFrame):
     """Display helper that keeps portrait previews crisp and centered."""
 
     def __init__(self, parent, placeholder: str = "Portrait preview"):
+        """Initialize the PortraitPreview instance."""
         super().__init__(parent)
         self.configure(fg_color=("#1e1e1e", "#1e1e1e"))
         self._label = ctk.CTkLabel(
@@ -36,6 +39,7 @@ class PortraitPreview(ctk.CTkFrame):
         self.bind("<Configure>", self._on_resize)
 
     def clear(self):
+        """Clear the operation."""
         self._original_image = None
         self._photo_image = None
         self._original_size = None
@@ -43,6 +47,7 @@ class PortraitPreview(ctk.CTkFrame):
         self._label.image = None
 
     def show_error(self, message: str):
+        """Show error."""
         self._original_image = None
         self._photo_image = None
         self._original_size = None
@@ -50,8 +55,11 @@ class PortraitPreview(ctk.CTkFrame):
         self._label.image = None
 
     def display_image(self, path: str) -> tuple[int, int] | None:
+        """Handle display image."""
         try:
+            # Keep display image resilient if this step fails.
             with Image.open(path) as img:
+                # Keep this resource scoped to display image.
                 img = ImageOps.exif_transpose(img)
                 if img.mode not in ("RGB", "RGBA"):
                     img = img.convert("RGBA")
@@ -65,10 +73,12 @@ class PortraitPreview(ctk.CTkFrame):
         return self._original_size
 
     def _on_resize(self, _event=None):
+        """Handle resize."""
         if self._original_image is not None:
             self._update_display()
 
     def _update_display(self):
+        """Update display."""
         if self._original_image is None:
             return
 
@@ -95,6 +105,7 @@ class PortraitImportReviewWindow:
         replace_existing: bool,
         copy_and_resize_callback,
     ) -> None:
+        """Initialize the PortraitImportReviewWindow instance."""
         self.parent = parent
         self.entity_review_data = entity_review_data
         self.replace_existing = replace_existing
@@ -117,6 +128,7 @@ class PortraitImportReviewWindow:
         # Preselect the first entity that has matches to streamline the workflow.
         for record in self.entity_review_data:
             if record.get("matches"):
+                # Handle the branch where record.get('matches').
                 self._show_entity_details(record)
                 if record.get("tree_id"):
                     self.tree.selection_set(record["tree_id"])
@@ -124,6 +136,7 @@ class PortraitImportReviewWindow:
                 break
 
     def _build_ui(self):
+        """Build UI."""
         container = ctk.CTkFrame(self.window)
         container.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
         container.grid_columnconfigure(0, weight=1)
@@ -161,6 +174,7 @@ class PortraitImportReviewWindow:
         self._build_detail_panel(container)
 
     def _build_entity_panel(self, container):
+        """Build entity panel."""
         left_frame = ctk.CTkFrame(container)
         left_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 10))
         left_frame.grid_columnconfigure(0, weight=1)
@@ -234,6 +248,7 @@ class PortraitImportReviewWindow:
         self.tree.bind("<Double-1>", self._on_tree_double_click)
 
     def _build_detail_panel(self, container):
+        """Build detail panel."""
         detail_frame = ctk.CTkFrame(container)
         detail_frame.grid(row=2, column=1, sticky="nsew")
         detail_frame.grid_columnconfigure(0, weight=1)
@@ -358,7 +373,9 @@ class PortraitImportReviewWindow:
         self.slider.set(self.threshold_var.get())
 
     def _populate_entities(self):
+        """Internal helper for populate entities."""
         for record in self.entity_review_data:
+            # Process each record from entity_review_data.
             score_text = (
                 f"{record.get('best_score', 0) * 100:.1f}%" if record.get("best_score") else "—"
             )
@@ -384,6 +401,7 @@ class PortraitImportReviewWindow:
             self.tree_records[tree_id] = record
 
     def _on_slider_change(self, value):
+        """Handle slider change."""
         try:
             numeric = float(value)
         except (TypeError, ValueError):
@@ -393,6 +411,7 @@ class PortraitImportReviewWindow:
         self._populate_match_list()
 
     def _on_spin_change(self):
+        """Handle spin change."""
         try:
             numeric = float(self.threshold_var.get())
         except (TypeError, ValueError, tk.TclError):
@@ -404,9 +423,11 @@ class PortraitImportReviewWindow:
         self._populate_match_list()
 
     def _update_threshold_label(self, value):
+        """Update threshold label."""
         self.threshold_display.configure(text=f"{float(value):.0f}%")
 
     def _populate_match_list(self):
+        """Internal helper for populate match list."""
         self.match_listbox.delete(0, "end")
         self.match_index_map = []
         self.assign_button.configure(state="disabled")
@@ -428,6 +449,7 @@ class PortraitImportReviewWindow:
 
         filtered = [m for m in matches if m.get("score", 0) >= threshold]
         if not filtered:
+            # Handle the branch where filtered is unavailable.
             filtered = matches[:5]
             if filtered:
                 self.match_info_label.configure(
@@ -452,6 +474,7 @@ class PortraitImportReviewWindow:
             self._on_match_select()
 
     def _on_match_select(self, _event=None):
+        """Handle match select."""
         selection = self.match_listbox.curselection()
         if not selection:
             self.assign_button.configure(state="disabled")
@@ -472,8 +495,10 @@ class PortraitImportReviewWindow:
         )
 
     def _show_entity_details(self, record: dict | None):
+        """Show entity details."""
         self.current_entity = record
         if not record:
+            # Handle the branch where record is unavailable.
             self.entity_title_label.configure(text="Select an entity to review matches.")
             self.detail_status_label.configure(text="")
             self.match_info_label.configure(text="Select a portrait to preview.")
@@ -497,6 +522,7 @@ class PortraitImportReviewWindow:
         self._populate_match_list()
 
     def _on_tree_select(self, _event=None):
+        """Handle tree select."""
         selection = self.tree.selection()
         if not selection:
             return
@@ -504,6 +530,7 @@ class PortraitImportReviewWindow:
         self._show_entity_details(record)
 
     def _on_tree_double_click(self, event):
+        """Handle tree double click."""
         item_id = self.tree.identify_row(event.y)
         if not item_id:
             return
@@ -512,6 +539,7 @@ class PortraitImportReviewWindow:
         self._show_entity_details(self.tree_records.get(item_id))
 
     def _assign_selected_portrait(self, _event=None):
+        """Internal helper for assign selected portrait."""
         if self.current_entity is None:
             return
 
@@ -529,6 +557,7 @@ class PortraitImportReviewWindow:
             and not self.replace_existing
             and not self.current_entity.get("applied_path")
         ):
+            # Handle this branch separately before continuing.
             confirm = messagebox.askyesno(
                 "Replace Portrait?",
                 (
@@ -540,6 +569,7 @@ class PortraitImportReviewWindow:
                 return
 
         try:
+            # Keep assign selected portrait resilient if this step fails.
             new_path = self.copy_and_resize_portrait(
                 {"Name": self.current_entity.get("name", "Unnamed")},
                 target_path,
@@ -552,6 +582,7 @@ class PortraitImportReviewWindow:
             return
 
         try:
+            # Keep assign selected portrait resilient if this step fails.
             db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
             with sqlite3.connect(db_path) as conn:
                 conn.execute(
@@ -592,6 +623,7 @@ class PortraitImporter:
     """High level workflow for importing portraits from a directory."""
 
     def __init__(self, main_window) -> None:
+        """Initialize the PortraitImporter instance."""
         self.main_window = main_window
 
     def import_portraits_from_directory(self):
@@ -610,6 +642,7 @@ class PortraitImporter:
 
         for root, _dirs, files in os.walk(directory):
             for file_name in files:
+                # Process each file_name from files.
                 ext = os.path.splitext(file_name)[1].lower()
                 if ext not in supported_exts:
                     continue
@@ -677,12 +710,14 @@ class PortraitImporter:
         }
 
         def compute_matches(normalized_name: str) -> list[dict]:
+            """Handle compute matches."""
             matches: list[dict] = []
             if not normalized_name:
                 return matches
 
             compact_name = normalized_name.replace(" ", "")
             for candidate in image_candidates:
+                # Process each candidate from image_candidates.
                 score_full = SequenceMatcher(
                     None,
                     normalized_name,
@@ -721,12 +756,15 @@ class PortraitImporter:
         per_entity_updates: list[str] = []
 
         try:
+            # Keep portraits from directory resilient if this step fails.
             cursor = conn.cursor()
             for table, key_field in entity_configs:
+                # Process each (table, key_field) from entity_configs.
                 cursor.execute(f"SELECT {key_field}, Portrait FROM {table}")
                 rows = cursor.fetchall()
                 updated_here = 0
                 for row in rows:
+                    # Process each row from rows.
                     raw_name = row[key_field]
                     if raw_name is None:
                         continue
@@ -758,6 +796,7 @@ class PortraitImporter:
                         continue
 
                     if not best_match or best_score < 0.85:
+                        # Handle the branch where best match is unavailable or best_score < 0.85.
                         skipped_low_score += 1
                         if not matches:
                             entity_record["status"] = "No portrait suggestions"
@@ -766,6 +805,7 @@ class PortraitImporter:
                         continue
 
                     try:
+                        # Keep portraits from directory resilient if this step fails.
                         new_path = self.main_window.copy_and_resize_portrait({"Name": name}, best_match["path"])
                     except Exception as exc:
                         log_exception(
@@ -815,6 +855,7 @@ class PortraitImporter:
             conn.close()
 
         if total_updates:
+            # Continue with this path when total updates is set.
             log_info(
                 f"Imported {total_updates} portraits from directory {directory}",
                 func_name="portrait_importer.PortraitImporter.import_portraits_from_directory",

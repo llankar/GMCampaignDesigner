@@ -10,6 +10,7 @@ BACKENDS = ("html",)
 
 
 def _target_for_backend(output_path: str, export_html_only: bool) -> Path:
+    """Internal helper for target for backend."""
     base = Path(output_path)
     if export_html_only:
         return base.with_suffix(".html")
@@ -17,6 +18,7 @@ def _target_for_backend(output_path: str, export_html_only: bool) -> Path:
 
 
 def _export_with_html(payload: dict, rules_result, output_path: str, export_html_only: bool, language: str) -> str:
+    """Export with HTML."""
     html = render_character_sheet_html(payload, rules_result, language=language)
     target = _target_for_backend(output_path, export_html_only)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -32,6 +34,7 @@ def export_character_sheet(
     export_html_only: bool = True,
     language: str = "fr",
 ) -> tuple[str, str]:
+    """Export character sheet."""
     _ = backend
     out = _export_with_html(payload, rules_result, output_path, export_html_only, language)
     return out, "html"

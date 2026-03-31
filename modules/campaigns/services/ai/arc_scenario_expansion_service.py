@@ -1,3 +1,5 @@
+"""Utilities for AI arc scenario expansion service."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -22,6 +24,7 @@ class ArcScenarioExpansionService:
     """Generate exactly two new scenario payloads for each existing campaign arc."""
 
     def __init__(self, ai_client):
+        """Initialize the ArcScenarioExpansionService instance."""
         self.ai_client = ai_client
 
     def generate_scenarios(
@@ -31,6 +34,7 @@ class ArcScenarioExpansionService:
         *,
         existing_scenarios: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        """Handle generate scenarios."""
         normalized_arcs = self._normalize_input_arcs(arcs)
         existing_entities = build_existing_entity_lookup(foundation)
         prompt = build_arc_scenario_expansion_prompt(
@@ -49,6 +53,7 @@ class ArcScenarioExpansionService:
         runner = AIPipelineRunner(self.ai_client, pipeline_name="campaign.scenario_expansion")
         last_error: Exception | None = None
         for attempt in range(2):
+            # Process each attempt from range(2).
             raw_response = runner.run_chat(
                 messages,
                 phase="scenario_expansion",
@@ -59,6 +64,7 @@ class ArcScenarioExpansionService:
                 },
             )
             try:
+                # Keep generate scenarios resilient if this step fails.
                 parsed = parse_json_relaxed(raw_response)
                 return self._normalize_generated_payload(
                     parsed,
@@ -85,8 +91,10 @@ class ArcScenarioExpansionService:
         raise RuntimeError(f"Scenario expansion failed: {last_error}")
 
     def _normalize_input_arcs(self, arcs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Normalize input arcs."""
         normalized: list[dict[str, Any]] = []
         for index, arc in enumerate(arcs or [], start=1):
+            # Process each (index, arc) from enumerate(arcs or [], start=1).
             if not isinstance(arc, dict):
                 raise ArcScenarioExpansionValidationError(f"Arc #{index} must be an object")
 
@@ -121,6 +129,7 @@ class ArcScenarioExpansionService:
         *,
         existing_entities: dict[str, set[str]] | None = None,
     ) -> dict[str, Any]:
+        """Normalize generated payload."""
         payload = self._coerce_json_object(payload)
         if not isinstance(payload, dict):
             raise ArcScenarioExpansionValidationError("AI scenario generation must return a JSON object")
@@ -137,6 +146,7 @@ class ArcScenarioExpansionService:
         normalized_groups: list[dict[str, Any]] = []
 
         for raw_group in raw_arc_groups:
+            # Process each raw_group from raw_arc_groups.
             if not isinstance(raw_group, dict):
                 raise ArcScenarioExpansionValidationError("Each generated arc group must be an object")
 
@@ -188,10 +198,13 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _coerce_json_object(value: Any) -> Any:
+        """Coerce JSON object."""
         parsed = deserialize_possible_json(value)
         if isinstance(parsed, dict):
+            # Handle the branch where isinstance(parsed, dict).
             text_payload = parsed.get("text") or parsed.get("Text")
             if text_payload not in (None, ""):
+                # Handle the branch where text payload is not in (None, '').
                 nested = deserialize_possible_json(text_payload)
                 if isinstance(nested, dict):
                     return nested
@@ -199,10 +212,12 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _coerce_json_array(value: Any) -> Any:
+        """Coerce JSON array."""
         parsed = deserialize_possible_json(value)
         if isinstance(parsed, list):
             return parsed
         if isinstance(parsed, dict):
+            # Handle the branch where isinstance(parsed, dict).
             nested = ArcScenarioExpansionService._get_case_insensitive_value(parsed, "arcs")
             if nested is not None:
                 return ArcScenarioExpansionService._coerce_json_array(nested)
@@ -213,6 +228,7 @@ class ArcScenarioExpansionService:
 
     @classmethod
     def _extract_arc_groups(cls, value: Any) -> Any:
+        """Extract arc groups."""
         parsed = cls._coerce_json_object(value)
         if isinstance(parsed, list):
             return parsed
@@ -224,6 +240,7 @@ class ArcScenarioExpansionService:
             return cls._coerce_json_array(nested_arcs)
 
         for wrapper_key in ("response", "result", "data", "payload", "content"):
+            # Process each wrapper_key while updating arc groups.
             wrapper_value = cls._get_case_insensitive_value(parsed, wrapper_key)
             if wrapper_value is None:
                 continue
@@ -233,6 +250,7 @@ class ArcScenarioExpansionService:
 
         text_payload = cls._get_case_insensitive_value(parsed, "text")
         if text_payload not in (None, ""):
+            # Handle the branch where text payload is not in (None, '').
             nested_text = cls._extract_arc_groups(text_payload)
             if isinstance(nested_text, list):
                 return nested_text
@@ -241,6 +259,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _get_case_insensitive_value(payload: dict[str, Any], key: str) -> Any:
+        """Return case insensitive value."""
         target = key.casefold()
         for candidate_key, candidate_value in payload.items():
             if str(candidate_key).casefold() == target:
@@ -255,6 +274,7 @@ class ArcScenarioExpansionService:
         used_titles: set[str],
         existing_entities: dict[str, set[str]] | None,
     ) -> dict[str, Any]:
+        """Normalize scenario payload."""
         parent_arc_name = parent_arc["name"]
         if not isinstance(payload, dict):
             raise ArcScenarioExpansionValidationError(
@@ -409,6 +429,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_string_list(value: Any) -> list[str]:
+        """Normalize string list."""
         if value in (None, ""):
             return []
         if not isinstance(value, list):
@@ -417,6 +438,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_entity_creations(value: Any) -> dict[str, list[dict[str, Any]]]:
+        """Normalize entity creations."""
         raw = value if isinstance(value, dict) else {}
         return {
             "villains": ArcScenarioExpansionService._normalize_created_villains(raw.get("villains")),
@@ -428,9 +450,11 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _ensure_created_links_present(values: list[str], created_records: list[dict[str, Any]]) -> list[str]:
+        """Ensure created links present."""
         normalized = list(values)
         seen = {value.casefold() for value in normalized}
         for record in created_records:
+            # Process each record from created_records.
             name = str(record.get("Name") or "").strip()
             if not name or name.casefold() in seen:
                 continue
@@ -448,6 +472,7 @@ class ArcScenarioExpansionService:
         entity_creations: dict[str, list[dict[str, Any]]],
         existing_entities: dict[str, set[str]] | None,
     ) -> None:
+        """Validate new links are defined."""
         if existing_entities is None:
             return
 
@@ -481,6 +506,7 @@ class ArcScenarioExpansionService:
         entity_creations: dict[str, list[dict[str, Any]]],
         existing_entities: dict[str, set[str]] | None,
     ) -> None:
+        """Internal helper for backfill missing entity creations."""
         if existing_entities is None:
             return
 
@@ -513,6 +539,7 @@ class ArcScenarioExpansionService:
         existing_entities: dict[str, set[str]],
         scenario_context: dict[str, str],
     ) -> None:
+        """Append missing entity creations."""
         known_existing = existing_entities.get(entity_type, set())
         created_records = entity_creations.setdefault(entity_type, [])
         known_created = {
@@ -521,6 +548,7 @@ class ArcScenarioExpansionService:
             if str(item.get("Name") or "").strip()
         }
         for value in values:
+            # Process each value from values.
             key = value.casefold()
             if key in known_existing or key in known_created:
                 continue
@@ -544,6 +572,7 @@ class ArcScenarioExpansionService:
         summary: str,
         parent_arc_name: str,
     ) -> dict[str, Any]:
+        """Build placeholder entity record."""
         summary_text = summary.strip() or f"Auto-created from generated scenario '{title}'."
         arc_suffix = f" for arc '{parent_arc_name}'" if parent_arc_name else ""
 
@@ -599,6 +628,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_created_villains(value: Any) -> list[dict[str, Any]]:
+        """Normalize created villains."""
         records = ArcScenarioExpansionService._normalize_created_records(value, "villains")
         return [
             {
@@ -619,6 +649,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_created_factions(value: Any) -> list[dict[str, Any]]:
+        """Normalize created factions."""
         records = ArcScenarioExpansionService._normalize_created_records(value, "factions")
         return [
             {
@@ -632,6 +663,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_created_places(value: Any) -> list[dict[str, Any]]:
+        """Normalize created places."""
         records = ArcScenarioExpansionService._normalize_created_records(value, "places")
         return [
             {
@@ -646,6 +678,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_created_npcs(value: Any) -> list[dict[str, Any]]:
+        """Normalize created NPCs."""
         records = ArcScenarioExpansionService._normalize_created_records(value, "npcs")
         return [
             {
@@ -663,6 +696,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_created_creatures(value: Any) -> list[dict[str, Any]]:
+        """Normalize created creatures."""
         records = ArcScenarioExpansionService._normalize_created_records(value, "creatures")
         return [
             {
@@ -677,6 +711,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_created_records(value: Any, entity_type: str) -> list[dict[str, Any]]:
+        """Normalize created records."""
         if value in (None, ""):
             return []
         if not isinstance(value, list):
@@ -687,6 +722,7 @@ class ArcScenarioExpansionService:
         normalized: list[dict[str, Any]] = []
         seen: set[str] = set()
         for record in value:
+            # Process each record from value.
             if not isinstance(record, dict):
                 raise ArcScenarioExpansionValidationError(
                     f"EntityCreations.{entity_type} entries must be JSON objects"
@@ -705,6 +741,7 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _build_traceability_block(parent_arc: dict[str, Any]) -> str:
+        """Build traceability block."""
         source_scenarios = ", ".join(parent_arc.get("scenarios") or []) or "None"
         thread = str(parent_arc.get("thread") or "").strip() or "Unspecified"
         return (

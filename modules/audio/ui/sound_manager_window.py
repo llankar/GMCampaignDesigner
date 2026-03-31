@@ -1,3 +1,5 @@
+"""Window for audio sound manager."""
+
 import json
 import os
 import threading
@@ -35,6 +37,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         *,
         controller: AudioController | None = None,
     ) -> None:
+        """Initialize the SoundManagerWindow instance."""
         super().__init__(master)
         self.title("Sound & Music Manager")
         self.geometry("1200x900")
@@ -53,6 +56,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self.bind("<Destroy>", self._on_destroy_event)
 
     def _build_ui(self) -> None:
+        """Build UI."""
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
@@ -71,6 +75,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self.tab_view.set(SECTION_TITLES["music"])
 
     def _build_section(self, parent: Any, section: str) -> dict[str, Any]:
+        """Build section."""
         container = ctk.CTkFrame(parent)
         container.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         container.grid_columnconfigure(0, weight=0)
@@ -134,6 +139,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         }
         return state
     def _register_controller_callbacks(self) -> None:
+        """Register controller callbacks."""
         if self._controller_listener is not None:
             return
         self._controller_listener = (
@@ -142,17 +148,21 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self.controller.add_listener(self._controller_listener)
 
     def _detach_controller_listener(self) -> None:
+        """Internal helper for detach controller listener."""
         if self._controller_listener is None:
             return
         self.controller.remove_listener(self._controller_listener)
         self._controller_listener = None
 
     def _on_destroy_event(self, event: tk.Event) -> None:  # pragma: no cover - UI callback
+        """Handle destroy event."""
         if event.widget is self:
             self._detach_controller_listener()
 
     def show(self) -> None:
+        """Show the operation."""
         try:
+            # Keep show resilient if this step fails.
             self.deiconify()
             self.lift()
             self.focus_force()
@@ -162,6 +172,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             pass
 
     def _dispatch_controller_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
+        """Internal helper for dispatch controller event."""
         try:
             self.after(0, self._handle_controller_event, section, event, payload)
         except Exception as exc:  # pragma: no cover - defensive
@@ -171,25 +182,31 @@ class SoundManagerWindow(ctk.CTkToplevel):
             )
 
     def _handle_controller_event(self, section: str, event: str, payload: dict[str, Any]) -> None:
+        """Internal helper for handle controller event."""
         state = self.sections.get(section)
         if not state:
             return
         if event == "track_started":
+            # Handle the branch where event == 'track_started'.
             track = payload.get("track") or {}
             name = track.get("name") or os.path.basename(track.get("path", ""))
             state["now_playing_var"].set(f"Now playing: {name}")
             self._highlight_track(section, track.get("id"))
             state["status_var"].set(f"Playing '{name}'.")
         elif event == "error":
+            # Handle the branch where event == 'error'.
             message = payload.get("message") or "Playback failed."
             state["status_var"].set(f"Error: {message}")
         elif event == "stopped":
+            # Handle the branch where event == 'stopped'.
             state["now_playing_var"].set("")
             state["status_var"].set("Playback stopped.")
         elif event == "playlist_ended":
+            # Handle the branch where event == 'playlist_ended'.
             state["now_playing_var"].set("Playlist finished")
             state["status_var"].set("Playlist finished.")
         elif event == "volume_changed":
+            # Handle the branch where event == 'volume_changed'.
             value = payload.get("value", 0.0)
             state["volume_slider"].set(float(value) * 100)
             state["volume_value_var"].set(f"{int(float(value) * 100)}%")
@@ -200,20 +217,24 @@ class SoundManagerWindow(ctk.CTkToplevel):
         elif event == "continue_changed":
             state["continue_var"].set(bool(payload.get("value")))
         elif event == "state_changed":
+            # Handle the branch where event == 'state_changed'.
             data = payload.get("state")
             if isinstance(data, dict):
                 self._apply_controller_state(section, data)
         elif event in {"play_failed", "navigation_failed"}:
+            # Handle the branch where event is in {'play_failed', 'navigation_failed'}.
             message = payload.get("message") or self.controller.get_last_error(section)
             if message:
                 state["status_var"].set(f"Error: {message}")
 
     def _apply_controller_state(self, section: str, data: dict[str, Any]) -> None:
+        """Apply controller state."""
         state = self.sections.get(section)
         if not state:
             return
 
         if "volume" in data:
+            # Handle the branch where 'volume' is in data.
             try:
                 value = float(data.get("volume", 0.0))
             except (TypeError, ValueError):
@@ -230,10 +251,13 @@ class SoundManagerWindow(ctk.CTkToplevel):
 
         category = data.get("category")
         if isinstance(category, str) and category:
+            # Continue with this path when isinstance(category, str) and category is set.
             current = state.get("current_category")
             if current != category:
+                # Handle the branch where current != category.
                 categories = self.library.get_categories(section)
                 if category in categories:
+                    # Handle the branch where category is in categories.
                     index = categories.index(category)
                     listbox = state["category_list"]
                     listbox.select_clear(0, "end")
@@ -250,13 +274,16 @@ class SoundManagerWindow(ctk.CTkToplevel):
         track = data.get("current_track") or {}
         last_error = data.get("last_error", "")
         if track:
+            # Continue with this path when track is set.
             track_mood = str(track.get("mood", "")).strip()
             if track_mood and track_mood != state.get("current_mood"):
                 state["current_mood"] = track_mood
                 self._refresh_moods(section)
         name = track.get("name") or os.path.basename(track.get("path", ""))
         if track:
+            # Continue with this path when track is set.
             if data.get("is_playing"):
+                # Handle the branch where data.get('is_playing').
                 state["now_playing_var"].set(f"Now playing: {name}")
                 state["status_var"].set(f"Playing '{name}'.")
             elif not state["now_playing_var"].get():
@@ -269,6 +296,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             state["status_var"].set(f"Error: {last_error}")
 
     def _highlight_track(self, section: str, track_id: str | None) -> None:
+        """Internal helper for highlight track."""
         if not track_id:
             return
         state = self.sections.get(section)
@@ -286,11 +314,13 @@ class SoundManagerWindow(ctk.CTkToplevel):
                 listbox.see(idx)
                 break
     def _get_state(self, section: str) -> dict[str, Any]:
+        """Return state."""
         state = self.sections.get(section)
         if state is None:
             raise KeyError(f"Unknown section '{section}'.")
         return state
     def _refresh_categories(self, section: str) -> None:
+        """Refresh categories."""
         state = self._get_state(section)
         categories = self.library.get_categories(section)
         listbox = state["category_list"]
@@ -299,6 +329,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             listbox.insert("end", name)
 
         if not categories:
+            # Handle the branch where categories is unavailable.
             state["current_category"] = None
             state["current_mood"] = None
             state["mood_list"].delete(0, "end")
@@ -320,6 +351,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _select_category(self, section: str, category: str) -> None:
+        """Select category."""
         state = self._get_state(section)
         categories = self.library.get_categories(section)
         if category not in categories:
@@ -333,6 +365,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _refresh_moods(self, section: str) -> None:
+        """Refresh moods."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood_list = state["mood_list"]
@@ -373,6 +406,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_tracks(section)
 
     def _refresh_tracks(self, section: str) -> None:
+        """Refresh tracks."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood = state.get("current_mood")
@@ -401,6 +435,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._update_directories_label(state, directories)
 
     def _update_directories_label(self, state: dict[str, Any], directories: list[str]) -> None:
+        """Update directories label."""
         if directories:
             formatted = "Folders:\\n" + "\\n".join(f"- {directory}" for directory in directories)
         else:
@@ -408,10 +443,12 @@ class SoundManagerWindow(ctk.CTkToplevel):
         state["directories_var"].set(formatted)
 
     def _set_status(self, section: str, message: str) -> None:
+        """Set status."""
         state = self._get_state(section)
         state["status_var"].set(message)
 
     def _get_selected_category(self, section: str) -> str | None:
+        """Return selected category."""
         state = self._get_state(section)
         selection = state["category_list"].curselection()
         if not selection:
@@ -419,6 +456,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         return state["category_list"].get(selection[0])
 
     def _get_selected_mood(self, section: str) -> str | None:
+        """Return selected mood."""
         state = self._get_state(section)
         selection = state["mood_list"].curselection()
         if not selection:
@@ -426,6 +464,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         return state["mood_list"].get(selection[0])
 
     def _add_category(self, section: str) -> None:
+        """Internal helper for add category."""
         name = simpledialog.askstring("Add Type", "Enter a name for the new type:", parent=self)
         if not name:
             return
@@ -437,6 +476,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_categories(section)
 
     def _rename_category(self, section: str) -> None:
+        """Internal helper for rename category."""
         current = self._get_selected_category(section)
         if not current:
             messagebox.showinfo("Rename Type", "Select a type to rename.", parent=self)
@@ -452,6 +492,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_categories(section)
 
     def _remove_category(self, section: str) -> None:
+        """Remove category."""
         current = self._get_selected_category(section)
         if not current:
             messagebox.showinfo("Remove Type", "Select a type to remove.", parent=self)
@@ -466,6 +507,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_categories(section)
 
     def _on_category_selected(self, section: str) -> None:
+        """Handle category selected."""
         selected = self._get_selected_category(section)
         if not selected:
             return
@@ -477,6 +519,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _on_mood_selected(self, section: str) -> None:
+        """Handle mood selected."""
         selected = self._get_selected_mood(section)
         if not selected:
             return
@@ -487,6 +530,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_tracks(section)
 
     def _add_mood(self, section: str) -> None:
+        """Internal helper for add mood."""
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -501,6 +545,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._set_status(section, f"Added mood '{name.strip()}' in {category}.")
 
     def _rename_mood(self, section: str) -> None:
+        """Internal helper for rename mood."""
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -522,6 +567,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _remove_mood(self, section: str) -> None:
+        """Remove mood."""
         state = self._get_state(section)
         category = state.get("current_category")
         if not category:
@@ -542,16 +588,19 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _get_initial_dir(self, section: str, category: str | None) -> str:
+        """Return initial dir."""
         last = self.library.get_setting(section, "last_directory", "")
         if isinstance(last, str) and last and os.path.isdir(last):
             return last
         if category:
+            # Continue with this path when category is set.
             directories = self.library.get_directories(section, category)
             if directories:
                 return directories[0]
         return os.getcwd()
 
     def _add_tracks_via_files(self, section: str) -> None:
+        """Internal helper for add tracks via files."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood = state.get("current_mood")
@@ -577,6 +626,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _add_tracks_via_folder(self, section: str) -> None:
+        """Internal helper for add tracks via folder."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood = state.get("current_mood")
@@ -592,6 +642,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         if not directory:
             return
         try:
+            # Keep add tracks via folder resilient if this step fails.
             added = self.library.add_directory(section, category, mood, directory, recursive=True)
             self.library.set_setting(section, "last_directory", directory)
             if added:
@@ -603,6 +654,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _remove_tracks(self, section: str) -> None:
+        """Remove tracks."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood = state.get("current_mood")
@@ -617,6 +669,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             return
         removed = 0
         for idx in reversed(selection):
+            # Process each idx from reversed(selection).
             try:
                 track = state["track_items"][idx]
             except IndexError:
@@ -630,6 +683,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_tracks(section)
 
     def _rescan_category(self, section: str) -> None:
+        """Internal helper for rescan category."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood = state.get("current_mood")
@@ -647,6 +701,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         self._refresh_moods(section)
 
     def _ai_sort_directory(self, section: str) -> None:
+        """Internal helper for AI sort directory."""
         directory = filedialog.askdirectory(parent=self, title="Select Folder for AI Sorting")
         if not directory:
             return
@@ -666,8 +721,10 @@ class SoundManagerWindow(ctk.CTkToplevel):
     def _ai_sort_directory_worker(
         self, section: str, directory: str, audio_files: list[dict[str, str]]
     ) -> None:
+        """Internal helper for AI sort directory worker."""
         self.after(0, lambda: self._set_status(section, "Contacting local AI for sorting..."))
         try:
+            # Keep AI sort directory worker resilient if this step fails.
             assignments = self._invoke_ai_sort(audio_files)
         except Exception as exc:
             log_exception(
@@ -689,6 +746,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         )
 
     def _invoke_ai_sort(self, audio_files: list[dict[str, str]]) -> dict[str, list[str]]:
+        """Internal helper for invoke AI sort."""
         client = LocalAIClient()
         payload = [
             {
@@ -735,6 +793,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
 
         assignments: dict[str, list[str]] = {}
         for entry in categories:
+            # Process each entry from categories.
             if not isinstance(entry, dict):
                 continue
             name = entry.get("name")
@@ -747,6 +806,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             if not isinstance(files, list):
                 continue
             for file_ref in files:
+                # Process each file_ref from files.
                 if not isinstance(file_ref, str):
                     continue
                 clean_ref = file_ref.strip()
@@ -765,9 +825,11 @@ class SoundManagerWindow(ctk.CTkToplevel):
         audio_files: list[dict[str, str]],
         assignments: dict[str, list[str]],
     ) -> None:
+        """Apply AI sort results."""
         path_lookup: dict[str, str] = {}
         all_paths: set[str] = set()
         for entry in audio_files:
+            # Process each entry from audio_files.
             absolute = entry["path"]
             relative = entry["relative"]
             filename = entry["filename"]
@@ -783,10 +845,12 @@ class SoundManagerWindow(ctk.CTkToplevel):
         category_paths: dict[str, list[str]] = {}
         assigned_paths: set[str] = set()
         for category, files in assignments.items():
+            # Process each (category, files) from assignments.items().
             clean_category = category.strip()
             if not clean_category:
                 continue
             for reference in files:
+                # Process each reference from files.
                 normalized = reference.strip().replace("\\", "/")
                 if not normalized:
                     continue
@@ -805,6 +869,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
 
         unassigned = sorted(all_paths - assigned_paths)
         if unassigned:
+            # Continue with this path when unassigned is set.
             unsorted_bucket = category_paths.setdefault("Unsorted", [])
             for path in unassigned:
                 if path not in unsorted_bucket:
@@ -824,9 +889,11 @@ class SoundManagerWindow(ctk.CTkToplevel):
         added_counts: dict[str, int] = {}
         focus_category: str | None = None
         for category, paths in category_paths.items():
+            # Process each (category, paths) from category_paths.items().
             unique_paths: list[str] = []
             seen: set[str] = set()
             for path in paths:
+                # Process each path from paths.
                 normalized = os.path.normpath(path)
                 if normalized in seen:
                     continue
@@ -866,12 +933,14 @@ class SoundManagerWindow(ctk.CTkToplevel):
         messagebox.showinfo("AI Sorting Complete", summary, parent=self)
 
     def _gather_audio_files(self, directory: str) -> list[dict[str, str]]:
+        """Internal helper for gather audio files."""
         collected: list[dict[str, str]] = []
         if not os.path.isdir(directory):
             return collected
 
         for root, _dirs, files in os.walk(directory):
             for filename in files:
+                # Process each filename from files.
                 extension = os.path.splitext(filename)[1].lower()
                 if extension not in AUDIO_EXTENSIONS:
                     continue
@@ -888,6 +957,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
         return collected
 
     def _play_selected(self, section: str) -> None:
+        """Internal helper for play selected."""
         state = self._get_state(section)
         category = state.get("current_category")
         mood = state.get("current_mood")
@@ -911,6 +981,7 @@ class SoundManagerWindow(ctk.CTkToplevel):
             messagebox.showerror("Playback", f"Failed to start playback:\n{details}", parent=self)
 
     def _classify_moods(self, section: str) -> None:
+        """Internal helper for classify moods."""
         if section != "music":
             messagebox.showinfo("Classify Moods", "Mood classification is available for music only.", parent=self)
             return
@@ -923,45 +994,53 @@ class SoundManagerWindow(ctk.CTkToplevel):
             self._set_status(section, "Mood classification complete (no changes).")
 
     def _next_track(self, section: str) -> None:
+        """Internal helper for next track."""
         if self.controller.next(section):
             self._set_status(section, "Skipped to next track.")
         else:
             self._set_status(section, "No next track available.")
 
     def _previous_track(self, section: str) -> None:
+        """Internal helper for previous track."""
         if self.controller.previous(section):
             self._set_status(section, "Returned to previous track.")
         else:
             self._set_status(section, "No previous track available.")
 
     def _stop_player(self, section: str) -> None:
+        """Stop player."""
         self.controller.stop(section)
         self._set_status(section, "Playback stopped.")
 
     def _toggle_shuffle(self, section: str) -> None:
+        """Toggle shuffle."""
         state = self._get_state(section)
         value = bool(state["shuffle_var"].get())
         self.controller.set_shuffle(section, value)
         self._set_status(section, f"Shuffle {'enabled' if value else 'disabled'}.")
 
     def _toggle_loop(self, section: str) -> None:
+        """Toggle loop."""
         state = self._get_state(section)
         value = bool(state["loop_var"].get())
         self.controller.set_loop(section, value)
         self._set_status(section, f"Loop {'enabled' if value else 'disabled'}.")
 
     def _toggle_continue(self, section: str) -> None:
+        """Toggle continue."""
         state = self._get_state(section)
         value = bool(state["continue_var"].get())
         self.controller.set_continue(section, value)
         self._set_status(section, f"Continue {'enabled' if value else 'disabled'}.")
 
     def _on_volume_change(self, section: str, value: float) -> None:
+        """Handle volume change."""
         state = self._get_state(section)
         normalized = max(0.0, min(float(value) / 100.0, 1.0))
         state["volume_value_var"].set(f"{int(normalized * 100)}%")
         self.controller.set_volume(section, normalized)
 
     def _on_close(self) -> None:
+        """Handle close."""
         self._detach_controller_listener()
         self.destroy()

@@ -1,3 +1,5 @@
+"""Utilities for arc studio detail form."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -12,6 +14,7 @@ class ArcDetailForm(ctk.CTkFrame):
     """Editor for one selected arc."""
 
     def __init__(self, master, on_change, *, get_available_scenarios=None):
+        """Initialize the ArcDetailForm instance."""
         super().__init__(master, fg_color=EDITOR_PALETTE["surface_soft"], corner_radius=12)
         self._on_change = on_change
         self._get_available_scenarios = get_available_scenarios or (lambda: [])
@@ -55,12 +58,14 @@ class ArcDetailForm(ctk.CTkFrame):
             widget.bind("<KeyRelease>", lambda _event: self._notify_change())
 
     def _textbox(self, label: str, *, height: int = 84):
+        """Internal helper for textbox."""
         ctk.CTkLabel(self, text=label, text_color=EDITOR_PALETTE["text"]).pack(anchor="w", padx=12)
         box = ctk.CTkTextbox(self, height=height, fg_color=EDITOR_PALETTE["surface"], border_width=1, border_color=EDITOR_PALETTE["border"])
         box.pack(fill="x", padx=12, pady=(2, 8))
         return box
 
     def _build_scenarios_editor(self):
+        """Build scenarios editor."""
         ctk.CTkLabel(self, text="Linked Scenarios", text_color=EDITOR_PALETTE["text"]).pack(anchor="w", padx=12)
 
         scenarios_panel = ctk.CTkFrame(
@@ -145,8 +150,10 @@ class ArcDetailForm(ctk.CTkFrame):
         self.scenario_entry.bind("<Return>", lambda _event: self._add_scenario_from_entry())
 
     def set_arc(self, arc: dict | None):
+        """Set arc."""
         self._is_loading = True
         try:
+            # Keep arc resilient if this step fails.
             self._set_text(self.name_entry, self.name_var, (arc or {}).get("name") or "")
             self.status_var.set(canonicalize_arc_status((arc or {}).get("status")))
             self._set_box(self.summary_box, (arc or {}).get("summary") or "")
@@ -160,6 +167,7 @@ class ArcDetailForm(ctk.CTkFrame):
             self._is_loading = False
 
     def get_arc_data(self) -> dict:
+        """Return arc data."""
         return {
             "name": self.name_var.get().strip(),
             "summary": self.summary_box.get("1.0", "end").strip(),
@@ -170,11 +178,13 @@ class ArcDetailForm(ctk.CTkFrame):
         }
 
     def _notify_change(self):
+        """Notify change."""
         if self._is_loading:
             return
         self._on_change()
 
     def _set_enabled(self, enabled: bool):
+        """Set enabled."""
         state = "normal" if enabled else "disabled"
         self.name_entry.configure(state=state)
         self.status_menu.configure(state=state)
@@ -186,6 +196,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._sync_remove_button_state()
 
     def _refresh_validation(self, arc: dict | None):
+        """Refresh validation."""
         if not arc:
             self.validation_label.configure(text="Select an arc to edit details.")
             return
@@ -200,16 +211,19 @@ class ArcDetailForm(ctk.CTkFrame):
 
     @staticmethod
     def _set_box(box: ctk.CTkTextbox, value: str):
+        """Set box."""
         box.configure(state="normal")
         box.delete("1.0", "end")
         box.insert("1.0", value)
 
     @staticmethod
     def _set_text(entry: ctk.CTkEntry, variable: tk.StringVar, value: str):
+        """Set text."""
         entry.configure(state="normal")
         variable.set(value)
 
     def _set_scenarios(self, scenarios: list[str]):
+        """Set scenarios."""
         self._scenario_items = list(dict.fromkeys(str(item).strip() for item in scenarios if str(item).strip()))
         self.scenarios_list.delete(0, tk.END)
         for scenario in self._scenario_items:
@@ -217,6 +231,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._sync_remove_button_state()
 
     def _sync_remove_button_state(self):
+        """Synchronize remove button state."""
         selected = bool(self.scenarios_list.curselection())
         selected_index = self._selected_scenario_index()
         selected_count = len(self._scenario_items)
@@ -230,6 +245,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self.clear_scenarios_btn.configure(state="normal" if is_enabled and selected_count > 0 else "disabled")
 
     def _add_scenario_from_entry(self):
+        """Internal helper for add scenario from entry."""
         title = self.scenario_entry_var.get().strip()
         if not title or title in self._scenario_items:
             return
@@ -240,6 +256,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _add_scenario_from_picker(self):
+        """Internal helper for add scenario from picker."""
         available_scenarios = [title for title in self._get_available_scenarios() if title not in self._scenario_items]
         if not available_scenarios:
             self._add_scenario_from_entry()
@@ -251,6 +268,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._add_scenario_from_entry()
 
     def _remove_selected_scenario(self):
+        """Remove selected scenario."""
         index = self._selected_scenario_index()
         if index is None:
             return
@@ -265,6 +283,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _move_selected_scenario_up(self):
+        """Move selected scenario up."""
         index = self._selected_scenario_index()
         if index is None or index <= 0:
             return
@@ -273,6 +292,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _move_selected_scenario_down(self):
+        """Move selected scenario down."""
         index = self._selected_scenario_index()
         if index is None or index >= len(self._scenario_items) - 1:
             return
@@ -281,6 +301,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _sort_scenarios(self):
+        """Sort scenarios."""
         if len(self._scenario_items) < 2:
             return
         selected_title = None
@@ -293,6 +314,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _clear_scenarios(self):
+        """Clear scenarios."""
         if not self._scenario_items:
             return
         self._scenario_items.clear()
@@ -300,6 +322,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._notify_change()
 
     def _render_scenarios(self, selected_index: int | None):
+        """Render scenarios."""
         self.scenarios_list.delete(0, tk.END)
         for scenario in self._scenario_items:
             self.scenarios_list.insert(tk.END, scenario)
@@ -310,6 +333,7 @@ class ArcDetailForm(ctk.CTkFrame):
         self._sync_remove_button_state()
 
     def _selected_scenario_index(self) -> int | None:
+        """Internal helper for selected scenario index."""
         selection = self.scenarios_list.curselection()
         if not selection:
             return None

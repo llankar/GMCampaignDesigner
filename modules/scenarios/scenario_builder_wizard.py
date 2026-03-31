@@ -1,3 +1,4 @@
+"""Wizard flow for scenario builder."""
 import copy
 import json
 import os
@@ -98,6 +99,7 @@ SCENARIO_ENTITY_TYPE_ORDER = (
 
 
 def _derive_scenario_entity_singular_label(field_name):
+    """Internal helper for derive scenario entity singular label."""
     override = SCENARIO_ENTITY_SINGULAR_LABELS.get(field_name)
     if override:
         return override
@@ -109,6 +111,7 @@ def _derive_scenario_entity_singular_label(field_name):
 
 
 def _build_scenario_entity_fields():
+    """Build scenario entity fields."""
     field_names = {}
     try:
         template = load_template("scenarios")
@@ -116,6 +119,7 @@ def _build_scenario_entity_fields():
         template = {}
 
     for field in template.get("fields") or []:
+        # Process each field from template.get('fields') or [].
         if not isinstance(field, dict):
             continue
         field_name = str(field.get("name") or "").strip()
@@ -130,6 +134,7 @@ def _build_scenario_entity_fields():
 
     ordered = {}
     for entity_type in SCENARIO_ENTITY_TYPE_ORDER:
+        # Process each entity_type from SCENARIO_ENTITY_TYPE_ORDER.
         field_name = field_names.pop(entity_type, None)
         if not field_name:
             continue
@@ -165,6 +170,7 @@ class WizardStep(ctk.CTkFrame):
 
 class BasicInfoStep(WizardStep):
     def __init__(self, master):
+        """Initialize the BasicInfoStep instance."""
         super().__init__(master)
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -186,6 +192,7 @@ class BasicInfoStep(WizardStep):
         self.secret_text.pack(fill="both", expand=True, pady=(0, 12))
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        """Load state."""
         self.title_var.set(state.get("Title", ""))
         self.summary_text.delete("1.0", "end")
         self.summary_text.insert("1.0", state.get("Summary", ""))
@@ -194,6 +201,7 @@ class BasicInfoStep(WizardStep):
         self.secret_text.insert("1.0", secret_val)
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
+        """Save state."""
         state["Title"] = self.title_var.get().strip()
         state["Summary"] = self.summary_text.get("1.0", "end").strip()
         secrets = self.secret_text.get("1.0", "end").strip()
@@ -224,6 +232,7 @@ class ScenesPlanningStep(WizardStep):
     }
 
     def __init__(self, master, entity_wrappers, *, scenario_wrapper=None, finale_planner_callback=None):
+        """Initialize the ScenesPlanningStep instance."""
         super().__init__(master)
         self.entity_wrappers = entity_wrappers or {}
         self.scenario_wrapper = scenario_wrapper
@@ -282,8 +291,10 @@ class ScenesPlanningStep(WizardStep):
         self._set_mode("guided", remap=False)
 
     def _build_entity_selector_callbacks(self):
+        """Build entity selector callbacks."""
         callbacks = {}
         for field_name in SCENE_CARD_ENTITY_FIELDS:
+            # Process each field_name from SCENE_CARD_ENTITY_FIELDS.
             entity_type = field_name.lower()
             wrapper = self.entity_wrappers.get(entity_type)
             if not wrapper:
@@ -294,6 +305,7 @@ class ScenesPlanningStep(WizardStep):
         return callbacks
 
     def _select_scene_entities(self, entity_type, field_name, current_values):  # pragma: no cover - UI interaction
+        """Select scene entities."""
         wrapper = self.entity_wrappers.get(entity_type)
         if not wrapper:
             return normalise_entity_list(current_values)
@@ -309,6 +321,7 @@ class ScenesPlanningStep(WizardStep):
         status_var = ctk.StringVar()
 
         def _update_status():
+            """Update status."""
             preview = ", ".join(selected_values[:6])
             if len(selected_values) > 6:
                 preview = f"{preview}, +{len(selected_values) - 6} more"
@@ -321,6 +334,7 @@ class ScenesPlanningStep(WizardStep):
                 status_var.set("No entities queued yet. Double-click to queue, then Apply Queued Selection.")
 
         def _queue_selected_entity(_et, name, _item):
+            """Internal helper for queue selected entity."""
             cleaned = str(name).strip()
             if not cleaned:
                 return
@@ -371,13 +385,16 @@ class ScenesPlanningStep(WizardStep):
         return normalise_entity_list(selected_values)
 
     def set_state_binding(self, state, on_state_change=None):
+        """Set state binding."""
         self._state_ref = state
         self._on_state_change = on_state_change
 
     def _on_mode_changed(self, value):
+        """Handle mode changed."""
         self._set_mode(value, remap=True)
 
     def _set_mode(self, mode, *, remap):
+        """Set mode."""
         mode = "canvas" if str(mode).strip().lower() == "canvas" else "guided"
         if self._active_mode == mode and remap:
             return
@@ -398,11 +415,13 @@ class ScenesPlanningStep(WizardStep):
         self.mode_var.set(mode)
 
     def _collect_active_scenes(self):
+        """Collect active scenes."""
         if self._active_mode == "guided":
             return guided_cards_to_scenes(self.guided_planner.export_cards())
         return self.canvas_planner.export_scenes()
 
     def _switch_to_epic_finale_planner(self):
+        """Internal helper for switch to epic finale planner."""
         if not self._finale_planner_callback or self._state_ref is None:
             return
         if not self.save_state(self._state_ref):
@@ -411,6 +430,7 @@ class ScenesPlanningStep(WizardStep):
         self._finale_planner_callback(payload)
 
     def _edit_scenario_info(self):
+        """Internal helper for edit scenario info."""
         dialog = ScenarioInfoDialog(self.winfo_toplevel(), title=self.scenario_title_var.get().strip() or "Scenario Notes", summary=self._scenario_summary, secrets=self._scenario_secrets)
         self.wait_window(dialog)
         if dialog.result:
@@ -418,6 +438,7 @@ class ScenesPlanningStep(WizardStep):
             self._scenario_secrets = dialog.result.get("secrets", "")
 
     def _load_existing_scenario(self):
+        """Load existing scenario."""
         if not self.scenario_wrapper:
             messagebox.showerror("Unavailable", "No scenario library is available to load from.")
             return
@@ -438,6 +459,7 @@ class ScenesPlanningStep(WizardStep):
         self.load_from_payload(copy.deepcopy(match))
 
     def _choose_existing_scenario(self):
+        """Internal helper for choose existing scenario."""
         template = load_template("scenarios")
         dialog = ctk.CTkToplevel(self)
         dialog.title("Select Scenario")
@@ -452,11 +474,13 @@ class ScenesPlanningStep(WizardStep):
         return result["payload"] if result["payload"] is not None else result["name"]
 
     def load_from_payload(self, scenario):
+        """Load from payload."""
         if not isinstance(scenario, dict):
             return
         self._apply_loaded_scenario(copy.deepcopy(scenario))
 
     def _apply_loaded_scenario(self, scenario):
+        """Apply loaded scenario."""
         title = scenario.get("Title") or scenario.get("Name") or ""
         self.scenario_title_var.set(str(title))
         self._scenario_summary = coerce_text(scenario.get("Summary") or scenario.get("Text"))
@@ -472,6 +496,7 @@ class ScenesPlanningStep(WizardStep):
         self.guided_planner.load_cards(scenes_to_guided_cards(self.scenes))
 
     def load_state(self, state):
+        """Load state."""
         self.scenario_title_var.set(state.get("Title", ""))
         self._scenario_summary = state.get("Summary", "")
         self._scenario_secrets = state.get("Secrets") or state.get("Secret") or ""
@@ -487,6 +512,7 @@ class ScenesPlanningStep(WizardStep):
         self.guided_planner.load_cards(scenes_to_guided_cards(self.scenes))
 
     def save_state(self, state):
+        """Save state."""
         self.scenes = self._collect_active_scenes()
         state["Title"] = self.scenario_title_var.get().strip()
         state["Summary"] = (self._scenario_summary or "").strip()
@@ -497,6 +523,7 @@ class ScenesPlanningStep(WizardStep):
         payload = []
         layout = []
         for scene in self.scenes:
+            # Process each scene from scenes.
             record = {
                 "Title": scene.get("Title", "Scene"),
                 "Summary": scene.get("Summary", ""),
@@ -531,6 +558,7 @@ class ScenesPlanningStep(WizardStep):
 
 class ScenarioInfoDialog(ctk.CTkToplevel):
     def __init__(self, master, *, title, summary, secrets):
+        """Initialize the ScenarioInfoDialog instance."""
         super().__init__(master)
         window_title = title or "Scenario Notes"
         self.title(window_title)
@@ -583,6 +611,7 @@ class ScenarioInfoDialog(ctk.CTkToplevel):
         self.summary_text.focus_set()
 
     def _on_save(self):
+        """Handle save."""
         self.result = {
             "summary": self.summary_text.get("1.0", "end").strip(),
             "secrets": self.secrets_text.get("1.0", "end").strip(),
@@ -590,12 +619,14 @@ class ScenarioInfoDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _on_cancel(self):
+        """Handle cancel."""
         self.result = None
         self.destroy()
 
 
 class InlineSceneEditor(ctk.CTkFrame):
     def __init__(self, master, scene, *, scene_types, on_save, on_cancel, width=None, height=None):
+        """Initialize the InlineSceneEditor instance."""
         super().__init__(
             master,
             fg_color="#0f172a",
@@ -666,6 +697,7 @@ class InlineSceneEditor(ctk.CTkFrame):
         self.summary_text.focus_set()
 
     def _on_save(self, _event=None):
+        """Handle save."""
         data = {
             "Title": self.title_var.get().strip(),
             "SceneType": self.type_var.get().strip(),
@@ -675,6 +707,7 @@ class InlineSceneEditor(ctk.CTkFrame):
             self.on_save(data)
 
     def _on_cancel(self, _event=None):
+        """Handle cancel."""
         if callable(self.on_cancel):
             self.on_cancel()
 
@@ -690,6 +723,7 @@ class EntityLinkingStep(WizardStep):
     ENTITY_FIELDS = SCENARIO_ENTITY_FIELDS
 
     def __init__(self, master, wrappers):
+        """Initialize the EntityLinkingStep instance."""
         super().__init__(master)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -711,6 +745,7 @@ class EntityLinkingStep(WizardStep):
         entity_defs = load_entity_definitions()
         self._entity_icons = {}
         for entity_type in self.ENTITY_FIELDS:
+            # Process each entity_type from ENTITY_FIELDS.
             icon_path = None
             meta = entity_defs.get(entity_type)
             if meta:
@@ -728,6 +763,7 @@ class EntityLinkingStep(WizardStep):
         container.grid_columnconfigure((0, 1), weight=1, uniform="entities")
 
         for idx, (entity_type, (field, label)) in enumerate(self.ENTITY_FIELDS.items()):
+            # Process each (idx, (entity_type, (field, label))) from enumerate(ENTITY_FIELDS.items()).
             frame = ctk.CTkFrame(container)
             row, col = divmod(idx, 2)
             frame.grid(row=row, column=col, sticky="nsew", padx=8, pady=8)
@@ -770,6 +806,7 @@ class EntityLinkingStep(WizardStep):
             ).grid(row=0, column=2, padx=4, pady=2, sticky="ew")
 
     def _detect_media_field(self, entity_type):
+        """Internal helper for detect media field."""
         try:
             template = load_template(entity_type)
         except Exception:
@@ -779,6 +816,7 @@ class EntityLinkingStep(WizardStep):
             return None
         normalized = {}
         for field in fields:
+            # Process each field from fields.
             if not isinstance(field, dict):
                 continue
             name = str(field.get("name") or "").strip()
@@ -797,13 +835,16 @@ class EntityLinkingStep(WizardStep):
         return None
 
     def _invalidate_entity_cache(self, entity_type):
+        """Invalidate entity cache."""
         self._entity_cache.pop(entity_type, None)
 
     def _get_entity_record(self, entity_type, name):
+        """Return entity record."""
         if not name:
             return None
         cache = self._entity_cache.get(entity_type)
         if cache is None:
+            # Handle the branch where cache is missing.
             cache = {"exact": {}, "lower": {}}
             wrapper = self.wrappers.get(entity_type)
             if not wrapper:
@@ -815,6 +856,7 @@ class EntityLinkingStep(WizardStep):
                 self._entity_cache[entity_type] = cache
                 return None
             for item in items:
+                # Process each item from items.
                 if not isinstance(item, dict):
                     continue
                 value = item.get("Name") or item.get("Title")
@@ -832,6 +874,7 @@ class EntityLinkingStep(WizardStep):
         return cache["lower"].get(name.lower())
 
     def _resolve_portrait_path(self, raw_value):
+        """Resolve portrait path."""
         if not raw_value:
             return None
         text = str(raw_value).strip()
@@ -843,6 +886,7 @@ class EntityLinkingStep(WizardStep):
         candidates = []
         campaign_dir = ConfigHelper.get_campaign_dir()
         if campaign_dir:
+            # Continue with this path when campaign dir is set.
             candidates.append(os.path.join(campaign_dir, normalized))
             candidates.append(os.path.join(campaign_dir, "assets", normalized))
             base_name = os.path.basename(normalized)
@@ -854,18 +898,22 @@ class EntityLinkingStep(WizardStep):
         return None
 
     def _create_card_image(self, entity_type, portrait_value):
+        """Create card image."""
         resolved = self._resolve_portrait_path(portrait_value)
         image_obj = None
         if resolved:
             try:
+                # Keep card image resilient if this step fails.
                 with Image.open(resolved) as img:
                     image_obj = img.convert("RGBA")
             except Exception:
                 image_obj = None
         if image_obj is None:
+            # Handle the branch where image obj is missing.
             fallback_path = self._entity_icons.get(entity_type) or self._default_icon_path
             if fallback_path and os.path.exists(fallback_path):
                 try:
+                    # Keep card image resilient if this step fails.
                     with Image.open(fallback_path) as img:
                         image_obj = img.convert("RGBA")
                 except Exception:
@@ -877,6 +925,7 @@ class EntityLinkingStep(WizardStep):
         return ctk.CTkImage(light_image=image_obj, size=self.CARD_IMAGE_SIZE)
 
     def _apply_card_selection_style(self, card, selected):
+        """Apply card selection style."""
         card.configure(
             fg_color=self.CARD_SELECTED_BG if selected else self.CARD_BG,
             border_color=self.CARD_SELECTED_BORDER if selected else self.CARD_BORDER,
@@ -884,6 +933,7 @@ class EntityLinkingStep(WizardStep):
         )
 
     def _toggle_card_selection(self, field, name):
+        """Toggle card selection."""
         cards = self.card_widgets.get(field, {})
         card = cards.get(name)
         if not card:
@@ -897,6 +947,7 @@ class EntityLinkingStep(WizardStep):
             self._apply_card_selection_style(card, True)
 
     def _create_entity_card(self, field, name):
+        """Create entity card."""
         entity_type = self.field_to_entity.get(field)
         record = self._get_entity_record(entity_type, name) if entity_type else None
         portrait_field = self._media_fields.get(entity_type) if entity_type else None
@@ -956,6 +1007,7 @@ class EntityLinkingStep(WizardStep):
         return card
 
     def open_selector(self, entity_type, field):  # pragma: no cover - UI interaction
+        """Open selector."""
         wrapper = self.wrappers.get(entity_type)
         if not wrapper:
             messagebox.showerror("Unavailable", f"No data source is available for {field}.")
@@ -977,6 +1029,7 @@ class EntityLinkingStep(WizardStep):
         top.grab_set()
 
     def _on_entity_selected(self, field, name, window):  # pragma: no cover - UI callback
+        """Handle entity selected."""
         if not name:
             return
         items = self.selected.setdefault(field, [])
@@ -989,6 +1042,7 @@ class EntityLinkingStep(WizardStep):
             pass
 
     def remove_selected(self, field):  # pragma: no cover - UI interaction
+        """Remove selected."""
         selected_cards = set(self.card_selection.get(field) or set())
         if not selected_cards:
             return
@@ -998,12 +1052,14 @@ class EntityLinkingStep(WizardStep):
         self.refresh_list(field)
 
     def create_new_entity(self, entity_type, field, label):  # pragma: no cover - UI interaction
+        """Create new entity."""
         wrapper = self.wrappers.get(entity_type)
         if not wrapper:
             messagebox.showerror("Unavailable", f"No {label} data source is available.")
             return
 
         try:
+            # Keep new entity resilient if this step fails.
             template = load_template(entity_type)
         except Exception as exc:  # pragma: no cover - defensive path
             log_exception(f"Failed to load template for {entity_type}: {exc}")
@@ -1011,6 +1067,7 @@ class EntityLinkingStep(WizardStep):
             return
 
         try:
+            # Keep new entity resilient if this step fails.
             items = wrapper.load_items()
         except Exception as exc:  # pragma: no cover - defensive path
             log_exception(f"Failed to load existing {entity_type}: {exc}")
@@ -1034,6 +1091,7 @@ class EntityLinkingStep(WizardStep):
         unique_key = next((key for key in preferred_keys if new_item.get(key)), None)
         unique_value = new_item.get(unique_key, "") if unique_key else ""
         if unique_key:
+            # Continue with this path when unique key is set.
             replaced = False
             for idx, existing in enumerate(items):
                 if existing.get(unique_key) == new_item.get(unique_key):
@@ -1046,6 +1104,7 @@ class EntityLinkingStep(WizardStep):
             items.append(new_item)
 
         try:
+            # Keep new entity resilient if this step fails.
             wrapper.save_items(items)
             # Refresh data so future selectors pick up the new record immediately.
             wrapper.load_items()
@@ -1068,6 +1127,7 @@ class EntityLinkingStep(WizardStep):
             self.refresh_list(field)
 
     def refresh_list(self, field):  # pragma: no cover - UI helper
+        """Refresh list."""
         container = self.card_containers.get(field)
         if not container:
             return
@@ -1081,6 +1141,7 @@ class EntityLinkingStep(WizardStep):
         deduped = []
         seen = set()
         for name in values:
+            # Process each name from values.
             if name in seen:
                 continue
             seen.add(name)
@@ -1106,7 +1167,9 @@ class EntityLinkingStep(WizardStep):
         container.grid_columnconfigure(0, weight=1)
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        """Load state."""
         for entity_type, (field, _) in self.ENTITY_FIELDS.items():
+            # Process each (entity_type, (field, _)) from ENTITY_FIELDS.items().
             values = state.get(field) or []
             if isinstance(values, str):
                 values = [values]
@@ -1115,6 +1178,7 @@ class EntityLinkingStep(WizardStep):
             self.refresh_list(field)
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
+        """Save state."""
         for _, (field, _) in self.ENTITY_FIELDS.items():
             state[field] = list(dict.fromkeys(self.selected.get(field, [])))
         return True
@@ -1122,6 +1186,7 @@ class EntityLinkingStep(WizardStep):
 
 class CharacterRelationsStep(WizardStep):
     def __init__(self, master, npc_wrapper, pc_wrapper, faction_wrapper):
+        """Initialize the CharacterRelationsStep instance."""
         super().__init__(master)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -1189,10 +1254,12 @@ class CharacterRelationsStep(WizardStep):
         self.graph_editor.grid(row=0, column=0, sticky="nsew")
 
     def set_state_binding(self, state, on_state_change=None):
+        """Set state binding."""
         self._state_ref = state
         self._on_state_change = on_state_change
 
     def _on_entity_added(self, entity_type, entity_name):
+        """Handle entity added."""
         if not self._state_ref or not entity_name:
             return
         if entity_type == "npc":
@@ -1203,12 +1270,14 @@ class CharacterRelationsStep(WizardStep):
             return
         values = list(self._state_ref.get(field) or [])
         if entity_name not in values:
+            # Handle the branch where entity name is not in values.
             values.append(entity_name)
             self._state_ref[field] = values
             if callable(self._on_state_change):
                 self._on_state_change(source=self)
 
     def _on_entity_removed(self, entity_type, entity_name):
+        """Handle entity removed."""
         if not self._state_ref or not entity_name:
             return
         if entity_type == "npc":
@@ -1219,12 +1288,14 @@ class CharacterRelationsStep(WizardStep):
             return
         values = list(self._state_ref.get(field) or [])
         if entity_name in values:
+            # Handle the branch where entity name is in values.
             values = [value for value in values if value != entity_name]
             self._state_ref[field] = values
             if callable(self._on_state_change):
                 self._on_state_change(source=self)
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        """Load state."""
         self.sync_to_global_var.set(bool(state.get("ScenarioCharacterGraphSync")))
         scene_npcs = collect_scene_entity_names(state.get("Scenes"), "NPCs")
         merged_npcs = list(dict.fromkeys((state.get("NPCs") or []) + scene_npcs))
@@ -1237,11 +1308,13 @@ class CharacterRelationsStep(WizardStep):
         self.graph_editor.load_graph_data(graph_data)
 
     def save_state(self, state):  # pragma: no cover - UI synchronization
+        """Save state."""
         graph_data = self.graph_editor.export_graph_data()
         state["ScenarioCharacterGraph"] = graph_data
         npc_names = []
         pc_names = []
         for node in graph_data.get("nodes", []):
+            # Process each node from graph_data.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -1262,6 +1335,7 @@ class CharacterRelationsStep(WizardStep):
 
 class ReviewStep(WizardStep):
     def __init__(self, master):
+        """Initialize the ReviewStep instance."""
         super().__init__(master)
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=3)
@@ -1343,6 +1417,7 @@ class ReviewStep(WizardStep):
         self.details_text.grid(row=5, column=0, sticky="nsew", padx=16, pady=(0, 16))
 
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        """Load state."""
         title = state.get("Title", "Untitled Scenario")
         summary = state.get("Summary") or "(No summary provided.)"
         secrets = state.get("Secrets") or "(No secrets provided.)"
@@ -1356,6 +1431,7 @@ class ReviewStep(WizardStep):
 
         scenes = copy.deepcopy(state.get("Scenes") or [])
         for idx, scene in enumerate(scenes):
+            # Process each (idx, scene) from enumerate(scenes).
             if not isinstance(scene, dict):
                 continue
             canonical_scene = canonicalise_scene(scene, index=idx)
@@ -1366,6 +1442,7 @@ class ReviewStep(WizardStep):
         scene_count = len(scenes)
         entity_counts = []
         for field in SCENARIO_ENTITY_FIELD_NAMES:
+            # Process each field from SCENARIO_ENTITY_FIELD_NAMES.
             entries = state.get(field) or []
             if entries:
                 entity_counts.append(f"{len(entries)} {field}")
@@ -1389,6 +1466,7 @@ class ReviewStep(WizardStep):
 
         if scenes:
             for idx, scene in enumerate(scenes, start=1):
+                # Process each (idx, scene) from enumerate(scenes, start=1).
                 title_value = ""
                 if isinstance(scene, dict):
                     title_value = scene.get("Title") or scene.get("title") or ""
@@ -1400,6 +1478,7 @@ class ReviewStep(WizardStep):
             summary_lines.append("  (No scenes planned.)")
 
         for field in SCENARIO_ENTITY_FIELD_NAMES:
+            # Process each field from SCENARIO_ENTITY_FIELD_NAMES.
             entries = state.get(field) or []
             summary_lines.append("")
             summary_lines.append(f"{field}:")
@@ -1430,6 +1509,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         on_embedded_result=None,
         persist_on_finish=False,
     ):
+        """Initialize the ScenarioBuilderWizard instance."""
         super().__init__(master)
         self.title("Scenario Builder Wizard")
         self.geometry("1920x1080+0+0")
@@ -1498,12 +1578,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._destroy_scheduled = True
 
         try:
+            # Keep safe destroy resilient if this step fails.
             if self.winfo_exists():
                 self.withdraw()
         except Exception:
             pass
 
         def _finalize():
+            """Internal helper for finalize."""
             try:
                 super(ScenarioBuilderWizard, self).destroy()
             except Exception:
@@ -1515,12 +1597,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             _finalize()
 
     def destroy(self):  # pragma: no cover - UI teardown
+        """Handle destroy."""
         self._schedule_safe_destroy()
 
     def focus_set(self):  # pragma: no cover - UI focus handling
         """Safely set focus on the wizard if it still exists."""
 
         try:
+            # Keep focus set resilient if this step fails.
             if not self.winfo_exists():
                 return
         except Exception:
@@ -1535,6 +1619,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         """Safely force focus on the wizard if it still exists."""
 
         try:
+            # Keep focus force resilient if this step fails.
             if not self.winfo_exists():
                 return
         except Exception:
@@ -1546,6 +1631,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             pass
 
     def _build_layout(self):  # pragma: no cover - UI layout
+        """Build layout."""
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
@@ -1580,6 +1666,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.story_forge_btn.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
 
     def _create_steps(self):  # pragma: no cover - UI layout
+        """Create steps."""
         entity_wrappers = dict(self.entity_wrappers)
 
         planning_step = ScenesPlanningStep(
@@ -1616,7 +1703,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                 frame.set_state_binding(self.wizard_state, self._on_wizard_state_changed)
 
     def _launch_epic_finale_planner(self, state):  # pragma: no cover - UI interaction
+        """Launch epic finale planner."""
         try:
+            # Keep epic finale planner resilient if this step fails.
             from modules.scenarios.epic_finale_planner import EpicFinalePlannerWizard
         except Exception as exc:  # pragma: no cover - defensive path
             log_exception(
@@ -1631,6 +1720,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         payload = copy.deepcopy(state or {})
         try:
+            # Keep epic finale planner resilient if this step fails.
             wizard = EpicFinalePlannerWizard(
                 self.master,
                 on_saved=self.on_saved,
@@ -1659,7 +1749,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             pass
 
         def _close_original_wizard():
+            """Close original wizard."""
             try:
+                # Keep original wizard resilient if this step fails.
                 if not self.winfo_exists():
                     return
             except Exception:
@@ -1674,6 +1766,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             _close_original_wizard()
 
     def _show_step(self, index):  # pragma: no cover - UI navigation
+        """Show step."""
         title, frame = self.steps[index]
         self.header_label.configure(text=f"Step {index + 1} of {len(self.steps)}: {title}")
         frame.tkraise()
@@ -1681,7 +1774,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._update_navigation_buttons()
 
     def _on_wizard_state_changed(self, source=None):  # pragma: no cover - UI synchronization
+        """Handle wizard state changed."""
         for _, frame in self.steps:
+            # Process each (_, frame) from steps.
             if frame is source:
                 continue
             try:
@@ -1690,6 +1785,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                 pass
 
     def load_existing_scenario(self, scenario):  # pragma: no cover - UI interaction
+        """Load existing scenario."""
         planning_step = next(
             (frame for _, frame in self.steps if isinstance(frame, ScenesPlanningStep)),
             None,
@@ -1699,7 +1795,9 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         scenario_payload = None
         if isinstance(scenario, str):
+            # Handle the branch where isinstance(scenario, str).
             try:
+                # Keep existing scenario resilient if this step fails.
                 items = self.scenario_wrapper.load_items()
             except Exception as exc:
                 log_exception(
@@ -1709,6 +1807,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                 messagebox.showerror("Load Error", "Unable to load scenarios from the database.")
                 return
             for entry in items or []:
+                # Process each entry from items or [].
                 title = entry.get("Title") or entry.get("Name")
                 if title == scenario:
                     scenario_payload = entry
@@ -1726,12 +1825,14 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._show_step(self.current_step_index)
 
     def _update_navigation_buttons(self):  # pragma: no cover - UI navigation
+        """Update navigation buttons."""
         self.back_btn.configure(state="normal" if self.current_step_index > 0 else "disabled")
         is_last = self.current_step_index == len(self.steps) - 1
         self.next_btn.configure(state="disabled" if is_last else "normal")
         self.finish_btn.configure(state="normal" if is_last else "disabled")
 
     def go_next(self):  # pragma: no cover - UI navigation
+        """Handle go next."""
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.wizard_state):
             return
@@ -1739,6 +1840,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._show_step(self.current_step_index)
 
     def go_back(self):  # pragma: no cover - UI navigation
+        """Handle go back."""
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.wizard_state):
             return
@@ -1746,9 +1848,11 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._show_step(self.current_step_index)
 
     def cancel(self):  # pragma: no cover - UI navigation
+        """Handle cancel."""
         self.destroy()
 
     def _run_story_forge(self):  # pragma: no cover - UI interaction
+        """Run story forge."""
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.wizard_state):
             return
@@ -1788,16 +1892,19 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._set_navigation_enabled(False)
 
         def _worker():
+            """Internal helper for worker."""
             result = self.story_forge.run(request)
             payload = result.to_scenario_payload()
             self.after(0, lambda: _on_success(payload))
 
         def _on_success(payload: dict):
+            """Handle success."""
             self._set_navigation_enabled(True)
             self.load_existing_scenario(payload)
             messagebox.showinfo("Story Forge", "Scenario draft applied. Review and adjust before finishing.")
 
         def _on_error(exc: Exception):
+            """Handle error."""
             self._set_navigation_enabled(True)
             log_exception(
                 f"Story Forge failed: {exc}",
@@ -1808,16 +1915,20 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self._run_in_worker(_worker, on_error=_on_error)
 
     def _set_navigation_enabled(self, enabled: bool):  # pragma: no cover - UI interaction
+        """Set navigation enabled."""
         state = "normal" if enabled else "disabled"
         for btn in (self.back_btn, self.next_btn, self.finish_btn, self.cancel_btn, self.story_forge_btn):
             try:
+                # Keep navigation enabled resilient if this step fails.
                 if btn.winfo_exists():
                     btn.configure(state=state)
             except Exception:
                 continue
 
     def _run_in_worker(self, worker, *, on_error=None):
+        """Run in worker."""
         def _runner():
+            """Internal helper for runner."""
             try:
                 worker()
             except Exception as exc:  # pragma: no cover - threaded failure path
@@ -1829,8 +1940,11 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         threading.Thread(target=_runner, daemon=True).start()
 
     def _persist_scenario_payload(self, title, payload):
+        """Persist scenario payload."""
         while True:
+            # Keep looping while True.
             try:
+                # Keep scenario payload resilient if this step fails.
                 items = self.scenario_wrapper.load_items()
                 break
             except (sqlite3.Error, json.JSONDecodeError):
@@ -1847,6 +1961,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         replaced = False
         for idx, existing in enumerate(items):
             if existing.get("Title") == title:
+                # Handle the branch where existing.get('Title') == title.
                 if not messagebox.askyesno(
                     "Overwrite Scenario",
                     f"A scenario titled '{title}' already exists. Overwrite it?",
@@ -1868,6 +1983,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         return True, replaced
 
     def finish(self):  # pragma: no cover - UI navigation
+        """Handle finish."""
         step = self.steps[self.current_step_index][1]
         if not step.save_state(self.wizard_state):
             return
@@ -1905,13 +2021,17 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             btn.configure(state="disabled")
 
         try:
+            # Keep finish resilient if this step fails.
             if self.mode == "embedded":
+                # Handle the branch where mode == 'embedded'.
                 if self.persist_on_finish:
+                    # Continue with this path when persist on finish is set.
                     persisted, _ = self._persist_scenario_payload(title, payload)
                     if not persisted:
                         return
                 if callable(self.on_embedded_result):
                     try:
+                        # Keep finish resilient if this step fails.
                         callback_payload = build_embedded_result_payload(
                             StoryForgeResponse(
                                 title=payload["Title"],
@@ -1947,6 +2067,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                     pass
             if sync_graph:
                 try:
+                    # Keep finish resilient if this step fails.
                     sync_scenario_graph_to_global(
                         self.wizard_state.get("ScenarioCharacterGraph") or {},
                         title,

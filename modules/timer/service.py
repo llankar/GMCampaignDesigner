@@ -1,3 +1,5 @@
+﻿"""Service helpers for timer."""
+
 from __future__ import annotations
 
 import time
@@ -13,9 +15,15 @@ log_module_import(__name__)
 
 
 class TkAfterScheduler(Protocol):
-    def after(self, delay_ms: int, callback: Callable[[], None]) -> str: ...
+    """Protocol for Tk-compatible scheduling hooks used by the timer service."""
 
-    def after_cancel(self, after_id: str) -> None: ...
+    def after(self, delay_ms: int, callback: Callable[[], None]) -> str:
+        """Schedule a callback after the given delay."""
+        ...
+
+    def after_cancel(self, after_id: str) -> None:
+        """Cancel a previously scheduled callback."""
+        ...
 
 
 TimerSubscriber = Callable[[List[TimerState]], None]
@@ -29,6 +37,7 @@ class TimerService:
         persistence: Optional[TimerPersistence] = None,
         tick_ms: int = 200,
     ) -> None:
+        """Initialize the TimerService instance."""
         self._scheduler = scheduler
         self._persistence = persistence or TimerPersistence()
         self._tick_ms = max(50, int(tick_ms))
@@ -45,20 +54,25 @@ class TimerService:
         self._load_persisted_state()
 
     def set_scheduler(self, scheduler: TkAfterScheduler) -> None:
+        """Set scheduler."""
         self._scheduler = scheduler
         self._ensure_tick_loop()
 
     def subscribe(self, callback: TimerSubscriber) -> None:
+        """Handle subscribe."""
         self._subscribers.add(callback)
         callback(self.list_timers())
 
     def unsubscribe(self, callback: TimerSubscriber) -> None:
+        """Handle unsubscribe."""
         self._subscribers.discard(callback)
 
     def subscribe_finished(self, callback: TimerFinishedSubscriber) -> None:
+        """Handle subscribe finished."""
         self._finished_subscribers.add(callback)
 
     def unsubscribe_finished(self, callback: TimerFinishedSubscriber) -> None:
+        """Handle unsubscribe finished."""
         self._finished_subscribers.discard(callback)
 
     def create_timer(
@@ -69,6 +83,7 @@ class TimerService:
         repeat: bool = False,
         color_tag: str = "",
     ) -> TimerState:
+        """Create timer."""
         timer_id = str(uuid.uuid4())
         normalized_mode = "countdown" if mode not in {"countdown", "stopwatch"} else mode
         duration = max(0.0, float(duration or 0.0))
@@ -88,6 +103,7 @@ class TimerService:
         return replace(timer)
 
     def start(self, timer_id: str) -> Optional[TimerState]:
+        """Start the operation."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -104,6 +120,7 @@ class TimerService:
         return replace(timer)
 
     def pause(self, timer_id: str) -> Optional[TimerState]:
+        """Handle pause."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -114,6 +131,7 @@ class TimerService:
         return replace(timer)
 
     def resume(self, timer_id: str) -> Optional[TimerState]:
+        """Handle resume."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -125,6 +143,7 @@ class TimerService:
         return replace(timer)
 
     def stop(self, timer_id: str) -> Optional[TimerState]:
+        """Stop the operation."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -135,6 +154,7 @@ class TimerService:
         return replace(timer)
 
     def reset(self, timer_id: str) -> Optional[TimerState]:
+        """Reset the operation."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -147,6 +167,7 @@ class TimerService:
         return replace(timer)
 
     def delete_timer(self, timer_id: str) -> bool:
+        """Delete timer."""
         if timer_id not in self._timers:
             return False
         self._timers.pop(timer_id, None)
@@ -155,6 +176,7 @@ class TimerService:
         return True
 
     def set_repeat(self, timer_id: str, repeat: bool) -> Optional[TimerState]:
+        """Set repeat."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -163,6 +185,7 @@ class TimerService:
         return replace(timer)
 
     def add_time(self, timer_id: str, delta_seconds: float) -> Optional[TimerState]:
+        """Handle add time."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -174,9 +197,11 @@ class TimerService:
         return replace(timer)
 
     def subtract_time(self, timer_id: str, delta_seconds: float) -> Optional[TimerState]:
+        """Handle subtract time."""
         return self.add_time(timer_id, -float(delta_seconds))
 
     def lap(self, timer_id: str) -> Optional[float]:
+        """Handle lap."""
         timer = self._timers.get(timer_id)
         if timer is None:
             return None
@@ -190,7 +215,9 @@ class TimerService:
         return value
 
     def next_in_queue(self) -> Optional[TimerState]:
+        """Handle next in queue."""
         for timer_id in self._order:
+            # Process each timer_id from _order.
             timer = self._timers.get(timer_id)
             if timer is None or timer.running:
                 continue
@@ -200,9 +227,11 @@ class TimerService:
         return None
 
     def list_timers(self) -> List[TimerState]:
+        """Handle list timers."""
         return [replace(self._timers[timer_id]) for timer_id in self._order if timer_id in self._timers]
 
     def list_presets(self) -> List[TimerPreset]:
+        """Handle list presets."""
         return [replace(preset) for preset in self._presets.values()]
 
     def save_preset(
@@ -213,6 +242,7 @@ class TimerService:
         repeat: bool = False,
         color_tag: str = "",
     ) -> TimerPreset:
+        """Save preset."""
         preset = TimerPreset(
             id=str(uuid.uuid4()),
             name=name.strip() or "Preset",
@@ -226,6 +256,7 @@ class TimerService:
         return replace(preset)
 
     def delete_preset(self, preset_id: str) -> bool:
+        """Delete preset."""
         if preset_id not in self._presets:
             return False
         self._presets.pop(preset_id, None)
@@ -233,6 +264,7 @@ class TimerService:
         return True
 
     def _load_persisted_state(self) -> None:
+        """Load persisted state."""
         timers, presets = self._persistence.load()
         for timer in timers:
             timer.running = False
@@ -243,6 +275,7 @@ class TimerService:
             self._presets[preset.id] = preset
 
     def _tick(self) -> None:
+        """Internal helper for tick."""
         self._after_id = None
         now = time.monotonic()
         delta = max(0.0, now - (self._last_tick_ts or now))
@@ -250,10 +283,12 @@ class TimerService:
 
         changed = False
         for timer in self._timers.values():
+            # Process each timer from _timers.values().
             if not timer.running:
                 continue
 
             if timer.mode == "countdown":
+                # Handle the branch where timer.mode == 'countdown'.
                 timer.remaining = max(0.0, timer.remaining - delta)
                 if timer.remaining <= 0:
                     if timer.repeat and timer.duration > 0:
@@ -282,6 +317,7 @@ class TimerService:
         self._ensure_tick_loop()
 
     def _ensure_tick_loop(self) -> None:
+        """Ensure tick loop."""
         if self._scheduler is None:
             return
         if self._after_id is not None:
@@ -292,14 +328,17 @@ class TimerService:
         self._after_id = self._scheduler.after(self._tick_ms, self._tick)
 
     def _notify_subscribers(self) -> None:
+        """Notify subscribers."""
         snapshot = self.list_timers()
         for callback in list(self._subscribers):
             callback(snapshot)
 
     def _persist(self) -> None:
+        """Persist the operation."""
         self._persistence.save(self.list_timers(), self.list_presets())
 
     def _persist_and_publish(self, schedule: bool = False) -> None:
+        """Persist and publish."""
         self._persist()
         self._notify_subscribers()
         if schedule:
@@ -310,6 +349,7 @@ class TimerService:
             self._after_id = None
 
     def _notify_finished(self, timer: TimerState) -> None:
+        """Notify finished."""
         snapshot = replace(timer)
         for callback in list(self._finished_subscribers):
             callback(snapshot)

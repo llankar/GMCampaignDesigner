@@ -1,3 +1,5 @@
+"""Controller for updater UI."""
+
 from __future__ import annotations
 
 import traceback
@@ -16,12 +18,14 @@ _LOG_PATH = Path(tempfile.gettempdir()) / "gmcampaign_updater.log"
 
 class UpdaterController:
     def __init__(self, args) -> None:
+        """Initialize the UpdaterController instance."""
         self.args = args
         self.window = UpdaterWindow()
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.exit_code = 1
 
     def run(self) -> int:
+        """Run the operation."""
         worker = threading.Thread(target=self._run_update, args=(self.args,), daemon=True)
         worker.start()
         self.window.root.after(100, self._pump_events)
@@ -29,7 +33,9 @@ class UpdaterController:
         return self.exit_code
 
     def _run_update(self, args: object) -> None:
+        """Run update."""
         try:
+            # Keep update resilient if this step fails.
             apply_update(args, progress_cb=self._progress_callback)
         except Exception as exc:
             self._write_error_log(exc)
@@ -38,25 +44,31 @@ class UpdaterController:
         self.events.put(("done", None))
 
     def _progress_callback(self, message: str, fraction: float) -> None:
+        """Internal helper for progress callback."""
         self.events.put(("progress", (message, fraction)))
 
     def _pump_events(self) -> None:
+        """Internal helper for pump events."""
         keep_running = True
         while True:
+            # Keep looping while True.
             try:
                 event, payload = self.events.get_nowait()
             except queue.Empty:
                 break
 
             if event == "progress":
+                # Handle the branch where event == 'progress'.
                 message, fraction = payload  # type: ignore[misc]
                 self.window.set_progress(message, fraction)
             elif event == "done":
+                # Handle the branch where event == 'done'.
                 self.exit_code = 0
                 self.window.show_success()
                 self.window.root.after(1200, self.window.root.destroy)
                 keep_running = False
             elif event == "error":
+                # Handle the branch where event == 'error'.
                 self.exit_code = 1
                 error = payload
                 clear_message = (
@@ -73,6 +85,7 @@ class UpdaterController:
             self.window.root.after(100, self._pump_events)
 
     def _write_error_log(self, exc: Exception) -> None:
+        """Internal helper for write error log."""
         _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with _LOG_PATH.open("a", encoding="utf-8") as handle:
             handle.write("\n=== GMCampaignDesigner updater failure ===\n")
@@ -80,6 +93,7 @@ class UpdaterController:
 
 
 def run_updater_app() -> int:
+    """Run updater app."""
     args = parse_args()
     controller = UpdaterController(args)
     return controller.run()

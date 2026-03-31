@@ -1,3 +1,5 @@
+"""Window for timer."""
+
 from __future__ import annotations
 
 from typing import List, Optional
@@ -16,6 +18,7 @@ class TimerWindow:
     """Coordinates a compact control window + transparent display window."""
 
     def __init__(self, parent):
+        """Initialize the TimerWindow instance."""
         self._parent = parent
         self._timer_service = get_timer_service(scheduler=parent)
         self._timer_id: Optional[str] = None
@@ -43,15 +46,19 @@ class TimerWindow:
         self.display.hide()
 
     def show(self) -> None:
+        """Show the operation."""
         self.control.show()
 
     def _close_control(self) -> None:
+        """Close control."""
         self.control.withdraw()
 
     def _open_controls_from_display(self) -> None:
+        """Open controls from display."""
         self.control.show()
 
     def _ensure_timer(self) -> Optional[TimerState]:
+        """Ensure timer."""
         if self._timer_id:
             for timer in self._timer_service.list_timers():
                 if timer.id == self._timer_id:
@@ -62,6 +69,7 @@ class TimerWindow:
         return timer
 
     def _start(self) -> None:
+        """Start the operation."""
         duration = parse_time_to_seconds(self.control.time_var.get(), fallback=self._last_duration_seconds)
         self._last_duration_seconds = duration
         timer = self._ensure_timer()
@@ -78,6 +86,7 @@ class TimerWindow:
         self.display.show()
 
     def _stop(self) -> None:
+        """Stop the operation."""
         timer = self._ensure_timer()
         if not timer:
             return
@@ -87,17 +96,20 @@ class TimerWindow:
         self.display.hide()
 
     def _pause(self) -> None:
+        """Internal helper for pause."""
         timer = self._ensure_timer()
         if timer:
             self._timer_service.pause(timer.id)
 
     def _continue(self) -> None:
+        """Internal helper for continue."""
         timer = self._ensure_timer()
         if timer:
             self._timer_service.resume(timer.id)
             self.display.show()
 
     def _delete_timer(self) -> None:
+        """Delete timer."""
         if self._timer_id:
             self._timer_service.delete_timer(self._timer_id)
             self._timer_id = None
@@ -105,6 +117,7 @@ class TimerWindow:
         self.display.hide()
 
     def _adjust(self, seconds: float) -> None:
+        """Internal helper for adjust."""
         timer = self._ensure_timer()
         if not timer:
             return
@@ -114,6 +127,7 @@ class TimerWindow:
             self._timer_service.subtract_time(timer.id, abs(seconds))
 
     def _on_timers_changed(self, timers: List[TimerState]) -> None:
+        """Handle timers changed."""
         timer = None
         if self._timer_id:
             timer = next((item for item in timers if item.id == self._timer_id), None)
@@ -127,6 +141,7 @@ class TimerWindow:
 
 
     def _on_timer_finished(self, timer: TimerState) -> None:
+        """Handle timer finished."""
         if timer.id != self._timer_id:
             return
         self.display.show()
@@ -134,6 +149,7 @@ class TimerWindow:
         self._alerts.notify_finished(timer.name)
 
     def destroy(self) -> None:
+        """Handle destroy."""
         self._timer_service.unsubscribe(self._on_timers_changed)
         self._timer_service.unsubscribe_finished(self._on_timer_finished)
         for window in (self.control, self.display):

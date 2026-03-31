@@ -1,3 +1,5 @@
+"""Window for event calendar."""
+
 from datetime import date, timedelta
 import tkinter as tk
 
@@ -38,6 +40,7 @@ class CalendarWindow(ctk.CTkToplevel):
         on_open_entity=None,
         entity_link_service=None,
     ):
+        """Initialize the CalendarWindow instance."""
         super().__init__(master)
         self.title("Calendrier complet")
         self.geometry("1250x760")
@@ -78,6 +81,7 @@ class CalendarWindow(ctk.CTkToplevel):
     def _raise_above_parent(self):
         """Ensure the calendar opens above the main window without staying always-on-top."""
         try:
+            # Keep raise above parent resilient if this step fails.
             self.attributes("-topmost", True)
             self.lift()
             self.focus_force()
@@ -87,6 +91,7 @@ class CalendarWindow(ctk.CTkToplevel):
 
     @classmethod
     def _normalize_view_mode(cls, mode):
+        """Normalize view mode."""
         normalized = str(mode or "").lower().strip()
         if normalized in cls.SUPPORTED_VIEWS:
             return normalized
@@ -94,9 +99,11 @@ class CalendarWindow(ctk.CTkToplevel):
 
     @staticmethod
     def _start_of_week(target_date):
+        """Start of week."""
         return target_date - timedelta(days=target_date.weekday())
 
     def _build_ui(self, initial_panel_widths=None):
+        """Build UI."""
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -148,12 +155,14 @@ class CalendarWindow(ctk.CTkToplevel):
 
 
     def _bind_responsive_events(self):
+        """Bind responsive events."""
         self.bind("<Configure>", self._on_window_resized)
         self.bind("<KeyPress-n>", self._on_new_event_shortcut)
         self.bind("<KeyPress-N>", self._on_new_event_shortcut)
         self.bind("<ButtonRelease-1>", self._on_sash_interaction, add="+")
 
     def _on_window_resized(self, event):
+        """Handle window resized."""
         if event.widget is not self:
             return
         should_compact = event.width < 980
@@ -162,19 +171,23 @@ class CalendarWindow(ctk.CTkToplevel):
             self.event_detail_panel.set_compact_mode(self.is_detail_compact)
 
     def _on_filters_changed(self, filters):
+        """Handle filters changed."""
         self.panel_filters.update(filters)
         self._render()
         self._emit_state_change()
 
     def _on_compact_toggle(self, is_compact):
+        """Handle compact toggle."""
         self.is_detail_compact = bool(is_compact)
         self._emit_state_change()
 
     def _on_quick_edit(self, event, new_title):
+        """Handle quick edit."""
         event["title"] = new_title
         self._render_detail_panel()
 
     def _on_event_moved(self, event, target_date, target_time=None):
+        """Handle event moved."""
         if not callable(self.on_update_event):
             return
         if self.on_update_event(event, target_date=target_date, target_time=target_time):
@@ -184,28 +197,34 @@ class CalendarWindow(ctk.CTkToplevel):
             self._emit_state_change()
 
     def _on_calendar_event_click(self, event):
+        """Handle calendar event click."""
         if not isinstance(event, dict):
             return
         self._open_event_editor(event)
 
 
     def _on_open_entity(self, entity_type, entity_name):
+        """Handle open entity."""
         if callable(self.on_open_entity):
             self.on_open_entity(entity_type, entity_name)
 
     def _open_timeline_simulator(self):
+        """Open timeline simulator."""
         if callable(self.on_open_timeline_simulator):
             self.on_open_timeline_simulator(parent=self, target_date=self.active_date)
 
     def _on_new_event_shortcut(self, _event=None):
+        """Handle new event shortcut."""
         self._open_full_editor()
 
     def _open_full_editor(self):
+        """Open full editor."""
         initial_values = {
             "date": self.active_date,
         }
 
         def _save_from_editor(payload):
+            """Save from editor."""
             self._create_event(payload)
 
         EventEditorDialog(
@@ -216,6 +235,7 @@ class CalendarWindow(ctk.CTkToplevel):
         )
 
     def _open_event_editor(self, event):
+        """Open event editor."""
         initial_values = {
             "title": event.get("title") or "",
             "date": event.get("date"),
@@ -238,6 +258,7 @@ class CalendarWindow(ctk.CTkToplevel):
         }
 
         def _save_from_editor(payload):
+            """Save from editor."""
             self._update_event(event, payload)
 
         EventEditorDialog(
@@ -249,11 +270,13 @@ class CalendarWindow(ctk.CTkToplevel):
         )
 
     def _update_event(self, event, payload):
+        """Update event."""
         if not callable(self.on_update_event):
             return
 
         new_date = payload.get("date")
         if self.on_update_event(event, target_date=new_date, payload=payload):
+            # Handle the branch where on_update_event(event, target_date=new_date, payload=payload).
             resolved_date = payload.get("date")
             if isinstance(resolved_date, date):
                 self.active_date = resolved_date
@@ -262,13 +285,16 @@ class CalendarWindow(ctk.CTkToplevel):
             self._emit_state_change()
 
     def _on_calendar_cell_click(self, selected_date, start_time=None):
+        """Handle calendar cell click."""
         self._select_day(selected_date)
         self._open_quick_add(selected_date, start_time=start_time)
 
     def _on_calendar_cell_double_click(self, selected_date, start_time=None):
+        """Handle calendar cell double click."""
         self._select_day(selected_date)
 
     def _open_quick_add(self, selected_date, start_time=None):
+        """Open quick add."""
         QuickAddPopover(
             self,
             initial_date=selected_date,
@@ -278,6 +304,7 @@ class CalendarWindow(ctk.CTkToplevel):
         )
 
     def _create_event(self, payload):
+        """Create event."""
         if not callable(self.on_create_event):
             return
         created = self.on_create_event(payload)
@@ -291,7 +318,9 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def _go_previous(self):
+        """Internal helper for go previous."""
         if self.view_mode == self.VIEW_MONTH:
+            # Handle the branch where view_mode == VIEW_MONTH.
             year, month = self.anchor_date.year, self.anchor_date.month
             if month == 1:
                 year, month = year - 1, 12
@@ -310,7 +339,9 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def _go_next(self):
+        """Internal helper for go next."""
         if self.view_mode == self.VIEW_MONTH:
+            # Handle the branch where view_mode == VIEW_MONTH.
             year, month = self.anchor_date.year, self.anchor_date.month
             if month == 12:
                 year, month = year + 1, 1
@@ -329,9 +360,11 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def _jump_today(self):
+        """Internal helper for jump today."""
         self.focus_date(CampaignDateService.get_today(), view_mode=self.view_mode, auto_select=True)
 
     def set_view_mode(self, view_mode):
+        """Set view mode."""
         normalized = self._normalize_view_mode(view_mode)
         if normalized == self.view_mode:
             return
@@ -341,6 +374,7 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def focus_date(self, target_date, view_mode=None, auto_select=True):
+        """Handle focus date."""
         if target_date is None:
             target_date = CampaignDateService.get_today()
         if view_mode is not None:
@@ -354,12 +388,14 @@ class CalendarWindow(ctk.CTkToplevel):
         self._emit_state_change()
 
     def _select_day(self, selected_date):
+        """Select day."""
         self.active_date = selected_date
         self.anchor_date = selected_date
         self._render()
         self._emit_state_change()
 
     def _render(self):
+        """Render the operation."""
         filtered_events = self._filtered_events()
         unique_types = sorted({str(event.get("type") or "").strip() for event in filtered_events if event.get("type")})
         unique_statuses = sorted({str(event.get("status") or "").strip() for event in filtered_events if event.get("status")})
@@ -390,6 +426,7 @@ class CalendarWindow(ctk.CTkToplevel):
         self._render_detail_panel()
 
     def _render_detail_panel(self):
+        """Render detail panel."""
         events = [event for event in self.get_events_for_day(self.active_date) if self._passes_filters(event)]
         self.event_detail_panel.render(
             active_date=self.active_date,
@@ -399,9 +436,11 @@ class CalendarWindow(ctk.CTkToplevel):
         self.event_detail_panel.set_compact_mode(self.is_detail_compact)
 
     def _filtered_events(self):
+        """Internal helper for filtered events."""
         return [event for event in self.get_events_for_range(date.min, date.max) if self._passes_filters(event)]
 
     def _passes_filters(self, event):
+        """Internal helper for passes filters."""
         text = str(self.panel_filters.get("search_text") or "").strip().lower()
         type_filter = str(self.panel_filters.get("type") or "").strip().lower()
         entity_filter = str(self.panel_filters.get("entity") or "").strip().lower()
@@ -421,6 +460,7 @@ class CalendarWindow(ctk.CTkToplevel):
             return False
 
         if text:
+            # Continue with this path when text is set.
             haystack = [
                 str(event.get("title") or "").lower(),
                 str(event.get("type") or "").lower(),
@@ -433,13 +473,16 @@ class CalendarWindow(ctk.CTkToplevel):
         return True
 
     def _close_window(self):
+        """Close window."""
         self._emit_state_change()
         self.withdraw()
 
     def _on_sash_interaction(self, _event=None):
+        """Handle sash interaction."""
         self._emit_state_change()
 
     def _restore_panel_widths(self, panel_widths):
+        """Restore panel widths."""
         if not isinstance(panel_widths, dict):
             return
         try:
@@ -463,6 +506,7 @@ class CalendarWindow(ctk.CTkToplevel):
                 pass
 
     def _collect_state(self):
+        """Collect state."""
         left_sidebar = None
         center_grid = None
         try:
@@ -485,6 +529,7 @@ class CalendarWindow(ctk.CTkToplevel):
         }
 
     def _emit_state_change(self):
+        """Internal helper for emit state change."""
         if callable(self.on_state_change):
             state = self._collect_state()
             self.on_state_change(state)

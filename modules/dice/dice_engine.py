@@ -35,14 +35,17 @@ class ParsedFormula:
     modifier: int = 0
 
     def __post_init__(self) -> None:
+        """Finalize dataclass initialization."""
         normalized = {int(faces): int(count) for faces, count in dict(self.dice).items() if int(count) != 0}
         object.__setattr__(self, "dice", MappingProxyType(normalized))
 
     @property
     def total_dice(self) -> int:
+        """Handle total dice."""
         return sum(self.dice.values())
 
     def canonical(self) -> str:
+        """Handle canonical."""
         return format_formula(self.dice, self.modifier)
 
 
@@ -63,10 +66,12 @@ class DieRollChain:
 
     @property
     def total(self) -> int:
+        """Handle total."""
         return sum(roll.value for roll in self.rolls)
 
     @property
     def display_values(self) -> Tuple[str, ...]:
+        """Handle display values."""
         return tuple(f"{roll.value}{'!' if roll.exploded else ''}" for roll in self.rolls)
 
 
@@ -80,10 +85,12 @@ class FaceRollSummary:
 
     @property
     def total(self) -> int:
+        """Handle total."""
         return sum(roll.value for roll in self.rolls)
 
     @property
     def display_values(self) -> Tuple[str, ...]:
+        """Handle display values."""
         return tuple(f"{roll.value}{'!' if roll.exploded else ''}" for roll in self.rolls)
 
 
@@ -99,15 +106,19 @@ class RollResult:
 
     @property
     def modifier(self) -> int:
+        """Handle modifier."""
         return self.parsed.modifier
 
     def canonical(self) -> str:
+        """Handle canonical."""
         return self.parsed.canonical()
 
     def totals_by_face(self) -> Mapping[int, int]:
+        """Handle totals by face."""
         return {summary.faces: summary.total for summary in self.face_summaries}
 
     def display_values_by_face(self) -> Mapping[int, Tuple[str, ...]]:
+        """Handle display values by face."""
         return {summary.faces: summary.display_values for summary in self.face_summaries}
 
 
@@ -125,6 +136,7 @@ def parse_formula(formula: str, *, supported_faces: Iterable[int] | None = None)
     sign = "+"
     for char in cleaned:
         if char in "+-":
+            # Handle the branch where char is in '+-'.
             if current:
                 tokens.append((sign, current))
                 current = ""
@@ -139,9 +151,11 @@ def parse_formula(formula: str, *, supported_faces: Iterable[int] | None = None)
     seen_dice_segment = False
 
     for sign, token in tokens:
+        # Process each (sign, token) from tokens.
         if not token:
             raise FormulaError("Formula contains an empty segment.")
         if "d" in token:
+            # Handle the branch where 'd' is in token.
             count_str, _, faces_str = token.partition("d")
             if not faces_str:
                 raise FormulaError("Missing die size in formula.")
@@ -184,6 +198,7 @@ def format_formula(dice: Mapping[int, int], modifier: int) -> str:
 
     parts: list[str] = []
     for faces in sorted(dice):
+        # Process each faces from sorted(dice).
         count = dice[faces]
         if count <= 0:
             continue
@@ -217,11 +232,14 @@ def roll_parsed_formula(
     per_face_rolls: dict[int, list[DieRoll]] = defaultdict(list)
 
     for faces in sorted(parsed.dice):
+        # Process each faces from sorted(parsed.dice).
         count = parsed.dice[faces]
         for _ in range(count):
+            # Process each _ from range(count).
             chain_rolls: list[DieRoll] = []
             keep_rolling = True
             while keep_rolling:
+                # Keep looping while keep_rolling.
                 value = generator.randint(1, faces)
                 exploded = explode and faces > 1 and value == faces
                 die_roll = DieRoll(value=value, exploded=exploded)

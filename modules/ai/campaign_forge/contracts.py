@@ -1,3 +1,4 @@
+"""Contracts for campaign forge."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -25,7 +26,9 @@ class CampaignForgeResponse:
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def to_persistence_payload(self) -> dict[str, Any]:
+        """Handle to persistence payload."""
         return dict(self.persistence_payload)
 
     def to_preview_payload(self) -> dict[str, Any]:
+        """Handle to preview payload."""
         return dict(self.preview_payload)

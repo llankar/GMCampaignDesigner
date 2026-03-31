@@ -21,6 +21,7 @@ class AudioController:
     """Coordinates shared audio playback state."""
 
     def __init__(self, library: Optional[AudioLibrary] = None) -> None:
+        """Initialize the AudioController instance."""
         self.library = library or AudioLibrary()
         self._lock = threading.RLock()
         self._players: Dict[str, AudioPlayer] = {}
@@ -28,6 +29,7 @@ class AudioController:
         self._state: Dict[str, Dict[str, Any]] = {}
 
         for section in SECTION_KEYS:
+            # Process each section from SECTION_KEYS.
             player = AudioPlayer()
             self._players[section] = player
             initial_state = self._initial_state(section)
@@ -46,11 +48,13 @@ class AudioController:
     # Listener handling
     # ------------------------------------------------------------------
     def add_listener(self, callback: ControllerListener) -> None:
+        """Handle add listener."""
         with self._lock:
             if callback not in self._listeners:
                 self._listeners.append(callback)
 
     def remove_listener(self, callback: ControllerListener) -> None:
+        """Remove listener."""
         with self._lock:
             if callback in self._listeners:
                 self._listeners.remove(callback)
@@ -62,6 +66,7 @@ class AudioController:
         payload: Optional[Dict[str, Any]] = None,
         **extra: Any,
     ) -> None:
+        """Internal helper for emit."""
         with self._lock:
             listeners = list(self._listeners)
         merged_payload: Dict[str, Any] = {}
@@ -90,11 +95,13 @@ class AudioController:
         category: Optional[str] = None,
         mood: Optional[str] = None,
     ) -> None:
+        """Set playlist."""
         player = self._get_player(section)
         playlist = list(tracks)
         player.set_playlist(playlist)
 
         def _track_in_playlist(track: Optional[Dict[str, Any]], playlist_items: List[Dict[str, Any]]) -> bool:
+            """Internal helper for track in playlist."""
             if not isinstance(track, dict):
                 return False
 
@@ -102,6 +109,7 @@ class AudioController:
             track_path = track.get("path")
 
             for item in playlist_items:
+                # Process each item from playlist_items.
                 if not isinstance(item, dict):
                     continue
                 if track_id and item.get("id") == track_id:
@@ -111,6 +119,7 @@ class AudioController:
             return False
 
         with self._lock:
+            # Keep this resource scoped to playlist.
             state = self._state[section]
             state["playlist"] = list(playlist)
             state["category"] = category
@@ -143,6 +152,7 @@ class AudioController:
         start_index: Optional[int] = None,
         track_id: Optional[str] = None,
     ) -> bool:
+        """Handle play."""
         player = self._get_player(section)
         if track_id is not None:
             success = player.play_track_id(track_id)
@@ -154,13 +164,16 @@ class AudioController:
         return success
 
     def pause(self, section: str) -> None:
+        """Handle pause."""
         player = self._get_player(section)
         player.stop()
 
     def stop(self, section: str) -> None:
+        """Stop the operation."""
         self.pause(section)
 
     def next(self, section: str) -> bool:
+        """Handle next."""
         player = self._get_player(section)
         success = player.next()
         self._update_last_error(section, player.last_error if not success else "")
@@ -169,6 +182,7 @@ class AudioController:
         return success
 
     def previous(self, section: str) -> bool:
+        """Handle previous."""
         player = self._get_player(section)
         success = player.previous()
         self._update_last_error(section, player.last_error if not success else "")
@@ -177,32 +191,38 @@ class AudioController:
         return success
 
     def set_shuffle(self, section: str, enabled: bool) -> None:
+        """Set shuffle."""
         player = self._get_player(section)
         player.set_shuffle(bool(enabled))
         self.library.set_setting(section, "shuffle", bool(enabled))
 
     def set_loop(self, section: str, enabled: bool) -> None:
+        """Set loop."""
         player = self._get_player(section)
         player.set_loop(bool(enabled))
         self.library.set_setting(section, "loop", bool(enabled))
 
     def set_continue(self, section: str, enabled: bool) -> None:
+        """Set continue."""
         player = self._get_player(section)
         player.set_continue(bool(enabled))
         self.library.set_setting(section, "continue", bool(enabled))
 
     def set_volume(self, section: str, value: float) -> None:
+        """Set volume."""
         player = self._get_player(section)
         normalized = max(0.0, min(float(value), 1.0))
         player.set_volume(normalized)
         self.library.set_setting(section, "volume", normalized)
 
     def get_state(self, section: str) -> Dict[str, Any]:
+        """Return state."""
         with self._lock:
             state = self._state.get(section, {})
             return copy.deepcopy(state)
 
     def get_last_error(self, section: str) -> str:
+        """Return last error."""
         with self._lock:
             state = self._state.get(section, {})
             return str(state.get("last_error", ""))
@@ -211,6 +231,7 @@ class AudioController:
     # Internal helpers
     # ------------------------------------------------------------------
     def _initial_state(self, section: str) -> Dict[str, Any]:
+        """Internal helper for initial state."""
         volume = float(self.library.get_setting(section, "volume", 0.8) or 0.0)
         shuffle = bool(self.library.get_setting(section, "shuffle", False))
         loop = bool(self.library.get_setting(section, "loop", False))
@@ -230,11 +251,13 @@ class AudioController:
         }
 
     def _restore_last_playlist(self, section: str) -> None:
+        """Restore last playlist."""
         category = str(self.library.get_setting(section, "last_category", "") or "")
         mood = str(self.library.get_setting(section, "last_mood", "") or "")
         if not category:
             return
         try:
+            # Keep last playlist resilient if this step fails.
             tracks = self.library.list_tracks(section, category, mood=mood or None)
         except KeyError:
             self.library.set_setting(section, "last_category", "")
@@ -248,6 +271,7 @@ class AudioController:
         last_track_id = str(self.library.get_setting(section, "last_track_id", "") or "")
         selected_track: Optional[Dict[str, Any]] = None
         if last_track_id:
+            # Continue with this path when last track ID is set.
             for track in tracks:
                 if str(track.get("id")) == last_track_id:
                     selected_track = track
@@ -255,6 +279,7 @@ class AudioController:
             if selected_track is None:
                 self.library.set_setting(section, "last_track_id", "")
         with self._lock:
+            # Keep this resource scoped to last playlist.
             state = self._state[section]
             state["playlist"] = list(tracks)
             state["category"] = category
@@ -263,24 +288,30 @@ class AudioController:
                 state["last_track"] = copy.deepcopy(selected_track)
 
     def _get_player(self, section: str) -> AudioPlayer:
+        """Return player."""
         try:
             return self._players[section]
         except KeyError as exc:
             raise KeyError(f"Unknown audio section '{section}'.") from exc
 
     def _update_last_error(self, section: str, message: str) -> None:
+        """Update last error."""
         with self._lock:
             self._state[section]["last_error"] = message
         self._emit("state_changed", section, state=self.get_state(section))
 
     def _handle_player_event(self, section: str, event: str, payload: Dict[str, Any]) -> None:
+        """Internal helper for handle player event."""
         with self._lock:
+            # Keep this resource scoped to handle player event.
             state = self._state[section]
             if event == "track_started":
+                # Handle the branch where event == 'track_started'.
                 raw_track = payload.get("track")
                 track = copy.deepcopy(raw_track) if isinstance(raw_track, dict) else raw_track
                 state["current_track"] = track
                 if isinstance(track, dict):
+                    # Handle the branch where isinstance(track, dict).
                     state["last_track"] = copy.deepcopy(track)
                     track_id = track.get("id")
                     if track_id:
@@ -298,6 +329,7 @@ class AudioController:
                 state["is_playing"] = True
                 state["last_error"] = ""
             elif event == "stopped":
+                # Handle the branch where event == 'stopped'.
                 state["is_playing"] = False
                 raw_track = payload.get("track")
                 if isinstance(raw_track, dict):
@@ -305,6 +337,7 @@ class AudioController:
                 elif raw_track is not None:
                     state["last_track"] = raw_track
             elif event == "playlist_ended":
+                # Handle the branch where event == 'playlist_ended'.
                 state["is_playing"] = False
                 if isinstance(state.get("current_track"), dict):
                     state["last_track"] = copy.deepcopy(state["current_track"])

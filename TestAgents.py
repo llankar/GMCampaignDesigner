@@ -1,3 +1,5 @@
+"""Ad hoc harness for local agent integration experiments."""
+
 import os
 import time
 
@@ -6,18 +8,21 @@ BASE = os.path.expanduser("~/.openclaw/agents")
 AGENTS = ["manager", "dev", "reviewer", "tester"]
 
 def get_sessions(agent):
+    """Return sessions."""
     path = os.path.join(BASE, agent, "sessions")
     if not os.path.exists(path):
         return []
     return os.listdir(path)
 
 def snapshot():
+    """Handle snapshot."""
     data = {}
     for agent in AGENTS:
         data[agent] = get_sessions(agent)
     return data
 
 def compare(before, after):
+    """Handle compare."""
     results = {}
 
     for agent in AGENTS:

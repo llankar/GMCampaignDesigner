@@ -1,3 +1,5 @@
+"""Regression tests for campaign graph pills."""
+
 import importlib.util
 import sys
 import types
@@ -6,27 +8,34 @@ from pathlib import Path
 
 class _DummyWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _DummyWidget instance."""
         self.args = args
         self.kwargs = kwargs
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         return None
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         return None
 
     def place(self, *args, **kwargs):
+        """Handle place."""
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def grid_rowconfigure(self, *args, **kwargs):
+        """Handle grid rowconfigure."""
         return None
 
 
 class _StrictLabel(_DummyWidget):
     def __init__(self, *args, **kwargs):
+        """Initialize the _StrictLabel instance."""
         unsupported = [key for key in ("border_width", "border_color") if key in kwargs]
         if unsupported:
             raise TypeError(f"Unsupported CTkLabel arguments: {unsupported}")
@@ -34,6 +43,7 @@ class _StrictLabel(_DummyWidget):
 
 
 def _load_module(module_name: str, relative_path: str):
+    """Load module."""
     module_path = Path(relative_path)
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)
@@ -82,10 +92,12 @@ scenario_header = _load_module(
 
 
 def test_scenario_tag_row_uses_frame_backed_pills():
+    """Verify that scenario tag row uses frame backed pills."""
     scenario_metrics.ScenarioTagRow(None, tags=["Mystery", "Urban"], accent="#7dd3fc")
 
 
 def test_scenario_hero_strip_uses_frame_backed_pills():
+    """Verify that scenario hero strip uses frame backed pills."""
     scenario_header.ScenarioHeroStrip(
         None,
         title="The Hollow Crown",

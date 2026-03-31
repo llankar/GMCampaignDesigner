@@ -1,3 +1,5 @@
+"""Regression tests for scenario graph editor."""
+
 import sys
 import types
 
@@ -6,66 +8,87 @@ try:  # pragma: no cover - prefer real module when available
 except ModuleNotFoundError:  # pragma: no cover - testing fallback
     class _DummyWidget:
         def __init__(self, *args, **kwargs):
+            """Initialize the _DummyWidget instance."""
             pass
 
         def __call__(self, *args, **kwargs):
+            """Invoke the instance like a callable."""
             return None
 
         def pack(self, *args, **kwargs):
+            """Pack the operation."""
             return None
 
         def grid(self, *args, **kwargs):
+            """Handle grid."""
             return None
 
         def place(self, *args, **kwargs):
+            """Handle place."""
             return None
 
         def destroy(self):
+            """Handle destroy."""
             return None
 
         def configure(self, *args, **kwargs):
+            """Handle configure."""
             return None
 
         def bind(self, *args, **kwargs):
+            """Bind the operation."""
             return None
 
         def after(self, *args, **kwargs):
+            """Handle after."""
             return None
 
         def winfo_width(self):
+            """Handle winfo width."""
             return 0
 
         def winfo_height(self):
+            """Handle winfo height."""
             return 0
 
         def winfo_rootx(self):
+            """Handle winfo rootx."""
             return 0
 
         def winfo_rooty(self):
+            """Handle winfo rooty."""
             return 0
 
         def create_window(self, *args, **kwargs):
+            """Create window."""
             return None
 
         def create_line(self, *args, **kwargs):
+            """Create line."""
             return None
 
         def create_rectangle(self, *args, **kwargs):
+            """Create rectangle."""
             return None
 
         def create_text(self, *args, **kwargs):
+            """Create text."""
             return None
 
         def delete(self, *args, **kwargs):
+            """Delete the operation."""
             return None
 
         def update(self, *args, **kwargs):
+            """Update the operation."""
             return None
 
         def __getattr__(self, _):
+            """Handle getattr."""
             return self._return_none
 
         def _return_none(self, *args, **kwargs):
+            """Internal helper for return none."""
             return None
 
     dummy_ctk = types.SimpleNamespace(
@@ -89,9 +112,11 @@ try:  # pragma: no cover - prefer real pillow when available
 except ModuleNotFoundError:  # pragma: no cover - testing fallback
     class _DummyImageModule(types.SimpleNamespace):
         def open(self, *args, **kwargs):
+            """Open the operation."""
             return _DummyWidget()
 
         def new(self, *args, **kwargs):
+            """Handle new."""
             return _DummyWidget()
 
     class _DummyImageTkModule(types.SimpleNamespace):
@@ -114,10 +139,12 @@ from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 
 
 def _make_editor():
+    """Internal helper for make editor."""
     return ScenarioGraphEditor.__new__(ScenarioGraphEditor)
 
 
 def test_summarize_scene_text_handles_rtf_json_mapping():
+    """Verify that summarize scene text handles RTF JSON mapping."""
     editor = _make_editor()
 
     lines, truncated = editor._summarize_scene_text(
@@ -133,10 +160,12 @@ def test_summarize_scene_text_handles_rtf_json_mapping():
 
 
 def test_summarize_scene_text_handles_rich_text_value():
+    """Verify that summarize scene text handles rich text value."""
     editor = _make_editor()
 
     class DummyRichText:
         def __init__(self, text):
+            """Initialize the DummyRichText instance."""
             self.text = text
 
     lines, truncated = editor._summarize_scene_text(DummyRichText("A bold plan unfolds."))
@@ -146,6 +175,7 @@ def test_summarize_scene_text_handles_rich_text_value():
 
 
 def test_summarize_scene_text_parses_python_literal_payload():
+    """Verify that summarize scene text parses python literal payload."""
     editor = _make_editor()
 
     raw_value = "{'text': 'Investigate the well before dawn.', 'formatting': {'bold': []}}"

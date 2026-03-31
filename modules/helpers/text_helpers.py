@@ -1,3 +1,5 @@
+"""Utilities for text helpers."""
+
 import ast
 import html
 import json
@@ -50,6 +52,7 @@ def rtf_to_html(rtf):
 
     # Helper: convert "line.char" → absolute offset in text
     def tk_index_to_offset(idx):
+        """Handle tk index to offset."""
         try:
             line_str, char_str = idx.split('.', 1)
             line = int(line_str)
@@ -93,6 +96,7 @@ def rtf_to_html(rtf):
         # close tags at this position
         for fmt in closes.get(i, []):
             if fmt in ("bold","italic","underline"):
+                # Handle the branch where fmt is in ('bold', 'italic', 'underline').
                 tag = {"bold":"strong","italic":"em","underline":"u"}[fmt]
                 out.append(f"</{tag}>")
             elif fmt.startswith("size_") or fmt.startswith("color_"):
@@ -106,12 +110,15 @@ def rtf_to_html(rtf):
         # open tags at this position
         for fmt in opens.get(i, []):
             if fmt in ("bold","italic","underline"):
+                # Handle the branch where fmt is in ('bold', 'italic', 'underline').
                 tag = {"bold":"strong","italic":"em","underline":"u"}[fmt]
                 out.append(f"<{tag}>")
             elif fmt.startswith("size_"):
+                # Handle the branch where fmt.startswith('size_').
                 size = fmt.split("_",1)[1]
                 out.append(f"<span style=\"font-size:{size}px\">")
             elif fmt.startswith("color_"):
+                # Handle the branch where fmt.startswith('color_').
                 color = fmt.split("_",1)[1]
                 out.append(f"<span style=\"color:{color}\">")
             elif fmt in ("left","center","right"):
@@ -127,6 +134,7 @@ def rtf_to_html(rtf):
     # close any tags hanging at end-of-text
     for fmt in closes.get(len(text), []):
         if fmt in ("bold","italic","underline"):
+            # Handle the branch where fmt is in ('bold', 'italic', 'underline').
             tag = {"bold":"strong","italic":"em","underline":"u"}[fmt]
             out.append(f"</{tag}>")
         elif fmt.startswith("size_") or fmt.startswith("color_"):
@@ -148,6 +156,7 @@ def normalize_rtf_json(rtf, text_widget=None):
     new_fm = {}
     # helper to convert "L.C" → offset
     def to_offset(pos):
+        """Handle to offset."""
         if isinstance(pos, str) and "." in pos:
             line, col = map(int, pos.split(".",1))
             # sum lines’ lengths +1 for newline:
@@ -155,6 +164,7 @@ def normalize_rtf_json(rtf, text_widget=None):
             return sum(len(l)+1 for l in lines[:line-1]) + col
         return int(pos)
     for tag, ranges in fm.items():
+        # Process each (tag, ranges) from fm.items().
         new_ranges = []
         for start,end in ranges:
             new_ranges.append([ to_offset(start), to_offset(end) ])
@@ -188,6 +198,7 @@ def ai_text_to_rtf_json(raw_text):
     formatting = {}
 
     def add_run(tag, start, end):
+        """Handle add run."""
         if start is None or end is None or end <= start:
             return
         formatting.setdefault(tag, []).append((start, end))
@@ -216,10 +227,13 @@ def ai_text_to_rtf_json(raw_text):
         }
 
         def open_tag(tag):
+            """Open tag."""
             stack[tag].append(len(rendered))
 
         def close_tag(tag):
+            """Close tag."""
             if stack[tag]:
+                # Handle the branch where stack[tag].
                 start = stack[tag].pop()
                 end = len(rendered)
                 if end > start:
@@ -227,6 +241,7 @@ def ai_text_to_rtf_json(raw_text):
 
         L = len(line)
         while i < L:
+            # Keep looping while i < L.
             ch = line[i]
 
             # HTML-like tags
@@ -267,18 +282,21 @@ def ai_text_to_rtf_json(raw_text):
                     open_tag("bold")
                 i += 2; continue
             if line.startswith("++", i):
+                # Handle the branch where line.startswith('++', i).
                 if stack["underline"]:
                     close_tag("underline")
                 else:
                     open_tag("underline")
                 i += 2; continue
             if ch == "*":
+                # Handle the branch where ch == '*'.
                 if stack["italic"]:
                     close_tag("italic")
                 else:
                     open_tag("italic")
                 i += 1; continue
             if ch == "_":
+                # Handle the branch where ch == '_'.
                 if stack["italic"]:
                     close_tag("italic")
                 else:
@@ -292,6 +310,7 @@ def ai_text_to_rtf_json(raw_text):
         # Close any unclosed tags at end-of-line (best-effort)
         for tag, arr in stack.items():
             while arr:
+                # Keep looping while arr.
                 start = arr.pop()
                 end = len(rendered)
                 if end > start:
@@ -301,6 +320,7 @@ def ai_text_to_rtf_json(raw_text):
 
     lines = text.split("\n")
     for li, raw_line in enumerate(lines):
+        # Process each (li, raw_line) from enumerate(lines).
         line = raw_line
         size_tag = None
         bullet_prefix = ""
@@ -308,9 +328,11 @@ def ai_text_to_rtf_json(raw_text):
         # Headings (check from largest to smallest? we mapped in order #, ##, ### above)
         # Use most specific first: ###, then ##, then #
         if re.match(r"^\s*###\s+", line):
+            # Handle the branch where re.match('^\\s*###\\s+', line).
             line = re.sub(r"^\s*###\s+", "", line)
             size_tag = "size_16"
         elif re.match(r"^\s*##\s+", line):
+            # Handle the branch where re.match('^\\s*##\\s+', line).
             line = re.sub(r"^\s*##\s+", "", line)
             size_tag = "size_18"
         elif re.match(r"^\s*#\s+", line):
@@ -329,6 +351,7 @@ def ai_text_to_rtf_json(raw_text):
         # (we don't add formatting tags; the textual prefix is enough)
         # Already matched bullet? skip numbered check in that case
         if not m_bullet:
+            # Handle the branch where m bullet is unavailable.
             m_num = numbered_re.match(line)
             if m_num:
                 # normalize to "<indent><n>. "
@@ -351,6 +374,7 @@ def ai_text_to_rtf_json(raw_text):
 
         # Apply heading size across the whole line (including bullet prefix)
         if size_tag:
+            # Continue with this path when size tag is set.
             line_len = prefix_len + len(rendered)
             if line_len > 0:
                 add_run(size_tag, line_start, line_start + line_len)
@@ -366,6 +390,7 @@ def ai_text_to_rtf_json(raw_text):
 
 # --- Robust fallbacks for longtext coercion ---
 def _coerce_text(val):
+    """Coerce text."""
     if val is None:
         return ""
     if isinstance(val, list):
@@ -376,6 +401,7 @@ def _coerce_text(val):
             _coerce_text(x) for x in val if x is not None
         )
     if isinstance(val, dict):
+        # Handle the branch where isinstance(val, dict).
         v = val.get("text", "")
         if isinstance(v, (list, dict)):
             return _coerce_text(v)

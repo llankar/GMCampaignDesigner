@@ -1,3 +1,5 @@
+"""Regression tests for generation policy prompt constraints."""
+
 from modules.campaigns.services.ai.prompt_builders import (
     build_arc_generation_prompt,
     build_arc_scenario_expansion_prompt,
@@ -9,6 +11,7 @@ from modules.generic.editor.window_components.ai_scenario_generation import (
 
 class _FakeGenerationDefaultsService:
     def load(self):
+        """Load the operation."""
         return {
             "main_pc_factions": ["Dawn Guard"],
             "protected_factions": ["Archivist Circle"],
@@ -18,6 +21,7 @@ class _FakeGenerationDefaultsService:
 
 
 def test_arc_generation_prompt_includes_hard_constraints_from_defaults():
+    """Verify that arc generation prompt includes hard constraints from defaults."""
     prompt = build_arc_generation_prompt(
         foundation={"name": "Shattered Sky"},
         scenarios=[{"Title": "Cold Open", "Summary": "Hook"}],
@@ -30,6 +34,7 @@ def test_arc_generation_prompt_includes_hard_constraints_from_defaults():
 
 
 def test_arc_scenario_expansion_prompt_includes_hard_constraints_from_defaults():
+    """Verify that arc scenario expansion prompt includes hard constraints from defaults."""
     prompt = build_arc_scenario_expansion_prompt(
         foundation={"name": "Shattered Sky"},
         arcs=[
@@ -50,6 +55,7 @@ def test_arc_scenario_expansion_prompt_includes_hard_constraints_from_defaults()
 
 
 def test_one_click_user_prompt_includes_hard_constraints_block():
+    """Verify that one click user prompt includes hard constraints block."""
     prompt = _build_one_click_scenario_user_prompt(
         theme="Noir",
         selected_npcs=["Rika Vale"],

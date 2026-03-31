@@ -50,10 +50,12 @@ class GalleryBundleSummary:
 
     @property
     def display_title(self) -> str:
+        """Handle display title."""
         return self.release_name or self.tag or self.asset_name
 
     @property
     def is_full_campaign(self) -> bool:
+        """Return whether full campaign."""
         metadata = self.metadata if isinstance(self.metadata, dict) else {}
         mode = str(metadata.get("bundle_mode") or "").lower()
         if mode == "full_campaign":
@@ -66,6 +68,7 @@ class GithubGalleryClient:
     """Client that wraps GitHub's release API for bundle distribution."""
 
     def __init__(self, repo: Optional[str] = None, token: Optional[str] = None, timeout: Optional[int] = None):
+        """Initialize the GithubGalleryClient instance."""
         repo_config = (ConfigHelper.get("Gallery", "github_repo", fallback="") or "").strip()
         repo_env = os.environ.get("GMCD_GALLERY_REPO", "").strip()
         token_config_raw = (ConfigHelper.get("Gallery", "github_token", fallback="") or "").strip()
@@ -81,18 +84,22 @@ class GithubGalleryClient:
     # ------------------------------------------------------------------ Props
     @property
     def repo(self) -> str:
+        """Handle repo."""
         return self._repo
 
     @property
     def can_publish(self) -> bool:
+        """Return whether publish."""
         return bool(self._token)
 
     @property
     def timeout(self) -> int:
+        """Handle timeout."""
         return self._timeout
 
     # --------------------------------------------------------- Credentials
     def set_token(self, token: Optional[str]) -> None:
+        """Set token."""
         if token is not None:
             self._token = token or None
             return
@@ -104,10 +111,12 @@ class GithubGalleryClient:
 
     # ----------------------------------------------------------------- Session
     def _create_session(self, *, auth: bool = False) -> requests.Session:
+        """Create session."""
         session = requests.Session()
         session.headers.setdefault("User-Agent", "GMCampaignDesigner-Gallery")
         session.headers.setdefault("Accept", "application/vnd.github+json")
         if auth:
+            # Continue with this path when auth is set.
             if not self._token:
                 raise RuntimeError("GitHub token not configured for gallery publishing.")
             session.headers["Authorization"] = f"Bearer {self._token}"
@@ -117,11 +126,13 @@ class GithubGalleryClient:
 
     # ------------------------------------------------------------ List bundles
     def list_bundles(self, *, include_drafts: bool = False) -> List[GalleryBundleSummary]:
+        """Handle list bundles."""
         if not self._repo:
             raise RuntimeError("GitHub repository for gallery is not configured.")
 
         session = self._create_session()
         try:
+            # Keep list bundles resilient if this step fails.
             params = {"per_page": 100}
             response = session.get(
                 f"{self._api_base}/repos/{self._repo}/releases",
@@ -144,6 +155,7 @@ class GithubGalleryClient:
 
         results: List[GalleryBundleSummary] = []
         for release in payload:
+            # Process each release from payload.
             if not isinstance(release, dict):
                 continue
             if release.get("draft") and not include_drafts:
@@ -177,19 +189,23 @@ class GithubGalleryClient:
         *,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> Path:
+        """Handle download bundle."""
         destination = Path(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
 
         session = self._create_session()
         try:
+            # Keep download bundle resilient if this step fails.
             if progress_callback:
                 progress_callback(f"Downloading {bundle.asset_name}…", 0.0)
             with session.get(bundle.download_url, stream=True, timeout=self._timeout) as response:
+                # Keep this resource scoped to download bundle.
                 response.raise_for_status()
                 total = int(response.headers.get("Content-Length") or 0)
                 downloaded = 0
                 with destination.open("wb") as handle:
                     for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                        # Process each chunk while updating download bundle.
                         if not chunk:
                             continue
                         handle.write(chunk)
@@ -222,6 +238,7 @@ class GithubGalleryClient:
         description: str = "",
         progress_callback: Optional[ProgressCallback] = None,
     ) -> GalleryBundleSummary:
+        """Handle publish bundle."""
         archive_path = Path(archive_path)
         if not archive_path.exists():
             raise FileNotFoundError(archive_path)
@@ -238,6 +255,7 @@ class GithubGalleryClient:
         }
 
         try:
+            # Keep publish bundle resilient if this step fails.
             if progress_callback:
                 progress_callback("Creating GitHub release…", 0.85)
             response = session.post(
@@ -289,8 +307,10 @@ class GithubGalleryClient:
         *,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> None:
+        """Delete bundle."""
         session = self._create_session(auth=True)
         try:
+            # Keep bundle resilient if this step fails.
             if progress_callback:
                 progress_callback("Removing release asset…", 0.5)
             asset_url = f"{self._api_base}/repos/{self._repo}/releases/assets/{bundle.asset_id}"
@@ -325,6 +345,7 @@ class GithubGalleryClient:
         asset: Dict[str, object],
         metadata: Dict[str, object],
     ) -> GalleryBundleSummary:
+        """Build summary."""
         published_at = self._parse_datetime(
             str(release.get("published_at") or release.get("created_at") or "")
         )
@@ -337,6 +358,7 @@ class GithubGalleryClient:
         source_campaign = ""
         manifest_created_at = ""
         if isinstance(metadata, dict):
+            # Handle the branch where isinstance(metadata, dict).
             description = str(metadata.get("description") or "")
             counts = metadata.get("entity_counts")
             if isinstance(counts, dict):
@@ -377,12 +399,15 @@ class GithubGalleryClient:
         return summary
 
     def _parse_metadata(self, body: Optional[str]) -> Dict[str, object]:
+        """Parse metadata."""
         if not body:
             return {}
         text = str(body)
         if text.startswith(BODY_PREFIX):
+            # Handle the branch where text.startswith(BODY_PREFIX).
             payload = text[len(BODY_PREFIX) :].strip()
             try:
+                # Keep metadata resilient if this step fails.
                 data = json.loads(payload)
                 if isinstance(data, dict):
                     return data
@@ -394,14 +419,17 @@ class GithubGalleryClient:
         return {}
 
     def _serialize_body(self, metadata: Dict[str, object]) -> str:
+        """Serialize body."""
         return BODY_PREFIX + json.dumps(metadata, indent=2, ensure_ascii=False)
 
     @staticmethod
     def _parse_datetime(value: str) -> Optional[datetime]:
+        """Parse datetime."""
         value = value.strip()
         if not value:
             return None
         try:
+            # Keep datetime resilient if this step fails.
             if value.endswith("Z"):
                 value = value[:-1] + "+00:00"
             return datetime.fromisoformat(value)
@@ -410,10 +438,12 @@ class GithubGalleryClient:
 
     @staticmethod
     def _select_asset(release: Dict[str, object]) -> Optional[Dict[str, object]]:
+        """Select asset."""
         assets = release.get("assets")
         if not isinstance(assets, list):
             return None
         for asset in assets:
+            # Process each asset from assets.
             if not isinstance(asset, dict):
                 continue
             name = str(asset.get("name") or "")
@@ -423,6 +453,7 @@ class GithubGalleryClient:
 
     @staticmethod
     def _metadata_from_manifest(manifest: dict, title: str, description: str) -> Dict[str, object]:
+        """Internal helper for metadata from manifest."""
         entities_meta = {}
         for entity_type, meta in (manifest.get("entities") or {}).items():
             if isinstance(meta, dict):
@@ -447,6 +478,7 @@ class GithubGalleryClient:
 
 
 def _slugify(value: str) -> str:
+    """Internal helper for slugify."""
     value = value.strip().lower()
     value = re.sub(r"[^a-z0-9]+", "-", value)
     value = re.sub(r"-+", "-", value).strip("-")

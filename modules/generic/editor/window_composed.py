@@ -1,3 +1,5 @@
+"""Utilities for editor window composed."""
+
 from modules.generic.editor.window_base import GenericEditorWindowBase
 from modules.generic.editor.window_components import (
     GenericEditorWindowNavigationAndRendering,

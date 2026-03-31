@@ -1,3 +1,5 @@
+"""Constants for arc studio."""
+
 from __future__ import annotations
 
 from modules.generic.editor.styles import EDITOR_PALETTE
@@ -14,4 +16,5 @@ STATUS_COLORS = {
 
 
 def color_for_status(status: str) -> str:
+    """Handle color for status."""
     return STATUS_COLORS.get((status or "").strip().casefold(), EDITOR_PALETTE["accent"])

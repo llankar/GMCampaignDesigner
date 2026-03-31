@@ -1,3 +1,5 @@
+"""State helpers for campaign selection."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,9 +18,11 @@ class CampaignOverviewSelectionStore:
     """Persists campaign overview focus state in a dedicated metadata table."""
 
     def __init__(self, repository: CampaignConfigRepository | None = None):
+        """Initialize the CampaignOverviewSelectionStore instance."""
         self._repository = repository or CampaignConfigRepository()
 
     def load(self, campaign_record: dict[str, Any] | None) -> CampaignOverviewSelectionState:
+        """Load the operation."""
         if not isinstance(campaign_record, dict):
             return CampaignOverviewSelectionState()
 
@@ -35,6 +39,7 @@ class CampaignOverviewSelectionStore:
         return CampaignOverviewSelectionState()
 
     def save(self, campaign_record: dict[str, Any] | None, *, arc_name: str, scenario_title: str) -> dict[str, Any] | None:
+        """Save the operation."""
         if not isinstance(campaign_record, dict):
             return campaign_record
 

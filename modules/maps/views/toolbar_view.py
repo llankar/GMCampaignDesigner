@@ -1,3 +1,5 @@
+"""View for map toolbar."""
+
 import tkinter as tk
 import customtkinter as ctk
 from modules.ui.icon_dropdown import IconDropdown
@@ -7,15 +9,18 @@ from modules.scenarios.plot_twist_panel import PlotTwistPanel
 log_module_import(__name__)
 
 def _build_toolbar(self):
+    """Build toolbar."""
     section_tracker = {"count": 0}
     horizontal_spacing = 4
     control_pady = 4
 
     def _pack_control(widget, *, leading=0, trailing=None, pady=None):
+        """Pack control."""
         padx = (leading, horizontal_spacing if trailing is None else trailing)
         widget.pack(side="left", padx=padx, pady=control_pady if pady is None else pady)
 
     def _create_collapsible_section(parent, title):
+        """Create collapsible section."""
         if section_tracker["count"]:
             separator = ctk.CTkFrame(
                 parent,
@@ -32,6 +37,7 @@ def _build_toolbar(self):
 
         toggle_state = tk.BooleanVar(value=True)
         def _toggle():
+            """Toggle the operation."""
             if toggle_state.get():
                 content_frame.pack_forget()
                 toggle_state.set(False)
@@ -200,6 +206,7 @@ def _build_toolbar(self):
     drawing_container.pack(side="left", fill="both", expand=True, padx=(0, 4), pady=(2, 2))
 
     def _pack_drawing_row(row, *, pady=(4, 2)):
+        """Pack drawing row."""
         row.pack(side="top", fill="x", anchor="w", padx=(6, 2), pady=pady)
 
     drawing_tool_row = ctk.CTkFrame(drawing_container, fg_color="transparent")
@@ -392,6 +399,7 @@ def _build_toolbar(self):
     self._update_fog_button_states()
 
 def _on_brush_size_change(self, val): # This is for FOG brush
+    """Handle brush size change."""
     try:
         size = int(val)
     except (TypeError, ValueError):
@@ -399,6 +407,7 @@ def _on_brush_size_change(self, val): # This is for FOG brush
     self.brush_size = size
     options = list(getattr(self, "brush_size_options", []))
     if size not in options:
+        # Handle the branch where size is not in options.
         options.append(size)
         options = sorted(set(options))
         menu = getattr(self, "brush_size_menu", None)
@@ -410,10 +419,12 @@ def _on_brush_size_change(self, val): # This is for FOG brush
     self.brush_size_options = list(options)
 
 def _on_brush_shape_change(self, val): # This is for FOG brush
+    """Handle brush shape change."""
     # normalize to lowercase for comparisons
     self.brush_shape = val.lower()
 
 def _change_brush(self, delta): # This is for FOG brush
+    """Internal helper for change brush."""
     options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
     if not options:
         return
@@ -429,6 +440,7 @@ def _change_brush(self, delta): # This is for FOG brush
             pass
 
 def _on_token_size_change(self, val):
+    """Handle token size change."""
     try:
         size = int(val)
     except (TypeError, ValueError):
@@ -436,6 +448,7 @@ def _on_token_size_change(self, val):
     self.token_size = size
     options = list(getattr(self, "token_size_options", []))
     if size not in options:
+        # Handle the branch where size is not in options.
         options.append(size)
         options = sorted(set(options))
         menu = getattr(self, "token_size_menu", None)
@@ -460,6 +473,7 @@ def _update_fog_button_states(self):
     active_mode = getattr(self, "fog_mode", None)
 
     for mode, button in buttons.items():
+        # Process each (mode, button) from buttons.items().
         if not button:
             continue
         style = active_style if mode == active_mode else default_style

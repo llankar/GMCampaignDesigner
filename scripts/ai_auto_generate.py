@@ -1,3 +1,5 @@
+"""Script entry point for AI-assisted content generation."""
+
 import argparse
 import json
 import sys
@@ -9,6 +11,7 @@ log_module_import(__name__)
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse args."""
     parser = argparse.ArgumentParser(
         description="Generate campaign entities via local AI without opening the UI.",
     )
@@ -21,6 +24,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run the module entry point."""
     args = parse_args()
     generator = EntityAutoGenerator(db_path=args.db_path)
     items = generator.generate(args.entity, args.count, args.prompt)

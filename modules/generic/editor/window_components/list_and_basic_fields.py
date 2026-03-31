@@ -1,3 +1,5 @@
+"""Field helpers for window components list and basic."""
+
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, option_menu_style, primary_button_style, toolbar_entry_style
 from modules.generic.editor.window_components.dynamic_linked_entities import resolve_linked_entity_source
@@ -10,6 +12,7 @@ from modules.generic.editor.shared.campaign_status_field import (
 
 class GenericEditorWindowListAndBasicFields:
     def create_audio_field(self, field):
+        """Create audio field."""
         frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         frame.pack(fill="x", pady=5)
 
@@ -29,10 +32,12 @@ class GenericEditorWindowListAndBasicFields:
         button_row.pack(fill="x", pady=(5, 0))
 
         def update_value(new_value: str) -> None:
+            """Update value."""
             audio_var.set(new_value)
             display_label.configure(text=self._format_audio_label(new_value))
 
         def on_select() -> None:
+            """Handle select."""
             file_path = filedialog.askopenfilename(
                 title="Select Audio File",
                 filetypes=[
@@ -53,9 +58,11 @@ class GenericEditorWindowListAndBasicFields:
             update_value(relative)
 
         def on_clear() -> None:
+            """Handle clear."""
             update_value("")
 
         def on_play() -> None:
+            """Handle play."""
             value = audio_var.get()
             if not value:
                 messagebox.showinfo("Audio", "No audio file selected.")
@@ -65,6 +72,7 @@ class GenericEditorWindowListAndBasicFields:
                 messagebox.showwarning("Audio", "Unable to play the selected audio file.")
 
         def on_stop() -> None:
+            """Handle stop."""
             stop_entity_audio()
 
         ctk.CTkButton(button_row, text="Select Audio", **primary_button_style(), command=on_select).pack(side="left", padx=5)
@@ -74,6 +82,7 @@ class GenericEditorWindowListAndBasicFields:
 
         self.field_widgets[field["name"]] = audio_var
     def create_file_field(self, field):
+        """Create file field."""
         frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         frame.pack(fill="x", pady=5)
 
@@ -83,6 +92,7 @@ class GenericEditorWindowListAndBasicFields:
         raw_value = self.item.get(field_name, "") or ""
         normalized = self._campaign_relative_path(raw_value)
         if normalized and not normalized.startswith(".."):
+            # Handle the branch where normalized is set and not normalized.startswith('..').
             label_text = os.path.basename(normalized)
             abs_candidate = Path(ConfigHelper.get_campaign_dir()) / Path(normalized)
             if not abs_candidate.exists():
@@ -111,6 +121,7 @@ class GenericEditorWindowListAndBasicFields:
         # placeholder so save() sees the key
         self.field_widgets[field_name] = label_widget
     def select_attachment(self, field_name, label_widget, storage_subdir):
+        """Select attachment."""
         file_path = filedialog.askopenfilename(
             title="Select Attachment",
             filetypes=[("All Files", "*.*")]
@@ -129,10 +140,12 @@ class GenericEditorWindowListAndBasicFields:
         dest = os.path.join(upload_folder, filename)
         counter = 1
         while os.path.exists(dest):
+            # Keep looping while os.path.exists(dest).
             filename = f"{name}_{counter}{ext}"
             dest = os.path.join(upload_folder, filename)
             counter += 1
         try:
+            # Keep attachment resilient if this step fails.
             shutil.copy2(file_path, dest)
             rel_path = os.path.relpath(dest, campaign_dir).replace("\\", "/")
             info = self._file_field_info.setdefault(field_name, {})
@@ -142,6 +155,7 @@ class GenericEditorWindowListAndBasicFields:
         except Exception as e:
             messagebox.showerror("Error", f"Could not copy file:\n{e}")
     def create_boolean_field(self, field):
+        """Create boolean field."""
         # Define the two possible dropdown options.
         options = ["True", "False"]
         # Retrieve the stored value (default to "False" if not found).
@@ -159,6 +173,7 @@ class GenericEditorWindowListAndBasicFields:
         # Save the widget and its StringVar for later retrieval.
         self.field_widgets[field["name"]] = (option_menu, var)
     def create_dynamic_combobox_list(self, field):
+        """Create dynamic combobox list."""
         container = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
         container.pack(fill="x", pady=5)
 
@@ -171,8 +186,10 @@ class GenericEditorWindowListAndBasicFields:
             initial_values = [val.strip() for val in initial_values.split(",") if val.strip()]
 
         def remove_this(row, entry_widget):
+            """Remove this."""
             row.destroy()
             try:
+                # Keep this resilient if this step fails.
                 idx = combobox_list.index(entry_widget)
                 combobox_list.pop(idx)
                 if idx < len(combobox_vars):
@@ -181,6 +198,7 @@ class GenericEditorWindowListAndBasicFields:
                 pass
 
         def open_dropdown(widget, var):
+            """Open dropdown."""
             x = widget.winfo_rootx()
             y = widget.winfo_rooty() + widget.winfo_height()
             dropdown = CustomDropdown(
@@ -198,6 +216,7 @@ class GenericEditorWindowListAndBasicFields:
             dropdown.entry.focus_set()
 
         def add_combobox(initial_value=None):
+            """Handle add combobox."""
             row = ctk.CTkFrame(container, fg_color="transparent")
             row.pack(fill="x", pady=2)
 
@@ -236,6 +255,7 @@ class GenericEditorWindowListAndBasicFields:
         self.field_widgets[f"{field['name']}_container"] = container
         self.field_widgets[f"{field['name']}_add_combobox"] = add_combobox
     def create_text_entry(self, field):
+        """Create text entry."""
         value = self.item.get(field["name"], "")
         field_name = str(field.get("name", ""))
         field_type = str(field.get("type", "")).strip().lower()
@@ -263,6 +283,7 @@ class GenericEditorWindowListAndBasicFields:
             return
 
         if getattr(self.model_wrapper, "entity_type", "") == "events":
+            # Handle the branch where getattr(model_wrapper, 'entity_type', '') == 'events'.
             if field_name == "Date":
                 widget = EventDatePickerField(self._field_parent(), initial_value=value)
                 widget.pack(fill="x", pady=5)
@@ -280,6 +301,7 @@ class GenericEditorWindowListAndBasicFields:
         entry.pack(fill="x", pady=5)
         self.field_widgets[field["name"]] = entry
     def on_combo_mousewheel(self, event, combobox):
+        """Handle combo mousewheel."""
         # Get the current selection and available options.
         options = combobox.cget("values")
         if not options:

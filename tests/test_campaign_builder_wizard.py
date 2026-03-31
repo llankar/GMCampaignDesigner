@@ -1,23 +1,30 @@
+"""Regression tests for campaign builder wizard."""
+
 import sys
 from types import SimpleNamespace
 
 
 class _StubWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _StubWidget instance."""
         pass
 
     def __getattr__(self, _name):
+        """Handle getattr."""
         def _method(*_args, **_kwargs):
+            """Internal helper for method."""
             return None
 
         return _method
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         return None
 
 
 class _FakeCTkModule(SimpleNamespace):
     def __getattr__(self, _name):
+        """Handle getattr."""
         return _StubWidget
 
 
@@ -40,6 +47,7 @@ from modules.campaigns.ui import campaign_builder_wizard
 
 
 def test_load_existing_campaign_uses_selected_payload(monkeypatch):
+    """Verify that load existing campaign uses selected payload."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -61,6 +69,7 @@ def test_load_existing_campaign_uses_selected_payload(monkeypatch):
 
 
 def test_load_existing_campaign_ignores_empty_selection():
+    """Verify that load existing campaign ignores empty selection."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -75,41 +84,52 @@ def test_load_existing_campaign_ignores_empty_selection():
 
 class _FakeTextBox:
     def __init__(self, value=""):
+        """Initialize the _FakeTextBox instance."""
         self.value = value
 
     def get(self, *_args, **_kwargs):
+        """Return the operation."""
         return self.value
 
     def delete(self, *_args, **_kwargs):
+        """Delete the operation."""
         self.value = ""
 
     def insert(self, *_args):
+        """Handle insert."""
         self.value = _args[-1]
 
 
 class _FakeDateField:
     def __init__(self, value=""):
+        """Initialize the _FakeDateField instance."""
         self.value = value
 
     def get(self):
+        """Return the operation."""
         return self.value
 
     def set(self, value):
+        """Set the operation."""
         self.value = value
 
 
 class _FakeVar:
     def __init__(self, value=""):
+        """Initialize the _FakeVar instance."""
         self.value = value
 
     def get(self):
+        """Return the operation."""
         return self.value
 
     def set(self, value):
+        """Set the operation."""
         self.value = value
 
 
 def test_apply_preset_preserves_touched_fields_and_arcs():
+    """Verify that apply preset preserves touched fields and arcs."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -146,6 +166,7 @@ def test_apply_preset_preserves_touched_fields_and_arcs():
     assert wizard.arcs == [{"name": "Existing Arc"}]
 
 def test_extract_arc_index_from_preview_line_parses_order_header():
+    """Verify that extract arc index from preview line parses order header."""
     index = campaign_builder_wizard.CampaignBuilderWizard._extract_arc_index_from_preview_line(
         "Order 3: Midnight Rising [Planned]"
     )
@@ -153,6 +174,7 @@ def test_extract_arc_index_from_preview_line_parses_order_header():
 
 
 def test_extract_arc_index_from_preview_line_ignores_non_header_lines():
+    """Verify that extract arc index from preview line ignores non header lines."""
     index = campaign_builder_wizard.CampaignBuilderWizard._extract_arc_index_from_preview_line(
         "   Objective: Recover the relic"
     )
@@ -160,6 +182,7 @@ def test_extract_arc_index_from_preview_line_ignores_non_header_lines():
 
 
 def test_find_arc_index_for_line_uses_whole_arc_block_ranges():
+    """Verify that find arc index for line uses whole arc block ranges."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -176,6 +199,7 @@ def test_find_arc_index_for_line_uses_whole_arc_block_ranges():
 
 
 def test_select_arc_from_preview_event_updates_current_arc_and_refreshes():
+    """Verify that select arc from preview event updates current arc and refreshes."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -185,12 +209,15 @@ def test_select_arc_from_preview_event_updates_current_arc_and_refreshes():
 
     class _FakeArcsList:
         def __init__(self):
+            """Initialize the _FakeArcsList instance."""
             self.states = []
 
         def configure(self, **kwargs):
+            """Handle configure."""
             self.states.append(kwargs.get("state"))
 
         def index(self, _index):
+            """Handle index."""
             return "5.0"
 
     wizard.arcs_list = _FakeArcsList()
@@ -206,6 +233,7 @@ def test_select_arc_from_preview_event_updates_current_arc_and_refreshes():
 
 
 def test_double_click_on_arc_preview_opens_selected_arc_editor():
+    """Verify that double click on arc preview opens selected arc editor."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -222,6 +250,7 @@ def test_double_click_on_arc_preview_opens_selected_arc_editor():
 
 
 def test_apply_generated_arcs_replaces_existing_arcs_after_ai_success():
+    """Verify that apply generated arcs replaces existing arcs after AI success."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -260,6 +289,7 @@ def test_apply_generated_arcs_replaces_existing_arcs_after_ai_success():
 
 
 def test_generate_arcs_from_scenarios_applies_service_result_after_confirmation(monkeypatch):
+    """Verify that generate arcs from scenarios applies service result after confirmation."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -285,10 +315,12 @@ def test_generate_arcs_from_scenarios_applies_service_result_after_confirmation(
 
     class _FakeArcGenerationService:
         def __init__(self, ai_client, scenario_wrapper):
+            """Initialize the _FakeArcGenerationService instance."""
             applied["ai_client"] = ai_client
             applied["scenario_wrapper"] = scenario_wrapper
 
         def generate_arcs(self, foundation):
+            """Handle generate arcs."""
             applied["foundation"] = foundation
             return {
                 "arcs": [
@@ -333,6 +365,7 @@ def test_generate_arcs_from_scenarios_applies_service_result_after_confirmation(
 
 
 def test_validate_arcs_for_scenario_generation_rejects_arcs_without_linked_scenarios():
+    """Verify that validate arcs for scenario generation rejects arcs without linked scenarios."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -356,6 +389,7 @@ def test_validate_arcs_for_scenario_generation_rejects_arcs_without_linked_scena
 
 
 def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkeypatch):
+    """Verify that generate scenarios per arc links saved titles back to parent arc."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -389,9 +423,11 @@ def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkey
 
     class _FakeExpansionService:
         def __init__(self, ai_client):
+            """Initialize the _FakeExpansionService instance."""
             assert ai_client is not None
 
         def generate_scenarios(self, foundation, arcs):
+            """Handle generate scenarios."""
             assert foundation["name"] == "Stormfront"
             assert arcs[0]["name"] == "Guild War"
             return {
@@ -430,13 +466,16 @@ def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkey
 
     class _FakeWrapper:
         def __init__(self, entity_type):
+            """Initialize the _FakeWrapper instance."""
             assert entity_type == "scenarios"
 
     class _FakePersistence:
         def __init__(self, scenario_wrapper):
+            """Initialize the _FakePersistence instance."""
             assert scenario_wrapper is not None
 
         def save_generated_arc_scenarios(self, generated_payload, arcs):
+            """Save generated arc scenarios."""
             arcs[0]["scenarios"].extend(
                 [scenario["Title"] for scenario in generated_payload["arcs"][0]["scenarios"]]
             )
@@ -466,6 +505,7 @@ def test_generate_scenarios_per_arc_links_saved_titles_back_to_parent_arc(monkey
 
 
 def test_generate_db_aware_scenarios_button_handler_calls_generation_flow():
+    """Verify that generate DB aware scenarios button handler calls generation flow."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -478,6 +518,7 @@ def test_generate_db_aware_scenarios_button_handler_calls_generation_flow():
 
 
 def test_forge_full_campaign_save_preview_keeps_existing_arc_scenarios(monkeypatch):
+    """Verify that forge full campaign save preview keeps existing arc scenarios."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
         campaign_builder_wizard.CampaignBuilderWizard
     )
@@ -509,10 +550,12 @@ def test_forge_full_campaign_save_preview_keeps_existing_arc_scenarios(monkeypat
 
     class _FakePersistence:
         def __init__(self, scenario_wrapper, campaign_wrapper=None):
+            """Initialize the _FakePersistence instance."""
             captured["scenario_wrapper"] = scenario_wrapper
             captured["campaign_wrapper"] = campaign_wrapper
 
         def build_dry_run_report(self, generated_payload, arcs, *, save_mode):
+            """Build dry run report."""
             captured["generated_payload"] = generated_payload
             captured["arcs"] = arcs
             captured["save_mode"] = save_mode

@@ -22,6 +22,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
     """Allow editing the list of campaign systems stored in the database."""
 
     def __init__(self, master: tk.Misc | None = None) -> None:
+        """Initialize the SystemManagerDialog instance."""
         super().__init__(master)
         self.title("Manage Campaign Systems")
         self.geometry("1040x640")
@@ -55,6 +56,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self.destroy)
 
     def _build_ui(self) -> None:
+        """Build UI."""
         root = ctk.CTkFrame(self)
         root.pack(fill="both", expand=True, padx=18, pady=18)
         root.grid_columnconfigure(0, weight=1, minsize=240)
@@ -121,6 +123,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         ctk.CTkButton(button_row, text="Save", command=self._save_current).pack(side="right")
 
     def _load_systems(self) -> None:
+        """Load systems."""
         self._systems.clear()
         self._list_order.clear()
         query = (
@@ -128,6 +131,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             "FROM campaign_systems ORDER BY label, slug"
         )
         with closing(get_connection()) as conn:
+            # Keep this resource scoped to systems.
             cursor = conn.execute(query)
             for row in cursor.fetchall():
                 slug, label, default_formula, supported_faces_json, analyzer_config_json = row
@@ -143,6 +147,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self._render_list()
 
     def _render_list(self) -> None:
+        """Render list."""
         listbox = self.system_listbox
         if listbox is None:
             return
@@ -153,6 +158,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             listbox.insert("end", f"{label} ({slug})")
 
     def _refresh_active_label(self) -> None:
+        """Refresh active label."""
         self._active_slug = get_selected_system_slug()
         if self._active_slug:
             active_label = self._systems.get(self._active_slug, {}).get("label") or self._active_slug
@@ -161,6 +167,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             self.active_var.set("Active system: (not set)")
 
     def _select_initial_system(self) -> None:
+        """Select initial system."""
         if not self._list_order:
             self._enter_create_mode()
             return
@@ -172,6 +179,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self._select_list_index(index)
 
     def _select_list_index(self, index: int) -> None:
+        """Select list index."""
         listbox = self.system_listbox
         if listbox is None:
             return
@@ -183,6 +191,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self._load_into_form(slug)
 
     def _load_into_form(self, slug: str) -> None:
+        """Load into form."""
         data = self._systems.get(slug)
         if not data:
             return
@@ -196,6 +205,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self.status_var.set("")
 
     def _enter_create_mode(self) -> None:
+        """Internal helper for enter create mode."""
         self._mode = "create"
         self._current_slug = None
         self.slug_var.set("")
@@ -209,6 +219,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             listbox.selection_clear(0, "end")
 
     def _on_select(self, _event=None) -> None:
+        """Handle select."""
         listbox = self.system_listbox
         if listbox is None:
             return
@@ -221,6 +232,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             self._load_into_form(slug)
 
     def _duplicate_selected(self) -> None:
+        """Internal helper for duplicate selected."""
         if not self._current_slug or self._current_slug not in self._systems:
             messagebox.showwarning("No Selection", "Select a system to duplicate first.")
             return
@@ -236,23 +248,28 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self.status_var.set("")
 
     def _suggest_duplicate_slug(self, base: str) -> str:
+        """Internal helper for suggest duplicate slug."""
         candidate = f"{base}_copy"
         if candidate not in self._systems:
             return candidate
         index = 2
         while True:
+            # Keep looping while True.
             candidate = f"{base}_copy_{index}"
             if candidate not in self._systems:
                 return candidate
             index += 1
 
     def _save_current(self) -> None:
+        """Save current."""
         values = self._validate_form()
         if values is None:
             return
         slug, label, formula, faces_json, analyzer_json = values
         try:
+            # Keep current resilient if this step fails.
             with closing(get_connection()) as conn:
+                # Keep this resource scoped to current.
                 if self._mode == "create" or self._current_slug is None:
                     conn.execute(
                         """
@@ -296,10 +313,12 @@ class SystemManagerDialog(ctk.CTkToplevel):
         self.status_var.set("Saved.")
 
     def _delete_selected(self) -> None:
+        """Delete selected."""
         if not self._current_slug:
             messagebox.showwarning("No Selection", "Select a system to delete first.")
             return
         if self._current_slug == self._active_slug:
+            # Handle the branch where _current_slug == _active_slug.
             if len(self._systems) <= 1:
                 messagebox.showwarning(
                     "Cannot Delete",
@@ -310,6 +329,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             if not replacement:
                 return
             try:
+                # Keep selected resilient if this step fails.
                 set_selected_system_slug(replacement)
                 self._active_slug = replacement
             except Exception as exc:
@@ -323,6 +343,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             return
 
         try:
+            # Keep selected resilient if this step fails.
             with closing(get_connection()) as conn:
                 conn.execute("DELETE FROM campaign_systems WHERE slug = ?", (self._current_slug,))
                 conn.commit()
@@ -340,9 +361,11 @@ class SystemManagerDialog(ctk.CTkToplevel):
         system_config.refresh_current_system()
 
     def _prompt_replacement_system(self) -> str | None:
+        """Internal helper for prompt replacement system."""
         options = []
         lookup: dict[str, str] = {}
         for slug in self._list_order:
+            # Process each slug from _list_order.
             if slug == self._current_slug:
                 continue
             label = self._systems.get(slug, {}).get("label") or slug
@@ -357,11 +380,13 @@ class SystemManagerDialog(ctk.CTkToplevel):
         return lookup.get(selection)
 
     def _select_slug(self, slug: str) -> None:
+        """Select slug."""
         if slug not in self._list_order:
             return
         self._select_list_index(self._list_order.index(slug))
 
     def _validate_form(self) -> tuple[str, str, str | None, str | None, str | None] | None:
+        """Validate form."""
         slug = self.slug_var.get().strip().lower()
         label = self.label_var.get().strip()
         default_formula = self.default_formula_var.get().strip()
@@ -380,6 +405,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
             return None
 
         if default_formula:
+            # Continue with this path when default formula is set.
             canonical = dice_preferences.canonicalize_formula(default_formula)
             if canonical is None:
                 self.status_var.set("Default formula is invalid.")
@@ -399,6 +425,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
         return slug, label, default_formula, faces_json, analyzer_json
 
     def _validate_json_field(self, value: str, label: str) -> str | None:
+        """Validate JSON field."""
         cleaned = value.strip()
         if not cleaned:
             return None
@@ -411,6 +438,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _format_json(raw: str | None) -> str:
+        """Format JSON."""
         if not raw:
             return ""
         try:
@@ -421,6 +449,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _set_text(widget: ctk.CTkTextbox | None, value: str) -> None:
+        """Set text."""
         if widget is None:
             return
         widget.delete("1.0", "end")
@@ -428,6 +457,7 @@ class SystemManagerDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _get_text(widget: ctk.CTkTextbox | None) -> str:
+        """Return text."""
         if widget is None:
             return ""
         return widget.get("1.0", "end").strip()

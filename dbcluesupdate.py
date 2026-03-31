@@ -1,3 +1,5 @@
+"""Utility script for updating clue records in the database."""
+
 import json, sqlite3
 from modules.helpers.text_helpers import normalize_rtf_json
 from modules.helpers.logging_helper import log_module_import

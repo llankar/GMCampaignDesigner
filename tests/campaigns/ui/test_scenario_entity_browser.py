@@ -1,3 +1,5 @@
+"""Regression tests for scenario entity browser."""
+
 import importlib.util
 import sys
 import types
@@ -6,31 +8,40 @@ from pathlib import Path
 
 class _DummyWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _DummyWidget instance."""
         self.args = args
         self.kwargs = kwargs
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         return None
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         return None
 
     def place(self, *args, **kwargs):
+        """Handle place."""
         return None
 
     def bind(self, *args, **kwargs):
+        """Bind the operation."""
         return None
 
     def after_idle(self, callback, *args, **kwargs):
+        """Handle after idle."""
         return callback(*args, **kwargs)
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def grid_rowconfigure(self, *args, **kwargs):
+        """Handle grid rowconfigure."""
         return None
 
     def winfo_children(self):
+        """Handle winfo children."""
         return []
 
 
@@ -74,11 +85,13 @@ group_scenario_entities = module.group_scenario_entities
 
 class _Link:
     def __init__(self, entity_type: str, name: str):
+        """Initialize the _Link instance."""
         self.entity_type = entity_type
         self.name = name
 
 
 def test_group_scenario_entities_orders_and_deduplicates_links():
+    """Verify that group scenario entities orders and deduplicates links."""
     groups = group_scenario_entities([
         _Link("NPCs", "Mara"),
         _Link("Places", "The Gloam Market"),
@@ -95,4 +108,5 @@ def test_group_scenario_entities_orders_and_deduplicates_links():
 
 
 def test_scenario_entity_browser_renders_without_links():
+    """Verify that scenario entity browser renders without links."""
     ScenarioEntityBrowser(None, scenario_title="Moonlit Wake", links=[], on_open_entity=lambda *_args: None)

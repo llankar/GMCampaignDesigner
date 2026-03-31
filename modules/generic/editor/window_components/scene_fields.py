@@ -1,8 +1,11 @@
+"""Field helpers for window components scene."""
+
 from modules.generic.editor.window_context import *
 
 
 class GenericEditorWindowSceneFields:
     def create_dynamic_longtext_list(self, field):
+        """Create dynamic longtext list."""
         container = ctk.CTkFrame(self._field_parent())
         container.pack(fill="x", pady=4)
 
@@ -19,6 +22,7 @@ class GenericEditorWindowSceneFields:
         entity_templates = {}
 
         def _get_wrapper(label):
+            """Return wrapper."""
             if label not in entity_wrappers:
                 key = entity_type_map[label]
                 entity_wrappers[label] = GenericModelWrapper(key)
@@ -26,13 +30,17 @@ class GenericEditorWindowSceneFields:
             return entity_wrappers[label], entity_templates[label]
 
         def renumber_scenes():
+            """Handle renumber scenes."""
             for idx, state in enumerate(editors, start=1):
+                # Process each (idx, state) from enumerate(editors, start=1).
                 label = state.get("index_label")
                 if label:
                     label.configure(text=f"Scene {idx}")
 
         def remove_scene(state):
+            """Remove scene."""
             if state in editors:
+                # Handle the branch where state is in editors.
                 editors.remove(state)
                 try:
                     state["frame"].destroy()
@@ -41,6 +49,7 @@ class GenericEditorWindowSceneFields:
                 renumber_scenes()
 
         def _coerce_names(value):
+            """Coerce names."""
             if value is None:
                 return []
             if isinstance(value, list):
@@ -54,14 +63,17 @@ class GenericEditorWindowSceneFields:
             return parts or [text]
 
         def _coerce_links(value):
+            """Coerce links."""
             result = []
             if value is None:
                 return result
             if isinstance(value, list):
+                # Handle the branch where isinstance(value, list).
                 for item in value:
                     result.extend(_coerce_links(item))
                 return result
             if isinstance(value, dict):
+                # Handle the branch where isinstance(value, dict).
                 target = None
                 text = None
                 for key in ("Target", "target", "Scene", "scene", "Next", "next", "Id", "id"):
@@ -83,6 +95,7 @@ class GenericEditorWindowSceneFields:
             return result
 
         def refresh_entity_chips(state, label):
+            """Refresh entity chips."""
             frame = state["entity_chip_frames"].get(label)
             if not frame:
                 return
@@ -91,6 +104,7 @@ class GenericEditorWindowSceneFields:
 
             entries = state["entities"].get(label, [])
             if not entries:
+                # Handle the branch where entries is unavailable.
                 if frame.winfo_manager():
                     frame.pack_forget()
                 return
@@ -104,6 +118,7 @@ class GenericEditorWindowSceneFields:
                 ctk.CTkLabel(chip, text=name).pack(side="left", padx=(6, 2))
 
                 def _remove(n=name, lbl=label, st=state, widget=chip):
+                    """Remove the operation."""
                     st["entities"][lbl] = [x for x in st["entities"].get(lbl, []) if x != n]
                     widget.destroy()
                     if not st["entities"].get(lbl):
@@ -112,6 +127,7 @@ class GenericEditorWindowSceneFields:
                 ctk.CTkButton(chip, text="×", width=24, command=_remove).pack(side="left", padx=(0, 6))
 
         def add_entity(state, label, name):
+            """Handle add entity."""
             cleaned = str(name).strip()
             if not cleaned:
                 return
@@ -122,6 +138,7 @@ class GenericEditorWindowSceneFields:
             refresh_entity_chips(state, label)
 
         def open_entity_picker(state, label):
+            """Open entity picker."""
             wrapper, template = _get_wrapper(label)
             dialog = ctk.CTkToplevel(self)
             dialog.title(f"Select {label[:-1] if label.endswith('s') else label}")
@@ -130,6 +147,7 @@ class GenericEditorWindowSceneFields:
             dialog.grab_set()
 
             def _on_select(entity_type, name):
+                """Handle select."""
                 add_entity(state, label, name)
                 if dialog.winfo_exists():
                     dialog.destroy()
@@ -145,7 +163,9 @@ class GenericEditorWindowSceneFields:
             dialog.wait_window()
 
         def remove_link(state, link_state):
+            """Remove link."""
             if link_state in state.get("link_rows", []):
+                # Handle the branch where link state is in state.get('link_rows', []).
                 state["link_rows"].remove(link_state)
                 try:
                     link_state["frame"].destroy()
@@ -157,6 +177,7 @@ class GenericEditorWindowSceneFields:
                 container.pack_forget()
 
         def add_link_row(state, link=None):
+            """Handle add link row."""
             container = state["links_container"]
             if not container.winfo_manager():
                 container.pack(fill="x", padx=16, pady=(2, 2))
@@ -180,6 +201,7 @@ class GenericEditorWindowSceneFields:
             ).pack(side="left")
 
             if isinstance(link, dict):
+                # Handle the branch where isinstance(link, dict).
                 target_val = link.get("target")
                 text_val = link.get("text")
                 if target_val is not None:
@@ -190,6 +212,7 @@ class GenericEditorWindowSceneFields:
             state.setdefault("link_rows", []).append(link_state)
 
         def add_scene(initial_data=None):
+            """Handle add scene."""
             data = initial_data
             if data is None:
                 data = {}
@@ -235,6 +258,7 @@ class GenericEditorWindowSceneFields:
             scene_state["entity_chip_frames"] = {}
 
             for label in entity_type_map:
+                # Process each label from entity_type_map.
                 block = ctk.CTkFrame(entity_section, fg_color="transparent")
                 block.pack(fill="x", pady=(1, 0))
 
@@ -299,6 +323,7 @@ class GenericEditorWindowSceneFields:
         self.field_widgets[f"{field['name']}_add_scene"] = add_scene
         self.field_widgets[f"{field['name']}_renumber"] = renumber_scenes
     def create_character_links_field(self, field):
+        """Create character links field."""
         container = ctk.CTkFrame(self._field_parent())
         container.pack(fill="x", pady=4)
 
@@ -317,7 +342,9 @@ class GenericEditorWindowSceneFields:
             ctk.CTkLabel(container, text="No links yet.").pack(anchor="w", padx=4)
         else:
             for link in links:
+                # Process each link from links.
                 if isinstance(link, dict):
+                    # Handle the branch where isinstance(link, dict).
                     target_type = link.get("target_type") or "unknown"
                     target_name = link.get("target_name") or "unknown"
                     label = link.get("label") or ""

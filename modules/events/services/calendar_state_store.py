@@ -1,3 +1,4 @@
+"""State storage helpers for event calendar."""
 from __future__ import annotations
 
 import json
@@ -29,10 +30,12 @@ class CalendarStateStore:
     }
 
     def __init__(self, file_path: str | Path | None = None):
+        """Initialize the CalendarStateStore instance."""
         default_path = Path(ConfigHelper.get_campaign_dir()) / "calendar_state.json"
         self._file_path = Path(file_path) if file_path else default_path
 
     def load(self):
+        """Load the operation."""
         state = self._default_copy()
         if not self._file_path.exists():
             return state
@@ -48,6 +51,7 @@ class CalendarStateStore:
         return self._sanitize_state(payload)
 
     def save(self, state):
+        """Save the operation."""
         if not isinstance(state, dict):
             return
 
@@ -59,6 +63,7 @@ class CalendarStateStore:
             return
 
     def _sanitize_state(self, payload):
+        """Internal helper for sanitize state."""
         state = self._default_copy()
 
         view_mode = str(payload.get("view_mode") or "").strip().lower()
@@ -71,6 +76,7 @@ class CalendarStateStore:
 
         filters_payload = payload.get("filters")
         if isinstance(filters_payload, dict):
+            # Handle the branch where isinstance(filters_payload, dict).
             state["filters"]["show_source"] = bool(filters_payload.get("show_source", True))
             state["filters"]["search_text"] = str(filters_payload.get("search_text") or "").strip()
             state["filters"]["type"] = str(filters_payload.get("type") or "").strip()
@@ -83,6 +89,7 @@ class CalendarStateStore:
         panel_payload = payload.get("panel_widths")
         if isinstance(panel_payload, dict):
             for key in state["panel_widths"]:
+                # Process each key from state['panel_widths'].
                 width = self._int_or_none(panel_payload.get(key))
                 if width is not None and width >= 0:
                     state["panel_widths"][key] = width
@@ -91,6 +98,7 @@ class CalendarStateStore:
 
     @classmethod
     def to_runtime_state(cls, stored_state):
+        """Handle to runtime state."""
         state = cls()._sanitize_state(stored_state or {})
         runtime = {
             "view_mode": state["view_mode"],
@@ -102,6 +110,7 @@ class CalendarStateStore:
 
     @staticmethod
     def _parse_date(value):
+        """Parse date."""
         if isinstance(value, date):
             return value
         if not value:
@@ -113,6 +122,7 @@ class CalendarStateStore:
 
     @staticmethod
     def _int_or_none(value):
+        """Internal helper for int or none."""
         try:
             return int(value)
         except (TypeError, ValueError):
@@ -120,6 +130,7 @@ class CalendarStateStore:
 
     @classmethod
     def _default_copy(cls):
+        """Internal helper for default copy."""
         return {
             "view_mode": cls.DEFAULT_STATE["view_mode"],
             "active_date": cls.DEFAULT_STATE["active_date"],

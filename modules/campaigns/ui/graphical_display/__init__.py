@@ -7,6 +7,7 @@ __all__ = ["CampaignGraphWindow", "CampaignGraphPanel"]
 
 
 def __getattr__(name: str):
+    """Handle getattr."""
     if name == "CampaignGraphWindow":
         from .window import CampaignGraphWindow
 

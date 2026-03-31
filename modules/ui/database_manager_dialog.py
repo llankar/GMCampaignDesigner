@@ -29,6 +29,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
         on_selected: DatabaseSelectedCallback | None = None,
         on_cancelled: Callable[[], None] | None = None,
     ) -> None:
+        """Initialize the DatabaseManagerDialog instance."""
         super().__init__(master)
         self.title("Manage Campaign Database")
         self.geometry("560x520")
@@ -68,6 +69,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
     # UI construction
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build UI."""
         root = ctk.CTkFrame(self)
         root.pack(fill="both", expand=True, padx=18, pady=18)
         root.grid_columnconfigure(0, weight=1)
@@ -138,7 +140,9 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     @staticmethod
     def _determine_campaigns_directory() -> Path:
+        """Internal helper for determine campaigns directory."""
         try:
+            # Keep determine campaigns directory resilient if this step fails.
             if getattr(sys, "frozen", False):
                 base = Path(sys.executable).resolve().parent
             else:
@@ -149,19 +153,23 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _sanitize_name(name: str) -> str:
+        """Internal helper for sanitize name."""
         safe = "".join(ch for ch in name.strip() if ch.isalnum() or ch in {"_", "-", " "})
         safe = safe.strip().replace(" ", "_")
         return safe
 
     def _load_existing_databases(self) -> None:
+        """Load existing databases."""
         self._option_flags.clear()
         for path in self._discover_databases():
             self._option_flags[str(path)] = False
         self._render_database_options()
 
     def _discover_databases(self) -> Iterable[Path]:
+        """Internal helper for discover databases."""
         candidates: list[Path] = []
         try:
+            # Keep discover databases resilient if this step fails.
             for root, _dirs, files in os.walk(self._campaigns_dir):
                 for filename in files:
                     if filename.lower().endswith(".db"):
@@ -174,6 +182,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
         return sorted({path.resolve() for path in candidates})
 
     def _render_database_options(self) -> None:
+        """Render database options."""
         container = self._list_container
         if container is None:
             return
@@ -199,6 +208,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
             radio.grid(row=0, column=0, sticky="w")
 
     def _format_display_text(self, path: Path) -> str:
+        """Format display text."""
         try:
             relative = path.resolve().relative_to(self._campaigns_dir.resolve())
             return str(relative)
@@ -209,6 +219,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
     # Event handlers
     # ------------------------------------------------------------------
     def _create_new_campaign(self) -> None:
+        """Create new campaign."""
         name = self._new_name_var.get().strip()
         safe = self._sanitize_name(name)
         if not safe:
@@ -234,6 +245,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
         self._set_error("")
 
     def _browse_for_database(self) -> None:
+        """Internal helper for browse for database."""
         path = filedialog.askopenfilename(
             title="Select Campaign Database",
             initialdir=str(self._campaigns_dir),
@@ -248,6 +260,7 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
         self._set_error("")
 
     def _confirm_selection(self) -> None:
+        """Internal helper for confirm selection."""
         value = self._selection_var.get().strip()
         if not value:
             self._set_error("Select or create a campaign database before continuing.")
@@ -258,17 +271,20 @@ class DatabaseManagerDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _cancel(self) -> None:
+        """Internal helper for cancel."""
         if self._on_cancelled is not None:
             self._on_cancelled()
         self.destroy()
 
     def _set_error(self, message: str) -> None:
+        """Set error."""
         self._error_var.set(message)
         if self._error_label is not None:
             self._error_label.configure(text_color="#ff6666" if message else "#a0a0a0")
         self._update_confirm_state()
 
     def _update_confirm_state(self) -> None:
+        """Update confirm state."""
         if self._confirm_button is None:
             return
         state = "normal" if self._selection_var.get().strip() else "disabled"

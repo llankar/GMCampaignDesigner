@@ -14,12 +14,14 @@ _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "templates" / "charact
 
 
 def _rule_attr(rules_result, key: str, default=""):
+    """Internal helper for rule attr."""
     if isinstance(rules_result, dict):
         return rules_result.get(key, default)
     return getattr(rules_result, key, default)
 
 
 def _build_skill_rows(skill_dice: dict, favorites: set[str]) -> str:
+    """Build skill rows."""
     items = list(skill_dice.items())
     max_rows = max(15, len(items))
     rows: list[str] = []
@@ -36,6 +38,7 @@ def _build_skill_rows(skill_dice: dict, favorites: set[str]) -> str:
 
 
 def _build_list_lines(values: list[str], total: int, with_box: bool = False) -> str:
+    """Build list lines."""
     rows: list[str] = []
     for i in range(total):
         value = escape(values[i]) if i < len(values) else "&nbsp;"
@@ -47,6 +50,7 @@ def _build_list_lines(values: list[str], total: int, with_box: bool = False) -> 
 
 
 def _format_option_value(option: str) -> str:
+    """Format option value."""
     option_text = str(option or "").strip()
     if not option_text:
         return ""
@@ -66,6 +70,7 @@ def _format_option_value(option: str) -> str:
     return f"{option_name.strip()} : {mode}, {points} pt ({effect})"
 
 def _format_feat_line(feat: dict, labels: dict[str, str]) -> str:
+    """Format feat line."""
     name = (feat.get("name") or "").strip()
     prowess_points = int(feat.get("prowess_points") or 0)
     options = [_format_option_value(option) for option in (feat.get("options") or [])]
@@ -89,10 +94,12 @@ def _format_feat_line(feat: dict, labels: dict[str, str]) -> str:
 
 
 def _build_advancement_lines(advancement_choices: list[dict], total_advancements: int, labels: dict[str, str]) -> list[str]:
+    """Build advancement lines."""
     option_labels = {value: label for value, label in ADVANCEMENT_OPTIONS}
     lines: list[str] = []
 
     for index, raw_choice in enumerate(advancement_choices[:total_advancements], start=1):
+        # Process each (index, raw_choice) while updating advancement lines.
         choice = raw_choice or {}
         choice_type = str(choice.get("type") or "").strip()
         details = str(choice.get("details") or "").strip()
@@ -107,8 +114,10 @@ def _build_advancement_lines(advancement_choices: list[dict], total_advancements
 
 
 def _advancement_assets(advancement_choices: list[dict]) -> list[str]:
+    """Internal helper for advancement assets."""
     lines: list[str] = []
     for raw_choice in advancement_choices:
+        # Process each raw_choice from advancement_choices.
         choice = raw_choice or {}
         if str(choice.get("type") or "").strip() != "new_edge":
             continue
@@ -120,6 +129,7 @@ def _advancement_assets(advancement_choices: list[dict]) -> list[str]:
 
 
 def _object_sort_key(object_key: str) -> tuple[int, str]:
+    """Internal helper for object sort key."""
     if object_key == "weapon":
         return (0, object_key)
     if object_key == "armor":
@@ -127,6 +137,7 @@ def _object_sort_key(object_key: str) -> tuple[int, str]:
     if object_key == "utility":
         return (2, object_key)
     if object_key.startswith("object_"):
+        # Handle the branch where object_key.startswith('object_').
         suffix = object_key.split("_", 1)[-1]
         if suffix.isdigit():
             return (3 + int(suffix), object_key)
@@ -134,11 +145,13 @@ def _object_sort_key(object_key: str) -> tuple[int, str]:
 
 
 def _build_equipment_lines(payload: dict, labels: dict[str, str]) -> list[str]:
+    """Build equipment lines."""
     equipment = payload.get("equipment") or {}
     purchases = payload.get("equipment_purchases") or {}
     lines: list[str] = []
 
     for object_key in sorted(set(equipment) | set(purchases), key=_object_sort_key):
+        # Process each object_key while updating equipment lines.
         name = str(equipment.get(object_key, "") or "").strip()
         stats = purchases.get(object_key) or {}
         has_effect = any(int(stats.get(field, 0) or 0) > 0 for field in ("damage", "pierce_armor", "armor", "special_effect", "skill_bonus"))
@@ -168,6 +181,7 @@ def _build_equipment_lines(payload: dict, labels: dict[str, str]) -> list[str]:
 
 
 def render_character_sheet_html(payload: dict, rules_result, language: str = "fr") -> str:
+    """Render character sheet HTML."""
     template = Template(_TEMPLATE_PATH.read_text(encoding="utf-8"))
     labels = get_export_labels(language)
 
@@ -176,6 +190,7 @@ def render_character_sheet_html(payload: dict, rules_result, language: str = "fr
     feats = payload.get("feats") or []
     feats_lines: list[str] = []
     for feat in feats:
+        # Process each feat from feats.
         feat_line = _format_feat_line(feat, labels)
         if feat_line:
             feats_lines.append(feat_line)

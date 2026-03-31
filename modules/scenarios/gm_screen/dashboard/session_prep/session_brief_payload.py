@@ -1,3 +1,4 @@
+"""Payload helpers for dashboard session brief."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,6 +25,7 @@ class SessionBriefPayload:
 def build_session_brief_payload(
     *, fields: list[dict[str, Any]], campaign_item: dict[str, Any] | None
 ) -> SessionBriefPayload:
+    """Build session brief payload."""
     summary = _extract_summary(fields)
     active_arcs = _extract_active_arcs(fields)
     arc_details = _extract_arc_details(fields)
@@ -39,7 +41,9 @@ def build_session_brief_payload(
 
 
 def _extract_summary(fields: list[dict[str, Any]]) -> str:
+    """Extract summary."""
     for field in fields:
+        # Process each field from fields.
         name = str(field.get("name") or "").strip().lower()
         if not any(token in name for token in _SUMMARY_KEYS):
             continue
@@ -48,6 +52,7 @@ def _extract_summary(fields: list[dict[str, Any]]) -> str:
             return value
 
     for field in fields:
+        # Process each field from fields.
         value = str(field.get("value") or "").strip()
         if value:
             return value
@@ -55,12 +60,15 @@ def _extract_summary(fields: list[dict[str, Any]]) -> str:
 
 
 def _extract_active_arcs(fields: list[dict[str, Any]]) -> list[str]:
+    """Extract active arcs."""
     for field in fields:
+        # Process each field from fields.
         if str(field.get("name") or "").strip().lower() != "arcs":
             continue
 
         lines: list[str] = []
         for arc in coerce_arc_list(field.get("value")):
+            # Process each arc from coerce_arc_list(field.get('value')).
             status = str(arc.get("status") or "").strip().lower()
             if status not in {"in progress", "active", "ongoing"}:
                 continue
@@ -72,15 +80,19 @@ def _extract_active_arcs(fields: list[dict[str, Any]]) -> list[str]:
 
 
 def _extract_arc_details(fields: list[dict[str, Any]]) -> list[str]:
+    """Extract arc details."""
     for field in fields:
+        # Process each field from fields.
         if str(field.get("name") or "").strip().lower() != "arcs":
             continue
 
         details: list[str] = []
         for index, arc in enumerate(coerce_arc_list(field.get("value")), start=1):
+            # Process each (index, arc) while updating arc details.
             name = str(arc.get("name") or "").strip() or f"Arc #{index}"
             segments = [f"Arc {index}: {name}"]
             for key, raw_value in arc.items():
+                # Process each (key, raw_value) from arc.items().
                 if str(key).strip().lower() == "name":
                     continue
                 rendered = _render_arc_value(raw_value)
@@ -94,8 +106,10 @@ def _extract_arc_details(fields: list[dict[str, Any]]) -> list[str]:
 
 
 def _extract_dashboard_fields(fields: list[dict[str, Any]]) -> list[str]:
+    """Extract dashboard fields."""
     lines: list[str] = []
     for field in fields:
+        # Process each field from fields.
         name = str(field.get("name") or "").strip()
         if not name:
             continue
@@ -109,13 +123,16 @@ def _extract_dashboard_fields(fields: list[dict[str, Any]]) -> list[str]:
 
 
 def _extract_text_values(field: dict[str, Any]) -> list[str]:
+    """Extract text values."""
     if field.get("type") == "list":
         return [str(value).strip() for value in (field.get("values") or []) if str(value).strip()]
 
     value = field.get("value")
     if isinstance(value, list):
+        # Handle the branch where isinstance(value, list).
         rendered_items: list[str] = []
         for item in value:
+            # Process each item from value.
             rendered = _render_arc_value(item)
             if rendered:
                 rendered_items.append(rendered)
@@ -126,6 +143,7 @@ def _extract_text_values(field: dict[str, Any]) -> list[str]:
 
 
 def _render_arc_value(raw_value: Any) -> str:
+    """Render arc value."""
     if isinstance(raw_value, list):
         rendered = [str(item).strip() for item in raw_value if str(item).strip()]
         return ", ".join(rendered)

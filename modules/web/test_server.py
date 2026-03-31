@@ -1,3 +1,5 @@
+"""Utilities for test server."""
+
 from flask import Flask
 from modules.helpers.logging_helper import log_module_import
 
@@ -7,6 +9,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def hello():
+    """Handle hello."""
     return "Hello, world!"
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=31000, debug=True)

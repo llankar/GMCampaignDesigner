@@ -1,3 +1,4 @@
+"""Orchestration helpers for campaign forge."""
 from __future__ import annotations
 
 import time
@@ -21,10 +22,12 @@ class CampaignForgeOrchestrator:
     """Deterministic multi-stage campaign-forge orchestration pipeline."""
 
     def __init__(self, ai_client, scenario_wrapper=None):
+        """Initialize the CampaignForgeOrchestrator instance."""
         self.ai_client = ai_client
         self.scenario_wrapper = scenario_wrapper
 
     def run(self, request: CampaignForgeRequest) -> CampaignForgeResponse:
+        """Run the operation."""
         total_started = time.perf_counter()
         self._log_event(
             "campaign_forge.pipeline.start",
@@ -135,6 +138,7 @@ class CampaignForgeOrchestrator:
         )
 
     def _resolve_arcs(self, request: CampaignForgeRequest, foundation: dict[str, Any]) -> list[dict[str, Any]]:
+        """Resolve arcs."""
         provided_arcs = coerce_arcs(request.arcs)
         if provided_arcs:
             return provided_arcs
@@ -147,6 +151,7 @@ class CampaignForgeOrchestrator:
         return arcs
 
     def _resolve_existing_scenarios(self, request: CampaignForgeRequest) -> list[dict[str, Any]]:
+        """Resolve existing scenarios."""
         if request.existing_scenarios is not None:
             return [dict(item) for item in request.existing_scenarios if isinstance(item, dict)]
         if self.scenario_wrapper is None:
@@ -158,6 +163,7 @@ class CampaignForgeOrchestrator:
             )
             return []
         try:
+            # Keep existing scenarios resilient if this step fails.
             loaded = self.scenario_wrapper.load_items()
         except Exception as exc:
             self._log_event(
@@ -171,11 +177,13 @@ class CampaignForgeOrchestrator:
         return [dict(item) for item in loaded if isinstance(item, dict)]
 
     def _log_stage_start(self, stage: str, action: str) -> float:
+        """Internal helper for log stage start."""
         started_at = time.perf_counter()
         self._log_event("campaign_forge.stage.start", action, stage=stage)
         return started_at
 
     def _log_stage_end(self, stage: str, action: str, started_at: float, **details: Any) -> None:
+        """Internal helper for log stage end."""
         self._log_event(
             "campaign_forge.stage.end",
             action,
@@ -185,6 +193,7 @@ class CampaignForgeOrchestrator:
         )
 
     def _log_event(self, event: str, action: str, *, level: str = "info", **details: Any) -> None:
+        """Internal helper for log event."""
         detail_parts = [f"{key}={details[key]!r}" for key in sorted(details.keys())]
         message = f"event={event} action={action}"
         if detail_parts:
@@ -200,17 +209,21 @@ class CampaignForgeOrchestrator:
 
     @staticmethod
     def _elapsed_ms(started_at: float) -> int:
+        """Internal helper for elapsed ms."""
         return max(0, int((time.perf_counter() - started_at) * 1000))
 
     @staticmethod
     def _collect_generated_counts(payload: dict[str, Any]) -> dict[str, int]:
+        """Collect generated counts."""
         arc_groups = [item for item in (payload.get("arcs") or []) if isinstance(item, dict)]
         scenario_count = 0
         scene_count = 0
         for group in arc_groups:
+            # Process each group from arc_groups.
             scenarios = [item for item in (group.get("scenarios") or []) if isinstance(item, dict)]
             scenario_count += len(scenarios)
             for scenario in scenarios:
+                # Process each scenario from scenarios.
                 scenes = scenario.get("scene_ideas") or scenario.get("scenes") or []
                 if isinstance(scenes, list):
                     scene_count += len([scene for scene in scenes if isinstance(scene, dict)])

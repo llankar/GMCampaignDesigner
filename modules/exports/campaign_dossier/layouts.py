@@ -1,3 +1,4 @@
+"""Layout helpers for campaign dossier."""
 from dataclasses import dataclass
 
 from docx.shared import Inches, Pt
@@ -61,10 +62,12 @@ MIN_FONT_SIZE_PT = 14
 
 
 def get_layout_presets() -> dict[str, LayoutPreset]:
+    """Return layout presets."""
     return {preset.key: preset for preset in LAYOUT_PRESETS}
 
 
 def _apply_header_footer(section, preset: LayoutPreset, include_branding: bool) -> None:
+    """Apply header footer."""
     if not include_branding:
         return
     header_text = preset.header_text or DEFAULT_BRANDING_HEADER
@@ -78,6 +81,7 @@ def _apply_header_footer(section, preset: LayoutPreset, include_branding: bool) 
 
 
 def _apply_document_style(document, preset: LayoutPreset) -> None:
+    """Apply document style."""
     if preset.min_font_size_pt is None:
         return
     normal_style = document.styles["Normal"]
@@ -92,12 +96,14 @@ def _apply_document_style(document, preset: LayoutPreset) -> None:
 
 
 def format_entity_label(preset: LayoutPreset, entity_label: str, name: str) -> str:
+    """Format entity label."""
     if preset.entity_label_format:
         return preset.entity_label_format.format(entity=entity_label, name=name)
     return name
 
 
 def apply_layout(document, preset_key: str, include_branding: bool = False) -> LayoutPreset:
+    """Apply layout."""
     presets = get_layout_presets()
     preset = presets.get(preset_key) or presets[DEFAULT_LAYOUT_KEY]
     section = document.sections[0]

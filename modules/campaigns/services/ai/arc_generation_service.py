@@ -1,3 +1,5 @@
+"""Utilities for AI arc generation service."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -15,14 +17,17 @@ class ArcGenerationService:
     """Generate campaign arcs from scenario summaries using a strict-JSON AI contract."""
 
     def __init__(self, ai_client, scenario_wrapper):
+        """Initialize the ArcGenerationService instance."""
         self.ai_client = ai_client
         self.scenario_wrapper = scenario_wrapper
 
     def load_scenario_catalog(self) -> list[dict[str, Any]]:
+        """Load scenario catalog."""
         scenarios = self.scenario_wrapper.load_items() if self.scenario_wrapper else []
         return [dict(item) for item in (scenarios or []) if isinstance(item, dict)]
 
     def generate_arcs(self, foundation: dict[str, Any]) -> dict[str, Any]:
+        """Handle generate arcs."""
         scenarios = self.load_scenario_catalog()
         prompt = build_arc_generation_prompt(foundation=foundation, scenarios=scenarios)
         available_titles = self._build_available_scenario_aliases(scenarios)
@@ -38,6 +43,7 @@ class ArcGenerationService:
         runner = AIPipelineRunner(self.ai_client, pipeline_name="campaign.arc_generation")
         last_error: Exception | None = None
         for attempt in range(2):
+            # Process each attempt from range(2).
             raw_response = runner.run_chat(
                 messages,
                 phase="arc_generation",
@@ -48,6 +54,7 @@ class ArcGenerationService:
                 },
             )
             try:
+                # Keep generate arcs resilient if this step fails.
                 parsed = parse_json_relaxed(raw_response)
                 normalized = normalize_arc_generation_payload(parsed, available_scenarios=available_titles)
                 normalized["arcs"] = [self._normalize_arc(arc) for arc in normalized["arcs"]]
@@ -72,6 +79,7 @@ class ArcGenerationService:
         raise RuntimeError(f"Arc generation failed: {last_error}")
 
     def _normalize_arc(self, arc: dict[str, Any]) -> dict[str, Any]:
+        """Normalize arc."""
         return {
             "name": (arc.get("name") or "").strip(),
             "summary": (arc.get("summary") or "").strip(),
@@ -83,8 +91,10 @@ class ArcGenerationService:
 
     @staticmethod
     def _build_available_scenario_aliases(scenarios: list[dict[str, Any]]) -> dict[str, str]:
+        """Build available scenario aliases."""
         aliases: dict[str, str] = {}
         for item in scenarios:
+            # Process each item from scenarios.
             title = str(item.get("Title") or item.get("Name") or "").strip()
             if not title:
                 continue

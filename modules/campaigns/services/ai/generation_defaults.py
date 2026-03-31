@@ -1,3 +1,5 @@
+"""Utilities for AI generation defaults."""
+
 from __future__ import annotations
 
 import json
@@ -26,6 +28,7 @@ DEFAULT_AI_GENERATION_DEFAULTS: AIGenerationDefaults = {
 
 
 def load_ai_generation_defaults() -> AIGenerationDefaults:
+    """Load AI generation defaults."""
     raw = get_campaign_setting(_AI_GENERATION_DEFAULTS_KEY, None)
     if not raw:
         return dict(DEFAULT_AI_GENERATION_DEFAULTS)
@@ -42,12 +45,14 @@ def load_ai_generation_defaults() -> AIGenerationDefaults:
 
 
 def save_ai_generation_defaults(value: dict[str, Any] | None) -> AIGenerationDefaults:
+    """Save AI generation defaults."""
     normalized = normalize_ai_generation_defaults(value)
     set_campaign_setting(_AI_GENERATION_DEFAULTS_KEY, json.dumps(normalized, ensure_ascii=False))
     return normalized
 
 
 def normalize_ai_generation_defaults(value: dict[str, Any] | None) -> AIGenerationDefaults:
+    """Normalize AI generation defaults."""
     value = value or {}
 
     allow_internal_conflict = value.get("allow_internal_conflict")
@@ -65,6 +70,7 @@ def normalize_ai_generation_defaults(value: dict[str, Any] | None) -> AIGenerati
 
 
 def _normalize_string_list(values: Any) -> list[str]:
+    """Normalize string list."""
     if isinstance(values, str):
         values = [values]
     if not isinstance(values, list):
@@ -73,6 +79,7 @@ def _normalize_string_list(values: Any) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
     for value in values:
+        # Process each value from values.
         cleaned = str(value or "").strip()
         if not cleaned:
             continue

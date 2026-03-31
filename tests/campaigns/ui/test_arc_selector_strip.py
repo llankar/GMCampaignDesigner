@@ -1,3 +1,5 @@
+"""Regression tests for arc selector strip."""
+
 import importlib.util
 import sys
 import types
@@ -8,47 +10,60 @@ from modules.campaigns.ui.graphical_display.data import CampaignGraphArc
 
 class _DummyFrame:
     def __init__(self, *args, **kwargs):
+        """Initialize the _DummyFrame instance."""
         self._children = []
 
     def after_idle(self, callback, *args, **kwargs):
+        """Handle after idle."""
         return callback(*args, **kwargs)
 
 
 class _FakeCanvas:
     def __init__(self, *args, **kwargs):
+        """Initialize the _FakeCanvas instance."""
         self.bound = {}
         self.configured = {}
         self.deleted = []
         self.created = []
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         return None
 
     def bind(self, *args, **kwargs):
+        """Bind the operation."""
         return None
 
     def tag_bind(self, tag, sequence, callback):
+        """Handle tag bind."""
         self.bound[(tag, sequence)] = callback
 
     def winfo_exists(self):
+        """Handle winfo exists."""
         return True
 
     def winfo_width(self):
+        """Handle winfo width."""
         return 480
 
     def winfo_height(self):
+        """Handle winfo height."""
         return 124
 
     def delete(self, *args):
+        """Delete the operation."""
         self.deleted.append(args)
 
     def create_rectangle(self, *args, **kwargs):
+        """Create rectangle."""
         self.created.append(("rectangle", args, kwargs))
 
     def create_text(self, *args, **kwargs):
+        """Create text."""
         self.created.append(("text", args, kwargs))
 
     def configure(self, **kwargs):
+        """Handle configure."""
         self.configured.update(kwargs)
 
 
@@ -66,6 +81,7 @@ spec.loader.exec_module(module)
 
 
 def test_arc_selector_strip_callbacks_accept_missing_event(monkeypatch):
+    """Verify that arc selector strip callbacks accept missing event."""
     fake_canvas = _FakeCanvas()
     monkeypatch.setattr(module.tk, "Canvas", lambda *args, **kwargs: fake_canvas)
 

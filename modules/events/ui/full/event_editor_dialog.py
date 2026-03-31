@@ -1,3 +1,5 @@
+"""Dialog for event editor."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -24,6 +26,7 @@ class EventEditorDialog(ctk.CTkToplevel):
     STATUS_OPTIONS = ["Planned", "Confirmed", "Completed", "Canceled"]
 
     def __init__(self, master, *, initial_values=None, on_save=None, entity_link_service=None, save_label="Create"):
+        """Initialize the EventEditorDialog instance."""
         super().__init__(master)
         self.title("Event editor")
         self.geometry("960x820")
@@ -49,6 +52,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.grab_set()
 
     def _build_ui(self):
+        """Build UI."""
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -94,6 +98,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self._build_footer()
 
     def _build_identity_section(self, container):
+        """Build identity section."""
         for column in range(2):
             container.grid_columnconfigure(column, weight=1)
 
@@ -126,6 +131,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         status_row = ctk.CTkFrame(status_block, fg_color="transparent")
         status_row.grid(row=2, column=0, sticky="ew")
         for index, status in enumerate(self.STATUS_OPTIONS):
+            # Process each (index, status) from enumerate(STATUS_OPTIONS).
             button = ctk.CTkButton(
                 status_row,
                 text=status,
@@ -152,6 +158,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.status_entry.grid(row=3, column=0, sticky="ew", pady=(10, 0))
 
     def _build_schedule_section(self, container):
+        """Build schedule section."""
         for column in range(3):
             container.grid_columnconfigure(column, weight=1)
 
@@ -189,6 +196,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.end_entry.grid(row=2, column=0, sticky="ew")
 
     def _build_appearance_section(self, container):
+        """Build appearance section."""
         container.grid_columnconfigure(0, weight=1)
         container.grid_columnconfigure(1, weight=0)
 
@@ -215,6 +223,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         chip_row.grid(row=1, column=0, sticky="ew", pady=(12, 0))
         self._color_presets = []
         for index, label in enumerate(event_type_labels()):
+            # Process each (index, label) from enumerate(event_type_labels()).
             event_type = get_event_type(label)
             chip = ctk.CTkButton(
                 chip_row,
@@ -232,9 +241,11 @@ class EventEditorDialog(ctk.CTkToplevel):
             self._color_presets.append(chip)
 
     def _build_links_section(self, container):
+        """Build links section."""
         for column in range(2):
             container.grid_columnconfigure(column, weight=1)
         for index, (field_name, label) in enumerate(EVENT_LINK_GROUPS):
+            # Process each (index, (field_name, label)) from enumerate(EVENT_LINK_GROUPS).
             selector = MultiLinkSelector(
                 container,
                 label=label,
@@ -251,6 +262,7 @@ class EventEditorDialog(ctk.CTkToplevel):
             self._link_selectors[field_name] = selector
 
     def _build_footer(self):
+        """Build footer."""
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.grid(row=1, column=0, padx=18, pady=(0, 18), sticky="ew")
         footer.grid_columnconfigure(0, weight=1)
@@ -283,6 +295,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         ).pack(side="right")
 
     def _create_field_block(self, master, title: str, helper: str):
+        """Create field block."""
         block = ctk.CTkFrame(master, fg_color="transparent")
         block.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -301,6 +314,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         return block
 
     def _bind_live_updates(self):
+        """Bind live updates."""
         self.title_entry.bind("<KeyRelease>", lambda _event: self._refresh_summary_preview())
         self.status_entry.bind("<KeyRelease>", lambda _event: self._refresh_summary_preview())
         self.date_entry.entry.bind("<KeyRelease>", lambda _event: self._refresh_summary_preview(), add="+")
@@ -312,6 +326,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.type_menu.configure(command=lambda _value: self._on_type_changed())
 
     def _populate_fields(self):
+        """Internal helper for populate fields."""
         self.title_entry.insert(0, self._initial.get("title", ""))
 
         current_date = self._initial.get("date") or date.today()
@@ -336,12 +351,14 @@ class EventEditorDialog(ctk.CTkToplevel):
             selector.set_values(self._initial.get(field_name) or [])
 
     def _set_status(self, value: str):
+        """Set status."""
         self.status_entry.delete(0, "end")
         self.status_entry.insert(0, value)
         self._highlight_status(value)
         self._refresh_summary_preview()
 
     def _highlight_status(self, active_status: str):
+        """Internal helper for highlight status."""
         normalized = str(active_status or "").strip().lower()
         for status, button in self._status_buttons.items():
             is_active = status.lower() == normalized
@@ -352,6 +369,7 @@ class EventEditorDialog(ctk.CTkToplevel):
             )
 
     def _on_type_changed(self):
+        """Handle type changed."""
         chosen_type = self.type_menu.get().strip()
         event_type = get_event_type(chosen_type)
         if not self._color_locked:
@@ -359,12 +377,14 @@ class EventEditorDialog(ctk.CTkToplevel):
         self._refresh_summary_preview()
 
     def _apply_color(self, color: str, *, lock: bool):
+        """Apply color."""
         self._selected_color = normalize_hex_color(color, fallback=self._selected_color)
         self._color_locked = lock
         self._update_color_button()
         self._refresh_summary_preview()
 
     def _save(self):
+        """Save the operation."""
         payload = {
             "title": self.title_entry.get().strip(),
             "date": self.date_entry.get().strip(),
@@ -381,6 +401,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self.destroy()
 
     def _choose_color(self):
+        """Internal helper for choose color."""
         current = normalize_hex_color(self._selected_color, fallback="#4F8EF7")
         selection = colorchooser.askcolor(color=current, parent=self)
         color = None
@@ -389,6 +410,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         self._apply_color(normalize_hex_color(color, fallback=current), lock=True)
 
     def _update_color_button(self):
+        """Update color button."""
         self.color_button.configure(
             text=f"{self._selected_color}  {'• custom' if self._color_locked else '• auto'}",
             fg_color=self._selected_color,
@@ -397,6 +419,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         )
 
     def _refresh_summary_preview(self):
+        """Refresh summary preview."""
         status = self.status_entry.get().strip()
         self._highlight_status(status)
         self.hero.update_preview(
@@ -408,6 +431,7 @@ class EventEditorDialog(ctk.CTkToplevel):
         )
 
     def _format_schedule_preview(self):
+        """Format schedule preview."""
         selected_date = self.date_entry.get().strip()
         start_time = self.start_entry.get().strip()
         end_time = self.end_entry.get().strip()

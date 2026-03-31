@@ -1,3 +1,5 @@
+"""Helpers for building AI prompts."""
+
 from __future__ import annotations
 
 import json
@@ -397,26 +399,32 @@ def build_arc_scenario_expansion_prompt(
 
 
 def _format_prompt_block(block: str) -> str:
+    """Format prompt block."""
     if not block:
         return ""
     return f"{block}\n"
 
 
 def _scenario_title(scenario: dict[str, Any]) -> str:
+    """Internal helper for scenario title."""
     return _clean(scenario.get("Title") or scenario.get("Name"))
 
 
 def _scenario_summary(scenario: dict[str, Any]) -> str:
+    """Internal helper for scenario summary."""
     return _clean(scenario.get("Summary") or scenario.get("Description") or scenario.get("Logline"))
 
 
 def _scenario_details(scenario: dict[str, Any]) -> dict[str, Any]:
+    """Internal helper for scenario details."""
     details: dict[str, Any] = {}
     for key in ("Secrets", "Scenes", "NPCs", "Places", "Factions", "LinkedNPCs", "LinkedPlaces"):
+        # Process each key while updating scenario details.
         value = scenario.get(key)
         if value in (None, "", []):
             continue
         if isinstance(value, list):
+            # Handle the branch where isinstance(value, list).
             normalized = [_clean(item) for item in value if _clean(item)]
             if normalized:
                 details[key] = normalized
@@ -428,11 +436,13 @@ def _scenario_details(scenario: dict[str, Any]) -> dict[str, Any]:
 
 
 def _scenario_scene_titles(scenario: dict[str, Any]) -> list[str]:
+    """Internal helper for scenario scene titles."""
     scenes = scenario.get("Scenes")
     if not isinstance(scenes, list):
         return []
     titles: list[str] = []
     for scene in scenes:
+        # Process each scene from scenes.
         if isinstance(scene, dict):
             title = _clean(scene.get("Title"))
         else:
@@ -443,4 +453,5 @@ def _scenario_scene_titles(scenario: dict[str, Any]) -> list[str]:
 
 
 def _clean(value: Any) -> str:
+    """Internal helper for clean."""
     return coerce_text(value).strip()

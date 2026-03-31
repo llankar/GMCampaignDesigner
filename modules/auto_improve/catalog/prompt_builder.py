@@ -1,7 +1,10 @@
+"""Helpers for building catalog prompts."""
+
 from __future__ import annotations
 
 
 def build_idea_prompt(limit: int, excluded_slugs: set[str]) -> str:
+    """Build idea prompt."""
     excluded = ", ".join(sorted(excluded_slugs)) if excluded_slugs else "none"
     return (
         "You are reviewing the current GMCampaignDesigner repository.\n"

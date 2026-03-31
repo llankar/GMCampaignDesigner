@@ -1,3 +1,5 @@
+"""Utilities for world map fog service."""
+
 import io
 import os
 import re
@@ -11,6 +13,7 @@ from modules.maps.services.fog_manager import apply_fog_rectangle
 
 
 def init_world_map_fog(panel) -> None:
+    """Initialize world map fog."""
     panel.fog_mode = None
     panel.brush_size = 32
     panel.brush_size_options = list(range(4, 129, 4))
@@ -27,12 +30,14 @@ def init_world_map_fog(panel) -> None:
 
 
 def _fog_mask_records(panel):
+    """Internal helper for fog mask records."""
     record = panel.maps_wrapper_data.get(panel.current_map_name) if panel.current_map_name else None
     entry = panel.current_world_map if isinstance(panel.current_world_map, dict) else {}
     return record, entry
 
 
 def _resolve_fog_mask_path(panel) -> str:
+    """Resolve fog mask path."""
     record, entry = _fog_mask_records(panel)
     fog_rel = ""
     if isinstance(record, dict):
@@ -45,6 +50,7 @@ def _resolve_fog_mask_path(panel) -> str:
 
 
 def _mask_base_name(panel) -> str:
+    """Internal helper for mask base name."""
     record, entry = _fog_mask_records(panel)
     image_path = ""
     if isinstance(record, dict):
@@ -52,6 +58,7 @@ def _mask_base_name(panel) -> str:
     if not image_path and isinstance(entry, dict):
         image_path = str(entry.get("image") or "").strip()
     if image_path:
+        # Continue with this path when image path is set.
         base = os.path.splitext(os.path.basename(image_path))[0]
         if base:
             return base
@@ -61,6 +68,7 @@ def _mask_base_name(panel) -> str:
 
 
 def load_world_map_fog(panel) -> None:
+    """Load world map fog."""
     if not panel.base_image or not panel.current_map_name:
         panel.mask_img = None
         panel.mask_tk = None
@@ -91,6 +99,7 @@ def load_world_map_fog(panel) -> None:
 
 
 def save_world_map_fog(panel) -> None:
+    """Save world map fog."""
     if not panel.current_map_name or panel.mask_img is None:
         return
 
@@ -112,6 +121,7 @@ def save_world_map_fog(panel) -> None:
 
     record, entry = _fog_mask_records(panel)
     if isinstance(record, dict):
+        # Handle the branch where isinstance(record, dict).
         record["FogMaskPath"] = rel_mask_path
         panel.maps_wrapper_data[panel.current_map_name] = record
         try:
@@ -127,6 +137,7 @@ def save_world_map_fog(panel) -> None:
 
 
 def _fog_event_to_world(panel, event):
+    """Internal helper for fog event to world."""
     if not panel.render_params:
         return None
     scale, offset_x, offset_y, _, _ = panel.render_params
@@ -136,6 +147,7 @@ def _fog_event_to_world(panel, event):
 
 
 def update_world_map_fog_canvas(panel, *, resample=None) -> None:
+    """Update world map fog canvas."""
     if not panel.mask_img or not panel.render_params:
         return
     canvas = getattr(panel, "canvas", None)
@@ -165,6 +177,7 @@ def update_world_map_fog_canvas(panel, *, resample=None) -> None:
 
 
 def clear_world_map_fog(panel) -> None:
+    """Clear world map fog."""
     if not panel.base_image:
         return
     panel.mask_img = Image.new("RGBA", panel.base_image.size, (0, 0, 0, 0))
@@ -172,6 +185,7 @@ def clear_world_map_fog(panel) -> None:
 
 
 def reset_world_map_fog(panel) -> None:
+    """Reset world map fog."""
     if not panel.base_image:
         return
     panel.mask_img = Image.new("RGBA", panel.base_image.size, (0, 0, 0, 128))
@@ -179,6 +193,7 @@ def reset_world_map_fog(panel) -> None:
 
 
 def paint_world_map_fog(panel, event) -> None:
+    """Handle paint world map fog."""
     if panel.fog_mode not in ("add", "rem"):
         return
     if panel.mask_img is None:
@@ -205,6 +220,7 @@ def paint_world_map_fog(panel, event) -> None:
 
 
 def update_fog_rectangle_preview(panel, event) -> None:
+    """Update fog rectangle preview."""
     if panel._fog_rect_start_world is None or panel.render_params is None:
         return
     coords = _fog_event_to_world(panel, event)
@@ -247,6 +263,7 @@ def update_fog_rectangle_preview(panel, event) -> None:
 
 
 def clear_fog_rectangle_preview(panel) -> None:
+    """Clear fog rectangle preview."""
     canvas = getattr(panel, "canvas", None)
     if canvas and canvas.winfo_exists():
         canvas.delete("fog_preview")
@@ -254,6 +271,7 @@ def clear_fog_rectangle_preview(panel) -> None:
 
 
 def push_fog_history(panel) -> None:
+    """Handle push fog history."""
     if panel.mask_img is None:
         return
 
@@ -273,11 +291,13 @@ def push_fog_history(panel) -> None:
 
     max_budget = fog_history_budget_bytes(panel)
     while panel.fog_history and panel._fog_history_bytes > max_budget:
+        # Keep looping while panel.fog_history and panel._fog_history_bytes > max_budget.
         dropped = panel.fog_history.pop(0)
         panel._fog_history_bytes -= len(dropped)
 
 
 def fog_history_budget_bytes(panel) -> int:
+    """Handle fog history budget bytes."""
     if panel.mask_img is None:
         return 0
     pixel_count = max(1, panel.mask_img.width * panel.mask_img.height)
@@ -288,6 +308,7 @@ def fog_history_budget_bytes(panel) -> int:
 
 
 def undo_world_map_fog(panel, _event=None) -> None:
+    """Handle undo world map fog."""
     if not panel.fog_history:
         return
 
@@ -296,6 +317,7 @@ def undo_world_map_fog(panel, _event=None) -> None:
     panel._fog_history_bytes = max(0, panel._fog_history_bytes)
 
     try:
+        # Keep undo world map fog resilient if this step fails.
         with Image.open(io.BytesIO(payload)) as restored:
             restored_img = restored.convert("RGBA")
     except Exception as exc:
@@ -309,6 +331,7 @@ def undo_world_map_fog(panel, _event=None) -> None:
 
 
 def apply_world_map_fog_rectangle(panel, start_world, end_world) -> None:
+    """Apply world map fog rectangle."""
     if panel.mask_img is None:
         return
     if start_world is None or end_world is None:

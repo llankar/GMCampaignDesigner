@@ -1,3 +1,4 @@
+"""Context helpers for editor window."""
 import customtkinter as ctk
 import os
 import requests
@@ -66,6 +67,7 @@ class ReadOnlyLongTextPreview(ctk.CTkFrame):
     PREVIEW_CHAR_LIMIT = 2000
 
     def __init__(self, parent, field_label: str, raw_value):
+        """Initialize the ReadOnlyLongTextPreview instance."""
         super().__init__(parent)
         self.field_label = field_label
         # Preserve the original payload so ``save()`` can write it back without
@@ -111,7 +113,9 @@ class ReadOnlyLongTextPreview(ctk.CTkFrame):
 
     @staticmethod
     def _coerce_to_text(value) -> str:
+        """Coerce to text."""
         if isinstance(value, dict):
+            # Handle the branch where isinstance(value, dict).
             text_val = value.get("text")
             if isinstance(text_val, str):
                 return text_val
@@ -124,6 +128,7 @@ class ReadOnlyLongTextPreview(ctk.CTkFrame):
         return str(value or "")
 
     def _open_full_transcript(self):
+        """Open full transcript."""
         top = ctk.CTkToplevel(self)
         top.title(f"{self.field_label} – Full Transcript")
         top.geometry("900x600")
@@ -207,6 +212,7 @@ class CustomDropdown(ctk.CTkToplevel):
         self.entry.bind("<Down>", lambda e: self.listbox.focus_set())
                         
     def _populate_options(self):
+        """Internal helper for populate options."""
         self.listbox.delete(0, tk.END)
         for opt in self.filtered_options:
             self.listbox.insert(tk.END, opt)
@@ -214,6 +220,7 @@ class CustomDropdown(ctk.CTkToplevel):
             self.listbox.selection_set(0)
 
     def _on_search_change(self, *args):
+        """Handle search change."""
         q = self.search_var.get().lower()
         if q:
             self.filtered_options = [o for o in self.all_options if q in o.lower()]
@@ -223,6 +230,7 @@ class CustomDropdown(ctk.CTkToplevel):
         # after filter, we could also dynamically resize height if you like
 
     def _on_activate(self, event):
+        """Handle activate."""
         sel = self.listbox.curselection()
         if not sel: return
         value = self.filtered_options[sel[0]]
@@ -230,12 +238,14 @@ class CustomDropdown(ctk.CTkToplevel):
         self.destroy()
 
     def _on_mousewheel(self, event):
+        """Handle mousewheel."""
         if event.num == 4 or event.delta > 0:
             self.listbox.yview_scroll(-1, "units")
         else:
             self.listbox.yview_scroll(1,  "units")
 
     def _on_focus_out(self, event):
+        """Handle focus out."""
         # if the new focus is still inside our Toplevel, do nothing
         new = self.focus_get()
         if new and str(new).startswith(str(self)):
@@ -255,12 +265,14 @@ def load_entities_list(entity_type):
         list: A list of names for the given entity, or an empty list on error.
     """
     try:
+        # Keep entities list resilient if this step fails.
         wrapper = GenericModelWrapper(entity_type)
         entities = wrapper.load_items() # Assumes get_all() returns a list of dictionaries.
 
         key_field = "Title" if str(entity_type).lower() in {"scenarios", "books"} else "Name"
         options = []
         for entity in entities:
+            # Process each entity from entities.
             value = entity.get(key_field)
             if value is None and key_field != "Name":
                 value = entity.get("Name")
@@ -278,29 +290,37 @@ def load_entities_list(entity_type):
 
 @log_function
 def load_factions_list():
+    """Load factions list."""
     return load_entities_list("factions")
 
 @log_function
 def load_npcs_list():
+    """Load NPCs list."""
     return load_entities_list("npcs")
 @log_function
 def load_villains_list():
+    """Load villains list."""
     return load_entities_list("villains")
 @log_function
 def load_pcs_list():
+    """Load PCs list."""
     return load_entities_list("pcs")
 @log_function
 def load_places_list():
+    """Load places list."""
     return load_entities_list("places")
 
 @log_function
 def load_objects_list():
+    """Load objects list."""
     return load_entities_list("objects")
 
 @log_function
 def load_creatures_list():
+    """Load creatures list."""
     return load_entities_list("creatures")
 
 @log_function
 def load_books_list():
+    """Load books list."""
     return load_entities_list("books")

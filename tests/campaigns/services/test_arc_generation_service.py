@@ -1,3 +1,5 @@
+"""Regression tests for arc generation service."""
+
 from modules.campaigns.services.ai import (
     ArcGenerationService,
     ArcGenerationValidationError,
@@ -9,33 +11,40 @@ from modules.campaigns.services.ai import (
 
 class _FakeAIClient:
     def __init__(self, response):
+        """Initialize the _FakeAIClient instance."""
         self.response = response
         self.messages = None
 
     def chat(self, messages):
+        """Handle chat."""
         self.messages = messages
         return self.response
 
 
 class _RetryingFakeAIClient:
     def __init__(self, responses):
+        """Initialize the _RetryingFakeAIClient instance."""
         self.responses = list(responses)
         self.calls: list[list[dict[str, str]]] = []
 
     def chat(self, messages):
+        """Handle chat."""
         self.calls.append(list(messages))
         return self.responses.pop(0)
 
 
 class _FakeScenarioWrapper:
     def __init__(self, items):
+        """Initialize the _FakeScenarioWrapper instance."""
         self.items = items
 
     def load_items(self):
+        """Load items."""
         return list(self.items)
 
 
 def test_parse_json_relaxed_accepts_code_fenced_payload():
+    """Verify that parse JSON relaxed accepts code fenced payload."""
     payload = parse_json_relaxed(
         """```json
         {"campaign": {"name": "Stormfront"}, "threads": [], "arcs": []}
@@ -46,6 +55,7 @@ def test_parse_json_relaxed_accepts_code_fenced_payload():
 
 
 def test_parse_json_relaxed_extracts_json_with_trailing_commentary():
+    """Verify that parse JSON relaxed extracts JSON with trailing commentary."""
     payload = parse_json_relaxed(
         """{"arcs": [{"arc_name": "Guild War", "scenarios": []}]}
 
@@ -56,6 +66,7 @@ I hope this helps."""
 
 
 def test_minimum_scenarios_per_arc_scales_for_small_catalogs():
+    """Verify that minimum scenarios per arc scales for small catalogs."""
     assert minimum_scenarios_per_arc(None) == 3
     assert minimum_scenarios_per_arc(1) == 1
     assert minimum_scenarios_per_arc(2) == 2
@@ -64,6 +75,7 @@ def test_minimum_scenarios_per_arc_scales_for_small_catalogs():
 
 
 def test_normalize_arc_generation_payload_rejects_arc_with_too_few_scenarios():
+    """Verify that normalize arc generation payload rejects arc with too few scenarios."""
     payload = {
         "campaign": {"name": "Stormfront"},
         "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}],
@@ -88,6 +100,7 @@ def test_normalize_arc_generation_payload_rejects_arc_with_too_few_scenarios():
 
 
 def test_normalize_arc_generation_payload_allows_longer_arcs_when_connected():
+    """Verify that normalize arc generation payload allows longer arcs when connected."""
     payload = {
         "campaign": {"name": "Stormfront"},
         "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}],
@@ -109,6 +122,7 @@ def test_normalize_arc_generation_payload_allows_longer_arcs_when_connected():
 
 
 def test_normalize_arc_generation_payload_resolves_title_plus_summary_aliases():
+    """Verify that normalize arc generation payload resolves title plus summary aliases."""
     payload = {
         "campaign": {"name": "Stormfront"},
         "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}],
@@ -147,6 +161,7 @@ def test_normalize_arc_generation_payload_resolves_title_plus_summary_aliases():
 
 
 def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs():
+    """Verify that arc generation service uses full scenario catalog and normalizes arcs."""
     ai_client = _FakeAIClient(
         '{"campaign": {"name": "Stormfront", "summary": "", "objective": ""}, '
         '"threads": [{"name": "Conspiracy", "summary": "Escalation", "arcs": ["Arc One"]}], '
@@ -196,6 +211,7 @@ def test_arc_generation_service_uses_full_scenario_catalog_and_normalizes_arcs()
 
 
 def test_arc_generation_service_accepts_title_plus_summary_scenario_references():
+    """Verify that arc generation service accepts title plus summary scenario references."""
     ai_client = _FakeAIClient(
         '{"campaign": {"name": "Neon Eclipse"}, "threads": [{"name": "Main Thread", "summary": "", "arcs": ["Arc One"]}], '
         '"arcs": [{"name": "Arc One", "summary": "Escalation", "objective": "Stop the conspiracy", "status": "planned", '
@@ -221,6 +237,7 @@ def test_arc_generation_service_accepts_title_plus_summary_scenario_references()
 
 
 def test_arc_generation_service_retries_when_first_payload_has_single_scenario_arc():
+    """Verify that arc generation service retries when first payload has single scenario arc."""
     ai_client = _RetryingFakeAIClient(
         [
             '{"campaign": {"name": "Stormfront"}, "threads": [{"name": "Conspiracy", "summary": "", "arcs": ["Arc One"]}], '

@@ -1,3 +1,5 @@
+"""Dialog for imports web text import."""
+
 from __future__ import annotations
 
 import json
@@ -34,6 +36,7 @@ class WebTextImportDialog(ctk.CTkToplevel):
         default_target_slug: str | None = None,
         on_complete=None,
     ) -> None:
+        """Initialize the WebTextImportDialog instance."""
         super().__init__(master)
         self.default_target_slug = default_target_slug
         self.on_complete = on_complete
@@ -51,6 +54,7 @@ class WebTextImportDialog(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_ui(self) -> None:
+        """Build UI."""
         self.title("Import de texte (Web)")
         self.geometry("880x320")
         self.minsize(820, 280)
@@ -107,19 +111,23 @@ class WebTextImportDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _build_selection_path() -> Path:
+        """Build selection path."""
         filename = f"web_selection_{uuid4().hex}.json"
         return Path(tempfile.gettempdir()) / filename
 
     def _resolve_search_url(self) -> str:
+        """Resolve search URL."""
         subject = (self._subject_var.get() or "").strip() or self._DEFAULT_QUERY
         encoded = quote_plus(subject)
         return self._SEARCH_URL.format(query=encoded)
 
     @log_function
     def _open_search(self) -> None:
+        """Open search."""
         url = self._resolve_search_url()
         self._status_var.set("Recherche ouverte dans le navigateur.")
         try:
+            # Keep search resilient if this step fails.
             if self._selection_path.exists():
                 self._selection_path.unlink()
             self._browser_client.open(
@@ -141,6 +149,7 @@ class WebTextImportDialog(ctk.CTkToplevel):
             self._poll_selection()
 
     def _poll_selection(self) -> None:
+        """Internal helper for poll selection."""
         self._polling_job = self.after(800, self._poll_selection)
         if not self._selection_path.exists():
             return
@@ -155,6 +164,7 @@ class WebTextImportDialog(ctk.CTkToplevel):
         if not payload_text:
             return
         try:
+            # Keep poll selection resilient if this step fails.
             payload = json.loads(payload_text)
         except json.JSONDecodeError:
             log_exception(
@@ -177,6 +187,7 @@ class WebTextImportDialog(ctk.CTkToplevel):
             pass
 
     def _open_text_import_dialog(self, selection: str, url: str) -> None:
+        """Open text import dialog."""
         dialog = TextImportDialog(
             self,
             source_text=selection,
@@ -187,10 +198,12 @@ class WebTextImportDialog(ctk.CTkToplevel):
         dialog.focus_force()
 
     def _on_close(self) -> None:
+        """Handle close."""
         if self._polling_job:
             self.after_cancel(self._polling_job)
             self._polling_job = None
         try:
+            # Keep on close resilient if this step fails.
             if self._selection_path.exists():
                 self._selection_path.unlink()
         except Exception:

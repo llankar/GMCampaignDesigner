@@ -1,3 +1,5 @@
+"""Dialog for event date agenda."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -10,6 +12,7 @@ from modules.events.services.date_validation import max_days_for_month, validate
 
 class CampaignDateAgendaDialog(ctk.CTkToplevel):
     def __init__(self, master, *, initial_date: date | None = None, on_apply=None):
+        """Initialize the CampaignDateAgendaDialog instance."""
         super().__init__(master)
         self.title("Set campaign day")
         self.geometry("420x290")
@@ -27,6 +30,7 @@ class CampaignDateAgendaDialog(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_ui(self):
+        """Build UI."""
         self.grid_columnconfigure(1, weight=1)
 
         row = 0
@@ -68,12 +72,14 @@ class CampaignDateAgendaDialog(ctk.CTkToplevel):
         self.apply_button.pack(side="left")
 
     def _set_controls_from_date(self, value: date):
+        """Set controls from date."""
         self.year_var.set(str(value.year))
         self.month_var.set(f"{value.month:02d}")
         self._set_day_options(value.year, value.month, value.day)
         self.iso_var.set(value.isoformat())
 
     def _set_day_options(self, year: int, month: int, day: int | None = None):
+        """Set day options."""
         max_day = max_days_for_month(year, month)
         values = [f"{value:02d}" for value in range(1, max_day + 1)]
         self.day_selector.configure(values=values)
@@ -83,6 +89,7 @@ class CampaignDateAgendaDialog(ctk.CTkToplevel):
         self.day_var.set(f"{current_day:02d}")
 
     def _validate_from_parts(self):
+        """Validate from parts."""
         try:
             year_value = int((self.year_var.get() or "").strip())
         except ValueError:
@@ -113,6 +120,7 @@ class CampaignDateAgendaDialog(ctk.CTkToplevel):
         self._set_invalid(result.error_message or "Invalid date.")
 
     def _validate_from_text(self):
+        """Validate from text."""
         result = validate_iso_text(self.iso_var.get())
         if not result.is_valid:
             self._set_invalid(result.error_message or "Invalid date.")
@@ -123,10 +131,12 @@ class CampaignDateAgendaDialog(ctk.CTkToplevel):
         self._set_valid()
 
     def _set_invalid(self, message: str):
+        """Set invalid."""
         self.feedback_label.configure(text=message, text_color="#d65a5a")
         self.apply_button.configure(state="disabled")
 
     def _set_valid(self):
+        """Set valid."""
         if self._selected_date is None:
             self._set_invalid("Invalid date.")
             return
@@ -135,6 +145,7 @@ class CampaignDateAgendaDialog(ctk.CTkToplevel):
         self.apply_button.configure(state="normal")
 
     def _apply(self):
+        """Apply the operation."""
         if self._selected_date is None:
             self._set_invalid("Invalid date.")
             return

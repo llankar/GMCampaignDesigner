@@ -1,4 +1,6 @@
 
+"""View for scenario generator."""
+
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -14,6 +16,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
     """Frame embedding the scenario generator inside the main application."""
 
     def __init__(self, parent):
+        """Initialize the ScenarioGeneratorView instance."""
         super().__init__(parent)
 
         self.setting_var = ctk.StringVar(value=list(GENERATOR_FUNCTIONS.keys())[0])
@@ -24,6 +27,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _build_widgets(self):
+        """Build widgets."""
         top = ctk.CTkFrame(self)
         top.pack(fill="x", padx=10, pady=10)
 
@@ -52,6 +56,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def generate_campaign(self):
+        """Handle generate campaign."""
         setting = self.setting_var.get()
         try:
             generator = GENERATOR_FUNCTIONS[setting]
@@ -69,6 +74,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
         # Display each entry as a styled card similar to the original UI
         for key, value in campaign.items():
+            # Process each (key, value) from campaign.items().
             card = ctk.CTkFrame(
                 self.results_frame,
                 fg_color="#34495e",
@@ -94,6 +100,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             card.pack(fill="x", expand=True, padx=5, pady=5)
 
             def _update_desc_wrap(_event=None, label=desc_lbl, parent=card):
+                """Update desc wrap."""
                 try:
                     label.configure(wraplength=max(320, parent.winfo_width() - 24))
                 except Exception:
@@ -107,6 +114,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def export_docx(self):
+        """Export docx."""
         if not self.current_campaign:
             messagebox.showwarning("No Scenario", "Generate a scenario first.")
             return
@@ -128,6 +136,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def add_to_db(self):
+        """Handle add to DB."""
         if not self.current_campaign:
             messagebox.showwarning("No Scenario", "Generate a scenario first.")
             return

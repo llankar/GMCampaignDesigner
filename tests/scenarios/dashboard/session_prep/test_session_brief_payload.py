@@ -1,7 +1,10 @@
+"""Regression tests for session brief payload."""
+
 from modules.scenarios.gm_screen.dashboard.session_prep import build_session_brief_payload
 
 
 def test_build_session_brief_payload_collects_expected_sections():
+    """Verify that build session brief payload collects expected sections."""
     fields = [
         {"name": "Summary", "type": "longtext", "value": "The city is on edge."},
         {

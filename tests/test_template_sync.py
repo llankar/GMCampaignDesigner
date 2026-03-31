@@ -1,3 +1,5 @@
+"""Regression tests for template sync."""
+
 import json
 from pathlib import Path
 
@@ -7,11 +9,13 @@ from modules.helpers import template_loader
 
 
 def _write_json(path: Path, payload: dict):
+    """Internal helper for write JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_sync_campaign_template_updates_fields_and_preserves_custom(tmp_path, monkeypatch):
+    """Verify that sync campaign template updates fields and preserves custom."""
     entity = "test_entity"
     default_path = tmp_path / "default.json"
     campaign_path = tmp_path / "campaign" / "templates" / f"{entity}_template.json"
@@ -58,6 +62,7 @@ def test_sync_campaign_template_updates_fields_and_preserves_custom(tmp_path, mo
     ],
 )
 def test_sync_campaign_template_no_change_when_fields_match(tmp_path, monkeypatch, fields_initial):
+    """Verify that sync campaign template no change when fields match."""
     entity = "test_entity"
     default_path = tmp_path / "default.json"
     campaign_path = tmp_path / "campaign" / "templates" / f"{entity}_template.json"

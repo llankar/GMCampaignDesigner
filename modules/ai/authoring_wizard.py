@@ -1,3 +1,4 @@
+"""Wizard flow for AI authoring."""
 import re
 import json
 import customtkinter as ctk
@@ -10,6 +11,7 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 def _parse_json_relaxed(s: str):
+    """Parse JSON relaxed."""
     if not s:
         raise RuntimeError("Empty AI response")
     s = s.strip()
@@ -29,8 +31,10 @@ def _parse_json_relaxed(s: str):
             start = i
             break
     if start is not None:
+        # Handle the branch where start is available.
         tail = s[start:]
         for j in range(len(tail), max(len(tail) - 2000, 0), -1):
+            # Process each j from range(len(tail), max(len(tail) - 2000, 0), -1).
             chunk = tail[:j]
             try:
                 return json.loads(chunk)
@@ -43,6 +47,7 @@ class AuthoringWizardView(ctk.CTkFrame):
     """AI-assisted authoring for NPCs and Scenarios with presets and checks."""
 
     def __init__(self, parent):
+        """Initialize the AuthoringWizardView instance."""
         super().__init__(parent)
         # Data access
         self.npcs = GenericModelWrapper("npcs")
@@ -72,6 +77,7 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     # UI -----------------------------------------------------------------
     def _build_layout(self):
+        """Build layout."""
         # Presets bar
         bar = ctk.CTkFrame(self)
         bar.pack(fill="x", padx=10, pady=6)
@@ -112,6 +118,7 @@ class AuthoringWizardView(ctk.CTkFrame):
                 pass
 
     def _build_tab_npc(self, tab):
+        """Build tab NPC."""
         form = ctk.CTkFrame(tab)
         form.pack(fill="x", padx=6, pady=6)
 
@@ -122,6 +129,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.npc_genre = ctk.StringVar(value="Urban Fantasy")
 
         def row(label, var):
+            """Handle row."""
             r = ctk.CTkFrame(form)
             r.pack(fill="x", pady=4)
             ctk.CTkLabel(r, text=label, width=120, anchor="w").pack(side="left")
@@ -142,6 +150,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.npc_output.pack(fill="both", expand=True, padx=6, pady=6)
 
     def _build_tab_scenario(self, tab):
+        """Build tab scenario."""
         form = ctk.CTkFrame(tab)
         form.pack(fill="x", padx=6, pady=6)
 
@@ -151,6 +160,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.sc_antagonist = ctk.StringVar()
 
         def row(label, var):
+            """Handle row."""
             r = ctk.CTkFrame(form)
             r.pack(fill="x", pady=4)
             ctk.CTkLabel(r, text=label, width=120, anchor="w").pack(side="left")
@@ -170,6 +180,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.sc_output.pack(fill="both", expand=True, padx=6, pady=6)
 
     def _build_tab_beats(self, tab):
+        """Build tab beats."""
         split = ctk.CTkFrame(tab)
         split.pack(fill="both", expand=True, padx=6, pady=6)
 
@@ -189,9 +200,12 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     # Lore ---------------------------------------------------------------
     def _lore_digest(self, max_chars: int = 2000) -> str:
+        """Internal helper for lore digest."""
         def take(items, key, n):
+            """Handle take."""
             vals = []
             for it in items[:n]:
+                # Process each it from items[:n].
                 v = it.get(key)
                 if isinstance(v, dict):
                     text = v.get("text", "")
@@ -208,6 +222,7 @@ class AuthoringWizardView(ctk.CTkFrame):
 
         npc_lines = []
         for it in npc_items[:20]:
+            # Process each it from npc_items[:20].
             name = it.get("Name", "?")
             role = it.get("Role", "")
             facs = it.get("Factions", [])
@@ -238,6 +253,7 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     @staticmethod
     def _short(val, n=120):
+        """Internal helper for short."""
         if isinstance(val, dict):
             text = val.get("text", "")
         else:
@@ -247,17 +263,20 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     # AI calls -----------------------------------------------------------
     def _system_hdr(self):
+        """Internal helper for system hdr."""
         return (
             f"You are an expert RPG design assistant. Tone: {self.tone_var.get()}. "
             f"Style: {self.style_var.get()}. Be coherent and concise for GMs."
         )
 
     def _with_lore(self, prompt: str) -> str:
+        """Internal helper for with lore."""
         if not self.use_lore_var.get():
             return prompt
         return f"{prompt}\n\n{self._lore_digest()}"
 
     def _chat_json(self, user_prompt: str) -> dict:
+        """Internal helper for chat JSON."""
         messages = [
             {"role": "system", "content": self._system_hdr() + " Return strict JSON only."},
             {"role": "user", "content": user_prompt},
@@ -270,6 +289,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             return {}
 
     def _chat_text(self, user_prompt: str) -> str:
+        """Internal helper for chat text."""
         messages = [
             {"role": "system", "content": self._system_hdr() + " Return plain text."},
             {"role": "user", "content": user_prompt},
@@ -278,10 +298,12 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     # -------- Formatting helpers (text view) --------
     def _format_kv(self, key, value):
+        """Format kv."""
         text = self._as_text(value).strip()
         return f"{key}:\n{text}\n" if text else ""
 
     def _format_list(self, title, items):
+        """Format list."""
         if not items:
             return ""
         lines = []
@@ -295,6 +317,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         return f"{title}:\n" + "\n".join(lines) + "\n"
 
     def _format_npc_text(self, data: dict) -> str:
+        """Format NPC text."""
         parts = []
         parts.append(self._format_kv("Name", data.get("Name")))
         parts.append(self._format_kv("Role", data.get("Role")))
@@ -310,6 +333,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         return "\n".join(p for p in parts if p).strip() + "\n"
 
     def _format_scenario_text(self, data: dict) -> str:
+        """Format scenario text."""
         parts = []
         parts.append(self._format_kv("Title", data.get("Title")))
         parts.append(self._format_kv("Summary", data.get("Summary")))
@@ -343,6 +367,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         return str(val)
 
     def generate_npc(self):
+        """Handle generate NPC."""
         name = (self.npc_name.get() or "Unnamed").strip()
         role = self.npc_role.get().strip()
         faction = self.npc_faction.get().strip()
@@ -379,6 +404,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.npc_output.insert("1.0", self._format_npc_text(data))
 
     def check_npc_consistency(self):
+        """Handle check NPC consistency."""
         # Prefer the last structured data; allow JSON pasted by power users as fallback
         data = self._last_npc_data
         if not isinstance(data, dict):
@@ -405,6 +431,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             messagebox.showwarning("Consistency Issues", "\n".join(issues))
 
     def save_npc(self):
+        """Save NPC."""
         data = self._last_npc_data
         if not isinstance(data, dict):
             try:
@@ -444,6 +471,7 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     # Scenario generation -----------------------------------------------
     def generate_scenario(self):
+        """Handle generate scenario."""
         title = (self.sc_title.get() or "Untitled").strip()
         premise = self.sc_premise.get().strip()
         theme = self.sc_theme.get().strip()
@@ -485,6 +513,7 @@ class AuthoringWizardView(ctk.CTkFrame):
         self.sc_output.insert("1.0", self._format_scenario_text(data))
 
     def check_scenario_consistency(self):
+        """Handle check scenario consistency."""
         data = self._last_scenario_data
         if not isinstance(data, dict):
             try:
@@ -513,6 +542,7 @@ class AuthoringWizardView(ctk.CTkFrame):
             messagebox.showwarning("Consistency Issues", "\n".join(issues))
 
     def save_scenario(self):
+        """Save scenario."""
         data = self._last_scenario_data
         if not isinstance(data, dict):
             try:
@@ -557,6 +587,7 @@ class AuthoringWizardView(ctk.CTkFrame):
 
     # Beats --------------------------------------------------------------
     def expand_beat(self):
+        """Handle expand beat."""
         beat = self.beat_input.get("1.0", "end").strip()
         if not beat:
             messagebox.showwarning("No Beat", "Enter a short beat to expand.")

@@ -1,3 +1,5 @@
+"""Utilities for maptools."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -16,6 +18,7 @@ def build_token_macros(actions: List[Dict[str, Any]], *, token_name: str | None 
         return macros
 
     for index, action in enumerate(actions, start=1):
+        # Process each (index, action) from enumerate(actions, start=1).
         if not isinstance(action, dict):
             continue
         label = str(action.get("label") or f"Action {index}")
@@ -54,6 +57,7 @@ def build_token_macros(actions: List[Dict[str, Any]], *, token_name: str | None 
 
 
 def _normalize_formula(value: Any) -> str:
+    """Normalize formula."""
     if value is None:
         return ""
     text = str(value).strip()

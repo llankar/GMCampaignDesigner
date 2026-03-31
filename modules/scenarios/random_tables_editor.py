@@ -1,3 +1,5 @@
+"""Editor helpers for scenario random tables."""
+
 import json
 import os
 import re
@@ -20,6 +22,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
     """Dialog to create or edit a structured random table."""
 
     def __init__(self, master=None, table: Optional[dict] = None):
+        """Initialize the RandomTableEditorDialog instance."""
         super().__init__(master)
         self.title("Random Table Editor")
         self.geometry("760x600")
@@ -48,6 +51,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
 
     # ------------------------------------------------------------------
     def _build_ui(self):
+        """Build UI."""
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=12, pady=12)
 
@@ -102,6 +106,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         ctk.CTkButton(actions, text="Cancel", command=self.destroy).pack(side="right")
 
     def _populate_entries(self, entries: List[dict]):
+        """Internal helper for populate entries."""
         self._clear_entry_rows()
         if not entries:
             self._add_entry_row()
@@ -110,11 +115,13 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             self._add_entry_row(entry)
 
     def _clear_entry_rows(self):
+        """Clear entry rows."""
         for row in self.entry_rows:
             row["frame"].destroy()
         self.entry_rows.clear()
 
     def _add_entry_row(self, data: Optional[dict] = None):
+        """Internal helper for add entry row."""
         row = len(self.entry_rows)
         frame = ctk.CTkFrame(self.entries_frame)
         frame.grid(row=row, column=0, columnspan=5, sticky="ew", pady=4)
@@ -134,6 +141,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         self.entry_rows.append({"frame": frame, "min": min_var, "max": max_var, "result": result_var, "tags": tags_var})
 
     def _remove_entry_row(self, frame: ctk.CTkFrame):
+        """Remove entry row."""
         for idx, row in enumerate(self.entry_rows):
             if row["frame"] is frame:
                 frame.destroy()
@@ -141,6 +149,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
                 break
 
     def _open_import_dialog(self):
+        """Open import dialog."""
         dialog = RandomTableImportDialog(self)
         self.wait_window(dialog)
         imported_entries = getattr(dialog, "result_entries", None)
@@ -150,6 +159,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
 
     # ------------------------------------------------------------------
     def _resolve_category_name(self, cat_id: Optional[str]) -> str:
+        """Resolve category name."""
         if not cat_id:
             return ""
         for cat in self.categories:
@@ -158,16 +168,20 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         return cat_id
 
     def _slugify(self, value: str) -> str:
+        """Internal helper for slugify."""
         text = re.sub(r"[^A-Za-z0-9_-]+", "_", (value or "").strip())
         return text.strip("_") or "table"
 
     def _parse_tags(self, value: str) -> List[str]:
+        """Parse tags."""
         return [tag.strip() for tag in (value or "").split(",") if tag.strip()]
 
     # ------------------------------------------------------------------
     def _collect_entries(self) -> Optional[List[dict]]:
+        """Collect entries."""
         entries: List[dict] = []
         for row in self.entry_rows:
+            # Process each row from entry_rows.
             try:
                 min_val = int(row["min"].get())
                 max_val = int(row["max"].get())
@@ -195,6 +209,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         return entries
 
     def _validate_metadata(self) -> Optional[dict]:
+        """Validate metadata."""
         title = self.title_var.get().strip()
         dice = self.dice_var.get().strip()
         category = self.category_var.get().strip()
@@ -213,6 +228,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         }
 
     def _save(self):
+        """Save the operation."""
         metadata = self._validate_metadata()
         if metadata is None:
             return
@@ -237,6 +253,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
             table_data["theme"] = theme_value
 
         try:
+            # Keep save resilient if this step fails.
             target_path = self._persist_table(
                 table_data,
                 metadata["category"],
@@ -263,6 +280,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         source_path: Optional[str] = None,
         theme: Optional[str] = None,
     ) -> str:
+        """Persist table."""
         base_path = self._resolve_base_path()
         target_file = self._resolve_target_file(base_path, source_path)
         data = self._load_existing_tables(target_file)
@@ -299,6 +317,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         return target_file
 
     def _resolve_base_path(self) -> str:
+        """Resolve base path."""
         base_path = RandomTableLoader.default_data_path()
         campaign_dir = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables")
         campaign_file = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables.json")
@@ -311,6 +330,7 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         return base_path
 
     def _resolve_target_file(self, base_path: str, source_path: Optional[str]) -> str:
+        """Resolve target file."""
         if source_path and os.path.exists(source_path):
             os.makedirs(os.path.dirname(source_path) or ".", exist_ok=True)
             return source_path
@@ -321,9 +341,11 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
         return base_path
 
     def _load_existing_tables(self, target_file: str) -> dict:
+        """Load existing tables."""
         data = {"categories": []}
         if os.path.exists(target_file):
             try:
+                # Keep existing tables resilient if this step fails.
                 with open(target_file, "r", encoding="utf-8") as handle:
                     loaded = json.load(handle)
                 if isinstance(loaded, dict):

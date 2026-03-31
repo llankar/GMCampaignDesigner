@@ -1,3 +1,5 @@
+"""Utilities for event calendar dock."""
+
 import calendar
 import customtkinter as ctk
 
@@ -7,6 +9,7 @@ from modules.events.ui.dock.date_agenda_dialog import CampaignDateAgendaDialog
 
 class CalendarDock(ctk.CTkFrame):
     def __init__(self, master, on_date_selected=None, on_set_campaign_today=None):
+        """Initialize the CalendarDock instance."""
         super().__init__(master, width=320, corner_radius=8)
         self.grid_propagate(False)
         self.on_date_selected = on_date_selected
@@ -26,6 +29,7 @@ class CalendarDock(ctk.CTkFrame):
         self._render_month()
 
     def _build_ui(self):
+        """Build UI."""
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=8, pady=(8, 4))
 
@@ -48,6 +52,7 @@ class CalendarDock(ctk.CTkFrame):
             ctk.CTkLabel(calendar_frame, text=label, width=34).grid(row=0, column=column, padx=1, pady=(4, 2))
 
         for week in range(6):
+            # Process each week from range(6).
             row_buttons = []
             for day in range(7):
                 button = ctk.CTkButton(
@@ -79,6 +84,7 @@ class CalendarDock(ctk.CTkFrame):
         self.upcoming_events_box.pack(fill="both", expand=True, padx=8, pady=(0, 8))
 
     def _render_month(self):
+        """Render month."""
         campaign_today = CampaignDateService.get_today()
         self.campaign_today_label.configure(text=f"Campaign Day: {campaign_today.strftime('%m/%d/%Y')}")
         self.month_label.configure(text=f"{calendar.month_name[self.display_month]} {self.display_year}")
@@ -88,6 +94,7 @@ class CalendarDock(ctk.CTkFrame):
 
         for week_index, week_dates in enumerate(month_matrix):
             for day_index, day_date in enumerate(week_dates):
+                # Process each (day_index, day_date) from enumerate(week_dates).
                 button = self._day_buttons[week_index][day_index]
                 is_current_month = day_date.month == self.display_month
                 is_selected = day_date == self.selected_date
@@ -102,6 +109,7 @@ class CalendarDock(ctk.CTkFrame):
                 )
 
     def _select_from_cell(self, week_index, day_index):
+        """Select from cell."""
         selected = self._cell_dates[week_index][day_index]
         self.selected_date = selected
         self.display_year = selected.year
@@ -111,6 +119,7 @@ class CalendarDock(ctk.CTkFrame):
             self.on_date_selected(selected)
 
     def _previous_month(self):
+        """Internal helper for previous month."""
         if self.display_month == 1:
             self.display_month = 12
             self.display_year -= 1
@@ -119,6 +128,7 @@ class CalendarDock(ctk.CTkFrame):
         self._render_month()
 
     def _next_month(self):
+        """Internal helper for next month."""
         if self.display_month == 12:
             self.display_month = 1
             self.display_year += 1
@@ -127,6 +137,7 @@ class CalendarDock(ctk.CTkFrame):
         self._render_month()
 
     def set_selected_date_events(self, selected_date, events):
+        """Set selected date events."""
         self.selected_date = selected_date
         self.selected_title_label.configure(text=f"Events for {selected_date.strftime('%d/%m/%Y')}")
         self._populate_event_list(
@@ -139,6 +150,7 @@ class CalendarDock(ctk.CTkFrame):
         self._render_month()
 
     def set_upcoming_events(self, events):
+        """Set upcoming events."""
         self._populate_event_list(
             self.upcoming_events_box,
             self._upcoming_event_line_widgets,
@@ -148,6 +160,7 @@ class CalendarDock(ctk.CTkFrame):
         )
 
     def set_month_event_map(self, events_by_date):
+        """Set month event map."""
         if isinstance(events_by_date, dict):
             self._events_by_date = dict(events_by_date)
         else:
@@ -156,6 +169,7 @@ class CalendarDock(ctk.CTkFrame):
 
     @staticmethod
     def _event_badge(event):
+        """Internal helper for event badge."""
         event_date = event.get("date")
         if event_date is None:
             return "upcoming"
@@ -167,13 +181,16 @@ class CalendarDock(ctk.CTkFrame):
         return "upcoming"
 
     def _open_campaign_today_dialog(self, _event=None):
+        """Open campaign today dialog."""
         CampaignDateAgendaDialog(self, on_apply=self._on_campaign_today_applied)
 
     def _set_campaign_today_from_selection(self):
+        """Set campaign today from selection."""
         campaign_today = CampaignDateService.set_today(self.selected_date)
         self._on_campaign_today_applied(campaign_today)
 
     def _on_campaign_today_applied(self, campaign_today):
+        """Handle campaign today applied."""
         self.selected_date = campaign_today
         self.display_year = campaign_today.year
         self.display_month = campaign_today.month
@@ -183,9 +200,11 @@ class CalendarDock(ctk.CTkFrame):
 
     @classmethod
     def _format_event_line(cls, event, include_date=False):
+        """Format event line."""
         title = event.get("title", "Untitled")
         badge = cls._event_badge(event)
         if include_date:
+            # Continue with this path when include date is set.
             event_date = event.get("date")
             if event_date:
                 return f"• {event_date.strftime('%d/%m')} — {title} [{badge}]"
@@ -193,6 +212,7 @@ class CalendarDock(ctk.CTkFrame):
 
     @classmethod
     def _populate_event_list(cls, container, cache, events, *, include_date=False, empty_message="No events"):
+        """Internal helper for populate event list."""
         for widget in cache:
             try:
                 widget.destroy()

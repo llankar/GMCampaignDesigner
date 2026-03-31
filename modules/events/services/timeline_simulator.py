@@ -1,3 +1,4 @@
+﻿"""Simulation helpers for event timeline."""
 from __future__ import annotations
 
 import json
@@ -59,17 +60,21 @@ class CampaignTimelineSimulator:
     )
 
     def __init__(self, wrappers: dict[str, Any] | None = None):
+        """Initialize the CampaignTimelineSimulator instance."""
         self._wrappers = dict(wrappers or {})
 
     def advance_days(self, days: int) -> TimelineSimulationResult:
+        """Advance the campaign clock by the requested number of days."""
         current = self._get_current_date()
         return self.advance_to(current + timedelta(days=max(0, int(days))))
 
     @classmethod
     def current_campaign_date(cls) -> date:
+        """Return the current campaign date tracked by the date service."""
         return cls._get_current_date()
 
     def advance_to(self, target_date: date | str) -> TimelineSimulationResult:
+        """Advance the campaign clock to a target date and record the resulting world-state changes."""
         end_date = _coerce_date(target_date)
         if end_date is None:
             raise ValueError("target_date must be a valid date")
@@ -90,6 +95,7 @@ class CampaignTimelineSimulator:
 
         cursor = start_date + timedelta(days=1)
         while cursor <= end_date:
+            # Advance the world one day at a time so every subsystem sees the same state transition.
             day_changes, day_counts = self._advance_single_day(cursor, state, indexes)
             changes.extend(day_changes)
             resolved_events += day_counts["resolved_events"]
@@ -124,6 +130,7 @@ class CampaignTimelineSimulator:
         )
 
     def _advance_single_day(self, current_day: date, state: dict[str, list[dict]], indexes: dict[str, dict[str, dict]]) -> tuple[list[TimelineChange], dict[str, int]]:
+        """Internal helper for advance single day."""
         changes: list[TimelineChange] = []
         counts = {
             "resolved_events": 0,
@@ -134,6 +141,7 @@ class CampaignTimelineSimulator:
         }
 
         for event in state["events"]:
+            # Resolve scheduled events first so later reactions see the updated event state.
             if _coerce_date(event.get("Date")) != current_day:
                 continue
             if str(event.get("Status") or "").strip().lower() in _COMPLETED_EVENT_STATUSES:
@@ -164,6 +172,7 @@ class CampaignTimelineSimulator:
             counts["resolved_events"] += 1
 
         for faction in state["factions"]:
+            # Advance faction plans that are due to escalate on the current day.
             if _coerce_date(faction.get("NextEscalationDate")) != current_day:
                 continue
             name = _text(faction.get("Name") or "Faction")
@@ -195,6 +204,7 @@ class CampaignTimelineSimulator:
             counts["escalated_factions"] += 1
 
         for villain in state["villains"]:
+            # Push each villain scheme forward when its escalation date arrives.
             if _coerce_date(villain.get("NextEscalationDate")) != current_day:
                 continue
             name = _text(villain.get("Name") or "Villain")
@@ -232,6 +242,7 @@ class CampaignTimelineSimulator:
             counts["escalated_villains"] += 1
 
         for npc in state["npcs"]:
+            # Process each npc from state['npcs'].
             if not _is_truthy(npc.get("IsVillain")):
                 continue
             if _coerce_date(npc.get("NextEscalationDate")) != current_day:
@@ -264,11 +275,13 @@ class CampaignTimelineSimulator:
             counts["escalated_villains"] += 1
 
         for base in state["bases"]:
+            # Process each base from state['bases'].
             projects = _coerce_list(base.get("Projects"))
             if not projects:
                 continue
             project_changed = False
             for project in projects:
+                # Process each project from projects.
                 if not isinstance(project, dict):
                     continue
                 if str(project.get("status") or "active").strip().lower() not in {"active", "in_progress", "planned"}:
@@ -312,11 +325,13 @@ class CampaignTimelineSimulator:
                 base["Projects"] = projects
 
         for npc in state["npcs"]:
+            # Process each npc from state['npcs'].
             schedule = _coerce_list(npc.get("MovementSchedule"))
             if not schedule:
                 continue
             schedule_changed = False
             for step in schedule:
+                # Process each step from schedule.
                 if not isinstance(step, dict):
                     continue
                 if _is_truthy(step.get("resolved")):
@@ -362,9 +377,11 @@ class CampaignTimelineSimulator:
         *,
         previous_location: str | None = None,
     ) -> None:
+        """Apply change feedback."""
         payload = asdict(change)
 
         for scenario_name in change.related_scenarios:
+            # Process each scenario_name from change.related_scenarios.
             scenario = indexes["scenarios"].get(_normalize_key(scenario_name))
             if scenario is None:
                 continue
@@ -373,12 +390,14 @@ class CampaignTimelineSimulator:
             scenario["GMNotes"] = _append_paragraph(scenario.get("GMNotes"), f"{change.occurred_on}: {change.summary}")
 
         for place_name in change.related_places:
+            # Process each place_name from change.related_places.
             place = indexes["places"].get(_normalize_key(place_name))
             if place is None:
                 continue
             place["WorldStateChanges"] = _append_history(place.get("WorldStateChanges"), payload)
             place["Situation"] = _append_paragraph(place.get("Situation"), f"{change.occurred_on}: {change.summary}")
             if change.category == "npc_movement":
+                # Keep occupant lists in sync when the change records an NPC relocation.
                 occupants = _coerce_list(place.get("Occupants"))
                 for npc_name in change.related_npcs:
                     if _normalize_key(place_name) == _normalize_key(previous_location):
@@ -388,6 +407,7 @@ class CampaignTimelineSimulator:
                 place["Occupants"] = _dedupe_strings(occupants)
 
         for map_name in change.related_maps:
+            # Process each map_name from change.related_maps.
             campaign_map = indexes["maps"].get(_normalize_key(map_name))
             if campaign_map is None:
                 continue
@@ -395,6 +415,7 @@ class CampaignTimelineSimulator:
             campaign_map["DynamicNotes"] = _append_paragraph(campaign_map.get("DynamicNotes"), f"{change.occurred_on}: {change.summary}")
 
         for clue_name in change.related_clues:
+            # Process each clue_name from change.related_clues.
             clue = indexes["clues"].get(_normalize_key(clue_name))
             if clue is None:
                 continue
@@ -404,6 +425,7 @@ class CampaignTimelineSimulator:
 
         if change.category == "event":
             for clue_name in change.related_clues:
+                # Process each clue_name from change.related_clues.
                 clue = indexes["clues"].get(_normalize_key(clue_name))
                 if clue is None:
                     continue
@@ -427,6 +449,7 @@ class CampaignTimelineSimulator:
         map_names: list[Any],
         clue_names: list[Any],
     ) -> TimelineChange:
+        """Internal helper for record change."""
         change = TimelineChange(
             occurred_on=current_day.isoformat(),
             category=category,
@@ -443,6 +466,7 @@ class CampaignTimelineSimulator:
         return change
 
     def _build_gm_summary(self, start_date: date, end_date: date, changes: list[TimelineChange]) -> str:
+        """Build GM summary."""
         if not changes:
             return f"No world-state changes between {start_date.isoformat()} and {end_date.isoformat()}."
 
@@ -458,8 +482,10 @@ class CampaignTimelineSimulator:
         return "\n".join(lines)
 
     def _load_state(self) -> dict[str, list[dict]]:
+        """Load state."""
         state: dict[str, list[dict]] = {}
         for slug in self.ENTITY_TYPES:
+            # Process each slug from ENTITY_TYPES.
             wrapper = self._wrapper(slug)
             try:
                 state[slug] = wrapper.load_items()
@@ -468,16 +494,20 @@ class CampaignTimelineSimulator:
         return state
 
     def _persist_state(self, state: dict[str, list[dict]]) -> None:
+        """Persist state."""
         for slug, items in state.items():
             wrapper = self._wrapper(slug)
             wrapper.save_items(items, replace=True)
 
     def _build_indexes(self, state: dict[str, list[dict]]) -> dict[str, dict[str, dict]]:
+        """Build indexes."""
         indexed: dict[str, dict[str, dict]] = {}
         for slug, items in state.items():
+            # Process each (slug, items) from state.items().
             key_field = "Title" if slug in {"scenarios", "informations"} else "Name"
             table = {}
             for item in items:
+                # Process each item from items.
                 key = _normalize_key(item.get(key_field))
                 if key:
                     table[key] = item
@@ -485,6 +515,7 @@ class CampaignTimelineSimulator:
         return indexed
 
     def _wrapper(self, slug: str):
+        """Internal helper for wrapper."""
         wrapper = self._wrappers.get(slug)
         if wrapper is None:
             wrapper = GenericModelWrapper(slug)
@@ -499,6 +530,7 @@ class CampaignTimelineSimulator:
         agenda: str,
         level: int,
     ) -> None:
+        """Internal helper for upsert villain escalation event."""
         events = state.setdefault("events", [])
         villain_name = _text(villain.get("Name") or "Villain")
         event_name = f"{villain_name} escalation {current_day.isoformat()}"
@@ -532,14 +564,17 @@ class CampaignTimelineSimulator:
 
     @staticmethod
     def _get_current_date() -> date:
+        """Return current date."""
         return CampaignDateService.get_today()
 
     @staticmethod
     def _set_current_date(value: date) -> None:
+        """Set current date."""
         CampaignDateService.set_today(value)
 
 
 def _coerce_date(value: Any) -> date | None:
+    """Coerce date."""
     if isinstance(value, date):
         return value
     if value in (None, ""):
@@ -561,6 +596,7 @@ def _coerce_date(value: Any) -> date | None:
 
 
 def _coerce_list(value: Any) -> list[Any]:
+    """Coerce list."""
     if value is None:
         return []
     if isinstance(value, list):
@@ -568,10 +604,12 @@ def _coerce_list(value: Any) -> list[Any]:
     if isinstance(value, tuple):
         return list(value)
     if isinstance(value, str):
+        # Split serialized list fields back into concrete entries before downstream processing.
         text = value.strip()
         if not text:
             return []
         if text.startswith("["):
+            # Prefer JSON decoding first because some fields are persisted as encoded arrays.
             try:
                 decoded = json.loads(text)
             except json.JSONDecodeError:
@@ -585,12 +623,14 @@ def _coerce_list(value: Any) -> list[Any]:
 
 
 def _append_history(existing: Any, entry: dict[str, Any]) -> list[dict[str, Any]]:
+    """Append history."""
     history = _coerce_list(existing)
     history.append(entry)
     return history
 
 
 def _append_paragraph(existing: Any, text: str) -> str:
+    """Append paragraph."""
     base = _text(existing)
     if not base:
         return text
@@ -598,16 +638,19 @@ def _append_paragraph(existing: Any, text: str) -> str:
 
 
 def _text(value: Any) -> str:
+    """Internal helper for text."""
     if value is None:
         return ""
     return str(value).strip()
 
 
 def _normalize_key(value: Any) -> str:
+    """Normalize key."""
     return _text(value).casefold()
 
 
 def _int_value(value: Any, *, default: int = 0) -> int:
+    """Internal helper for int value."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -615,15 +658,18 @@ def _int_value(value: Any, *, default: int = 0) -> int:
 
 
 def _is_truthy(value: Any) -> bool:
+    """Return whether truthy."""
     if isinstance(value, bool):
         return value
     return _text(value).lower() in {"1", "true", "yes", "y", "on"}
 
 
 def _dedupe_strings(values: list[Any]) -> list[str]:
+    """Internal helper for dedupe strings."""
     seen: set[str] = set()
     ordered: list[str] = []
     for raw in values:
+        # Process each raw from values.
         text = _text(raw)
         if not text:
             continue

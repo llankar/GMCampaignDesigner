@@ -1,3 +1,5 @@
+"""Dialog for selection."""
+
 import customtkinter as ctk
 from modules.helpers.logging_helper import log_module_import
 
@@ -5,6 +7,7 @@ log_module_import(__name__)
 
 class SelectionDialog(ctk.CTkToplevel):
     def __init__(self, master, title, label, options):
+        """Initialize the SelectionDialog instance."""
         super().__init__(master)
         self.result = None
 
@@ -27,9 +30,11 @@ class SelectionDialog(ctk.CTkToplevel):
         ctk.CTkButton(button_frame, text="Cancel", command=self.on_cancel).pack(side="right", padx=5)
 
     def on_ok(self):
+        """Handle ok."""
         self.result = self.combo.get()
         self.destroy()
 
     def on_cancel(self):
+        """Handle cancel."""
         self.result = None
         self.destroy()

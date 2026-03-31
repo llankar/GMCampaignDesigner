@@ -1,3 +1,5 @@
+"""Utilities for classifying music files into library categories."""
+
 import json
 import copy
 
@@ -62,6 +64,7 @@ KEYWORDS = {
 }
 
 def classify(name):
+    """Handle classify."""
     name = name.lower()
     scores = {k: 0 for k in KEYWORDS}
 

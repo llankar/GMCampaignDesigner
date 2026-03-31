@@ -1,3 +1,5 @@
+"""Utilities for config helper."""
+
 import configparser
 import os
 from pathlib import Path
@@ -25,6 +27,7 @@ class ConfigHelper:
         mtime = os.path.getmtime(path) if path.exists() else None
 
         if cls._config is None or mtime != cls._config_mtime:
+            # Handle the branch where config is missing or mtime != _config_mtime.
             cls._config = configparser.ConfigParser()
             if mtime is not None:
                 cls._config.read(str(path), encoding="utf-8")
@@ -37,8 +40,10 @@ class ConfigHelper:
 
     @classmethod
     def get(cls, section, key, fallback=None):
+        """Return the operation."""
         cls.load_config()
         try:
+            # Keep get resilient if this step fails.
             value = cls._config.get(section, key, raw=True, fallback=fallback)
             if isinstance(value, list):
                 return "\n".join(str(item) for item in value)
@@ -49,8 +54,10 @@ class ConfigHelper:
 
     @classmethod
     def getboolean(cls, section, key, fallback=False):
+        """Handle getboolean."""
         cls.load_config()
         try:
+            # Keep getboolean resilient if this step fails.
             value = cls._config.get(section, key, raw=True, fallback=fallback)
             if isinstance(value, list):
                 value = value[0] if value else fallback
@@ -70,6 +77,7 @@ class ConfigHelper:
 
     @classmethod
     def set(cls, section, key, value, file_path: Union[str, os.PathLike, None] = None):
+        """Set the operation."""
         if file_path is None:
             config_path = cls.get_config_path()
         else:
@@ -93,6 +101,7 @@ class ConfigHelper:
 
     @classmethod
     def get_config_path(cls) -> Path:
+        """Return config path."""
         if not isinstance(cls._config_path, Path):
             cls._config_path = Path("config/config.ini")
         return cls._config_path
@@ -114,9 +123,12 @@ class ConfigHelper:
         path = cls.get_campaign_settings_path()
         mtime = os.path.getmtime(path) if os.path.exists(path) else None
         if cls._campaign_config is None or mtime != cls._campaign_mtime:
+            # Handle the branch where campaign config is missing or mtime != _campaign_mtime.
             cfg = configparser.ConfigParser()
             if mtime is not None:
+                # Handle the branch where mtime is available.
                 try:
+                    # Keep campaign config resilient if this step fails.
                     cfg.read(path, encoding="utf-8")
                 except configparser.ParsingError as error:
                     cleaned_text = cls._sanitize_ini(path)
@@ -133,6 +145,7 @@ class ConfigHelper:
     def _sanitize_ini(path: str) -> Union[str, None]:
         """Remove invalid empty-key assignments from an INI file."""
         try:
+            # Keep sanitize ini resilient if this step fails.
             with open(path, "r", encoding="utf-8") as file_handle:
                 lines = file_handle.readlines()
         except OSError as error:
@@ -141,6 +154,7 @@ class ConfigHelper:
 
         cleaned_lines = []
         for line in lines:
+            # Process each line from lines.
             stripped = line.lstrip()
             if stripped.startswith("="):
                 continue

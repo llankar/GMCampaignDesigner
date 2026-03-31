@@ -1,3 +1,5 @@
+"""Database migration helpers."""
+
 # migrate.py
 import json
 import os
@@ -8,6 +10,7 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 def migrate_table(json_file, table, columns):
+    """Migrate table."""
     if not os.path.exists(json_file):
         print(f"{json_file} does not exist.")
         return
@@ -19,8 +22,10 @@ def migrate_table(json_file, table, columns):
     cursor = conn.cursor()
     
     for entry in data:
+        # Process each entry from data.
         values = []
         for col in columns:
+            # Process each col from columns.
             val = entry.get(col, None)
             # For lists or dicts, store them as JSON strings
             if isinstance(val, (list, dict)):

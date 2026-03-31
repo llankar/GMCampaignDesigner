@@ -1,3 +1,5 @@
+"""Utilities for detail UI theme."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -6,7 +8,9 @@ from modules.generic.editor.styles import get_editor_palette
 
 
 def resolve_color(value):
+    """Resolve color."""
     if isinstance(value, (list, tuple)):
+        # Handle the branch where isinstance(value, (list, tuple)).
         appearance = ctk.get_appearance_mode()
         index = 1 if appearance == "Dark" else 0
         if not value:
@@ -18,6 +22,7 @@ def resolve_color(value):
 
 
 def get_detail_palette() -> dict:
+    """Return detail palette."""
     palette = dict(get_editor_palette())
     palette.update(
         {
@@ -38,10 +43,12 @@ def get_detail_palette() -> dict:
 
 
 def get_link_color() -> str:
+    """Return link color."""
     return get_detail_palette()["link"]
 
 
 def get_textbox_style() -> dict:
+    """Return textbox style."""
     palette = get_detail_palette()
     return {
         "fg_color": palette["surface_elevated"],
@@ -53,6 +60,7 @@ def get_textbox_style() -> dict:
 
 
 def create_section_card(parent, title: str, subtitle: str | None = None, *, compact: bool = False):
+    """Create section card."""
     palette = get_detail_palette()
     outer = ctk.CTkFrame(
         parent,
@@ -84,6 +92,7 @@ def create_section_card(parent, title: str, subtitle: str | None = None, *, comp
 
 
 def create_chip(parent, text: str, *, accent: bool = False):
+    """Create chip."""
     palette = get_detail_palette()
     chip = ctk.CTkFrame(
         parent,
@@ -112,6 +121,7 @@ def create_hero_header(
     portrait_builder=None,
     adaptive_wrap: bool = True,
 ):
+    """Create hero header."""
     palette = get_detail_palette()
     hero = ctk.CTkFrame(
         parent,
@@ -163,14 +173,17 @@ def create_hero_header(
         summary_label.pack(anchor="w", fill="x")
 
     if meta_items:
+        # Continue with this path when meta items is set.
         meta_flow = ctk.CTkFrame(text_col, fg_color="transparent")
         meta_flow.pack(fill="x", pady=(14, 0))
         for item in meta_items:
+            # Process each item from meta_items.
             if not item:
                 continue
             create_chip(meta_flow, item).pack(side="left", padx=(0, 8), pady=(0, 8))
 
     if portrait_widget is not None or portrait_builder is not None:
+        # Handle the branch where portrait widget is available or portrait builder is available.
         portrait_shell = ctk.CTkFrame(
             content,
             fg_color=palette["surface_overlay"],
@@ -187,7 +200,9 @@ def create_hero_header(
             rendered_portrait.pack(fill="both", expand=True, padx=12, pady=12)
 
     if adaptive_wrap:
+        # Continue with this path when adaptive wrap is set.
         def _update_wrap(_event=None):
+            """Update wrap."""
             try:
                 text_width = int(text_col.winfo_width())
             except Exception:
@@ -213,6 +228,7 @@ def create_hero_header(
 
 
 def _mix_hex(primary: str, secondary: str, amount: float) -> str:
+    """Internal helper for mix hex."""
     primary = primary.lstrip("#")
     secondary = secondary.lstrip("#")
     if len(primary) != 6 or len(secondary) != 6:

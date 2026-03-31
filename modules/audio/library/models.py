@@ -1,3 +1,5 @@
+"""Data models for library."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -13,6 +15,7 @@ class Track:
     mood: str
 
     def to_dict(self) -> Dict[str, str]:
+        """Handle to dict."""
         return {
             "id": self.id,
             "name": self.name,
@@ -28,6 +31,7 @@ class MoodBucket:
     tracks: List[Track] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Handle to dict."""
         return {
             "tracks": [track.to_dict() for track in self.tracks],
         }
@@ -40,6 +44,7 @@ class Category:
     moods: Dict[str, MoodBucket] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        """Handle to dict."""
         return {
             "directories": list(self.directories),
             "moods": {mood: bucket.to_dict() for mood, bucket in self.moods.items()},

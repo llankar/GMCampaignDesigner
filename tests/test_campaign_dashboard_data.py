@@ -1,3 +1,5 @@
+"""Regression tests for campaign dashboard data."""
+
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -12,13 +14,16 @@ load_campaign_entities = campaign_dashboard_data.load_campaign_entities
 
 class _Wrapper:
     def __init__(self, items):
+        """Initialize the _Wrapper instance."""
         self._items = items
 
     def load_items(self):
+        """Load items."""
         return list(self._items)
 
 
 def test_load_campaign_entities_reads_campaigns_wrapper_case_insensitively():
+    """Verify that load campaign entities reads campaigns wrapper case insensitively."""
     wrappers = {
         "campaigns": _Wrapper(
             [
@@ -34,6 +39,7 @@ def test_load_campaign_entities_reads_campaigns_wrapper_case_insensitively():
 
 
 def test_load_campaign_entities_deduplicates_names_case_insensitively():
+    """Verify that load campaign entities deduplicates names case insensitively."""
     wrappers = {
         "Campaigns": _Wrapper(
             [

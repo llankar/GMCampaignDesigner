@@ -1,3 +1,5 @@
+"""Utilities for date validation date input validation."""
+
 from __future__ import annotations
 
 import calendar
@@ -13,10 +15,12 @@ class DateAgendaValidationResult:
 
     @property
     def is_valid(self) -> bool:
+        """Return whether valid."""
         return self.date_value is not None and self.error_message is None
 
 
 def max_days_for_month(year: int, month: int) -> int:
+    """Handle max days for month."""
     if not 1 <= int(month) <= 12:
         return 31
     safe_year = max(1, min(9999, int(year)))
@@ -24,6 +28,7 @@ def max_days_for_month(year: int, month: int) -> int:
 
 
 def validate_date_parts(year: int, month: int, day: int) -> DateAgendaValidationResult:
+    """Validate date parts."""
     year_value = int(year)
     month_value = int(month)
     day_value = int(day)
@@ -45,6 +50,7 @@ def validate_date_parts(year: int, month: int, day: int) -> DateAgendaValidation
 
 
 def validate_iso_text(raw_text: str) -> DateAgendaValidationResult:
+    """Validate iso text."""
     text = str(raw_text or "").strip()
     if not text:
         return DateAgendaValidationResult(None, "Enter a date in YYYY-MM-DD format.", 31)

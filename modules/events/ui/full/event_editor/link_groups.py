@@ -1,3 +1,5 @@
+"""Utilities for event editor link groups."""
+
 EVENT_LINK_GROUPS = [
     ("Places", "Places"),
     ("NPCs", "NPCs"),

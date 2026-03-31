@@ -13,6 +13,7 @@ class EquipmentValidationError(ValueError):
 
 
 def rank_index_from_advancements(advancements: int) -> int:
+    """Handle rank index from advancements."""
     for idx, (_, end, _, _) in enumerate(RANK_TABLE):
         if advancements <= end:
             return idx
@@ -20,8 +21,10 @@ def rank_index_from_advancements(advancements: int) -> int:
 
 
 def equipment_points_from_advancement_choices(advancement_choices: list[dict]) -> int:
+    """Handle equipment points from advancement choices."""
     bonus = 0
     for index, raw_choice in enumerate(advancement_choices, start=1):
+        # Process each (index, raw_choice) from enumerate(advancement_choices, start=1).
         choice_type = (raw_choice or {}).get("type", "").strip()
         if choice_type != "equipment_points":
             continue
@@ -30,14 +33,17 @@ def equipment_points_from_advancement_choices(advancement_choices: list[dict]) -
 
 
 def available_equipment_points(advancement_choices: list[dict]) -> int:
+    """Handle available equipment points."""
     return BASE_EQUIPMENT_POINTS + equipment_points_from_advancement_choices(advancement_choices)
 
 
 def max_pe_per_object(advancements: int) -> int:
+    """Handle max pe per object."""
     return 1 + rank_index_from_advancements(advancements)
 
 
 def _coerce_int(value) -> int:
+    """Coerce int."""
     try:
         return int(value or 0)
     except (TypeError, ValueError) as exc:
@@ -45,6 +51,7 @@ def _coerce_int(value) -> int:
 
 
 def validate_equipment(character_input: dict, advancements: int, advancement_choices: list[dict]) -> None:
+    """Validate equipment."""
     equipment = character_input.get("equipment") or {}
     for key in EQUIPMENT_KEYS:
         if key not in equipment:
@@ -58,6 +65,7 @@ def validate_equipment(character_input: dict, advancements: int, advancement_cho
         raise EquipmentValidationError(f"Les PE alloués ne peuvent pas dépasser {total_available}.")
 
     for key, value in pe_alloc.items():
+        # Process each (key, value) from pe_alloc.items().
         if value < 0:
             raise EquipmentValidationError(f"Les PE de {key} ne peuvent pas être négatifs.")
         if value > max_per_object:
@@ -74,6 +82,7 @@ def validate_equipment(character_input: dict, advancements: int, advancement_cho
     }
 
     for key, allowed_fields in purchase_rules.items():
+        # Process each (key, allowed_fields) from purchase_rules.items().
         object_purchases = purchases.get(key) or {}
         spent = sum(_coerce_int(object_purchases.get(field, 0)) for field in allowed_fields)
         if spent != pe_alloc[key]:

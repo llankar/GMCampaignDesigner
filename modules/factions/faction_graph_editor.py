@@ -1,3 +1,5 @@
+"""Editor helpers for factions faction graph."""
+
 # modules/factions/faction_graph_editor.py
 
 import os, math
@@ -13,6 +15,7 @@ log_module_import(__name__)
 
 class FactionGraphEditor(ctk.CTkFrame):
     def __init__(self, master, faction_wrapper: GenericModelWrapper, *args, **kwargs):
+        """Initialize the FactionGraphEditor instance."""
         super().__init__(master, *args, **kwargs)
         self.faction_wrapper = faction_wrapper
         self.graph = {"nodes": [], "links": []}
@@ -46,6 +49,7 @@ class FactionGraphEditor(ctk.CTkFrame):
         self.draw_graph()
 
     def init_toolbar(self):
+        """Initialize toolbar."""
         bar = ctk.CTkFrame(self)
         bar.grid(row=0, column=0, columnspan=2, pady=5, sticky="ew")
         ctk.CTkButton(bar, text="Add Faction", command=self.add_faction).pack(side="left", padx=4)
@@ -54,6 +58,7 @@ class FactionGraphEditor(ctk.CTkFrame):
         ctk.CTkButton(bar, text="Load",        command=self.load_graph).pack(side="left", padx=4)
 
     def add_faction(self):
+        """Handle add faction."""
         # choose faction from list
         template = {"fields":[{"name":"Name","type":"text"}]}
         dialog = ctk.CTkToplevel(self)
@@ -71,12 +76,14 @@ class FactionGraphEditor(ctk.CTkFrame):
         dialog.wait_window()
 
     def _on_faction_chosen(self, name, dialog):
+        """Handle faction chosen."""
         dialog.destroy()
         self.pending_node = name
         # next click places it
         self.canvas.bind("<Button-1>", self.place_node)
 
     def place_node(self, evt):
+        """Handle place node."""
         x = self.canvas.canvasx(evt.x); y = self.canvas.canvasy(evt.y)
         tag = f"faction_{self.pending_node.replace(' ','_')}"
         if tag in (n["tag"] for n in self.graph["nodes"]):
@@ -90,9 +97,11 @@ class FactionGraphEditor(ctk.CTkFrame):
         self.draw_graph()
 
     def start_link(self):
+        """Start link."""
         self.canvas.bind("<Button-1>", self._pick_link_start)
 
     def _pick_link_start(self, evt):
+        """Internal helper for pick link start."""
         x,y = self.canvas.canvasx(evt.x), self.canvas.canvasy(evt.y)
         item = self.canvas.find_closest(x,y)
         tags = self.canvas.gettags(item)
@@ -101,6 +110,7 @@ class FactionGraphEditor(ctk.CTkFrame):
             self.canvas.bind("<Button-1>", self._pick_link_end)
 
     def _pick_link_end(self, evt):
+        """Internal helper for pick link end."""
         x,y = self.canvas.canvasx(evt.x), self.canvas.canvasy(evt.y)
         item = self.canvas.find_closest(x,y)
         tags = self.canvas.gettags(item)
@@ -116,6 +126,7 @@ class FactionGraphEditor(ctk.CTkFrame):
         self.draw_graph()
 
     def draw_graph(self):
+        """Handle draw graph."""
         self.canvas.delete("all")
         # links first
         for link in self.graph["links"]:
@@ -143,6 +154,7 @@ class FactionGraphEditor(ctk.CTkFrame):
 
     # --- dragging support ---
     def start_drag(self, evt):
+        """Start drag."""
         x,y = self.canvas.canvasx(evt.x), self.canvas.canvasy(evt.y)
         item = self.canvas.find_closest(x,y)
         tags = self.canvas.gettags(item)
@@ -151,6 +163,7 @@ class FactionGraphEditor(ctk.CTkFrame):
             self._drag_start = (x,y)
 
     def do_drag(self, evt):
+        """Handle do drag."""
         if not hasattr(self,"_drag_tag") or not self._drag_tag: return
         x,y = self.canvas.canvasx(evt.x), self.canvas.canvasy(evt.y)
         dx,dy = x-self._drag_start[0], y-self._drag_start[1]
@@ -168,22 +181,27 @@ class FactionGraphEditor(ctk.CTkFrame):
                 self.canvas.coords(ids["text"], mx,my)
 
     def end_drag(self, evt):
+        """Handle end drag."""
         self._drag_tag=None
 
     def _start_canvas_pan(self, event):
+        """Start canvas pan."""
         self._is_panning = True
         self.canvas.scan_mark(event.x, event.y)
 
     def _do_canvas_pan(self, event):
+        """Internal helper for do canvas pan."""
         if not self._is_panning:
             return
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
     def _end_canvas_pan(self, _event):
+        """Internal helper for end canvas pan."""
         self._is_panning = False
 
     # --- right-click menu to delete ---
     def on_right_click(self, evt):
+        """Handle right click."""
         x,y = self.canvas.canvasx(evt.x), self.canvas.canvasy(evt.y)
         item = self.canvas.find_closest(x,y)
         tags = self.canvas.gettags(item)
@@ -194,6 +212,7 @@ class FactionGraphEditor(ctk.CTkFrame):
             menu.post(evt.x_root, evt.y_root)
 
     def _delete_node(self, tag):
+        """Delete node."""
         name = tag.replace("faction_","").replace("_"," ")
         self.graph["nodes"] = [n for n in self.graph["nodes"] if n["tag"]!=tag]
         self.graph["links"] = [l for l in self.graph["links"]
@@ -201,6 +220,7 @@ class FactionGraphEditor(ctk.CTkFrame):
         self.node_positions.pop(tag,None)
         self.draw_graph()
     def get_state(self):
+        """Return state."""
         return {
             "graph": self.graph.copy(),
             "node_positions": self.node_positions.copy(),
@@ -208,11 +228,13 @@ class FactionGraphEditor(ctk.CTkFrame):
         }
 
     def set_state(self, state):
+        """Set state."""
         self.graph = state.get("graph", {}).copy()
         self.node_positions = state.get("node_positions", {}).copy()
         self.draw_graph()  # Refresh the drawing
     # --- save / load ---
     def save_graph(self):
+        """Save graph."""
         path = filedialog.asksaveasfilename(defaultextension=".json")
         if not path: return
         # sync positions
@@ -222,6 +244,7 @@ class FactionGraphEditor(ctk.CTkFrame):
             import json; json.dump(self.graph,f,indent=2)
 
     def load_graph(self):
+        """Load graph."""
         path = filedialog.askopenfilename(filetypes=[("JSON","*.json")])
         if not path: return
         import json

@@ -58,6 +58,7 @@ class ObjectShelfView:
     """Encapsulates the supply crate shelf experience for object entities."""
 
     def __init__(self, host, allowed_categories: Sequence[str]):
+        """Initialize the ObjectShelfView instance."""
         self.host = host
         self.allowed_categories = [c for c in allowed_categories]
         self.frame = ctk.CTkFrame(host, fg_color="transparent")
@@ -134,6 +135,7 @@ class ObjectShelfView:
         if not image_path.exists():
             return
         try:
+            # Keep initialize background resilient if this step fails.
             with Image.open(image_path) as img:
                 self._background_image_source = img.convert("RGBA")
         except Exception:
@@ -222,22 +224,27 @@ class ObjectShelfView:
     # Public API
     # ------------------------------------------------------------------
     def is_available(self) -> bool:
+        """Return whether available."""
         return self.host.model_wrapper.entity_type == "objects"
 
     def is_visible(self) -> bool:
+        """Return whether visible."""
         return bool(self.frame.winfo_manager())
 
     def show(self, before_widget):
+        """Show the operation."""
         self.frame.pack(
             fill="both", expand=True, padx=5, pady=5, before=before_widget
         )
 
     def hide(self):
+        """Hide the operation."""
         self.frame.pack_forget()
         self.stop_visibility_monitor()
         self.return_top.place_forget()
 
     def populate(self):
+        """Handle populate."""
         if not self.is_available():
             return
         self._rebuild_sections()
@@ -250,6 +257,7 @@ class ObjectShelfView:
             self._check_visible_shelves()
 
     def refresh_selection(self):
+        """Refresh selection."""
         if not self.is_available():
             return
         selected = self._get_current_selection()
@@ -259,6 +267,7 @@ class ObjectShelfView:
         self._last_known_selection = set(selected)
 
     def _get_current_selection(self) -> Set[str]:
+        """Return current selection."""
         selected = getattr(self.host, "selected_iids", set())
         try:
             return set(selected)
@@ -266,6 +275,7 @@ class ObjectShelfView:
             return set(list(selected))
 
     def _sync_selection_delta(self, previous: Set[str], current: Set[str], highlight_target: Optional[str] = None):
+        """Synchronize selection delta."""
         removed = previous - current
         added = current - previous
         for base_id in removed:
@@ -275,6 +285,7 @@ class ObjectShelfView:
         self._last_known_selection = set(current)
 
     def update_summary(self):
+        """Update summary."""
         if not self.is_available():
             return
         pinned = len(self._pinned_categories)
@@ -291,13 +302,16 @@ class ObjectShelfView:
         )
 
     def start_visibility_monitor(self):
+        """Start visibility monitor."""
         self.stop_visibility_monitor()
         if not self.is_available():
             return
         self._visibility_job = self.host.after(200, self._monitor_visibility)
 
     def stop_visibility_monitor(self):
+        """Stop visibility monitor."""
         if self._visibility_job is not None:
+            # Handle the branch where visibility job is available.
             try:
                 self.host.after_cancel(self._visibility_job)
             except Exception:
@@ -308,10 +322,13 @@ class ObjectShelfView:
     # Internals
     # ------------------------------------------------------------------
     def _rebuild_sections(self):
+        """Internal helper for rebuild sections."""
         if not self.container:
             return
         for state in self.sections:
+            # Process each state from sections.
             if state.wrap_refresh_job:
+                # Continue with this path when wrap refresh job is set.
                 try:
                     self.host.after_cancel(state.wrap_refresh_job)
                 except Exception:
@@ -346,6 +363,7 @@ class ObjectShelfView:
             self.sections_by_norm[state.norm] = state
         self._pinned_categories.intersection_update(self.sections_by_norm.keys())
         for norm in list(self._pinned_categories):
+            # Process each norm from list(_pinned_categories).
             state = self.sections_by_norm.get(norm)
             if state:
                 state.pinned = True
@@ -362,14 +380,17 @@ class ObjectShelfView:
         if not self._current_search_query():
             return
         for state in self.sections:
+            # Process each state from sections.
             if state.collapsed:
                 state.collapsed = False
             self._update_section_controls(state)
             self._ensure_section_loaded(state)
 
     def _group_items_by_category(self):
+        """Group items by category."""
         groups: Dict[str, Dict[str, object]] = {}
         for item in self.host.filtered_items:
+            # Process each item from host.filtered_items.
             norm, display = self._normalize_category(item.get("Category", ""))
             record = groups.setdefault(norm, {"display": display, "items": []})
             if not record["display"] and display:
@@ -400,12 +421,14 @@ class ObjectShelfView:
         return ordered
 
     def _normalize_category(self, value):
+        """Normalize category."""
         text = self.host.clean_value(value) or "Uncategorized"
         norm = text.strip().lower() or "uncategorized"
         display = text.strip() or "Uncategorized"
         return norm, display
 
     def _create_section_widgets(self, state: ShelfSectionState):
+        """Create section widgets."""
         container = ctk.CTkFrame(
             self.container,
             fg_color="#1a1a1a",
@@ -464,10 +487,12 @@ class ObjectShelfView:
         self._update_section_controls(state)
 
     def _update_section_controls(self, state: ShelfSectionState):
+        """Update section controls."""
         self._update_pin_button(state)
         self._update_collapse_button(state)
 
     def _format_category_display(self, state: ShelfSectionState) -> str:
+        """Format category display."""
         if state.category and state.category.strip():
             return state.category.strip()
         if state.norm and state.norm.strip():
@@ -475,6 +500,7 @@ class ObjectShelfView:
         return "Uncategorized"
 
     def _apply_column_configuration(self, state: ShelfSectionState):
+        """Apply column configuration."""
         grid = state.grid_frame
         if not grid:
             return
@@ -488,6 +514,7 @@ class ObjectShelfView:
         state.configured_columns = state.column_count
 
     def _on_grid_resize(self, state: ShelfSectionState, width: int):
+        """Handle grid resize."""
         if state.layout_freeze:
             state.pending_resize = True
             return
@@ -505,11 +532,13 @@ class ObjectShelfView:
             self._update_wrap_lengths(state)
 
     def _freeze_layout(self, state: ShelfSectionState):
+        """Internal helper for freeze layout."""
         if not state:
             return
         state.layout_freeze = True
 
     def _thaw_layout(self, state: ShelfSectionState):
+        """Internal helper for thaw layout."""
         if not state:
             return
         if not state.layout_freeze:
@@ -521,14 +550,18 @@ class ObjectShelfView:
             self._on_grid_resize(state, width)
 
     def _determine_column_count(self, state: ShelfSectionState, width: Optional[int] = None) -> int:
+        """Internal helper for determine column count."""
         return 7
 
     def _reposition_section_widgets(self, state: ShelfSectionState):
+        """Internal helper for reposition section widgets."""
         columns = max(1, state.column_count or 1)
         active_rows: Set[int] = set()
         self._freeze_layout(state)
         try:
+            # Keep reposition section widgets resilient if this step fails.
             for index, base_id in enumerate(state.crate_order):
+                # Process each (index, base_id) from enumerate(state.crate_order).
                 state.crate_index[base_id] = index
                 crate = state.crate_widgets.get(base_id)
                 if crate and crate.winfo_exists():
@@ -540,6 +573,7 @@ class ObjectShelfView:
                     active_rows.add(row_group)
             for row_group, strip in list(state.shelf_rows.items()):
                 if row_group not in active_rows:
+                    # Handle the branch where row group is not in active rows.
                     if strip and strip.winfo_exists():
                         strip.destroy()
                     state.shelf_rows.pop(row_group, None)
@@ -548,6 +582,7 @@ class ObjectShelfView:
             self._thaw_layout(state)
 
     def _update_pin_button(self, state: ShelfSectionState):
+        """Update pin button."""
         if not state.pin_button:
             return
         if state.pinned:
@@ -566,6 +601,7 @@ class ObjectShelfView:
             )
 
     def _update_collapse_button(self, state: ShelfSectionState):
+        """Update collapse button."""
         if not state.collapse_button:
             return
         symbol = ">" if state.collapsed else "v"
@@ -576,12 +612,14 @@ class ObjectShelfView:
                 body.pack_forget()
         else:
             if body and body.winfo_exists():
+                # Handle the branch where body is set and body.winfo_exists().
                 body.pack(fill="both", expand=True, padx=6, pady=(0, 6))
                 if state.initialized:
                     self._ensure_section_loaded(state)
         self._update_collapsed_strip_text(state)
 
     def _toggle_section_collapse(self, state: ShelfSectionState):
+        """Toggle section collapse."""
         if state.pinned and not state.collapsed:
             return
         state.collapsed = not state.collapsed
@@ -597,10 +635,12 @@ class ObjectShelfView:
         self.update_summary()
 
     def _collapse_section(self, state: ShelfSectionState):
+        """Collapse section."""
         if not state.body_holder:
             return
         self._freeze_layout(state)
         if state.wrap_refresh_job:
+            # Continue with this path when wrap refresh job is set.
             try:
                 self.host.after_cancel(state.wrap_refresh_job)
             except Exception:
@@ -618,6 +658,7 @@ class ObjectShelfView:
         self._thaw_layout(state)
 
     def _toggle_section_pin(self, state: ShelfSectionState):
+        """Toggle section pin."""
         state.pinned = not state.pinned
         if state.pinned:
             self._pinned_categories.add(state.norm)
@@ -631,6 +672,7 @@ class ObjectShelfView:
         self.update_summary()
 
     def _ensure_section_loaded(self, state: ShelfSectionState):
+        """Ensure section loaded."""
         if state.collapsed:
             return
         if not state.initialized:
@@ -641,11 +683,13 @@ class ObjectShelfView:
             self._maybe_load_more_crates(state, force=True)
 
     def _suggest_batch_size(self, state: ShelfSectionState) -> int:
+        """Internal helper for suggest batch size."""
         columns = state.column_count or self._determine_column_count(state)
         columns = max(1, columns)
         return max(24, min(96, columns * 6))
 
     def _prepare_item_display(self, state: ShelfSectionState, item: dict) -> dict:
+        """Internal helper for prepare item display."""
         base_id = self.host._get_base_id(item)
         cached = state.display_cache.get(base_id)
         if cached:
@@ -659,6 +703,7 @@ class ObjectShelfView:
         size_source = item.get("Size")
         secondary_label = "Size"
         if not size_source:
+            # Handle the branch where size source is unavailable.
             stats_value = item.get("Stats")
             if stats_value not in (None, ""):
                 size_source = stats_value
@@ -683,12 +728,14 @@ class ObjectShelfView:
     def _register_wrap_targets(
         self, state: ShelfSectionState, base_id: str, labels: Sequence[Optional[ctk.CTkLabel]]
     ):
+        """Register wrap targets."""
         targets = [label for label in labels if label]
         if not targets:
             return
         state.wrap_targets[base_id] = targets
 
     def _prepare_spec_data(self, state: ShelfSectionState, item: dict) -> List[Tuple[str, str, bool]]:
+        """Internal helper for prepare spec data."""
         base_id = self.host._get_base_id(item)
         cached = state.spec_data_cache.get(base_id)
         if cached:
@@ -698,6 +745,7 @@ class ObjectShelfView:
         seen: Set[str] = set()
         default_order = ("Description", "Stats", "Secrets")
         for key in default_order:
+            # Process each key from default_order.
             raw = item.get(key)
             text = clean_value(raw)
             if text in (None, ""):
@@ -710,6 +758,7 @@ class ObjectShelfView:
             seen.add(key.lower())
         unique_field = getattr(self.host, "unique_field", None)
         for key, raw in item.items():
+            # Process each (key, raw) from item.items().
             key_str = str(key)
             key_lower = key_str.lower()
             if key_lower in seen:
@@ -730,12 +779,15 @@ class ObjectShelfView:
 
     @staticmethod
     def _normalize_stats_text(text: str) -> str:
+        """Normalize stats text."""
         normalized = text.replace("\r", "\n").split("\n")
         lines = [segment.strip() for segment in normalized if segment.strip()]
         return " ".join(lines) if lines else text
 
     def _update_wrap_lengths(self, state: ShelfSectionState, *, immediate: bool = False):
+        """Update wrap lengths."""
         if not immediate:
+            # Handle the branch where immediate is unavailable.
             if state.wrap_refresh_job:
                 return
             try:
@@ -769,14 +821,17 @@ class ObjectShelfView:
                     label.configure(wraplength=wrap_length)
 
     def _load_section_batch(self, state: ShelfSectionState, batch_size=24):
+        """Load section batch."""
         if state.collapsed:
             return
         self._freeze_layout(state)
         try:
+            # Keep section batch resilient if this step fails.
             start = state.loaded_count
             end = min(start + batch_size, len(state.items))
             columns = max(1, state.column_count or 4)
             for index in range(start, end):
+                # Process each index from range(start, end).
                 item = state.items[index]
                 display = self._prepare_item_display(state, item)
                 base_id = display["base_id"]
@@ -808,6 +863,7 @@ class ObjectShelfView:
         columns: int,
         row: int,
     ) -> ctk.CTkFrame:
+        """Ensure shelf row."""
         grid = state.grid_frame
         if not grid:
             return None
@@ -873,6 +929,7 @@ class ObjectShelfView:
         container: ctk.CTkFrame,
         before_widget: Optional[ctk.CTkFrame] = None,
     ):
+        """Build collapsed strip."""
         strip = ctk.CTkFrame(
             container,
             fg_color="#1a1a1a",
@@ -885,6 +942,7 @@ class ObjectShelfView:
         strip.bind("<space>", lambda _e, st=state: self._toggle_section_collapse(st))
 
         def _focus_strip(_event, frame=strip):
+            """Internal helper for focus strip."""
             try:
                 frame.focus_set()
             except Exception:
@@ -1006,6 +1064,7 @@ class ObjectShelfView:
         return strip
 
     def _build_section_overlay(self, state: ShelfSectionState, parent: ctk.CTkFrame):
+        """Build section overlay."""
         overlay = ctk.CTkFrame(
             parent,
             fg_color="#2b1b11",
@@ -1056,6 +1115,7 @@ class ObjectShelfView:
         return overlay
 
     def _update_collapsed_strip_text(self, state: ShelfSectionState):
+        """Update collapsed strip text."""
         if not state.collapsed_title or not state.collapsed_detail:
             return
         count = len(state.items)
@@ -1076,6 +1136,7 @@ class ObjectShelfView:
         self._update_section_overlay_text(state)
 
     def _update_section_overlay_text(self, state: ShelfSectionState):
+        """Update section overlay text."""
         total = len(state.items)
         noun = "item" if total == 1 else "items"
         displayed = state.loaded_count if state.initialized and not state.collapsed else state.loaded_count
@@ -1084,6 +1145,7 @@ class ObjectShelfView:
         if state.section_overlay_title:
             state.section_overlay_title.configure(text=category_display.upper())
         if state.section_overlay_count:
+            # Continue with this path when section overlay count is set.
             if state.collapsed and not state.initialized:
                 shown_text = f"{total} {noun}"
             elif displayed and displayed < total:
@@ -1092,6 +1154,7 @@ class ObjectShelfView:
                 shown_text = f"{total} {noun}"
             state.section_overlay_count.configure(text=shown_text)
         if state.section_overlay_summary:
+            # Continue with this path when section overlay summary is set.
             if state.section_overlay_count:
                 summary_count = state.section_overlay_count.cget("text") or ""
             else:
@@ -1103,20 +1166,24 @@ class ObjectShelfView:
             state.section_overlay_summary.configure(text=summary_text)
 
     def _maybe_load_more_crates(self, state: ShelfSectionState, force=False):
+        """Internal helper for maybe load more crates."""
         if state.collapsed or state.loaded_count >= len(state.items):
             return
         canvas = getattr(self.container, "_parent_canvas", None)
         if canvas is None:
             return
         if not force:
+            # Handle the branch where force is unavailable.
             visible_bottom = canvas.canvasy(canvas.winfo_height())
             if state.grid_frame.winfo_ismapped():
+                # Handle the branch where state.grid_frame.winfo_ismapped().
                 bottom = state.grid_frame.winfo_y() + state.grid_frame.winfo_height()
                 if bottom - visible_bottom > 400:
                     return
         self._load_section_batch(state, batch_size=self._suggest_batch_size(state))
 
     def _create_crate_widget(self, state: ShelfSectionState, item, display: dict):
+        """Create crate widget."""
         base_id = display["base_id"]
         crate = ctk.CTkFrame(
             state.grid_frame,
@@ -1141,6 +1208,7 @@ class ObjectShelfView:
         wrap_length = state.current_wrap or 260
         content_text = display["content_text"]
         if compact:
+            # Continue with this path when compact is set.
             desc_label = ctk.CTkLabel(
                 crate,
                 text=content_text,
@@ -1220,6 +1288,7 @@ class ObjectShelfView:
         return crate
 
     def _handle_crate_primary(self, event, state: ShelfSectionState, base_id):
+        """Internal helper for handle crate primary."""
         widget = event.widget
         if isinstance(widget, ctk.CTkButton):
             return
@@ -1227,6 +1296,7 @@ class ObjectShelfView:
         self._toggle_spec_sheet(state, base_id)
 
     def _on_crate_click(self, _state: ShelfSectionState, base_id):
+        """Handle crate click."""
         previous = self._get_current_selection()
         self.host.selected_iids = {base_id}
         self.host._apply_selection_to_tree()
@@ -1236,6 +1306,7 @@ class ObjectShelfView:
         self.host._update_bulk_controls()
 
     def _toggle_crate_selection(self, base_id):
+        """Toggle crate selection."""
         previous = self._get_current_selection()
         if base_id in self.host.selected_iids:
             self.host.selected_iids.remove(base_id)
@@ -1248,6 +1319,7 @@ class ObjectShelfView:
         self.host._update_bulk_controls()
 
     def _focus_crate(self, base_id):
+        """Internal helper for focus crate."""
         previous = self._focused_base_id
         if previous and previous != base_id:
             self._set_crate_selected(previous, previous in self.host.selected_iids)
@@ -1255,8 +1327,10 @@ class ObjectShelfView:
         self._set_crate_selected(base_id, base_id in self.host.selected_iids, highlight=True)
 
     def _move_crate_focus(self, state: ShelfSectionState, base_id, delta):
+        """Move crate focus."""
         index = state.crate_index.get(base_id)
         if index is None:
+            # Handle the branch where index is missing.
             if base_id not in state.crate_order:
                 return
             index = state.crate_order.index(base_id)
@@ -1268,11 +1342,13 @@ class ObjectShelfView:
             crate.focus_set()
 
     def _toggle_spec_sheet(self, state: ShelfSectionState, base_id):
+        """Toggle spec sheet."""
         if state.active_spec_id == base_id:
             self._hide_spec_overlay(state)
             return
         item = state.item_map.get(base_id)
         if not item:
+            # Handle the branch where item is unavailable.
             item = next(
                 (it for it in state.items if self.host._get_base_id(it) == base_id),
                 None,
@@ -1300,6 +1376,7 @@ class ObjectShelfView:
         display: Dict[str, str],
         spec_data: Sequence[Tuple[str, str, bool]],
     ):
+        """Show spec overlay."""
         self._hide_spec_overlay(state)
         overlay = ctk.CTkFrame(
             state.body_holder,
@@ -1360,10 +1437,12 @@ class ObjectShelfView:
         state.active_spec_id = base_id
 
     def _build_spec_sheet_content(self, parent, spec_data: Sequence[Tuple[str, str, bool]]):
+        """Build spec sheet content."""
         for child in parent.winfo_children():
             child.destroy()
         wrap_labels: List[ctk.CTkLabel] = []
         for label_text, text, is_stats in spec_data:
+            # Process each (label_text, text, is_stats) from spec_data.
             wrapper = ctk.CTkFrame(parent, fg_color="#161616", corner_radius=10)
             dense_spacing = bool(is_stats)
             pad_x = 10 if dense_spacing else 12
@@ -1392,6 +1471,7 @@ class ObjectShelfView:
             wrap_labels.append(body)
 
         def _update_wrap(_event=None, labels=wrap_labels, widget=parent):
+            """Update wrap."""
             width = max(280, widget.winfo_width() - 20)
             for label in labels:
                 if label and label.winfo_exists():
@@ -1401,10 +1481,12 @@ class ObjectShelfView:
         parent.after(50, _update_wrap)
 
     def _hide_spec_overlay(self, state: ShelfSectionState, destroy: bool = True):
+        """Hide spec overlay."""
         if not state:
             return
         overlay = state.spec_overlay
         if overlay and overlay.winfo_exists():
+            # Handle the branch where overlay is set and overlay.winfo_exists().
             overlay.place_forget()
             if destroy:
                 overlay.destroy()
@@ -1413,9 +1495,11 @@ class ObjectShelfView:
         state.active_spec_id = None
 
     def _dispose_specs(self, state: ShelfSectionState):
+        """Internal helper for dispose specs."""
         self._hide_spec_overlay(state)
 
     def _scroll_widget_into_view(self, widget, padding: int = 20):
+        """Internal helper for scroll widget into view."""
         if not widget or not widget.winfo_exists():
             return
         canvas = getattr(self.container, "_parent_canvas", None)
@@ -1452,10 +1536,12 @@ class ObjectShelfView:
         canvas.yview_moveto(new_top / inner_height)
 
     def _set_crate_selected(self, base_id, selected=False, crate=None, highlight=False):
+        """Set crate selected."""
         target = crate
         if target is None:
             for state in self.sections:
                 if base_id in state.crate_widgets:
+                    # Handle the branch where base ID is in crate widgets.
                     candidate = state.crate_widgets.get(base_id)
                     if candidate and candidate.winfo_exists():
                         target = candidate
@@ -1468,6 +1554,7 @@ class ObjectShelfView:
             target.configure(border_color="#2d2d2d", border_width=2)
 
     def _monitor_visibility(self):
+        """Internal helper for monitor visibility."""
         if self.host.view_mode != "shelf":
             self._visibility_job = None
             return
@@ -1475,6 +1562,7 @@ class ObjectShelfView:
         self._visibility_job = self.host.after(250, self._monitor_visibility)
 
     def _check_visible_shelves(self):
+        """Internal helper for check visible shelves."""
         if self.host.view_mode != "shelf":
             return
         canvas = getattr(self.container, "_parent_canvas", None)
@@ -1488,6 +1576,7 @@ class ObjectShelfView:
         visible_bottom = visible_top + canvas.winfo_height()
         threshold = 200
         for state in self.sections:
+            # Process each state from sections.
             container = state.container
             if (
                 not container
@@ -1503,6 +1592,7 @@ class ObjectShelfView:
             bottom = top + container.winfo_height()
             body = state.body_holder
             if body and body.winfo_exists() and body.winfo_ismapped():
+                # Handle the branch where body is set and body.winfo_exists() and body.winfo_ismapped().
                 body_offset = body.winfo_y()
                 if inner_root_top is not None:
                     body_top = container_root_top + body_offset - inner_root_top
@@ -1512,6 +1602,7 @@ class ObjectShelfView:
                 top = min(top, body_top)
                 bottom = max(bottom, body_bottom)
             if bottom >= visible_top - threshold and top <= visible_bottom + threshold:
+                # Handle the branch where bottom >= visible_top - threshold and top <= visible_bottom + threshold.
                 self._ensure_section_loaded(state)
                 self._maybe_load_more_crates(state)
             else:
@@ -1520,6 +1611,7 @@ class ObjectShelfView:
         self._update_return_button()
 
     def _on_canvas_change(self):
+        """Handle canvas change."""
         self._update_return_button()
         canvas = getattr(self.container, "_parent_canvas", None)
         inner = getattr(self.container, "_scrollable_frame", None)
@@ -1532,6 +1624,7 @@ class ObjectShelfView:
         if needs_update:
             inner.configure(width=available)
         if needs_update:
+            # Continue with this path when needs update is set.
             inner.update_idletasks()
             for state in self.sections:
                 if state.grid_frame and state.grid_frame.winfo_exists():
@@ -1587,6 +1680,7 @@ class ObjectShelfView:
         return int(round(values[0] + values[1]))
 
     def _on_mousewheel(self, event):
+        """Handle mousewheel."""
         if self.host.view_mode != "shelf":
             return
         canvas = getattr(self.container, "_parent_canvas", None)
@@ -1598,12 +1692,14 @@ class ObjectShelfView:
         return "break"
 
     def scroll_to_top(self):
+        """Handle scroll to top."""
         canvas = getattr(self.container, "_parent_canvas", None)
         if canvas is not None:
             canvas.yview_moveto(0)
         self._update_return_button()
 
     def _update_return_button(self):
+        """Update return button."""
         if self.host.view_mode != "shelf":
             return
         canvas = getattr(self.container, "_parent_canvas", None)
@@ -1614,11 +1710,13 @@ class ObjectShelfView:
         show = False
         if self.sections:
             if len(self.sections) > 2:
+                # Handle the branch where len(sections) > 2.
                 third = self.sections[2]
                 if third.header_frame:
                     third_y = third.header_frame.winfo_y()
                     show = y > third_y
         if show:
+            # Continue with this path when show is set.
             height = self.frame.winfo_height() if self.frame else 0
             if height:
                 self.return_top.place(relx=0.98, rely=0.92, anchor="se")

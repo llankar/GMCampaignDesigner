@@ -1,3 +1,5 @@
+"""Utilities for menu image adapter."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -48,7 +50,9 @@ def resize_ctk_icon(icon: Any, size: tuple[int, int]):
 
 
 def _extract_pil_image(icon: Any):
+    """Extract pil image."""
     for attr_name in ("_light_image", "_dark_image", "light_image", "dark_image", "_image"):
+        # Process each attr_name while updating pil image.
         image = getattr(icon, attr_name, None)
         if image is not None:
             return image

@@ -1,3 +1,5 @@
+"""View for world map toolbar."""
+
 import tkinter as tk
 import customtkinter as ctk
 from modules.helpers.logging_helper import log_module_import
@@ -8,15 +10,18 @@ log_module_import(__name__)
 
 
 def build_world_map_toolbar(panel) -> None:
+    """Build world map toolbar."""
     section_tracker = {"count": 0}
     horizontal_spacing = 6
     control_pady = 4
 
     def _pack_control(widget, *, leading=0, trailing=None, pady=None):
+        """Pack control."""
         padx = (leading, horizontal_spacing if trailing is None else trailing)
         widget.pack(side="left", padx=padx, pady=control_pady if pady is None else pady)
 
     def _create_collapsible_section(parent, title):
+        """Create collapsible section."""
         if section_tracker["count"]:
             separator = ctk.CTkFrame(
                 parent,
@@ -34,6 +39,7 @@ def build_world_map_toolbar(panel) -> None:
         toggle_state = tk.BooleanVar(value=True)
 
         def _toggle():
+            """Toggle the operation."""
             if toggle_state.get():
                 content_frame.pack_forget()
                 toggle_state.set(False)

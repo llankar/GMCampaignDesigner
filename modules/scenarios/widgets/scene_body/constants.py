@@ -1,2 +1,4 @@
+"""Constants for scenario."""
+
 COMPACT_GRID_BREAKPOINT = 760
 DEFAULT_VISIBLE_CHIPS = 6

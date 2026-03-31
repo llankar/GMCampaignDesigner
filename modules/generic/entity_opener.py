@@ -1,3 +1,4 @@
+"""Opening helpers for generic entity."""
 import customtkinter as ctk
 from tkinter import messagebox
 from scenarios.gm_screen_view import GMScreenView
@@ -13,6 +14,7 @@ log_module_import(__name__)
 
 
 def _open_detached_entity_window(entity_type, entity_name, wrapper_name):
+    """Open detached entity window."""
     wrapper = GenericModelWrapper(wrapper_name)
     items = wrapper.load_items()
     item = next((entry for entry in items if entry.get("Name") == entity_name), None)
@@ -37,12 +39,14 @@ def _open_detached_entity_window(entity_type, entity_name, wrapper_name):
 
 @log_function
 def open_detached_npc(npc_name):
+    """Open detached NPC."""
     log_info(f"Opening detached NPC window: {npc_name}", func_name="open_detached_npc")
     """Open an NPC in a detached window using the shared detail factory UI."""
     _open_detached_entity_window("NPCs", npc_name, "npcs")
 
 @log_function
 def open_detached_pc(pc_name):
+    """Open detached PC."""
     log_info(f"Opening detached PC window: {pc_name}", func_name="open_detached_pc")
     """Open a PC in a detached window using the shared detail factory UI."""
     _open_detached_entity_window("PCs", pc_name, "pcs")

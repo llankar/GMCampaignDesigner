@@ -1,3 +1,5 @@
+"""Utilities for campaign startup config."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

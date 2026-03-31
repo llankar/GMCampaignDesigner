@@ -1,3 +1,5 @@
+"""Utilities for editor smart UI."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -20,12 +22,14 @@ def prioritize_fields(fields: list[dict], priority: tuple[str, ...] = DEFAULT_FI
     seen: set[str] = set()
 
     for field_name in priority:
+        # Process each field_name from priority.
         field = by_name.get(field_name)
         if field is not None:
             ordered.append(field)
             seen.add(field_name)
 
     for field in fields:
+        # Process each field from fields.
         name = str(field.get("name", ""))
         if name in seen:
             continue
@@ -38,6 +42,7 @@ class SmartEditorToolbar(ctk.CTkFrame):
     """Top toolbar with quick-jump, filtering and dirty-state feedback."""
 
     def __init__(self, master, *, on_filter_change, on_jump_to_field):
+        """Initialize the SmartEditorToolbar instance."""
         super().__init__(
             master,
             fg_color=EDITOR_PALETTE["surface_alt"],
@@ -93,6 +98,7 @@ class SmartEditorToolbar(ctk.CTkFrame):
         self.dirty_label.grid(row=0, column=4, padx=(0, 14), pady=10)
 
     def set_fields(self, field_names: list[str]):
+        """Set fields."""
         self._field_names = field_names
         values = ["Jump to…", *field_names] if field_names else ["Jump to…"]
         self.jump_menu.configure(values=values)
@@ -100,17 +106,21 @@ class SmartEditorToolbar(ctk.CTkFrame):
         self.update_visible_count(len(field_names), len(field_names))
 
     def update_visible_count(self, visible: int, total: int):
+        """Update visible count."""
         self.info_label.configure(text=f"{visible}/{total} fields")
 
     def set_dirty(self, dirty: bool):
+        """Set dirty."""
         if dirty:
             self.dirty_label.configure(text="Unsaved changes", text_color=EDITOR_PALETTE["warning"])
         else:
             self.dirty_label.configure(text="Saved", text_color=EDITOR_PALETTE["success"])
 
     def _handle_search(self, *_):
+        """Internal helper for handle search."""
         self._on_filter_change(self.search_var.get())
 
     def _handle_jump(self, value: str):
+        """Internal helper for handle jump."""
         if value and value != "Jump to…":
             self._on_jump_to_field(value)

@@ -1,3 +1,5 @@
+"""Utilities for map entity picker service."""
+
 import tkinter as tk
 from modules.ui.image_viewer import show_portrait
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -54,13 +56,16 @@ def on_entities_selected(self, entity_type, records, picker_frame):
         picker_frame.destroy()
 
 def _extract_portrait_path(record):
+    """Extract portrait path."""
     portrait = record.get("Portrait")
     return primary_portrait(portrait)
 
 def _get_entity_display_name(record):
+    """Return entity display name."""
     return record.get("Name") or record.get("Title") or "Unnamed"
 
 def _add_entity_record(self, entity_type, record):
+    """Internal helper for add entity record."""
     entity_name = _get_entity_display_name(record)
     path = _extract_portrait_path(record)
     if not path:

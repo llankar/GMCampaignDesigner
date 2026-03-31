@@ -23,6 +23,7 @@ VIDEO_EXTENSIONS = {".mp4", ".webm", ".mkv", ".avi", ".mov", ".m4v"}
 
 
 def is_video_path(path: str) -> bool:
+    """Return whether video path."""
     if not path:
         return False
     _, ext = os.path.splitext(str(path))
@@ -38,9 +39,11 @@ def _calc_frame_delay_ms(stream) -> int:
     """
     candidates = []
     for attr in ("average_rate", "base_rate", "rate"):
+        # Process each attr from ('average_rate', 'base_rate', 'rate').
         value = getattr(stream, attr, None)
         if value:
             try:
+                # Keep calc frame delay ms resilient if this step fails.
                 fps = float(value)
                 if fps and fps > 0:
                     candidates.append(fps)
@@ -49,9 +52,11 @@ def _calc_frame_delay_ms(stream) -> int:
     # time_base is seconds per tick; 1/time_base is ticks per second, not
     # strictly FPS, but in practice can be near it for some streams.
     if not candidates:
+        # Handle the branch where candidates is unavailable.
         time_base = getattr(stream, "time_base", None)
         if time_base:
             try:
+                # Keep calc frame delay ms resilient if this step fails.
                 approx = float(1.0 / float(time_base))
                 if approx and approx > 0:
                     candidates.append(approx)
@@ -86,6 +91,7 @@ class CanvasVideoBackgroundPlayer:
     """
 
     def __init__(self, controller, path: str, *, loop: bool = True) -> None:
+        """Initialize the CanvasVideoBackgroundPlayer instance."""
         if av is None:
             raise RuntimeError("PyAV is required for video backgrounds, but is not available.")
         if not path or not os.path.exists(path):
@@ -104,11 +110,13 @@ class CanvasVideoBackgroundPlayer:
     # Public API -----------------------------------------------------------
     @property
     def size(self) -> tuple[int, int]:
+        """Handle size."""
         if self._info is None:
             return (0, 0)
         return (self._info.width, self._info.height)
 
     def start(self) -> None:
+        """Start the operation."""
         if self._stopped:
             return
         parent = getattr(self._controller, "parent", None)
@@ -120,6 +128,7 @@ class CanvasVideoBackgroundPlayer:
             pass
 
     def stop(self) -> None:
+        """Stop the operation."""
         if self._stopped:
             return
         self._stopped = True
@@ -131,6 +140,7 @@ class CanvasVideoBackgroundPlayer:
                 pass
         self._after_id = None
         try:
+            # Keep stop resilient if this step fails.
             if self._container is not None:
                 self._container.close()
         except Exception:
@@ -141,6 +151,7 @@ class CanvasVideoBackgroundPlayer:
 
     # Internals ------------------------------------------------------------
     def _open_container(self) -> None:
+        """Open container."""
         if self._container is not None:
             try:
                 self._container.close()
@@ -175,6 +186,7 @@ class CanvasVideoBackgroundPlayer:
         self._frame_iter = self._container.decode(self._stream)
 
     def _schedule(self) -> None:
+        """Schedule the operation."""
         if self._stopped:
             return
         parent = getattr(self._controller, "parent", None)
@@ -186,15 +198,18 @@ class CanvasVideoBackgroundPlayer:
             self._after_id = None
 
     def _render_next(self) -> None:
+        """Render next."""
         if self._stopped:
             return
         if self._frame_iter is None:
             self._open_container()
         frame = None
         try:
+            # Keep next resilient if this step fails.
             frame = next(self._frame_iter)
         except StopIteration:
             if self._loop:
+                # Continue with this path when loop is set.
                 try:
                     self._open_container()
                     frame = next(self._frame_iter)
@@ -212,12 +227,14 @@ class CanvasVideoBackgroundPlayer:
                 frame = None
 
         if frame is not None:
+            # Handle the branch where frame is available.
             image = frame.to_image()
             # Share the current frame for web rendering and size queries
             setattr(self._controller, "_video_current_frame_pil", image)
             # Optionally keep base_img dimensions in sync for code paths that
             # rely on size. Avoid excessive churn by only replacing when size matches.
             try:
+                # Keep next resilient if this step fails.
                 if getattr(self._controller, "base_img", None) is None:
                     self._controller.base_img = image
             except Exception:
@@ -227,16 +244,19 @@ class CanvasVideoBackgroundPlayer:
         self._schedule()
 
     def _display_image(self, image: Image.Image) -> None:
+        """Internal helper for display image."""
         ctrl = self._controller
         canvas = getattr(ctrl, "canvas", None)
         if canvas is not None:
             try:
+                # Keep display image resilient if this step fails.
                 if not canvas.winfo_exists():
                     canvas = None
             except Exception:
                 canvas = None
 
         if canvas is not None:
+            # Handle the branch where canvas is available.
             try:
                 sw = max(1, int(image.width * float(getattr(ctrl, "zoom", 1.0) or 1.0)))
                 sh = max(1, int(image.height * float(getattr(ctrl, "zoom", 1.0) or 1.0)))
@@ -267,11 +287,13 @@ class CanvasVideoBackgroundPlayer:
         fs_canvas = getattr(ctrl, "fs_canvas", None)
         if fs_canvas is not None:
             try:
+                # Keep display image resilient if this step fails.
                 if not fs_canvas.winfo_exists():
                     fs_canvas = None
             except Exception:
                 fs_canvas = None
         if fs_canvas is not None:
+            # Handle the branch where fs canvas is available.
             try:
                 sw = max(1, int(image.width * float(getattr(ctrl, "zoom", 1.0) or 1.0)))
                 sh = max(1, int(image.height * float(getattr(ctrl, "zoom", 1.0) or 1.0)))

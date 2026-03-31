@@ -1,3 +1,5 @@
+"""Dialog for PDF review."""
+
 import customtkinter as ctk
 from tkinter import messagebox
 from typing import Iterable, List
@@ -7,6 +9,7 @@ class PDFReviewDialog(ctk.CTkToplevel):
     """Modal dialog that previews extracted PDF text and allows range trimming."""
 
     def __init__(self, master, pages: List[str], title: str = "Review PDF Text"):
+        """Initialize the PDFReviewDialog instance."""
         super().__init__(master)
         self.title(title)
         self.geometry("720x640")
@@ -45,16 +48,19 @@ class PDFReviewDialog(ctk.CTkToplevel):
         self._apply_ranges()
 
     def _cancel(self):
+        """Internal helper for cancel."""
         self.selected_pages = None
         self.destroy()
 
     def _confirm(self):
+        """Internal helper for confirm."""
         if self.selected_pages is None:
             messagebox.showwarning("No Pages", "Please apply a valid page range before importing.")
             return
         self.destroy()
 
     def _apply_ranges(self):
+        """Apply ranges."""
         raw = self.range_entry.get().strip()
         try:
             indices = _parse_page_ranges(raw, len(self._pages))
@@ -68,6 +74,7 @@ class PDFReviewDialog(ctk.CTkToplevel):
         self._refresh_preview(indices)
 
     def _refresh_preview(self, indices: Iterable[int]):
+        """Refresh preview."""
         self.preview.delete("1.0", "end")
         parts = []
         for idx in indices:
@@ -79,14 +86,17 @@ class PDFReviewDialog(ctk.CTkToplevel):
 
 
 def _parse_page_ranges(value: str, total_pages: int) -> list[int]:
+    """Parse page ranges."""
     if not value:
         return list(range(total_pages))
     indices = set()
     for chunk in value.split(","):
+        # Process each chunk from value.split(',').
         chunk = chunk.strip()
         if not chunk:
             continue
         if "-" in chunk:
+            # Handle the branch where '-' is in chunk.
             start_str, end_str = chunk.split("-", 1)
             try:
                 start = int(start_str)

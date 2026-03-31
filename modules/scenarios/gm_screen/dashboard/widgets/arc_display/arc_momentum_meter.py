@@ -1,3 +1,5 @@
+"""Utilities for arc display arc momentum meter."""
+
 from __future__ import annotations
 
 import tkinter as tk
@@ -11,6 +13,7 @@ class ArcMomentumMeter(ctk.CTkFrame):
     """Circular meter that highlights arc completion momentum."""
 
     def __init__(self, parent, *, completed_steps: int, total_steps: int, label: str):
+        """Initialize the ArcMomentumMeter instance."""
         super().__init__(parent, fg_color="transparent")
         self.grid_columnconfigure(0, weight=1)
 

@@ -1,3 +1,5 @@
+"""Regression tests for menu image adapter."""
+
 from __future__ import annotations
 
 import sys
@@ -6,10 +8,12 @@ from types import SimpleNamespace
 
 class _FakePilImage:
     def __init__(self, size=(64, 64), color="red"):
+        """Initialize the _FakePilImage instance."""
         self.size = size
         self.color = color
 
     def copy(self):
+        """Copy the operation."""
         return _FakePilImage(size=self.size, color=self.color)
 
 
@@ -19,6 +23,7 @@ if "PIL" not in sys.modules:
     pil_imagetk_module = types.ModuleType("PIL.ImageTk")
 
     def _contain(image, target_size):
+        """Internal helper for contain."""
         width, height = image.size
         bound_w, bound_h = target_size
         scale = min(bound_w / width, bound_h / height)
@@ -43,18 +48,23 @@ if "customtkinter" not in sys.modules:
 
     class _Widget:
         def __init__(self, *args, **kwargs):
+            """Initialize the _Widget instance."""
             pass
 
         def configure(self, *args, **kwargs):
+            """Handle configure."""
             pass
 
         def pack(self, *args, **kwargs):
+            """Pack the operation."""
             pass
 
         def grid(self, *args, **kwargs):
+            """Handle grid."""
             pass
 
         def destroy(self):
+            """Handle destroy."""
             pass
 
     ctk_stub.CTkButton = _Widget
@@ -72,26 +82,32 @@ from modules.ui.menu.top_nav_bar import AppMenuBar
 
 class _FakeMenu:
     def __init__(self):
+        """Initialize the _FakeMenu instance."""
         self.commands = []
         self.separators = 0
 
     def add_command(self, **kwargs):
+        """Handle add command."""
         self.commands.append(kwargs)
 
     def add_separator(self):
+        """Handle add separator."""
         self.separators += 1
 
 
 class _FakeIcon:
     def __init__(self, size=(18, 18)):
+        """Initialize the _FakeIcon instance."""
         self._light_image = _FakePilImage(size=(64, 64), color="red")
         self._size = size
 
 
 def test_prepare_menu_image_converts_ctk_style_image(monkeypatch):
+    """Verify that prepare menu image converts ctk style image."""
     captured = {}
 
     def _fake_photo_image(image):
+        """Internal helper for fake photo image."""
         captured["image"] = image
         return "tk-photo"
 
@@ -104,6 +120,7 @@ def test_prepare_menu_image_converts_ctk_style_image(monkeypatch):
 
 
 def test_resize_ctk_icon_returns_compact_clone():
+    """Verify that resize ctk icon returns compact clone."""
     resized = resize_ctk_icon(_FakeIcon(size=(60, 60)), (32, 20))
 
     assert resized._size == (32, 20)
@@ -111,6 +128,7 @@ def test_resize_ctk_icon_returns_compact_clone():
 
 
 def test_populate_submenu_uses_tk_compatible_images(monkeypatch):
+    """Verify that populate submenu uses tk compatible images."""
     sentinel_image = object()
     monkeypatch.setattr("modules.ui.menu.top_nav_bar.prepare_menu_image", lambda icon: sentinel_image)
 
@@ -144,10 +162,12 @@ def test_populate_submenu_uses_tk_compatible_images(monkeypatch):
 
 
 def test_populate_submenu_resizes_icons_for_compact_top_bar(monkeypatch):
+    """Verify that populate submenu resizes icons for compact top bar."""
     resize_calls = []
     sentinel_image = object()
 
     def _fake_resize(icon, size):
+        """Internal helper for fake resize."""
         resize_calls.append((icon, size))
         return icon
 

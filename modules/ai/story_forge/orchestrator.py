@@ -1,3 +1,4 @@
+"""Orchestration helpers for story forge."""
 from __future__ import annotations
 
 from uuid import uuid4
@@ -31,14 +32,17 @@ class StoryForgeOrchestrator:
     """Multi-step scenario generation pipeline used by Scenario Builder."""
 
     def __init__(self, ai_client: LocalAIClient | None = None):
+        """Initialize the StoryForgeOrchestrator instance."""
         self.ai_client = ai_client or LocalAIClient()
         self._runner = AIPipelineRunner(self.ai_client, pipeline_name="story_forge")
         self._last_step_metadata: dict = {"feature": "story_forge"}
 
     def run(self, request: StoryForgeRequest, request_id: str | None = None) -> StoryForgeResponse:
+        """Run the operation."""
         ai_request_id = request_id or uuid4().hex
         self._emit_started(ai_request_id)
         try:
+            # Keep run resilient if this step fails.
             self._emit_phase(ai_request_id, "context_preparation", "Preparing Story Forge context")
             rewrite_raw = self._chat(build_rewrite_options_prompt(request))
             rewrite_payload = parse_json_strict_with_fallback(rewrite_raw, fallback={"options": []})
@@ -80,6 +84,7 @@ class StoryForgeOrchestrator:
         return response
 
     def _chat(self, prompt: str) -> str:
+        """Internal helper for chat."""
         response, metadata = self._runner.chat_once(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -92,6 +97,7 @@ class StoryForgeOrchestrator:
 
     @staticmethod
     def _emit_started(request_id: str) -> None:
+        """Internal helper for emit started."""
         publish_local_ai_event(
             event_type=EVENT_AI_PIPELINE_STARTED,
             request_id=request_id,
@@ -101,6 +107,7 @@ class StoryForgeOrchestrator:
         )
 
     def _emit_phase(self, request_id: str, phase: str, message: str) -> None:
+        """Internal helper for emit phase."""
         publish_local_ai_event(
             event_type=EVENT_AI_PIPELINE_PHASE,
             request_id=request_id,
@@ -111,6 +118,7 @@ class StoryForgeOrchestrator:
         )
 
     def _emit_completed(self, request_id: str) -> None:
+        """Internal helper for emit completed."""
         publish_local_ai_event(
             event_type=EVENT_AI_PIPELINE_COMPLETED,
             request_id=request_id,
@@ -122,6 +130,7 @@ class StoryForgeOrchestrator:
         )
 
     def _emit_failed(self, request_id: str, exc: Exception) -> None:
+        """Internal helper for emit failed."""
         publish_local_ai_event(
             event_type=EVENT_AI_PIPELINE_FAILED,
             request_id=request_id,

@@ -1,3 +1,4 @@
+"""Overview helpers for campaign."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -19,6 +20,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         campaign_values: list[str],
         on_campaign_selected,
     ):
+        """Initialize the CampaignOverviewHero instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=22, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self._payload = payload
         self._campaign_var = campaign_var
@@ -34,6 +36,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
 
 
     def _build_control_strip(self) -> None:
+        """Build control strip."""
         controls = ctk.CTkFrame(self, fg_color="transparent")
         controls.grid(row=0, column=0, columnspan=2, sticky="ew", padx=18, pady=(12, 0))
         controls.grid_columnconfigure(0, weight=1)
@@ -79,6 +82,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         ).grid(row=0, column=1, sticky="e")
 
     def _build_identity_column(self) -> None:
+        """Build identity column."""
         identity = ctk.CTkFrame(self, fg_color="transparent")
         identity.grid(row=1, column=0, sticky="nsew", padx=(18, 12), pady=(12, 16))
         identity.grid_columnconfigure(0, weight=1)
@@ -119,6 +123,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         chips.grid(row=1, column=0, sticky="w", pady=(12, 0))
         chip_index = 0
         for value in [self._payload.genre, self._payload.tone, self._payload.status]:
+            # Process each value from [_payload.genre, _payload.tone, _payload.status].
             if not value:
                 continue
             _CompactChip(chips, text=value, fg_color=DASHBOARD_THEME.button_fg, text_color=DASHBOARD_THEME.text_primary).grid(
@@ -142,6 +147,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
             _StatCard(stats, label=label, value=value).grid(row=0, column=column, sticky="ew", padx=(0 if column == 0 else 8, 0))
 
     def _build_sidebar_column(self) -> None:
+        """Build sidebar column."""
         sidebar = ctk.CTkFrame(self, fg_color="transparent")
         sidebar.grid(row=1, column=1, sticky="nsew", padx=(0, 18), pady=(12, 16))
         for column in range(2):
@@ -171,6 +177,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         ]
         slot = 0
         for label, value in fact_items:
+            # Process each (label, value) from fact_items.
             if not value:
                 continue
             row = slot // 2
@@ -181,6 +188,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
 
 class _CompactChip(ctk.CTkFrame):
     def __init__(self, parent, *, text: str, fg_color: str, text_color: str):
+        """Initialize the _CompactChip instance."""
         super().__init__(parent, fg_color=fg_color, corner_radius=999)
         ctk.CTkLabel(
             self,
@@ -192,6 +200,7 @@ class _CompactChip(ctk.CTkFrame):
 
 class _StatCard(ctk.CTkFrame):
     def __init__(self, parent, *, label: str, value: str):
+        """Initialize the _StatCard instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=14, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -212,6 +221,7 @@ class _StatCard(ctk.CTkFrame):
 
 class _FactTile(ctk.CTkFrame):
     def __init__(self, parent, *, label: str, value: str):
+        """Initialize the _FactTile instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.card_bg, corner_radius=14)
         self.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(
@@ -232,6 +242,7 @@ class _FactTile(ctk.CTkFrame):
 
 
 def _compact_count(value: str) -> str:
+    """Internal helper for compact count."""
     text = str(value or "").strip()
     if not text:
         return "0"

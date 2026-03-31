@@ -1,3 +1,4 @@
+"""Persistence helpers for timer."""
 from __future__ import annotations
 
 import json
@@ -15,11 +16,14 @@ class TimerPersistence:
     """SQLite persistence for active timers and reusable presets."""
 
     def __init__(self) -> None:
+        """Initialize the TimerPersistence instance."""
         self._ensure_schema()
 
     def _ensure_schema(self) -> None:
+        """Ensure schema."""
         conn = get_connection()
         try:
+            # Keep schema resilient if this step fails.
             conn.execute("PRAGMA busy_timeout = 5000")
             cursor = conn.cursor()
             cursor.execute(
@@ -43,9 +47,11 @@ class TimerPersistence:
             conn.close()
 
     def load(self) -> Tuple[List[TimerState], List[TimerPreset]]:
+        """Load the operation."""
         self._ensure_schema()
         conn = get_connection()
         try:
+            # Keep load resilient if this step fails.
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -74,9 +80,11 @@ class TimerPersistence:
             conn.close()
 
     def save(self, timers: List[TimerState], presets: List[TimerPreset]) -> None:
+        """Save the operation."""
         self._ensure_schema()
         conn = get_connection()
         try:
+            # Keep save resilient if this step fails.
             conn.execute("PRAGMA busy_timeout = 5000")
             cursor = conn.cursor()
 

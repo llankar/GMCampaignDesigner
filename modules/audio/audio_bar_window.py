@@ -27,6 +27,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         *,
         controller: Optional[AudioController] = None,
     ) -> None:
+        """Initialize the AudioBarWindow instance."""
         super().__init__(master)
         self.controller = controller or get_audio_controller()
         self._listener: Optional[Any] = None
@@ -77,6 +78,7 @@ class AudioBarWindow(ctk.CTkToplevel):
     # UI construction
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build UI."""
         self._building_ui = True
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -246,12 +248,14 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._update_collapse_button()
 
     def _keep_search_dropdown_width(self, *_args: Any) -> None:
+        """Internal helper for keep search dropdown width."""
         width = getattr(self, "_search_results_menu_width", None)
         menu = getattr(self, "search_results_menu", None)
         if not width or menu is None:
             return
 
         def _apply() -> None:
+            """Apply the operation."""
             try:
                 menu.configure(width=width)
             except Exception:
@@ -263,12 +267,14 @@ class AudioBarWindow(ctk.CTkToplevel):
             _apply()
 
     def _keep_now_playing_dropdown_width(self, *_args: Any) -> None:
+        """Internal helper for keep now playing dropdown width."""
         width = getattr(self, "_now_playing_menu_width", None)
         menu = getattr(self, "now_playing_menu", None)
         if not width or menu is None:
             return
 
         def _apply() -> None:
+            """Apply the operation."""
             try:
                 menu.configure(width=width)
             except Exception:
@@ -283,18 +289,21 @@ class AudioBarWindow(ctk.CTkToplevel):
     # Controller listener handling
     # ------------------------------------------------------------------
     def _register_controller_listener(self) -> None:
+        """Register controller listener."""
         if self._listener is not None:
             return
         self._listener = lambda section, event, payload: self._dispatch_controller_event(section, event, payload)
         self.controller.add_listener(self._listener)
 
     def _detach_controller_listener(self) -> None:
+        """Internal helper for detach controller listener."""
         if self._listener is None:
             return
         self.controller.remove_listener(self._listener)
         self._listener = None
 
     def _dispatch_controller_event(self, section: str, event: str, payload: Dict[str, Any]) -> None:
+        """Internal helper for dispatch controller event."""
         try:
             self.after(0, self._handle_controller_event, section, event, payload)
         except Exception as exc:  # pragma: no cover - defensive
@@ -304,16 +313,20 @@ class AudioBarWindow(ctk.CTkToplevel):
             )
 
     def _handle_controller_event(self, section: str, event: str, payload: Dict[str, Any]) -> None:
+        """Internal helper for handle controller event."""
         if section != self._active_section:
             return
 
         if event in {"track_started", "state_changed", "playlist_set"}:
+            # Handle the branch where event is in {'track_started', 'state_changed', 'playlist_set'}.
             self._refresh_from_state(section)
             self._update_status_from_state(section)
         elif event == "stopped":
+            # Handle the branch where event == 'stopped'.
             self._refresh_from_state(section)
             self.status_var.set("Status: Stopped")
         elif event == "playlist_ended":
+            # Handle the branch where event == 'playlist_ended'.
             self._refresh_from_state(section)
             self.status_var.set("Status: Playlist finished")
         elif event == "volume_changed":
@@ -325,9 +338,11 @@ class AudioBarWindow(ctk.CTkToplevel):
         elif event == "continue_changed":
             self.continue_var.set(bool(payload.get("value")))
         elif event == "error":
+            # Handle the branch where event == 'error'.
             message = payload.get("message") or "Playback failed."
             self.status_var.set(f"Error: {message}")
         elif event in {"play_failed", "navigation_failed"}:
+            # Handle the branch where event is in {'play_failed', 'navigation_failed'}.
             message = payload.get("message") or self.controller.get_last_error(section)
             if message:
                 self.status_var.set(f"Error: {message}")
@@ -336,6 +351,7 @@ class AudioBarWindow(ctk.CTkToplevel):
     # Actions
     # ------------------------------------------------------------------
     def _toggle_section(self) -> None:
+        """Toggle section."""
         if not self._section_cycle:
             return
         try:
@@ -351,6 +367,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._refresh_from_state(self._active_section)
 
     def _on_category_selected(self, choice: str) -> None:
+        """Handle category selected."""
         if self._syncing_filters:
             return
         library = getattr(self.controller, "library", None)
@@ -369,6 +386,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         mood_values = ["No mood", *moods] if moods else ["No mood"]
         self._syncing_filters = True
         try:
+            # Keep on category selected resilient if this step fails.
             self.mood_menu.configure(values=mood_values)
             default_mood = resolved_mood or "No mood"
             self.mood_var.set(default_mood)
@@ -379,23 +397,28 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._apply_selected_filters(category=resolved_category, mood=default_mood)
 
     def _on_mood_selected(self, choice: str) -> None:
+        """Handle mood selected."""
         if self._syncing_filters:
             return
         self._apply_selected_filters(mood=choice)
 
     def _on_track_selected(self, choice: str) -> None:
+        """Handle track selected."""
         if choice not in self._playlist_lookup:
             return
         self._selected_track_key = choice
 
     def _on_search_submitted(self, _event: tk.Event | None = None) -> None:
+        """Handle search submitted."""
         self._perform_search()
 
     def _on_search_text_changed(self, _event: tk.Event | None = None) -> None:
+        """Handle search text changed."""
         if not (self.search_var.get() or "").strip():
             self._clear_search_results()
 
     def _perform_search(self) -> None:
+        """Internal helper for perform search."""
         query = (self.search_var.get() or "").strip()
         if not query:
             self._clear_search_results()
@@ -416,11 +439,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             categories = []
 
         for category in categories:
+            # Process each category from categories.
             try:
                 tracks = controller_library.list_tracks(self._active_section, category)
             except KeyError:
                 continue
             for track in tracks:
+                # Process each track from tracks.
                 name = self._format_track_label(track) or os.path.basename(track.get("path", ""))
                 display_name = name or "Track"
                 haystack = f"{display_name.lower()}|{category.lower()}|{str(track.get('path', '')).lower()}"
@@ -430,6 +455,7 @@ class AudioBarWindow(ctk.CTkToplevel):
                 label = base_label
                 suffix = 2
                 while label in seen_labels:
+                    # Keep looping while label is in seen_labels.
                     label = f"{base_label} ({suffix})"
                     suffix += 1
                 seen_labels.add(label)
@@ -472,6 +498,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._keep_search_dropdown_width()
 
     def _on_search_result_selected(self, choice: str) -> None:
+        """Handle search result selected."""
         if choice not in self._search_results_lookup:
             return
         info = self._search_results_lookup.get(choice)
@@ -480,6 +507,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._apply_search_result(info)
 
     def _apply_search_result(self, info: Dict[str, Any]) -> None:
+        """Apply search result."""
         track = info.get("track")
         category = info.get("category")
         mood = (track or {}).get("mood") if isinstance(track, dict) else None
@@ -490,6 +518,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         state = self.controller.get_state(self._active_section) or {}
         current_category = state.get("category")
         if current_category == category:
+            # Handle the branch where current_category == category.
             label = self._find_label_for_identifier(identifier)
             if label:
                 self._set_selected_track_by_label(label)
@@ -517,6 +546,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.controller.set_playlist(self._active_section, playlist, category=category, mood=mood)
 
     def _clear_search_results(self) -> None:
+        """Clear search results."""
         menu = getattr(self, "search_results_menu", None)
         if menu is None:
             return
@@ -527,8 +557,10 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._keep_search_dropdown_width()
 
     def _on_play_clicked(self) -> None:
+        """Handle play clicked."""
         info = self._get_selected_track_info()
         if info:
+            # Continue with this path when info is set.
             identifier = info.get("identifier")
             if identifier:
                 success = self.controller.play(self._active_section, track_id=identifier)
@@ -540,34 +572,42 @@ class AudioBarWindow(ctk.CTkToplevel):
             self._update_status_from_state(self._active_section)
 
     def _on_pause_clicked(self) -> None:
+        """Handle pause clicked."""
         self.controller.pause(self._active_section)
         self.status_var.set("Status: Paused")
 
     def _on_stop_clicked(self) -> None:
+        """Handle stop clicked."""
         self.controller.stop(self._active_section)
         self.status_var.set("Status: Stopped")
 
     def _on_next_clicked(self) -> None:
+        """Handle next clicked."""
         if not self.controller.next(self._active_section):
             self._update_status_from_state(self._active_section)
 
     def _on_prev_clicked(self) -> None:
+        """Handle prev clicked."""
         if not self.controller.previous(self._active_section):
             self._update_status_from_state(self._active_section)
 
     def _on_shuffle_toggle(self) -> None:
+        """Handle shuffle toggle."""
         value = bool(self.shuffle_var.get())
         self.controller.set_shuffle(self._active_section, value)
 
     def _on_loop_toggle(self) -> None:
+        """Handle loop toggle."""
         value = bool(self.loop_var.get())
         self.controller.set_loop(self._active_section, value)
 
     def _on_continue_toggle(self) -> None:
+        """Handle continue toggle."""
         value = bool(self.continue_var.get())
         self.controller.set_continue(self._active_section, value)
 
     def _on_volume_changed(self, value: float) -> None:
+        """Handle volume changed."""
         normalized = max(0.0, min(float(value) / 100.0, 1.0))
         self.volume_value_var.set(f"{int(normalized * 100)}%")
         self.controller.set_volume(self._active_section, normalized)
@@ -576,6 +616,7 @@ class AudioBarWindow(ctk.CTkToplevel):
     # State synchronisation helpers
     # ------------------------------------------------------------------
     def _refresh_from_state(self, section: Optional[str] = None) -> None:
+        """Refresh from state."""
         section = section or self._active_section
         state = self.controller.get_state(section)
         self._refresh_filter_menus(state)
@@ -587,12 +628,14 @@ class AudioBarWindow(ctk.CTkToplevel):
             track = state.get("current_track") or state.get("last_track")
 
         if track:
+            # Continue with this path when track is set.
             label = self._format_track_label(track) or ""
             self._remembered_track_label = (
                 self._truncate_with_suffix(label, self._now_playing_label_max_chars) if label else None
             )
             label = self._find_label_for_track(track)
             if label:
+                # Continue with this path when label is set.
                 self._set_selected_track_by_label(label)
             else:
                 display = self._remembered_track_label or ""
@@ -604,6 +647,7 @@ class AudioBarWindow(ctk.CTkToplevel):
                     self.now_playing_var.set("No tracks available")
                 self._selected_track_key = None
         elif self._playlist_lookup:
+            # Continue with this path when playlist lookup is set.
             if self._selected_track_key not in self._playlist_lookup:
                 first_label = next(iter(self._playlist_lookup))
                 self._set_selected_track_by_label(first_label)
@@ -625,6 +669,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._apply_pending_selection()
 
     def _refresh_filter_menus(self, state: Optional[Dict[str, Any]]) -> None:
+        """Refresh filter menus."""
         library = getattr(self.controller, "library", None)
         if library is None:
             return
@@ -638,6 +683,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         )
         self._syncing_filters = True
         try:
+            # Keep filter menus resilient if this step fails.
             category_values = options.categories or ["No category"]
             mood_values = ["No mood", *options.moods] if options.moods else ["No mood"]
             self.category_menu.configure(values=category_values)
@@ -655,6 +701,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         category: Optional[str] = None,
         mood: Optional[str] = None,
     ) -> None:
+        """Apply selected filters."""
         library = getattr(self.controller, "library", None)
         if library is None:
             return
@@ -689,6 +736,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         )
 
     def _apply_volume(self, value: Any) -> None:
+        """Apply volume."""
         try:
             normalized = max(0.0, min(float(value), 1.0))
         except (TypeError, ValueError):
@@ -698,6 +746,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.volume_value_var.set(f"{int(normalized * 100)}%")
 
     def _update_status_from_state(self, section: str) -> None:
+        """Update status from state."""
         state = self.controller.get_state(section)
         if not state:
             self.status_var.set("Status: Idle")
@@ -713,6 +762,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.status_var.set("Status: Idle")
 
     def _update_button_states(self, state: Dict[str, Any]) -> None:
+        """Update button states."""
         playing = bool(state.get("is_playing"))
         playlist = state.get("playlist") or []
         has_tracks = bool(playlist)
@@ -731,10 +781,12 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.now_playing_menu.configure(state="disabled")
 
     def _update_playlist_menu(self, playlist: list[Dict[str, Any]]) -> None:
+        """Update playlist menu."""
         self._playlist_lookup = {}
         values: list[str] = []
         existing_labels: set[str] = set()
         for index, track in enumerate(playlist):
+            # Process each (index, track) from enumerate(playlist).
             identifier = self._track_identifier(track)
             base_label = self._format_track_label(track) or f"Track {index + 1}"
             label = self._make_dropdown_label(
@@ -751,6 +803,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             values.append(label)
 
         if values:
+            # Continue with this path when values is set.
             self.now_playing_menu.configure(values=values)
             if self._selected_track_key in self._playlist_lookup:
                 self.now_playing_var.set(self._selected_track_key)
@@ -771,6 +824,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             self._selected_track_key = None
 
     def _find_label_for_track(self, track: Dict[str, Any]) -> Optional[str]:
+        """Find label for track."""
         identifier = self._track_identifier(track)
         for label, info in self._playlist_lookup.items():
             if info.get("identifier") == identifier:
@@ -778,6 +832,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         return None
 
     def _find_label_for_identifier(self, identifier: str) -> Optional[str]:
+        """Find label for identifier."""
         if not identifier:
             return None
         for label, info in self._playlist_lookup.items():
@@ -786,6 +841,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         return None
 
     def _set_selected_track_by_label(self, label: str) -> None:
+        """Set selected track by label."""
         if label not in self._playlist_lookup:
             return
         self._selected_track_key = label
@@ -794,11 +850,13 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._keep_now_playing_dropdown_width()
 
     def _get_selected_track_info(self) -> Optional[Dict[str, Any]]:
+        """Return selected track info."""
         if self._selected_track_key is None:
             return None
         return self._playlist_lookup.get(self._selected_track_key)
 
     def _apply_pending_selection(self) -> None:
+        """Apply pending selection."""
         if not self._pending_search_track_id:
             return
         label = self._find_label_for_identifier(self._pending_search_track_id)
@@ -808,6 +866,7 @@ class AudioBarWindow(ctk.CTkToplevel):
 
     @staticmethod
     def _track_identifier(track: Dict[str, Any]) -> str:
+        """Internal helper for track identifier."""
         identifier = track.get("id")
         if identifier:
             return str(identifier)
@@ -818,6 +877,7 @@ class AudioBarWindow(ctk.CTkToplevel):
 
     @staticmethod
     def _format_track_label(track: Dict[str, Any]) -> str:
+        """Format track label."""
         name = track.get("name")
         if isinstance(name, str) and name:
             return name
@@ -832,12 +892,14 @@ class AudioBarWindow(ctk.CTkToplevel):
         existing: set[str],
         max_chars: int,
     ) -> str:
+        """Internal helper for make dropdown label."""
         display = self._truncate_with_suffix(label, max_chars)
         if display not in existing:
             return display
 
         suffix_index = 2
         while True:
+            # Keep looping while True.
             suffix = f" ({suffix_index})"
             display = self._truncate_with_suffix(label, max_chars, suffix=suffix)
             if display not in existing:
@@ -846,6 +908,7 @@ class AudioBarWindow(ctk.CTkToplevel):
 
     @staticmethod
     def _truncate_with_suffix(label: str, max_chars: int, suffix: str = "") -> str:
+        """Internal helper for truncate with suffix."""
         suffix = suffix or ""
         if max_chars <= 0:
             return suffix[:max_chars]
@@ -865,12 +928,15 @@ class AudioBarWindow(ctk.CTkToplevel):
         return truncated + suffix
 
     def _section_button_label(self, section: str) -> str:
+        """Internal helper for section button label."""
         if section == "effects":
             return "Sound"
         return SECTION_TITLES.get(section, section.title())
 
     def _apply_geometry(self) -> None:
+        """Apply geometry."""
         try:
+            # Keep geometry resilient if this step fails.
             self.update_idletasks()
             if self._is_collapsed:
                 target = self._collapse_button or self
@@ -892,9 +958,11 @@ class AudioBarWindow(ctk.CTkToplevel):
             pass
 
     def _toggle_collapsed(self) -> None:
+        """Toggle collapsed."""
         self._set_collapsed(not self._is_collapsed)
 
     def _set_collapsed(self, collapsed: bool) -> None:
+        """Set collapsed."""
         if collapsed == self._is_collapsed:
             return
         self._is_collapsed = collapsed
@@ -910,6 +978,7 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._apply_geometry()
 
     def _update_collapse_button(self) -> None:
+        """Update collapse button."""
         if not self._collapse_button:
             return
         if self._is_collapsed:
@@ -921,7 +990,9 @@ class AudioBarWindow(ctk.CTkToplevel):
     # Window helpers
     # ------------------------------------------------------------------
     def show(self) -> None:
+        """Show the operation."""
         try:
+            # Keep show resilient if this step fails.
             self.deiconify()
             self._apply_geometry()
             self.lift()
@@ -931,9 +1002,11 @@ class AudioBarWindow(ctk.CTkToplevel):
             pass
 
     def _on_destroy_event(self, event: tk.Event) -> None:  # pragma: no cover - UI callback
+        """Handle destroy event."""
         if event.widget is self:
             self._detach_controller_listener()
 
     def _on_close(self) -> None:
+        """Handle close."""
         self._detach_controller_listener()
         self.destroy()

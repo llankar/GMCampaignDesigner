@@ -39,6 +39,7 @@ class _SecondScreenVideoPlayer:
     """Simple video player that renders frames inside a fullscreen CTk window."""
 
     def __init__(self, video_path: str, title: str | None = None) -> None:
+        """Initialize the _SecondScreenVideoPlayer instance."""
         if av is None:
             raise RuntimeError("PyAV is required to play video files.")
 
@@ -62,12 +63,14 @@ class _SecondScreenVideoPlayer:
         self.window.after(0, self._render_next_frame)
 
     def _open_container(self, path: str):
+        """Open container."""
         try:
             return av.open(path)
         except av.AVError as exc:  # pragma: no cover - depends on runtime files
             raise RuntimeError(f"Unable to open video file: {exc}") from exc
 
     def _get_video_stream(self):
+        """Return video stream."""
         stream = next((s for s in self._container.streams if s.type == "video"), None)
         if stream is None:
             self._container.close()
@@ -76,6 +79,7 @@ class _SecondScreenVideoPlayer:
         return stream
 
     def _calculate_frame_delay(self) -> int:
+        """Internal helper for calculate frame delay."""
         rate = None
         average_rate = getattr(self._stream, "average_rate", None)
         if average_rate:
@@ -84,6 +88,7 @@ class _SecondScreenVideoPlayer:
             except (TypeError, ValueError):
                 rate = None
         if not rate:
+            # Handle the branch where rate is unavailable.
             base_rate = getattr(self._stream, "base_rate", None)
             if base_rate:
                 try:
@@ -91,6 +96,7 @@ class _SecondScreenVideoPlayer:
                 except (TypeError, ValueError):
                     rate = None
         if not rate:
+            # Handle the branch where rate is unavailable.
             time_base = getattr(self._stream, "time_base", None)
             if time_base:
                 try:
@@ -103,6 +109,7 @@ class _SecondScreenVideoPlayer:
         return delay
 
     def _select_monitor(self) -> _MonitorBounds:
+        """Select monitor."""
         monitors = _get_monitors()
         if not monitors:
             self._container.close()
@@ -117,6 +124,7 @@ class _SecondScreenVideoPlayer:
         title: str | None,
         monitor: _MonitorBounds,
     ) -> ctk.CTkToplevel:
+        """Build window."""
         win = ctk.CTkToplevel()
         win.title(title or os.path.basename(video_path))
         win.geometry(f"{monitor.width}x{monitor.height}+{monitor.x}+{monitor.y}")
@@ -131,6 +139,7 @@ class _SecondScreenVideoPlayer:
         return win
 
     def _render_next_frame(self) -> None:
+        """Render next frame."""
         if self._stopped:
             return
         try:
@@ -147,6 +156,7 @@ class _SecondScreenVideoPlayer:
         self._after_id = self.window.after(self._frame_delay, self._render_next_frame)
 
     def _display_image(self, image: Image.Image) -> None:
+        """Internal helper for display image."""
         if not self.window.winfo_exists():
             return
         width = max(1, self.window.winfo_width())
@@ -173,10 +183,12 @@ class _SecondScreenVideoPlayer:
         self._image_label.image = photo
 
     def close(self, event=None) -> None:  # noqa: D401 - Tkinter callback signature
+        """Close the operation."""
         if self._stopped:
             return
         self._stopped = True
         if self._after_id and self.window.winfo_exists():
+            # Handle the branch where after ID is set and window.winfo_exists().
             try:
                 self.window.after_cancel(self._after_id)
             except Exception:  # pragma: no cover - depends on event timing

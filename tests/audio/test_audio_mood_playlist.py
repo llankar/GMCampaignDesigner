@@ -1,3 +1,5 @@
+"""Regression tests for audio mood playlist."""
+
 from pathlib import Path
 
 from modules.audio.audio_controller import AudioController
@@ -6,16 +8,19 @@ from modules.audio.ui.filter_selection_resolver import resolve_category_mood_sel
 
 
 def _make_audio_file(base: Path, name: str) -> str:
+    """Internal helper for make audio file."""
     path = base / name
     path.write_bytes(b"fake-audio")
     return str(path)
 
 
 def _new_service(tmp_path: Path) -> AudioLibraryService:
+    """Internal helper for new service."""
     return AudioLibraryService(path=str(tmp_path / "audio_library.json"))
 
 
 def test_list_and_remove_track_are_strict_on_category_and_mood(tmp_path: Path) -> None:
+    """Verify that list and remove track are strict on category and mood."""
     service = _new_service(tmp_path)
     service.add_category("music", "Ambience")
     service.add_mood("music", "Ambience", "calm")
@@ -42,6 +47,7 @@ def test_list_and_remove_track_are_strict_on_category_and_mood(tmp_path: Path) -
 
 
 def test_playlist_stays_coherent_when_switching_mood(tmp_path: Path) -> None:
+    """Verify that playlist stays coherent when switching mood."""
     service = _new_service(tmp_path)
     service.add_category("music", "Ambience")
     service.add_mood("music", "Ambience", "calm")
@@ -70,6 +76,7 @@ def test_playlist_stays_coherent_when_switching_mood(tmp_path: Path) -> None:
 
 
 def test_category_switch_with_incompatible_mood_falls_back_to_full_category_playlist(tmp_path: Path) -> None:
+    """Verify that category switch with incompatible mood falls back to full category playlist."""
     service = _new_service(tmp_path)
     service.add_category("music", "Ambience")
     service.add_category("music", "Battle")

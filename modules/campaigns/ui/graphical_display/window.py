@@ -1,3 +1,5 @@
+"""Window for campaign."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -9,6 +11,7 @@ from .panel import CampaignGraphPanel
 
 class CampaignGraphWindow(ctk.CTkToplevel):
     def __init__(self, master, *, campaign_wrapper=None, scenario_wrapper=None):
+        """Initialize the CampaignGraphWindow instance."""
         super().__init__(master)
         self.title("Campaign Overview")
         self.geometry("1440x940")
@@ -27,6 +30,7 @@ class CampaignGraphWindow(ctk.CTkToplevel):
         self.bind("<Destroy>", self._on_destroy, add="+")
 
     def _on_destroy(self, _event=None) -> None:
+        """Handle destroy."""
         unsub = getattr(self, "_theme_listener_unsub", None)
         if callable(unsub):
             unsub()
@@ -36,6 +40,7 @@ class CampaignGraphWindow(ctk.CTkToplevel):
             parent._campaign_graph_window = None
 
     def _on_theme_changed(self, _theme_key: str) -> None:
+        """Handle theme changed."""
         self.configure(fg_color=theme_manager.get_tokens().get("panel_bg", "#111c2a"))
         panel = getattr(self, "panel", None)
         if panel is not None and hasattr(panel, "refresh_theme"):

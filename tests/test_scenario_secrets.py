@@ -1,3 +1,5 @@
+"""Regression tests for scenario secrets."""
+
 import sqlite3
 import sys
 import types
@@ -5,39 +7,49 @@ import types
 
 class _CTkWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _CTkWidget instance."""
         pass
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         pass
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         pass
 
     def configure(self, *args, **kwargs):
+        """Handle configure."""
         pass
 
 
 class _CTkTextbox(_CTkWidget):
     def delete(self, *args, **kwargs):
+        """Delete the operation."""
         pass
 
     def insert(self, *args, **kwargs):
+        """Handle insert."""
         pass
 
 
 class _CTkToplevel(_CTkWidget):
     def destroy(self):
+        """Handle destroy."""
         pass
 
 
 class _StringVar:
     def __init__(self, value=""):
+        """Initialize the _StringVar instance."""
         self._value = value
 
     def get(self):
+        """Return the operation."""
         return self._value
 
     def set(self, value):
+        """Set the operation."""
         self._value = value
 
 
@@ -61,22 +73,27 @@ from modules.scenarios import scenario_builder_wizard as sbw
 
 class _DummyStep:
     def save_state(self, state):
+        """Save state."""
         return True
 
 
 class _DummyButton:
     def __init__(self):
+        """Initialize the _DummyButton instance."""
         self._state = "normal"
 
     def cget(self, key):
+        """Handle cget."""
         return self._state if key == "state" else None
 
     def configure(self, **kwargs):
+        """Handle configure."""
         if "state" in kwargs:
             self._state = kwargs["state"]
 
 
 def test_finish_persists_secret_aliases(tmp_path, monkeypatch):
+    """Verify that finish persists secret aliases."""
     db_path = tmp_path / "campaign.db"
 
     conn = sqlite3.connect(db_path)
@@ -120,6 +137,7 @@ def test_finish_persists_secret_aliases(tmp_path, monkeypatch):
 
     conn = sqlite3.connect(db_path)
     try:
+        # Keep test finish persists secret aliases resilient if this step fails.
         columns = {row[1] for row in conn.execute("PRAGMA table_info(scenarios)")}
     finally:
         conn.close()

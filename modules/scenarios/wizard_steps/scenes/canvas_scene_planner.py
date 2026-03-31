@@ -1,3 +1,5 @@
+"""Utilities for scenes canvas scene planner."""
+
 import copy
 import tkinter as tk
 
@@ -13,6 +15,7 @@ from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import normalise_
 
 class InlineSceneEditor(ctk.CTkFrame):
     def __init__(self, master, scene, *, scene_types, on_save, on_cancel, width=None, height=None):
+        """Initialize the InlineSceneEditor instance."""
         super().__init__(master, fg_color="#0f172a", corner_radius=12, width=width, height=height)
         self.on_save = on_save
         self.on_cancel = on_cancel
@@ -46,6 +49,7 @@ class InlineSceneEditor(ctk.CTkFrame):
         ctk.CTkButton(row, text="Save", command=self._on_save).grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
     def _on_save(self):
+        """Handle save."""
         self.on_save(
             {
                 "Title": self.title_var.get().strip(),
@@ -55,6 +59,7 @@ class InlineSceneEditor(ctk.CTkFrame):
         )
 
     def _on_cancel(self):
+        """Handle cancel."""
         self.on_cancel()
 
 
@@ -62,6 +67,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
     SCENE_TYPES = ["Auto", "Setup", "Choice", "Investigation", "Combat", "Outcome", "Social", "Travel", "Downtime"]
 
     def __init__(self, master, *, entity_selector_callbacks=None):
+        """Initialize the CanvasScenePlanner instance."""
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -94,14 +100,17 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self._update_buttons()
 
     def load_scenes(self, scenes):
+        """Load scenes."""
         self.scenes = [copy.deepcopy(scene) for scene in (scenes or [])]
         self.selected_index = 0 if self.scenes else None
         self.canvas.set_scenes(self.scenes, self.selected_index)
         self._update_buttons()
 
     def export_scenes(self):
+        """Export scenes."""
         exported = []
         for scene in self.scenes:
+            # Process each scene from scenes.
             record = copy.deepcopy(scene)
             for entity_field in SCENE_ENTITY_FIELDS:
                 if entity_field in record:
@@ -110,6 +119,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
         return exported
 
     def add_scene(self):
+        """Handle add scene."""
         scene = {"Title": f"Scene {len(self.scenes) + 1}", "Summary": "", "SceneType": "", "LinkData": [], "NextScenes": [], "_canvas": {}}
         self._assign_default_position(scene)
         self.scenes.append(scene)
@@ -118,6 +128,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self._update_buttons()
 
     def duplicate_scene(self):
+        """Handle duplicate scene."""
         if self.selected_index is None or self.selected_index >= len(self.scenes):
             return
         source = copy.deepcopy(self.scenes[self.selected_index])
@@ -130,6 +141,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self._update_buttons()
 
     def remove_scene(self):
+        """Remove scene."""
         if self.selected_index is None or self.selected_index >= len(self.scenes):
             return
         removed = self.scenes.pop(self.selected_index)
@@ -143,16 +155,19 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self._update_buttons()
 
     def _on_canvas_select(self, index):
+        """Handle canvas select."""
         self.selected_index = index if isinstance(index, int) and 0 <= index < len(self.scenes) else None
         self.canvas.set_scenes(self.scenes, self.selected_index)
         self._update_buttons()
 
     def _on_canvas_move(self, index, x, y):
+        """Handle canvas move."""
         if index is None or index >= len(self.scenes):
             return
         self.scenes[index].setdefault("_canvas", {}).update({"x": x, "y": y})
 
     def _open_inline_scene_editor(self, index):
+        """Open inline scene editor."""
         if index is None or index >= len(self.scenes):
             return
         bbox = self.canvas.get_card_bbox(index)
@@ -174,6 +189,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self._inline_editor = editor
 
     def _apply_inline_scene_update(self, index, data):
+        """Apply inline scene update."""
         scene = self.scenes[index]
         scene["Title"] = data.get("Title") or scene.get("Title") or f"Scene {index + 1}"
         scene["Summary"] = data.get("Summary", "")
@@ -182,11 +198,13 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _close_inline_scene_editor(self):
+        """Close inline scene editor."""
         if self._inline_editor is not None:
             self._inline_editor.destroy()
             self._inline_editor = None
 
     def _show_canvas_menu(self, event, index):
+        """Show canvas menu."""
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="Add Scene", command=self.add_scene)
         if index is not None:
@@ -195,11 +213,13 @@ class CanvasScenePlanner(ctk.CTkFrame):
             menu.add_command(label="Duplicate", command=self.duplicate_scene)
             menu.add_command(label="Remove", command=self.remove_scene)
         try:
+            # Keep canvas menu resilient if this step fails.
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
 
     def _link_scenes_via_drag(self, source_index, target_index):
+        """Internal helper for link scenes via drag."""
         if source_index is None or target_index is None:
             return
         if source_index >= len(self.scenes) or target_index >= len(self.scenes):
@@ -215,6 +235,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _on_add_entity_to_scene(self, index, entity_type):
+        """Handle add entity to scene."""
         if index is None or index >= len(self.scenes):
             return
         selector = self.entity_selector_callbacks.get(entity_type)
@@ -230,11 +251,13 @@ class CanvasScenePlanner(ctk.CTkFrame):
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
     def _assign_default_position(self, scene):
+        """Internal helper for assign default position."""
         scene.setdefault("_canvas", {})
         scene["_canvas"].setdefault("x", 180 + len(self.scenes) * 40)
         scene["_canvas"].setdefault("y", 160 + len(self.scenes) * 40)
 
     def _update_buttons(self):
+        """Update buttons."""
         state = "normal" if self.selected_index is not None else "disabled"
         self.dup_scene_btn.configure(state=state)
         self.remove_scene_btn.configure(state=state)

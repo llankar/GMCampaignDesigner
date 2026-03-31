@@ -1,3 +1,4 @@
+"""Popover UI for event quick add."""
 from datetime import date, datetime, time, timedelta
 from tkinter import colorchooser
 
@@ -11,6 +12,7 @@ class QuickAddPopover(ctk.CTkToplevel):
     """Lightweight quick-create dialog for calendar events."""
 
     def __init__(self, master, *, initial_date=None, initial_start_time=None, on_create=None, on_more_options=None):
+        """Initialize the QuickAddPopover instance."""
         super().__init__(master)
         self.title("Ajout rapide")
         self.geometry("420x360")
@@ -29,6 +31,7 @@ class QuickAddPopover(ctk.CTkToplevel):
         self.grab_set()
 
     def _build_ui(self):
+        """Build UI."""
         self.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(self, text="Title").grid(row=0, column=0, padx=12, pady=(16, 8), sticky="w")
@@ -70,11 +73,13 @@ class QuickAddPopover(ctk.CTkToplevel):
 
     @staticmethod
     def _normalize_time(value):
+        """Normalize time."""
         if not value:
             return "09:00"
         if isinstance(value, time):
             return value.strftime("%H:%M")
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             text = value.strip()
             if len(text) == 5 and text[2] == ":":
                 return text
@@ -82,6 +87,7 @@ class QuickAddPopover(ctk.CTkToplevel):
         return "09:00"
 
     def _prefill_values(self):
+        """Internal helper for prefill values."""
         self.date_entry.insert(0, self._initial_date.isoformat())
         self.start_entry.insert(0, self._initial_start_time)
         self.end_entry.insert(0, self._suggest_end_time(self._initial_start_time))
@@ -90,6 +96,7 @@ class QuickAddPopover(ctk.CTkToplevel):
 
     @staticmethod
     def _suggest_end_time(start_text):
+        """Internal helper for suggest end time."""
         try:
             parsed = datetime.strptime(start_text, "%H:%M")
             return (parsed + timedelta(hours=1)).strftime("%H:%M")
@@ -97,6 +104,7 @@ class QuickAddPopover(ctk.CTkToplevel):
             return "10:00"
 
     def _collect_payload(self):
+        """Collect payload."""
         return {
             "title": self.title_entry.get().strip(),
             "date": self.date_entry.get().strip(),
@@ -108,14 +116,17 @@ class QuickAddPopover(ctk.CTkToplevel):
         }
 
     def _emit_create(self):
+        """Internal helper for emit create."""
         if callable(self._on_create):
             self._on_create(self._collect_payload())
         self.destroy()
 
     def _open_more_options(self):
+        """Open more options."""
         initial_values = self._collect_payload()
 
         def _save_from_editor(payload):
+            """Save from editor."""
             if callable(self._on_more_options):
                 self._on_more_options(payload)
             self.destroy()
@@ -123,6 +134,7 @@ class QuickAddPopover(ctk.CTkToplevel):
         EventEditorDialog(self, initial_values=initial_values, on_save=_save_from_editor)
 
     def _choose_color(self):
+        """Internal helper for choose color."""
         current = normalize_hex_color(self.color_value, fallback="#4F8EF7")
         selection = colorchooser.askcolor(color=current, parent=self)
         color = None
@@ -132,6 +144,7 @@ class QuickAddPopover(ctk.CTkToplevel):
         self._update_color_button()
 
     def _update_color_button(self):
+        """Update color button."""
         self.color_button.configure(
             text=self.color_value,
             fg_color=self.color_value,

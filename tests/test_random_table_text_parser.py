@@ -9,6 +9,7 @@ from modules.scenarios.importers.random_table_text_parser import (
 
 
 def test_accepts_common_range_patterns():
+    """Verify that accepts common range patterns."""
     raw_text = """
     1-2 Light rain begins
     03–04: Thunder cracks overhead
@@ -25,6 +26,7 @@ def test_accepts_common_range_patterns():
 
 
 def test_accepts_single_values_with_varied_separators():
+    """Verify that accepts single values with varied separators."""
     raw_text = """
     7 Quiet street
     8. Crowd gathers
@@ -43,6 +45,7 @@ def test_accepts_single_values_with_varied_separators():
 
 
 def test_rejects_invalid_lines():
+    """Verify that rejects invalid lines."""
     with pytest.raises(RandomTableImportError):
         parse_random_table_text("not a valid entry")
 

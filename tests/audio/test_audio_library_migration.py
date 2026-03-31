@@ -1,3 +1,5 @@
+"""Regression tests for audio library migration."""
+
 import json
 from pathlib import Path
 
@@ -5,6 +7,7 @@ from modules.audio.library.repository import AudioLibraryRepository
 
 
 def test_repository_migrates_legacy_tracks_and_adds_last_mood_setting(tmp_path: Path) -> None:
+    """Verify that repository migrates legacy tracks and adds last mood setting."""
     audio_a = tmp_path / "legacy-a.mp3"
     audio_b = tmp_path / "legacy-b.mp3"
     audio_a.write_bytes(b"a")

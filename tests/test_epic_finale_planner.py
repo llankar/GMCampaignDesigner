@@ -1,3 +1,5 @@
+"""Regression tests for epic finale planner."""
+
 import random
 import sys
 import types
@@ -5,33 +7,42 @@ import types
 
 class _StubWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _StubWidget instance."""
         pass
 
     def grid(self, *args, **kwargs):  # pragma: no cover - defensive stub
+        """Handle grid."""
         return None
 
     def pack(self, *args, **kwargs):  # pragma: no cover - defensive stub
+        """Pack the operation."""
         return None
 
     def place(self, *args, **kwargs):  # pragma: no cover - defensive stub
+        """Handle place."""
         return None
 
     def configure(self, *args, **kwargs):  # pragma: no cover - defensive stub
+        """Handle configure."""
         return None
 
 
 class _StubVariable:
     def __init__(self, value=""):
+        """Initialize the _StubVariable instance."""
         self._value = value
 
     def get(self):
+        """Return the operation."""
         return self._value
 
     def set(self, value):  # pragma: no cover - defensive stub
+        """Set the operation."""
         self._value = value
 
 
 def _ensure_customtkinter_stub():
+    """Ensure customtkinter stub."""
     if "customtkinter" in sys.modules:
         return
 
@@ -52,6 +63,7 @@ def _ensure_customtkinter_stub():
 
 
 def _ensure_pil_stub():
+    """Ensure pil stub."""
     if "PIL" in sys.modules:
         return
 
@@ -59,27 +71,34 @@ def _ensure_pil_stub():
 
     class _StubImage:
         def __enter__(self):
+            """Enter the context manager scope."""
             return self
 
         def __exit__(self, *exc):
+            """Exit the context manager scope."""
             return None
 
         def resize(self, *_args, **_kwargs):  # pragma: no cover - defensive stub
+            """Handle resize."""
             return self
 
         def copy(self):  # pragma: no cover - defensive stub
+            """Copy the operation."""
             return self
 
     class _StubImageModule(types.SimpleNamespace):
         def __init__(self):
+            """Initialize the _StubImageModule instance."""
             super().__init__()
             self.Resampling = types.SimpleNamespace(LANCZOS="LANCZOS")
             self.LANCZOS = "LANCZOS"
 
         def new(self, *_args, **_kwargs):  # pragma: no cover - defensive stub
+            """Handle new."""
             return _StubImage()
 
         def open(self, *_args, **_kwargs):  # pragma: no cover - defensive stub
+            """Open the operation."""
             return _StubImage()
 
     image_module = _StubImageModule()
@@ -109,12 +128,14 @@ _ensure_pil_stub()
 
 
 def _ensure_requests_stub():
+    """Ensure requests stub."""
     if "requests" in sys.modules:
         return
 
     requests_module = types.ModuleType("requests")
 
     def _stub_method(*_args, **_kwargs):  # pragma: no cover - defensive stub
+        """Internal helper for stub method."""
         raise RuntimeError("Stubbed requests method accessed")
 
     for name in ("get", "post", "put", "delete", "head", "patch"):
@@ -127,6 +148,7 @@ _ensure_requests_stub()
 
 
 def _ensure_winsound_stub():
+    """Ensure winsound stub."""
     if "winsound" in sys.modules:
         return
 
@@ -144,6 +166,7 @@ from modules.scenarios import epic_finale_planner
 
 
 def test_scenario_guidance_highlights_callback_and_escalation():
+    """Verify that scenario guidance highlights callback and escalation."""
     step = epic_finale_planner.FinaleBlueprintStep.__new__(
         epic_finale_planner.FinaleBlueprintStep
     )
@@ -188,6 +211,7 @@ def test_scenario_guidance_highlights_callback_and_escalation():
 
 
 def test_new_climax_structures_drive_scene_generation():
+    """Verify that new climax structures drive scene generation."""
     step = epic_finale_planner.FinaleBlueprintStep.__new__(
         epic_finale_planner.FinaleBlueprintStep
     )
@@ -212,6 +236,7 @@ def test_new_climax_structures_drive_scene_generation():
 
 
 def test_escalation_summary_and_secrets_alignment():
+    """Verify that escalation summary and secrets alignment."""
     step = epic_finale_planner.FinaleBlueprintStep.__new__(
         epic_finale_planner.FinaleBlueprintStep
     )
@@ -235,6 +260,7 @@ def test_escalation_summary_and_secrets_alignment():
 
 
 def test_gm_guidance_surfaces_entity_secrets_and_motivations():
+    """Verify that GM guidance surfaces entity secrets and motivations."""
     step = epic_finale_planner.FinaleBlueprintStep.__new__(
         epic_finale_planner.FinaleBlueprintStep
     )
@@ -285,6 +311,7 @@ def test_gm_guidance_surfaces_entity_secrets_and_motivations():
 
 
 def test_random_rotation_cycles_entities_per_scene():
+    """Verify that random rotation cycles entities per scene."""
     step = epic_finale_planner.FinaleBlueprintStep.__new__(
         epic_finale_planner.FinaleBlueprintStep
     )

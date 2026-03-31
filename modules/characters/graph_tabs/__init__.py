@@ -1,3 +1,5 @@
+"""Graph Tabs package."""
+
 from .model import (
     build_default_tab,
     ensure_graph_tabs,

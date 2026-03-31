@@ -1,7 +1,10 @@
+"""Regression tests for character draft payload normalizer."""
+
 from modules.pcs.character_creation.storage.payload_normalizer import normalize_draft_payload_for_form
 
 
 def test_normalizer_maps_nested_equipment_to_flat_form_fields():
+    """Verify that normalizer maps nested equipment to flat form fields."""
     payload = {
         "name": "Ayla",
         "equipment": {"weapon": "Dague", "armor": "Manteau", "utility": "Grimoire"},
@@ -19,6 +22,7 @@ def test_normalizer_maps_nested_equipment_to_flat_form_fields():
 
 
 def test_normalizer_reads_legacy_equipement_keys():
+    """Verify that normalizer reads legacy equipement keys."""
     payload = {
         "equipement": {"weapon": "Arc", "armor": "Cuir", "utility": "Trousse"},
         "equipement_pe": {"weapon": 1, "armor": 2, "utility": 1},
@@ -35,6 +39,7 @@ def test_normalizer_reads_legacy_equipement_keys():
 
 
 def test_normalizer_recomputes_prowess_points_from_options():
+    """Verify that normalizer recomputes prowess points from options."""
     payload = {
         "feats": [
             {

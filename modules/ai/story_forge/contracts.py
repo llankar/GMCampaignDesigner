@@ -1,3 +1,4 @@
+"""Contracts for story forge."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -31,6 +32,7 @@ class StoryForgeResponse:
     raw_steps: dict[str, Any] = field(default_factory=dict)
 
     def to_scenario_payload(self) -> dict[str, Any]:
+        """Handle to scenario payload."""
         payload = {
             "Title": self.title,
             "Summary": self.summary,

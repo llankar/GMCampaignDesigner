@@ -1,3 +1,5 @@
+"""Utilities for second screen display."""
+
 import os
 import json
 import tkinter as tk
@@ -18,6 +20,7 @@ log_module_import(__name__)
 
 @log_function
 def show_entity_on_second_screen(item, title, fields):
+    """Show entity on second screen."""
     log_info(f"Showing entity on second screen: {title}", func_name="show_entity_on_second_screen")
     """Open a fullscreen window on the second monitor displaying selected fields of an entity.
 
@@ -45,11 +48,13 @@ def show_entity_on_second_screen(item, title, fields):
     # Optional portrait at top if requested
     portrait_label = None
     if any(f.lower() == "portrait" for f in fields):
+        # Handle the branch where any((f.lower() == 'portrait' for f in fields)).
         portrait_value = item.get("Portrait", "")
         portrait_rel = primary_portrait(portrait_value)
         portrait_abs = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if portrait_abs:
             try:
+                # Keep entity on second screen resilient if this step fails.
                 img = Image.open(portrait_abs)
                 max_w = min(sw - 120, 800)
                 max_h = min(sh // 3, 400)
@@ -88,9 +93,11 @@ def show_entity_on_second_screen(item, title, fields):
     body_window = canvas.create_window((0, 0), window=body, anchor="nw")
 
     def _update_scroll_region(event):
+        """Update scroll region."""
         canvas.configure(scrollregion=canvas.bbox("all"))
 
     def _resize_body(event):
+        """Internal helper for resize body."""
         canvas.itemconfig(body_window, width=event.width)
 
     body.bind("<Configure>", _update_scroll_region)
@@ -113,6 +120,7 @@ def show_entity_on_second_screen(item, title, fields):
         return "break"
 
     def _focus_canvas(_event):
+        """Internal helper for focus canvas."""
         canvas.focus_set()
 
     def _bind_mousewheel(widget):
@@ -148,8 +156,10 @@ def show_entity_on_second_screen(item, title, fields):
             return []
         # Stored as {"Scenes": [...]} or JSON string? handle both
         if isinstance(raw_scenes, str):
+            # Handle the branch where isinstance(raw_scenes, str).
             stripped = raw_scenes.strip()
             if stripped.startswith("{") or stripped.startswith("["):
+                # Handle the branch where stripped.startswith('{') or stripped.startswith('[').
                 try:
                     decoded = json.loads(stripped)
                 except json.JSONDecodeError:
@@ -161,6 +171,7 @@ def show_entity_on_second_screen(item, title, fields):
             # fall back to treating as single text scene
             return [raw_scenes]
         if isinstance(raw_scenes, dict):
+            # Handle the branch where isinstance(raw_scenes, dict).
             if isinstance(raw_scenes.get("Scenes"), list):
                 return raw_scenes.get("Scenes")
             # Sometimes scenes payload is a mapping representing one scene
@@ -170,6 +181,7 @@ def show_entity_on_second_screen(item, title, fields):
         return [raw_scenes]
 
     def _coerce_name_list(value):
+        """Coerce name list."""
         if value is None:
             return []
         if isinstance(value, (list, tuple, set)):
@@ -181,10 +193,13 @@ def show_entity_on_second_screen(item, title, fields):
         return parts or [text.strip()]
 
     def _coerce_scene_text(value):
+        """Coerce scene text."""
         value = _decode_longtext_payload(value)
         if isinstance(value, list):
+            # Handle the branch where isinstance(value, list).
             rendered_parts = []
             for part in value:
+                # Process each part from value.
                 part = _decode_longtext_payload(part)
                 if isinstance(part, dict):
                     rendered_parts.append(format_multiline_text(part))
@@ -196,6 +211,7 @@ def show_entity_on_second_screen(item, title, fields):
         return format_multiline_text(value) if value else ""
 
     def _render_scenes_section(parent, payload):
+        """Render scenes section."""
         scenes = _normalise_scene_entries(payload)
         if not scenes:
             return False
@@ -211,12 +227,14 @@ def show_entity_on_second_screen(item, title, fields):
         ).pack(anchor="w", pady=(0, 6))
 
         for idx, raw_scene in enumerate(scenes, start=1):
+            # Process each (idx, raw_scene) from enumerate(scenes, start=1).
             scene = raw_scene if isinstance(raw_scene, dict) else {"Text": raw_scene}
 
             # Heading
             title = ""
             for key in ("Title", "Scene", "Name", "Heading"):
                 if scene.get(key):
+                    # Handle the branch where scene.get(key).
                     title = str(scene.get(key)).strip()
                     if title:
                         break
@@ -235,6 +253,7 @@ def show_entity_on_second_screen(item, title, fields):
             body_text = ""
             for key in ("Text", "Summary", "Description", "Body", "Notes", "Gist"):
                 if scene.get(key):
+                    # Handle the branch where scene.get(key).
                     body_text = _coerce_scene_text(scene.get(key))
                     if body_text:
                         break
@@ -252,6 +271,7 @@ def show_entity_on_second_screen(item, title, fields):
             # Related entities (NPCs, Places, etc.)
             related_fields = []
             for label, key in (("NPCs", "NPCs"), ("Creatures", "Creatures"), ("Places", "Places"), ("Maps", "Maps")):
+                # Process each (label, key) while updating scenes section.
                 names = _coerce_name_list(scene.get(key))
                 if names:
                     related_fields.append((label, names))
@@ -270,6 +290,7 @@ def show_entity_on_second_screen(item, title, fields):
 
     # Render each requested field (skip Portrait which we handled above)
     for field in fields:
+        # Process each field from fields.
         if field.lower() == "portrait":
             continue
         val = item.get(field, "")

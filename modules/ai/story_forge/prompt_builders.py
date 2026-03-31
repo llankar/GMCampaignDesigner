@@ -1,3 +1,5 @@
+"""Helpers for building story forge prompts."""
+
 from __future__ import annotations
 
 import json
@@ -12,6 +14,7 @@ SYSTEM_PROMPT = (
 
 
 def build_rewrite_options_prompt(request: StoryForgeRequest) -> str:
+    """Build rewrite options prompt."""
     context = {
         "campaign": {
             "name": request.campaign_name,
@@ -34,6 +37,7 @@ def build_rewrite_options_prompt(request: StoryForgeRequest) -> str:
 
 
 def build_entity_options_prompt(request: StoryForgeRequest, selected_option: dict) -> str:
+    """Build entity options prompt."""
     context = {
         "selected_option": selected_option,
         "entity_catalog": request.entity_catalog,
@@ -46,6 +50,7 @@ def build_entity_options_prompt(request: StoryForgeRequest, selected_option: dic
 
 
 def build_full_draft_prompt(request: StoryForgeRequest, selected_option: dict, entities: dict) -> str:
+    """Build full draft prompt."""
     context = {
         "selected_option": selected_option,
         "entities": entities,

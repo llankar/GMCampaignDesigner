@@ -1,3 +1,5 @@
+"""Editor helpers for character graph."""
+
 import json
 import math
 import os
@@ -72,6 +74,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         *args,
         **kwargs,
     ):
+        """Initialize the CharacterGraphEditor instance."""
         super().__init__(master, *args, **kwargs)
         self.selected_shape = None
         self.link_canvas_ids = {}
@@ -195,15 +198,19 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._refresh_tab_selector()
 
     def _is_node_tag(self, tag):
+        """Return whether node tag."""
         return tag.startswith(NODE_TAG_PREFIXES)
 
     def _extract_node_tag(self, tags):
+        """Extract node tag."""
         return next((t for t in tags if self._is_node_tag(t)), None)
 
     def _get_node_by_tag(self, tag):
+        """Return node by tag."""
         return next((node for node in self.graph["nodes"] if node.get("tag") == tag), None)
 
     def on_toggle_collapse(self, event):
+        """Handle toggle collapse."""
         item = self.canvas.find_withtag("current")
         if not item:
             return "break"
@@ -221,6 +228,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return "break"
 
     def _add_node_to_active_tab(self, tag):
+        """Internal helper for add node to active tab."""
         active_tab = get_active_tab(self.graph)
         subset = active_tab.get("subsetDefinition") or {}
         if subset.get("mode") == "all":
@@ -248,6 +256,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return text.lower()
 
     def _normalize_entity_key(self, entity_type, entity_name):
+        """Normalize entity key."""
         return (entity_type, self._normalize_entity_name(entity_name))
 
     def _find_tag_for_entity(self, tag_lookup, entity_type, entity_name):
@@ -258,6 +267,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return tag
         # Fallback: partial match either way (covers extra descriptors).
         for (etype, key_norm), candidate_tag in tag_lookup.items():
+            # Process each ((etype, key_norm), candidate_tag) from tag_lookup.items().
             if etype != entity_type:
                 continue
             if norm.startswith(key_norm) or key_norm.startswith(norm):
@@ -265,6 +275,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return None
 
     def _get_entity_record(self, entity_type, entity_name):
+        """Return entity record."""
         if not entity_name:
             return None
         records = self.entity_records.get(entity_type, {})
@@ -280,12 +291,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return None
 
     def _refresh_entity_records(self, entity_type):
+        """Refresh entity records."""
         wrapper = self.entity_wrappers.get(entity_type)
         if not wrapper:
             return
         records = {}
         normalized = {}
         for item in wrapper.load_items():
+            # Process each item from wrapper.load_items().
             name = item.get("Name")
             if not name:
                 continue
@@ -297,6 +310,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.entity_records_normalized[entity_type] = normalized
 
     def _entity_type_to_table(self, entity_type):
+        """Internal helper for entity type to table."""
         if entity_type == "npc":
             return "npcs"
         if entity_type == "pc":
@@ -304,31 +318,37 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return None
 
     def _load_entity_wrapper(self, entity_type):
+        """Load entity wrapper."""
         table = self._entity_type_to_table(entity_type)
         if not table:
             return None
         return GenericModelWrapper(table)
 
     def _load_entity_record_from_db(self, entity_type, entity_name):
+        """Load entity record from DB."""
         wrapper = self._load_entity_wrapper(entity_type)
         if not wrapper:
             return None
         return wrapper.load_item_by_key(entity_name)
 
     def _save_entity_record(self, entity_type, record):
+        """Save entity record."""
         wrapper = self._load_entity_wrapper(entity_type)
         if not wrapper:
             return
         wrapper.save_item(record)
         if isinstance(record, dict):
+            # Handle the branch where isinstance(record, dict).
             name = record.get("Name")
             if name:
+                # Continue with this path when name is set.
                 self.entity_records.setdefault(entity_type, {})[name] = record
                 norm = self._normalize_entity_name(name)
                 if norm:
                     self.entity_records_normalized.setdefault(entity_type, {})[norm] = record
 
     def _get_node_entity_info(self, tag):
+        """Return node entity info."""
         node = self._get_node_by_tag(tag)
         if not node:
             return None
@@ -339,6 +359,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return entity_type, entity_name
 
     def _normalize_links_list(self, record):
+        """Normalize links list."""
         if not isinstance(record, dict):
             return []
         links = record.get("Links")
@@ -347,10 +368,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return []
 
     def _upsert_link_entry(self, record, target_type, target_name, label, arrow_mode):
+        """Internal helper for upsert link entry."""
         if not isinstance(record, dict):
             return False
         links = self._normalize_links_list(record)
         for link in links:
+            # Process each link from links.
             if not isinstance(link, dict):
                 continue
             if (
@@ -358,6 +381,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 and link.get("target_name") == target_name
                 and link.get("label") == label
             ):
+                # Handle this branch separately before continuing.
                 if arrow_mode and link.get("arrow_mode") != arrow_mode:
                     link["arrow_mode"] = arrow_mode
                     record["Links"] = links
@@ -374,6 +398,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return True
 
     def _remove_link_entry(self, record, target_type, target_name, label):
+        """Remove link entry."""
         if not isinstance(record, dict):
             return False
         links = self._normalize_links_list(record)
@@ -382,6 +407,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         new_links = []
         removed = False
         for link in links:
+            # Process each link from links.
             if not isinstance(link, dict):
                 new_links.append(link)
                 continue
@@ -398,6 +424,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return removed
 
     def _persist_link_to_entities(self, link):
+        """Persist link to entities."""
         node1 = self._get_node_entity_info(link.get("node1_tag"))
         node2 = self._get_node_entity_info(link.get("node2_tag"))
         if not node1 or not node2:
@@ -408,6 +435,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         arrow_mode = link.get("arrow_mode") or "both"
         record1 = self._load_entity_record_from_db(entity_type1, entity_name1)
         if record1:
+            # Continue with this path when record1 is set.
             changed = self._upsert_link_entry(
                 record1,
                 entity_type2,
@@ -419,6 +447,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self._save_entity_record(entity_type1, record1)
         record2 = self._load_entity_record_from_db(entity_type2, entity_name2)
         if record2:
+            # Continue with this path when record2 is set.
             changed = self._upsert_link_entry(
                 record2,
                 entity_type1,
@@ -430,6 +459,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self._save_entity_record(entity_type2, record2)
 
     def _remove_link_from_entities(self, link):
+        """Remove link from entities."""
         node1 = self._get_node_entity_info(link.get("node1_tag"))
         node2 = self._get_node_entity_info(link.get("node2_tag"))
         if not node1 or not node2:
@@ -439,6 +469,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         label = link.get("text") or ""
         record1 = self._load_entity_record_from_db(entity_type1, entity_name1)
         if record1:
+            # Continue with this path when record1 is set.
             removed = self._remove_link_entry(
                 record1,
                 entity_type2,
@@ -449,6 +480,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self._save_entity_record(entity_type1, record1)
         record2 = self._load_entity_record_from_db(entity_type2, entity_name2)
         if record2:
+            # Continue with this path when record2 is set.
             removed = self._remove_link_entry(
                 record2,
                 entity_type1,
@@ -459,8 +491,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self._save_entity_record(entity_type2, record2)
 
     def _rebuild_links_from_entities(self):
+        """Internal helper for rebuild links from entities."""
         tag_lookup = {}
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -474,6 +508,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         rebuilt_links = []
         seen = set()
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -485,6 +520,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             if not record:
                 continue
             for link in self._normalize_links_list(record):
+                # Process each link from _normalize_links_list(record).
                 if not isinstance(link, dict):
                     continue
                 target_type = link.get("target_type")
@@ -506,6 +542,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.graph["links"] = rebuilt_links
 
     def _link_key(self, link):
+        """Internal helper for link key."""
         if not isinstance(link, dict):
             return None
         tag1 = link.get("node1_tag")
@@ -516,8 +553,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return tuple(sorted((tag1, tag2))) + (label,)
 
     def _merge_links_from_entities(self):
+        """Merge links from entities."""
         tag_lookup = {}
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -538,6 +577,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         }
         new_links = []
         for node in self.graph.get("nodes", []):
+            # Process each node from graph.get('nodes', []).
             if not isinstance(node, dict):
                 continue
             entity_type = node.get("entity_type")
@@ -549,6 +589,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             if not record:
                 continue
             for link in self._normalize_links_list(record):
+                # Process each link from _normalize_links_list(record).
                 if not isinstance(link, dict):
                     continue
                 target_type = link.get("target_type")
@@ -574,6 +615,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return False
 
     def _get_entity_opener(self, entity_type):
+        """Return entity opener."""
         if entity_type == "pc":
             return pc_opener.open_pc_editor_window
         if entity_type == "villain":
@@ -581,6 +623,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         return npc_opener.open_npc_editor_window
 
     def _on_zoom(self, event):
+        """Handle zoom."""
         if event.delta > 0 or event.num == 4:
             scale = self.zoom_factor
         else:
@@ -597,12 +640,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # Update positions
         for tag, (x, y) in self.node_positions.items():
+            # Process each (tag, (x, y)) from node_positions.items().
             dx = x - anchor_x
             dy = y - anchor_y
             new_x = anchor_x + dx * scale_change
             new_y = anchor_y + dy * scale_change
             self.node_positions[tag] = (new_x, new_y)
             for node in self.graph["nodes"]:
+                # Process each node from graph['nodes'].
                 node_tag = node.get("tag")
                 if node_tag == tag:
                     node["x"], node["y"] = new_x, new_y
@@ -622,6 +667,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Opens the Generic Editor Window for the clicked character.
     # ─────────────────────────────────────────────────────────────────────────
     def open_character_editor(self, event):
+        """Open character editor."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         item = self.canvas.find_closest(x, y)
@@ -676,12 +722,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Scrolls the canvas vertically based on mouse wheel input.
     # ─────────────────────────────────────────────────────────────────────────
     def _on_mousewheel_y(self, event):
+        """Handle mousewheel y."""
         if event.num == 4 or event.delta > 0:
             self.canvas.yview_scroll(-1, "units")
         elif event.num == 5 or event.delta < 0:
             self.canvas.yview_scroll(1, "units")
 
     def get_state(self):
+        """Return state."""
         return {
             "graph": self.graph.copy(),
             "node_positions": self.node_positions.copy(),
@@ -689,6 +737,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         }
 
     def set_state(self, state):
+        """Set state."""
         self.graph = state.get("graph", {}).copy()
         ensure_graph_tabs(self.graph)
         self.node_positions = state.get("node_positions", {}).copy()
@@ -700,21 +749,25 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Scrolls the canvas horizontally based on mouse wheel input.
     # ─────────────────────────────────────────────────────────────────────────
     def _on_mousewheel_x(self, event):
+        """Handle mousewheel x."""
         if event.num == 4 or event.delta > 0:
             self.canvas.xview_scroll(-1, "units")
         elif event.num == 5 or event.delta < 0:
             self.canvas.xview_scroll(1, "units")
 
     def _start_canvas_pan(self, event):
+        """Start canvas pan."""
         self._is_panning = True
         self.canvas.scan_mark(event.x, event.y)
 
     def _do_canvas_pan(self, event):
+        """Internal helper for do canvas pan."""
         if not self._is_panning:
             return
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
     def _end_canvas_pan(self, _event):
+        """Internal helper for end canvas pan."""
         self._is_panning = False
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -722,6 +775,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Creates a toolbar with buttons for adding characters, factions, saving, loading, and adding links.
     # ─────────────────────────────────────────────────────────────────────────
     def init_toolbar(self):
+        """Initialize toolbar."""
         toolbar = ctk.CTkFrame(self)
         toolbar.pack(fill="x", padx=5, pady=5)
 
@@ -800,6 +854,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         ).pack(side="left", padx=5)
 
     def toggle_nodes_collapsed(self):
+        """Toggle nodes collapsed."""
         self.nodes_collapsed = not self.nodes_collapsed
         for node in self.graph["nodes"]:
             node["collapsed"] = self.nodes_collapsed
@@ -807,10 +862,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def reset_zoom(self):
+        """Reset zoom."""
         self.canvas_scale = 1.0
 
         # Restore node positions
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             tag = node.get("tag")
             if tag in self.original_positions:
                 x, y = self.original_positions[tag]
@@ -819,6 +876,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # Restore shape positions
         for shape in self.graph.get("shapes", []):
+            # Process each shape from graph.get('shapes', []).
             tag = shape["tag"]
             if tag in self.original_shape_positions:
                 x, y = self.original_shape_positions[tag]
@@ -828,16 +886,20 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def _refresh_tab_selector(self):
+        """Refresh tab selector."""
         ensure_graph_tabs(self.graph)
         tabs = self.graph.get("tabs", [])
         self.tab_id_by_name = {}
         display_names = []
         for tab in tabs:
+            # Process each tab from tabs.
             name = tab.get("name", "Tab")
             if name in self.tab_id_by_name:
+                # Handle the branch where name is in tab ID by name.
                 suffix = 2
                 candidate = f"{name} ({suffix})"
                 while candidate in self.tab_id_by_name:
+                    # Keep looping while candidate is in tab_id_by_name.
                     suffix += 1
                     candidate = f"{name} ({suffix})"
                 name = candidate
@@ -845,6 +907,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             display_names.append(name)
 
         if self.tab_selector:
+            # Continue with this path when tab selector is set.
             self.tab_selector.configure(values=display_names)
             active_tab = get_active_tab(self.graph)
             active_name = next(
@@ -855,6 +918,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self.tab_selector_var.set(active_name)
 
     def _on_tab_selected(self, selected_name):
+        """Handle tab selected."""
         tab_id = self.tab_id_by_name.get(selected_name)
         if tab_id:
             set_active_tab(self.graph, tab_id)
@@ -862,23 +926,28 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def open_manage_tabs(self):
+        """Open manage tabs."""
         ManageGraphTabsDialog(self, self.graph, on_update=self._on_tabs_updated)
 
     def _on_tabs_updated(self):
+        """Handle tabs updated."""
         self._refresh_tab_selector()
         self.draw_graph()
         self._autosave_graph()
 
     def _unique_tab_name(self, base_name, current_tab=None):
+        """Internal helper for unique tab name."""
         existing = {tab.get("name") for tab in self.graph.get("tabs", []) if tab is not current_tab}
         name = base_name
         suffix = 2
         while name in existing:
+            # Keep looping while name is in existing.
             name = f"{base_name} ({suffix})"
             suffix += 1
         return name
 
     def load_graph_into_tab(self):
+        """Load graph into tab."""
         path = filedialog.askopenfilename(
             filetypes=[("JSON Files", "*.json")],
             title="Load Character Graph JSON",
@@ -886,12 +955,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
         if not path:
             return
         try:
+            # Keep graph into tab resilient if this step fails.
             with open(path, "r", encoding="utf-8") as file:
                 imported_graph = json.load(file)
         except Exception as exc:
             messagebox.showerror("Load Error", f"Could not load file:\n{exc}")
             return
         try:
+            # Keep graph into tab resilient if this step fails.
             merge_result = merge_graph_into(
                 self.graph,
                 imported_graph,
@@ -903,6 +974,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return
 
         for node in merge_result.imported_nodes:
+            # Process each node from merge_result.imported_nodes.
             self.graph["nodes"].append(node)
             tag = node.get("tag")
             if tag:
@@ -913,6 +985,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.graph["links"].append(link)
 
         for shape in merge_result.imported_shapes:
+            # Process each shape from merge_result.imported_shapes.
             self.graph.setdefault("shapes", []).append(shape)
             tag = shape.get("tag")
             if tag:
@@ -937,6 +1010,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Temporarily rebinds left-click to select the first node for a new link.
     # ─────────────────────────────────────────────────────────────────────────
     def start_link_creation(self):
+        """Start link creation."""
         self.canvas.bind("<Button-1>", self.select_first_node)
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -944,6 +1018,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Selects the first node for a new link based on the nearest canvas item.
     # ─────────────────────────────────────────────────────────────────────────
     def select_first_node(self, event):
+        """Select first node."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         item = self.canvas.find_closest(x, y)
@@ -959,6 +1034,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Selects the second node for a new link and then opens the link text dialog.
     # ─────────────────────────────────────────────────────────────────────────
     def select_second_node(self, event):
+        """Select second node."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         item = self.canvas.find_closest(x, y)
@@ -975,6 +1051,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Opens a dialog for the user to enter link text, then adds the link.
     # ─────────────────────────────────────────────────────────────────────────
     def prompt_link_text(self):
+        """Handle prompt link text."""
         dialog = ctk.CTkToplevel(self)
         dialog.title("Enter Link Text")
         dialog.geometry("400x150")
@@ -987,6 +1064,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         link_text_entry.pack(pady=5)
         link_text_entry.bind("<Return>", lambda event: on_add_link())
         def on_add_link():
+            """Handle add link."""
             link_text = link_text_var.get()
             self.add_link(self.first_node, self.second_node, link_text)
             dialog.destroy()
@@ -999,6 +1077,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Adds a new link between two nodes with the specified link text.
     # ─────────────────────────────────────────────────────────────────────────
     def add_link(self, tag1, tag2, link_text):
+        """Handle add link."""
         if tag1 not in self.node_positions or tag2 not in self.node_positions:
             messagebox.showerror("Error", "One or both characters not found.")
             return
@@ -1030,10 +1109,12 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Opens a selection dialog and binds the next click to place the character.
     # ─────────────────────────────────────────────────────────────────────────
     def add_entity(self, entity_type):
+        """Handle add entity."""
         if entity_type not in self.allowed_entity_types:
             return
 
         def on_entity_selected(entity_name):
+            """Handle entity selected."""
             self._refresh_entity_records(entity_type)
             selected_entity = self._get_entity_record(entity_type, entity_name)
             if not selected_entity:
@@ -1072,6 +1153,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Places the selected character at the mouse click location and updates the graph.
     # ─────────────────────────────────────────────────────────────────────────
     def place_pending_entity(self, event):
+        """Handle place pending entity."""
         entity = self.pending_entity
         if not entity:
             return
@@ -1084,6 +1166,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         tag = base
         i = 1
         while tag in self.node_positions:
+            # Keep looping while tag is in node_positions.
             tag = f"{base}_{i}"
             i += 1
 
@@ -1110,6 +1193,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Opens a faction selection dialog and adds all characters from the selected faction.
     # ─────────────────────────────────────────────────────────────────────────
     def add_faction(self):
+        """Handle add faction."""
         # ── 1) Show a modal dialog to pick a faction ─────────────────────
         popup = ctk.CTkToplevel(self)
         popup.title("Select Faction")
@@ -1123,14 +1207,17 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # ── 2) Callback when the user double-clicks a faction ────────────
         def on_faction_selected(entity_type, faction_name):
+            """Handle faction selected."""
             # close the dialog
             if popup.winfo_exists():
                 popup.destroy()
 
             faction_characters = []
             for character_type in self.allowed_entity_types:
+                # Process each character_type from allowed_entity_types.
                 self._refresh_entity_records(character_type)
                 for record in self.entity_records.get(character_type, {}).values():
+                    # Process each record from entity_records.get(character_type, {}).values().
                     faction_value = record.get("Factions")
                     if isinstance(faction_value, list) and faction_name in faction_value:
                         faction_characters.append((character_type, record))
@@ -1145,12 +1232,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
             start_x, start_y = 100, 100
             spacing = int(120 * self.canvas_scale)
             for i, (character_type, record) in enumerate(faction_characters):
+                # Process each (i, (character_type, record)) from enumerate(faction_characters).
                 name = record["Name"]
                 # generate a unique tag
                 base = f"{character_type}_{name.replace(' ', '_')}"
                 tag = base
                 suffix = 1
                 while tag in self.node_positions:
+                    # Keep looping while tag is in node_positions.
                     tag = f"{base}_{suffix}"
                     suffix += 1
 
@@ -1196,11 +1285,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
         popup.wait_window()
 
     def update_links_positions_for_node(self, node_tag):
+        """Update links positions for node."""
         for link in self.graph["links"]:
             if node_tag in (link.get("node1_tag"), link.get("node2_tag")):
+                # Handle the branch where node tag is in (link.get('node1_tag'), link.get('node2_tag')).
                 key = (link.get("node1_tag"), link.get("node2_tag"))
                 canvas_ids = self.link_canvas_ids.get(key)
                 if canvas_ids:
+                    # Continue with this path when canvas ids is set.
                     tag1 = link.get("node1_tag")
                     tag2 = link.get("node2_tag")
                     x1, y1 = self.node_positions.get(tag1, (0, 0))
@@ -1233,6 +1325,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
     
     def update_links_for_node(self, node_tag):
+        """Update links for node."""
         # Delete only existing links and associated arrowheads/text
         self.canvas.delete("link")
         self.canvas.delete("arrowhead")
@@ -1251,6 +1344,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.canvas.tag_raise("link_text")
     
     def delete_shape(self, tag):
+        """Delete shape."""
         # Delete from canvas
         self.canvas.delete(tag)
         # Delete from internal storage
@@ -1265,6 +1359,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Determines whether a link or node was right-clicked and displays the appropriate context menu.
     # ─────────────────────────────────────────────────────────────────────────
     def on_right_click(self, event):
+        """Handle right click."""
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         item = self.canvas.find_closest(x, y)
@@ -1273,12 +1368,15 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         tags = self.canvas.gettags(item[0])
         if "link" in tags or "link_text" in tags or "arrowhead" in tags:
+            # Handle the branch where 'link' is in tags or 'link_text' is in tags or 'arrowhead' is in tags.
             self.selected_link = self.get_link_by_position(x, y)
             self.show_link_menu(int(x), int(y))
         elif any(self._is_node_tag(tag) for tag in tags):
+            # Handle the branch where any((_is_node_tag(tag) for tag in tags)).
             self.selected_node = self._extract_node_tag(tags)
             self.show_node_menu(x, y)
         elif any(tag.startswith("shape_") for tag in tags):
+            # Handle the branch where any((tag.startswith('shape_') for tag in tags)).
             shape_tag = next((t for t in tags if t.startswith("shape_")), None)
             if shape_tag:
                 self.show_shape_menu(x, y, shape_tag)
@@ -1289,6 +1387,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Displays a color selection menu for changing the node color.
     # ─────────────────────────────────────────────────────────────────────────
     def show_color_menu(self, x, y):
+        """Show color menu."""
         COLORS = [
             "red", "green", "blue", "yellow", "purple",
             "orange", "pink", "cyan", "magenta", "lightgray"
@@ -1303,6 +1402,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Displays a context menu for links with a submenu for arrow mode selection.
     # ─────────────────────────────────────────────────────────────────────────
     def show_link_menu(self, x, y):
+        """Show link menu."""
         link_menu = Menu(self.canvas, tearoff=0)
         arrow_submenu = Menu(link_menu, tearoff=0)
         arrow_submenu.add_command(label="No Arrows", command=lambda: self.set_arrow_mode("none"))
@@ -1319,6 +1419,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Displays a context menu for nodes with options to delete the node or change its color.
     # ─────────────────────────────────────────────────────────────────────────
     def show_node_menu(self, x, y):
+        """Show node menu."""
         node_menu = Menu(self.canvas, tearoff=0)
         node_menu.add_command(label="Delete Node", command=self.delete_node)
         node_menu.add_separator()
@@ -1327,6 +1428,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         record = None
         entity_name = None
         if self.selected_node:
+            # Continue with this path when selected node is set.
             node = self._get_node_by_tag(self.selected_node)
             if node:
                 entity_name = node.get("entity_name")
@@ -1346,6 +1448,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Sets the arrow_mode for the currently selected link.
     # ─────────────────────────────────────────────────────────────────────────
     def set_arrow_mode(self, new_mode):
+        """Set arrow mode."""
         if not self.selected_link:
             return
         updated_link = None
@@ -1363,6 +1466,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def delete_link(self):
+        """Delete link."""
         if not self.selected_link:
             return
         link_to_remove = self.selected_link
@@ -1376,6 +1480,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def _link_matches(self, link, other):
+        """Internal helper for link matches."""
         if not isinstance(link, dict) or not isinstance(other, dict):
             return False
         link_nodes = {link.get("node1_tag"), link.get("node2_tag")}
@@ -1387,6 +1492,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Deletes the currently selected node and removes any links involving it.
     # ─────────────────────────────────────────────────────────────────────────
     def delete_node(self):
+        """Delete node."""
         if not self.selected_node:
             return
 
@@ -1394,6 +1500,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         active_tab = get_active_tab(self.graph)
         subset = active_tab.get("subsetDefinition") or {}
         if subset.get("mode") != "all":
+            # Handle the branch where subset.get('mode') != 'all'.
             node_tags = list(subset.get("node_tags") or [])
             if tag in node_tags:
                 node_tags.remove(tag)
@@ -1431,12 +1538,15 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def redraw_after_drag(self):
+        """Handle redraw after drag."""
         self.draw_graph()
 
     def _get_entity_audio(self, record):
+        """Return entity audio."""
         return get_entity_audio_value(record)
 
     def _play_entity_audio(self, record, name):
+        """Internal helper for play entity audio."""
         audio_value = self._get_entity_audio(record)
         if not audio_value:
             messagebox.showinfo("Audio", "No audio file configured for this character.")
@@ -1450,6 +1560,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     
         # — ADDED: draw the scene flow background once canvas exists
     def _apply_scene_flow_background(self, width=None, height=None):
+        """Apply scene flow background."""
         if not hasattr(self, "canvas"):
             return
         width = width or max(self.canvas.winfo_width(), 1)
@@ -1465,6 +1576,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.canvas.tag_lower("scene_flow_bg")
 
     def _apply_corkboard_background(self, width=None, height=None):
+        """Apply corkboard background."""
         if not hasattr(self, "canvas"):
             return
         background_path = os.path.join("assets", "images", "corkboard_bg.png")
@@ -1512,12 +1624,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # and calculates/stores their bounding boxes.
     # ─────────────────────────────────────────────────────────────────────────
     def draw_nodes(self, nodes):
+        """Handle draw nodes."""
         scale = self.canvas_scale
         node_style = (self.node_style or "postit").lower()
         GAP = int((6 if node_style == "modern" else 5) * scale)
         PAD = int((14 if node_style == "modern" else 10) * scale)
 
         def draw_rounded_panel(x1, y1, x2, y2, radius, **kwargs):
+            """Handle draw rounded panel."""
             radius = max(0, int(radius))
             points = [
                 x1 + radius, y1,
@@ -1537,6 +1651,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # Helper to measure wrapped text height
         def measure_text_height(text, font, wrap_width):
+            """Handle measure text height."""
             tid = self.canvas.create_text(
                 0, 0,
                 text=text,
@@ -1549,6 +1664,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return (bbox[3] - bbox[1]) if bbox else 0
 
         def measure_text_size(text, font, wrap_width=None):
+            """Handle measure text size."""
             tid = self.canvas.create_text(
                 0, 0,
                 text=text,
@@ -1563,6 +1679,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
         for node in nodes:
+            # Process each node from nodes.
             entity_type = node.get("entity_type")
             entity_name = node.get("entity_name")
             tag = node.get("tag")
@@ -1579,6 +1696,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             title_text = entity_name
 
             if is_collapsed:
+                # Continue with this path when is collapsed is set.
                 title_w, title_h = measure_text_size(title_text, title_font)
                 wrap_width = max(1, int(title_w))
                 body_text = ""
@@ -1605,6 +1723,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 portrait_path = primary_portrait(portrait_value)
                 resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
                 if resolved_portrait and os.path.exists(resolved_portrait):
+                    # Handle the branch where resolved portrait is set and os.path.exists(resolved_portrait).
                     img = Image.open(resolved_portrait)
                     ow, oh = img.size
                     max_w = int(80 * scale)
@@ -1634,6 +1753,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
             # ── 1) Draw the node background ──────────────────────────
             if node_style == "modern":
+                # Handle the branch where node_style == 'modern'.
                 node_w, node_h = min_w, min_h
                 shadow_offset = max(2, int(4 * scale))
                 corner_radius = max(6, int(12 * scale))
@@ -1660,6 +1780,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 )
             else:
                 if self.postit_base:
+                    # Continue with this path when postit base is set.
                     ow, oh = self.postit_base.size
                     if is_collapsed:
                         node_w, node_h = int(min_w), int(min_h)
@@ -1766,6 +1887,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Iterates over all links in the graph and draws them, then lowers link elements behind nodes.
     # ─────────────────────────────────────────────────────────────────────────
     def draw_all_links(self, links):
+        """Handle draw all links."""
         for link in links:
             self.draw_one_link(link)
         self.canvas.tag_lower("link")
@@ -1775,6 +1897,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Draws a single link between two nodes, including its arrowheads (if any) and text.
     # ─────────────────────────────────────────────────────────────────────────
     def draw_one_link(self, link):
+        """Handle draw one link."""
         tag1 = link.get("node1_tag")
         tag2 = link.get("node2_tag")
         x1, y1 = self.node_positions.get(tag1, (0, 0))
@@ -1826,6 +1949,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Returns the point where a link should touch the edge of a node's bounding box.
     # ─────────────────────────────────────────────────────────────────────────
     def _get_edge_point(self, node_tag, target_x, target_y):
+        """Return edge point."""
         center_x, center_y = self.node_positions.get(node_tag, (0, 0))
         bbox = self.node_bboxes.get(node_tag)
         if not bbox:
@@ -1850,6 +1974,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Draws a triangular arrowhead near a node, offset outside the node's bounding box.
     # ─────────────────────────────────────────────────────────────────────────
     def draw_arrowhead(self, node_tag, target_x, target_y, color):
+        """Handle draw arrowhead."""
         arrow_length = 16
         arrow_width = 18
         arrow_apex_x, arrow_apex_y = self._get_edge_point(node_tag, target_x, target_y)
@@ -1879,6 +2004,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Loads a graph from a JSON file, rebuilds node positions, and sets default values.
     # ─────────────────────────────────────────────────────────────────────────
     def load_graph(self, path=None):
+        """Load graph."""
         # ── 0) Clear existing canvas items (keep only background) ─────────────────
         for item in self.canvas.find_all():
             if "background" not in self.canvas.gettags(item):
@@ -1893,8 +2019,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # ── 1) Prompt for file if needed and load JSON ───────────────────────────
         if not path:
+            # Handle the branch where path is unavailable.
             path = self.graph_path
             if not os.path.exists(path):
+                # Handle the branch where not os.path.exists(path).
                 path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
                 if not path:
                     return
@@ -1907,8 +2035,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
         # ── 2) Ensure every node dict has its own unique `tag` ────────────────────
         seen = set()
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             if "entity_type" not in node or "entity_name" not in node:
                 if "npc_name" in node:
+                    # Handle the branch where 'npc_name' is in node.
                     node["entity_type"] = "npc"
                     node["entity_name"] = node.pop("npc_name")
                 elif "pc_name" in node:
@@ -1923,6 +2053,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 # collide: generate a new one
                 i = 1
                 while f"{base}_{i}" in seen:
+                    # Keep looping while f'{base}_{i}' is in seen.
                     i += 1
                 tag = f"{base}_{i}"
             node["tag"] = tag
@@ -1943,8 +2074,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
         else:
             self.nodes_collapsed = True
         for link in self.graph["links"]:
+            # Process each link from graph['links'].
             if "node1_tag" not in link or "node2_tag" not in link:
                 if "npc_name1" in link and "npc_name2" in link:
+                    # Handle the branch where 'npc_name1' is in link and 'npc_name2' is in link.
                     link["node1_tag"] = f"npc_{link['npc_name1'].replace(' ', '_')}"
                     link["node2_tag"] = f"npc_{link['npc_name2'].replace(' ', '_')}"
                     link.pop("npc_name1", None)
@@ -1969,6 +2102,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         # update shape_counter so new shapes get unique tags
         max_i = 0
         for shape in self.graph["shapes"]:
+            # Process each shape from graph['shapes'].
             parts = shape["tag"].split("_")
             if parts[-1].isdigit():
                 max_i = max(max_i, int(parts[-1]))
@@ -1990,7 +2124,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Changes the color of the currently selected node, updating both the canvas and the graph data.
     # ─────────────────────────────────────────────────────────────────────────
     def change_node_color(self, color):
+        """Handle change node color."""
         if self.selected_node:
+            # Continue with this path when selected node is set.
             rect_id = self.node_rectangles[self.selected_node]
             self.canvas.itemconfig(rect_id, fill=color)
             for node in self.graph["nodes"]:
@@ -2000,6 +2136,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self._autosave_graph()
 
     def change_shape_color(self, tag, color):
+        """Handle change shape color."""
         self.canvas.itemconfig(tag, fill=color)
         shape = self.shapes.get(tag)
         if shape:
@@ -2007,6 +2144,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self._autosave_graph()
 
     def show_shape_menu(self, x, y, shape_tag):
+        """Show shape menu."""
         shape_menu = Menu(self.canvas, tearoff=0)
 
         # Color submenu
@@ -2033,6 +2171,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         shape_menu.post(int(x), int(y))
 
     def bring_to_front(self, shape_tag):
+        """Handle bring to front."""
         # Raise the shape on the canvas.
         self.canvas.tag_raise(shape_tag)
         shape = self.shapes.get(shape_tag)
@@ -2045,6 +2184,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self._autosave_graph()
 
     def send_to_back(self, tag=None):
+        """Handle send to back."""
         tag = tag or self.selected_shape
         if not tag:
             return
@@ -2058,6 +2198,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def activate_resize_mode(self, shape_tag):
+        """Handle activate resize mode."""
         shape = self.shapes.get(shape_tag)
         if not shape:
             return
@@ -2083,6 +2224,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.canvas.tag_bind(handle_id, "<ButtonRelease-1>", self.end_resizing, add="+")
 
     def start_resizing(self, event):
+        """Start resizing."""
         # Retrieve the shape tag from the current item.
         self.resizing_shape_tag = self.canvas.gettags("current")[1]  # second tag is shape_tag
         shape = self.shapes.get(self.resizing_shape_tag)
@@ -2096,6 +2238,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.original_height = shape["h"]
 
     def do_resizing(self, event):
+        """Handle do resizing."""
         if not self.resizing_shape_tag:
             return
         shape = self.shapes.get(self.resizing_shape_tag)
@@ -2128,6 +2271,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                             right + 5, bottom + 5)
 
     def end_resizing(self, event):
+        """Handle end resizing."""
         # Clean up the resize mode; remove the handle.
         shape = self.shapes.get(self.resizing_shape_tag)
         if shape and "resize_handle" in shape:
@@ -2143,6 +2287,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Calculates the distance from a point to a given line segment.
     # ─────────────────────────────────────────────────────────────────────────
     def distance_point_to_line(self, px, py, x1, y1, x2, y2):
+        """Handle distance point to line."""
         dx = x2 - x1
         dy = y2 - y1
         if dx == 0 and dy == 0:
@@ -2158,8 +2303,10 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # Returns the link that is within a threshold distance from the given (x, y) point.
     # ─────────────────────────────────────────────────────────────────────────
     def get_link_by_position(self, x, y):
+        """Return link by position."""
         threshold = 50  # Threshold for hit-testing
         for link in self.graph["links"]:
+            # Process each link from graph['links'].
             tag1 = link.get("node1_tag")
             tag2 = link.get("node2_tag")
             x1, y1 = self.node_positions.get(tag1, (0, 0))
@@ -2173,6 +2320,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
 
     def add_shape(self, shape_type):
+        """Handle add shape."""
         x, y = 200, 200
         width, height = 120, 80
         active_tab = get_active_tab(self.graph)
@@ -2195,6 +2343,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self._autosave_graph()
 
     def draw_shape(self, shape):
+        """Handle draw shape."""
         scale = self.canvas_scale
         x, y = shape["x"], shape["y"]
         w = int(shape["w"] * scale)
@@ -2222,12 +2371,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
         shape["canvas_id"] = shape_id
 
     def draw_all_shapes(self):
+        """Handle draw all shapes."""
         # Only draw shapes for the active tab (unless tab_id is missing).
         active_tab = get_active_tab(self.graph)
         active_id = active_tab.get("id") if active_tab else None
         self.shapes = {}
         shapes_sorted = sorted(self.graph.get("shapes", []), key=lambda s: s.get("z", 0))
         for shape in shapes_sorted:
+            # Process each shape from shapes_sorted.
             tab_id = shape.get("tab_id")
             if tab_id and active_id and tab_id != active_id:
                 continue
@@ -2235,9 +2386,11 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.draw_shape(shape)
 
     def _autosave_graph(self):
+        """Internal helper for autosave graph."""
         self.save_graph(show_message=False)
 
     def save_graph(self, path=None, show_message=True):
+        """Save graph."""
         if not path:
             path = self.graph_path
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -2245,6 +2398,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # 2) Update each node entry with its unique tag and current x,y
         for node in self.graph["nodes"]:
+            # Process each node from graph['nodes'].
             tag = node.get("tag")
             # fallback to name‐based tag if somehow missing
             if not tag:
@@ -2269,6 +2423,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
         # 3) Write out the full graph dict
         try:
+            # Keep graph resilient if this step fails.
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.graph, f, ensure_ascii=False, indent=2)
         except Exception as e:
@@ -2278,13 +2433,16 @@ class CharacterGraphEditor(ctk.CTkFrame):
             messagebox.showinfo("Saved", f"Graph saved to:\n{path}")
 
     def load_portrait_scaled(self, portrait_path, node_tag, scale=1.0):
+        """Load portrait scaled."""
         if portrait_path and not os.path.isabs(portrait_path):
+            # Handle the branch where portrait path is set and not os.path.isabs(portrait_path).
             candidate = os.path.join(ConfigHelper.get_campaign_dir(), portrait_path)
             if os.path.exists(candidate):
                 portrait_path = candidate
         if not portrait_path or not os.path.exists(portrait_path):
             return None, (0, 0)
         try:
+            # Keep portrait scaled resilient if this step fails.
             img = Image.open(portrait_path)
             size = int(MAX_PORTRAIT_SIZE[0] * scale), int(MAX_PORTRAIT_SIZE[1] * scale)
             resample_method = getattr(Image, "Resampling", Image).LANCZOS
@@ -2297,12 +2455,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return None, (0, 0)
 
     def _get_visible_graph_data(self):
+        """Return visible graph data."""
         ensure_graph_tabs(self.graph)
         self._sync_active_tab_selection()
         active_tab = get_active_tab(self.graph)
         return filter_graph_for_tab(self.graph, active_tab)
 
     def _sync_active_tab_selection(self):
+        """Synchronize active tab selection."""
         if not self.tab_selector_var:
             return
         selected_name = (self.tab_selector_var.get() or "").strip()
@@ -2318,6 +2478,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             set_active_tab(self.graph, tab_id)
 
     def draw_graph(self):
+        """Handle draw graph."""
         #self.canvas.delete("shape")
         #self.canvas.delete("link")
         #self.canvas.delete("link_text")
@@ -2362,6 +2523,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
                 self.canvas.tag_raise("shape")
 
     def _get_link_style(self, link):
+        """Return link style."""
         is_selected = bool(self.selected_link and self._link_matches(link, self.selected_link))
         if is_selected:
             return "#5bb8ff", 3
@@ -2369,6 +2531,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
 
 
     def start_drag(self, event):
+        """Start drag."""
         # Convert mouse coords to canvas coords
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
@@ -2382,6 +2545,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         items = list(self.canvas.find_overlapping(x, y, x, y))
         # Iterate in reverse so the topmost items get priority
         for item in reversed(items):
+            # Process each item from reversed(items).
             tags = self.canvas.gettags(item)
             # First check for a node tag
             for tag in tags:
@@ -2407,6 +2571,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             self.selected_items = []
 
     def on_drag(self, event):
+        """Handle drag."""
         if not (self.selected_node or self.selected_shape) or not self.drag_start:
             return
         x = self.canvas.canvasx(event.x)
@@ -2426,6 +2591,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         self.drag_start = (x, y)
 
     def end_drag(self, event):
+        """Handle end drag."""
         did_drag = bool(self.selected_node or self.selected_shape)
         self.selected_node = None
         self.selected_shape = None

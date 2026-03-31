@@ -26,6 +26,7 @@ def prowess_points_from_advancement_choices(advancement_choices: list[dict]) -> 
 
     budgets: list[int] = []
     for advancement_total, choice in enumerate(advancement_choices, start=1):
+        # Process each (advancement_total, choice) from enumerate(advancement_choices, start=1).
         choice_type = (choice or {}).get("type", "").strip()
         if choice_type != "prowess_points":
             continue

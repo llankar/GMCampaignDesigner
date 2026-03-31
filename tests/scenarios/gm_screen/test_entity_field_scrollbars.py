@@ -1,3 +1,5 @@
+"""Regression tests for entity field scrollbars."""
+
 import importlib.util
 import sys
 import types
@@ -6,25 +8,32 @@ from pathlib import Path
 
 class _DummyWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _DummyWidget instance."""
         self.args = args
         self.kwargs = kwargs
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         return None
 
     def pack(self, *args, **kwargs):
+        """Pack the operation."""
         return None
 
     def insert(self, *args, **kwargs):
+        """Handle insert."""
         return None
 
     def configure(self, *args, **kwargs):
+        """Handle configure."""
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def grid_rowconfigure(self, *args, **kwargs):
+        """Handle grid rowconfigure."""
         return None
 
 
@@ -32,11 +41,13 @@ class _TextboxRecorder(_DummyWidget):
     created_kwargs: list[dict] = []
 
     def __init__(self, *args, **kwargs):
+        """Initialize the _TextboxRecorder instance."""
         super().__init__(*args, **kwargs)
         _TextboxRecorder.created_kwargs.append(kwargs)
 
 
 def _load_module(module_name: str, path: str):
+    """Load module."""
     spec = importlib.util.spec_from_file_location(module_name, Path(path))
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
@@ -46,11 +57,13 @@ def _load_module(module_name: str, path: str):
 
 
 def _ensure_packages(*package_names: str) -> None:
+    """Ensure packages."""
     for package_name in package_names:
         sys.modules.setdefault(package_name, types.ModuleType(package_name))
 
 
 def test_campaign_overview_panel_field_textbox_uses_scrollbars():
+    """Verify that campaign overview panel field textbox uses scrollbars."""
     _ensure_packages("modules", "modules.scenarios", "modules.scenarios.gm_screen", "modules.helpers")
     sys.modules["customtkinter"] = types.SimpleNamespace(
         CTkFrame=_DummyWidget,
@@ -80,6 +93,7 @@ def test_campaign_overview_panel_field_textbox_uses_scrollbars():
 
 
 def test_campaign_dashboard_panel_field_textbox_uses_scrollbars():
+    """Verify that campaign dashboard panel field textbox uses scrollbars."""
     _ensure_packages(
         "modules",
         "modules.campaigns",

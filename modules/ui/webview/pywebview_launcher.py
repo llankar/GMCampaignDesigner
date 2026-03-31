@@ -196,9 +196,11 @@ class BrowserShellApi:
     _last_url: str = ""
 
     def get_initial_target(self) -> str:
+        """Return initial target."""
         return self.target_url
 
     def cache_selection(self, selection: str, url: str) -> None:
+        """Handle cache selection."""
         selection_text = (selection or "").strip()
         if not selection_text:
             return
@@ -206,11 +208,13 @@ class BrowserShellApi:
         self._last_url = (url or "").strip()
 
     def navigate(self, url: str) -> dict:
+        """Handle navigate."""
         if not url:
             return {"ok": False, "message": "Missing address."}
         if not self._content_window:
             return {"ok": False, "message": "Browser window not ready."}
         try:
+            # Keep navigate resilient if this step fails.
             self._content_window.load_url(url)
             self._last_selection = ""
             self._last_url = url.strip()
@@ -223,10 +227,12 @@ class BrowserShellApi:
         return {"ok": True}
 
     def import_selection(self, selection: str | None = None, url: str | None = None) -> dict:
+        """Import selection."""
         selection_text = (selection or "").strip()
         current_url = (url or "").strip()
         if self._content_window and (not selection_text or not current_url):
             try:
+                # Keep selection resilient if this step fails.
                 if not selection_text:
                     selection_text = (
                         self._content_window.evaluate_js(
@@ -244,10 +250,12 @@ class BrowserShellApi:
                 return {"ok": False, "message": "Unable to read selection."}
         if not selection_text and self._last_selection:
             if not current_url or current_url == self._last_url:
+                # Handle the branch where current URL is unavailable or current_url == _last_url.
                 selection_text = self._last_selection
                 if not current_url:
                     current_url = self._last_url
         if not selection_text:
+            # Handle the branch where selection text is unavailable.
             if not self._content_window and selection is None:
                 return {"ok": False, "message": "Browser window not ready."}
             return {"ok": False, "message": "Selection empty."}
@@ -266,6 +274,7 @@ class BrowserShellApi:
             "received_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         }
         try:
+            # Keep selection resilient if this step fails.
             Path(self.selection_output).write_text(
                 json.dumps(payload, ensure_ascii=False),
                 encoding="utf-8",
@@ -280,6 +289,7 @@ class BrowserShellApi:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse args."""
     parser = argparse.ArgumentParser(description="Launch a pywebview browser window")
     parser.add_argument("url", help="URL to open")
     parser.add_argument("--title", default="Image Browser", help="Window title")
@@ -300,6 +310,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _attach_content_helpers(window: object) -> None:
+    """Internal helper for attach content helpers."""
     try:
         window.evaluate_js(_CONTENT_SHELL_JS)
     except Exception as exc:
@@ -310,10 +321,12 @@ def _attach_content_helpers(window: object) -> None:
 
 
 def _module_available(module_name: str) -> bool:
+    """Internal helper for module available."""
     return importlib.util.find_spec(module_name) is not None
 
 
 def _qt_available() -> bool:
+    """Internal helper for qt available."""
     return any(
         _module_available(module_name)
         for module_name in ("PyQt6", "PySide6", "PyQt5", "PySide2")
@@ -321,18 +334,22 @@ def _qt_available() -> bool:
 
 
 def _cef_available() -> bool:
+    """Internal helper for cef available."""
     return _module_available("cefpython3")
 
 
 def _edgechromium_available() -> bool:
+    """Internal helper for edgechromium available."""
     return _module_available("clr")
 
 
 def _webkit_available() -> bool:
+    """Internal helper for webkit available."""
     return _module_available("objc") or _module_available("AppKit")
 
 
 def select_gui() -> str | None:
+    """Select gui."""
     if sys.platform.startswith("win"):
         preferred_guis = [("edgechromium", _edgechromium_available)]
     elif sys.platform == "darwin":
@@ -361,7 +378,9 @@ def select_gui() -> str | None:
 
 
 def _default_storage_path() -> str:
+    """Internal helper for default storage path."""
     if sys.platform.startswith("win"):
+        # Handle the branch where sys.platform.startswith('win').
         base_dir = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
         if base_dir:
             return str(Path(base_dir) / "GMCampaignDesigner" / "webview")
@@ -381,10 +400,12 @@ def _default_storage_path() -> str:
 
 
 def main() -> None:
+    """Run the module entry point."""
     args = parse_args()
     webview.settings["OPEN_DEVTOOLS_IN_DEBUG"] = False
     api = BrowserShellApi(selection_output=args.selection_output, target_url=args.url)
     if args.shell:
+        # Continue with this path when shell is set.
         content_window = webview.create_window(
             args.title,
             args.url,

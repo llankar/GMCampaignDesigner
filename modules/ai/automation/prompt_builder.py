@@ -1,3 +1,5 @@
+"""Helpers for building automation prompts."""
+
 import json
 from typing import List, Dict
 
@@ -12,8 +14,10 @@ log_module_import(__name__)
 
 
 def _format_fields(fields: List[Dict[str, str]]) -> str:
+    """Format fields."""
     lines = []
     for field in fields:
+        # Process each field from fields.
         name = field.get("name")
         field_type = field.get("type", "text")
         if not name:
@@ -23,6 +27,7 @@ def _format_fields(fields: List[Dict[str, str]]) -> str:
 
 
 def _build_tone_contract_section(*, db_path: str | None = None) -> str:
+    """Build tone contract section."""
     contract = load_campaign_tone_contract(db_path=db_path)
     if not contract:
         return ""
@@ -30,6 +35,7 @@ def _build_tone_contract_section(*, db_path: str | None = None) -> str:
 
 
 def build_entity_prompt(entity_slug: str, count: int, user_prompt: str, *, db_path: str | None = None) -> str:
+    """Build entity prompt."""
     template = load_template(entity_slug)
     fields = template.get("fields", [])
     field_list = _format_fields(fields)
@@ -68,6 +74,7 @@ def build_linked_entities_prompt(
     *,
     db_path: str | None = None,
 ) -> str:
+    """Build linked entities prompt."""
     template = load_template(entity_slug)
     fields = template.get("fields", [])
     field_list = _format_fields(fields)
@@ -96,6 +103,7 @@ def build_linked_entities_prompt(
 
 
 def build_story_arc_prompt(scenario_count: int, user_prompt: str, *, db_path: str | None = None) -> str:
+    """Build story arc prompt."""
     schema_hint = {
         "ArcTitle": "",
         "Premise": "",

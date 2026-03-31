@@ -1,3 +1,4 @@
+"""Normalization helpers for campaign forge."""
 from __future__ import annotations
 
 from typing import Any
@@ -6,6 +7,7 @@ from modules.helpers.text_helpers import deserialize_possible_json
 
 
 def coerce_foundation(foundation: dict[str, Any] | None) -> dict[str, Any]:
+    """Coerce foundation."""
     raw = foundation if isinstance(foundation, dict) else {}
     normalized = {
         "name": str(raw.get("name") or "").strip(),
@@ -24,11 +26,13 @@ def coerce_foundation(foundation: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def coerce_arcs(arcs: Any) -> list[dict[str, Any]]:
+    """Coerce arcs."""
     if not isinstance(arcs, list):
         return []
 
     normalized: list[dict[str, Any]] = []
     for arc in arcs:
+        # Process each arc from arcs.
         if not isinstance(arc, dict):
             continue
         name = str(arc.get("name") or "").strip()
@@ -53,6 +57,7 @@ def coerce_arcs(arcs: Any) -> list[dict[str, Any]]:
 
 
 def coerce_generated_payload(payload: Any) -> dict[str, Any]:
+    """Coerce generated payload."""
     parsed = deserialize_possible_json(payload)
     if not isinstance(parsed, dict):
         return {"arcs": []}
@@ -63,6 +68,7 @@ def coerce_generated_payload(payload: Any) -> dict[str, Any]:
 
     normalized_groups: list[dict[str, Any]] = []
     for group in arc_groups:
+        # Process each group from arc_groups.
         if not isinstance(group, dict):
             continue
         arc_name = str(group.get("arc_name") or "").strip()

@@ -1,8 +1,11 @@
+"""Regression tests for character creation rules."""
+
 from modules.pcs.character_creation.rules_engine import CharacterCreationError, build_character
 from modules.pcs.character_creation.points import summarize_point_budgets
 
 
 def _payload():
+    """Internal helper for payload."""
     skills = {
         "Artisanat": 0,
         "Athlétisme": 2,
@@ -46,6 +49,7 @@ def _payload():
 
 
 def test_build_character_ok():
+    """Verify that build character ok."""
     payload = _payload()
     payload["bonus_skills"]["Combat"] = 2
     payload["bonus_skills"]["Perception"] = 2
@@ -55,6 +59,7 @@ def test_build_character_ok():
 
 
 def test_build_character_requires_six_favorites():
+    """Verify that build character requires six favorites."""
     payload = _payload()
     payload["favorites"] = payload["favorites"][:5]
     try:
@@ -65,6 +70,7 @@ def test_build_character_requires_six_favorites():
 
 
 def test_build_character_enforces_rank_favorite_limit():
+    """Verify that build character enforces rank favorite limit."""
     payload = _payload()
     payload["advancements"] = 0
     payload["favorites"] = payload["favorites"] + ["Survie"]
@@ -76,6 +82,7 @@ def test_build_character_enforces_rank_favorite_limit():
 
 
 def test_build_character_allows_seven_favorites_from_rank_seven():
+    """Verify that build character allows seven favorites from rank seven."""
     payload = _payload()
     payload["advancements"] = 7
     payload["favorites"] = payload["favorites"] + ["Survie"]
@@ -94,6 +101,7 @@ def test_build_character_allows_seven_favorites_from_rank_seven():
 
 
 def test_favored_points_budget_summary_matches_rule():
+    """Verify that favored points budget summary matches rule."""
     payload = _payload()
     payload["bonus_skills"]["Combat"] = 2
     payload["bonus_skills"]["Perception"] = 2
@@ -107,6 +115,7 @@ def test_favored_points_budget_summary_matches_rule():
 
 
 def test_bonus_points_cannot_exceed_generated_pool():
+    """Verify that bonus points cannot exceed generated pool."""
     payload = _payload()
     payload["bonus_skills"]["Combat"] = 20
     try:
@@ -117,6 +126,7 @@ def test_bonus_points_cannot_exceed_generated_pool():
 
 
 def test_bonus_points_only_on_favorites():
+    """Verify that bonus points only on favorites."""
     payload = _payload()
     payload["skills"]["Combat"] = 4
     payload["bonus_skills"]["Artisanat"] = 1
@@ -126,6 +136,7 @@ def test_bonus_points_only_on_favorites():
 
 
 def test_advancement_choices_count_must_match_advancements():
+    """Verify that advancement choices count must match advancements."""
     payload = _payload()
     payload["advancements"] = 2
     payload["advancement_choices"] = [{"type": "new_edge", "details": "Atout social"}]
@@ -138,6 +149,7 @@ def test_advancement_choices_count_must_match_advancements():
 
 
 def test_limited_advancement_cannot_repeat_same_rank():
+    """Verify that limited advancement cannot repeat same rank."""
     payload = _payload()
     payload["advancements"] = 2
     payload["advancement_choices"] = [
@@ -153,6 +165,7 @@ def test_limited_advancement_cannot_repeat_same_rank():
 
 
 def test_limited_advancement_can_repeat_on_new_rank():
+    """Verify that limited advancement can repeat on new rank."""
     payload = _payload()
     payload["advancements"] = 5
     payload["advancement_choices"] = [
@@ -168,6 +181,7 @@ def test_limited_advancement_can_repeat_on_new_rank():
 
 
 def test_new_edge_advancement_adds_asset_line_in_result():
+    """Verify that new edge advancement adds asset line in result."""
     payload = _payload()
     payload["advancements"] = 1
     payload["advancement_choices"] = [{"type": "new_edge", "details": "Vigilance"}]
@@ -177,6 +191,7 @@ def test_new_edge_advancement_adds_asset_line_in_result():
 
 
 def test_superficial_health_advancement_increases_total_health():
+    """Verify that superficial health advancement increases total health."""
     payload = _payload()
     payload["advancements"] = 1
     payload["advancement_choices"] = [{"type": "superficial_health", "details": "+5 blessures"}]
@@ -186,6 +201,7 @@ def test_superficial_health_advancement_increases_total_health():
 
 
 def test_superficial_health_includes_rank_bonus():
+    """Verify that superficial health includes rank bonus."""
     payload = _payload()
     payload["advancements"] = 4
     payload["advancement_choices"] = [
@@ -201,6 +217,7 @@ def test_superficial_health_includes_rank_bonus():
 
 
 def test_skill_improvement_advancement_increases_skill_points():
+    """Verify that skill improvement advancement increases skill points."""
     payload = _payload()
     payload["advancements"] = 1
     payload["advancement_choices"] = [{"type": "skill_improvement", "details": "Combat, Perception"}]
@@ -211,6 +228,7 @@ def test_skill_improvement_advancement_increases_skill_points():
 
 
 def test_skill_improvement_adds_bonus_skill_point_budget():
+    """Verify that skill improvement adds bonus skill point budget."""
     payload = _payload()
     payload["advancements"] = 1
     payload["advancement_choices"] = [{"type": "skill_improvement", "details": "Combat, Perception"}]
@@ -223,6 +241,7 @@ def test_skill_improvement_adds_bonus_skill_point_budget():
 
 
 def test_skill_cap_increases_with_advancement_thresholds():
+    """Verify that skill cap increases with advancement thresholds."""
     payload = _payload()
     payload["advancements"] = 5
     payload["advancement_choices"] = [
@@ -239,6 +258,7 @@ def test_skill_cap_increases_with_advancement_thresholds():
 
 
 def test_build_character_validates_prowess_points_using_option_costs():
+    """Verify that build character validates prowess points using option costs."""
     payload = _payload()
     payload["feats"] = [
         {

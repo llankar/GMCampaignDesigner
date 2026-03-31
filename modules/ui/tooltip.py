@@ -1,3 +1,5 @@
+"""Utilities for tooltip."""
+
 import tkinter as tk
 from modules.helpers.logging_helper import log_module_import
 
@@ -5,6 +7,7 @@ log_module_import(__name__)
 
 class ToolTip:
     def __init__(self, widget, text, delay=500):
+        """Initialize the ToolTip instance."""
         self.widget = widget
         self.text = text
         self.delay = delay
@@ -16,19 +19,23 @@ class ToolTip:
         widget.bind("<ButtonPress>", self.cancel, add="+")
 
     def schedule_wrapper(self, event=None):
+        """Schedule wrapper."""
         self.schedule()
 
     def schedule(self):
+        """Schedule the operation."""
         self.cancel()
         self.after_id = self.widget.after(self.delay, self.showtip)
 
     def cancel(self, event=None):
+        """Handle cancel."""
         if self.after_id:
             self.widget.after_cancel(self.after_id)
             self.after_id = None
         self.hidetip()
 
     def showtip(self):
+        """Handle showtip."""
         if self.tiplabel or not self.text:
             return
 
@@ -54,6 +61,7 @@ class ToolTip:
         label.pack()
 
     def hidetip(self):
+        """Handle hidetip."""
         if self.tiplabel:
             self.tiplabel.destroy()
             self.tiplabel = None

@@ -1,3 +1,5 @@
+"""Regression tests for campaign arc field."""
+
 import importlib.util
 import sys
 import types
@@ -18,6 +20,7 @@ coerce_arc_list = module.coerce_arc_list
 
 
 def test_coerce_arc_list_from_dict_with_arcs_key():
+    """Verify that coerce arc list from dict with arcs key."""
     raw = {
         "arcs": [
             {"name": "Arc Alpha", "status": "Running"},
@@ -35,6 +38,7 @@ def test_coerce_arc_list_from_dict_with_arcs_key():
 
 
 def test_coerce_arc_list_from_text_payload():
+    """Verify that coerce arc list from text payload."""
     raw = {"text": '[{"name": "Text Arc", "objective": "Find clue"}]'}
 
     arcs = coerce_arc_list(raw)
@@ -43,6 +47,7 @@ def test_coerce_arc_list_from_text_payload():
 
 
 def test_coerce_arc_list_single_arc_dict_normalizes_status():
+    """Verify that coerce arc list single arc dict normalizes status."""
     arcs = coerce_arc_list({"name": "Arc Solo", "status": "done"})
 
     assert arcs == [{"name": "Arc Solo", "status": "Completed"}]

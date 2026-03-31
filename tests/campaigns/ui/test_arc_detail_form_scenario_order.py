@@ -1,68 +1,85 @@
+"""Regression tests for arc detail form scenario order."""
+
 from modules.campaigns.ui.arc_studio.detail_form import ArcDetailForm
 
 
 class _FakeListbox:
     def __init__(self, items=None, selection_index=None):
+        """Initialize the _FakeListbox instance."""
         self.items = list(items or [])
         self.selection_index = selection_index
         self.state = "normal"
         self.active_index = None
 
     def curselection(self):
+        """Handle curselection."""
         if self.selection_index is None:
             return ()
         return (self.selection_index,)
 
     def cget(self, key):
+        """Handle cget."""
         if key == "state":
             return self.state
         raise KeyError(key)
 
     def delete(self, start, end=None):
+        """Delete the operation."""
         if start == 0 and end == "end":
             self.items = []
             self.selection_index = None
             return
         if isinstance(start, int) and 0 <= start < len(self.items):
+            # Handle the branch where isinstance(start, int) and 0 <= start < len(items).
             del self.items[start]
             if self.selection_index is not None:
                 if self.selection_index >= len(self.items):
                     self.selection_index = len(self.items) - 1 if self.items else None
 
     def insert(self, _index, value):
+        """Handle insert."""
         self.items.append(value)
 
     def selection_set(self, index):
+        """Handle selection set."""
         self.selection_index = index
 
     def selection_clear(self, _start, _end):
+        """Handle selection clear."""
         self.selection_index = None
 
     def activate(self, index):
+        """Handle activate."""
         self.active_index = index
 
 
 class _FakeButton:
     def __init__(self):
+        """Initialize the _FakeButton instance."""
         self.state = None
 
     def configure(self, **kwargs):
+        """Handle configure."""
         if "state" in kwargs:
             self.state = kwargs["state"]
 
 
 class _FakeScenarioVar:
     def __init__(self, value=""):
+        """Initialize the _FakeScenarioVar instance."""
         self._value = value
 
     def get(self):
+        """Return the operation."""
         return self._value
 
     def set(self, value):
+        """Set the operation."""
         self._value = value
 
 
 def _build_form(items, selected_index):
+    """Build form."""
     form = ArcDetailForm.__new__(ArcDetailForm)
     form._scenario_items = list(items)
     form.scenarios_list = _FakeListbox(items=items, selection_index=selected_index)
@@ -79,6 +96,7 @@ def _build_form(items, selected_index):
 
 
 def test_move_selected_scenario_up_reorders_and_keeps_selection():
+    """Verify that move selected scenario up reorders and keeps selection."""
     form = _build_form(["Alpha", "Bravo", "Charlie"], selected_index=1)
 
     form._move_selected_scenario_up()
@@ -89,6 +107,7 @@ def test_move_selected_scenario_up_reorders_and_keeps_selection():
 
 
 def test_move_selected_scenario_down_reorders_and_keeps_selection():
+    """Verify that move selected scenario down reorders and keeps selection."""
     form = _build_form(["Alpha", "Bravo", "Charlie"], selected_index=1)
 
     form._move_selected_scenario_down()
@@ -99,6 +118,7 @@ def test_move_selected_scenario_down_reorders_and_keeps_selection():
 
 
 def test_sort_scenarios_preserves_selected_title():
+    """Verify that sort scenarios preserves selected title."""
     form = _build_form(["Zulu", "alpha", "Bravo"], selected_index=0)
 
     form._sort_scenarios()
@@ -109,6 +129,7 @@ def test_sort_scenarios_preserves_selected_title():
 
 
 def test_clear_scenarios_empties_list_and_notifies():
+    """Verify that clear scenarios empties list and notifies."""
     form = _build_form(["Alpha"], selected_index=0)
 
     form._clear_scenarios()
@@ -120,6 +141,7 @@ def test_clear_scenarios_empties_list_and_notifies():
 
 
 def test_sync_remove_button_state_handles_move_actions():
+    """Verify that sync remove button state handles move actions."""
     form = _build_form(["Alpha", "Bravo", "Charlie"], selected_index=1)
 
     form._sync_remove_button_state()
@@ -141,6 +163,7 @@ def test_sync_remove_button_state_handles_move_actions():
 
 
 def test_add_scenario_from_picker_adds_selected_value(monkeypatch):
+    """Verify that add scenario from picker adds selected value."""
     form = _build_form(["Alpha"], selected_index=None)
     form._get_available_scenarios = lambda: ["Alpha", "Bravo", "Charlie"]
 
@@ -154,6 +177,7 @@ def test_add_scenario_from_picker_adds_selected_value(monkeypatch):
 
 
 def test_add_scenario_from_picker_falls_back_to_entry_when_no_candidates():
+    """Verify that add scenario from picker falls back to entry when no candidates."""
     form = _build_form(["Alpha"], selected_index=None)
     form._get_available_scenarios = lambda: ["Alpha"]
     form.scenario_entry_var.set("Beta")

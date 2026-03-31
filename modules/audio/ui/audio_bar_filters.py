@@ -1,3 +1,5 @@
+"""Utilities for audio bar filters."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,6 +21,7 @@ def build_audio_bar_filter_options(
     preferred_category: str = "",
     preferred_mood: str = "",
 ) -> AudioBarFilterOptions:
+    """Build audio bar filter options."""
     categories = list(_safe_list_categories(library, section))
     category = _pick_value(categories, preferred_category)
     moods = list(_safe_list_moods(library, section, category)) if category else []
@@ -32,6 +35,7 @@ def build_audio_bar_filter_options(
 
 
 def _safe_list_categories(library: Any, section: str) -> list[str]:
+    """Internal helper for safe list categories."""
     try:
         return list(library.get_categories(section))
     except Exception:
@@ -39,6 +43,7 @@ def _safe_list_categories(library: Any, section: str) -> list[str]:
 
 
 def _safe_list_moods(library: Any, section: str, category: str) -> list[str]:
+    """Internal helper for safe list moods."""
     if not category:
         return []
     try:
@@ -48,6 +53,7 @@ def _safe_list_moods(library: Any, section: str, category: str) -> list[str]:
 
 
 def _pick_value(values: list[str], preferred: str) -> str:
+    """Internal helper for pick value."""
     if preferred and preferred in values:
         return preferred
     if values:

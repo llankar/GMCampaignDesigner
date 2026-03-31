@@ -1,3 +1,5 @@
+"""Utilities for handouts newsletter RTF."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Tuple
@@ -14,11 +16,14 @@ DEFAULT_FONT_SIZE = 12
 
 
 def _render_newsletter_plain(payload: Dict[str, Iterable[Any]] | None) -> str:
+    """Render newsletter plain."""
     return render_plain_newsletter(payload)
 
 
 def _coerce_payload(payload: Any, language: str | None, style: str | None) -> Dict[str, Iterable[Any]]:
+    """Coerce payload."""
     if isinstance(payload, dict):
+        # Handle the branch where isinstance(payload, dict).
         scenario_title = payload.get("scenario_title")
         if scenario_title:
             sections = payload.get("sections")
@@ -26,6 +31,7 @@ def _coerce_payload(payload: Any, language: str | None, style: str | None) -> Di
             return build_newsletter_payload(scenario_title, sections, language, style, base_text)
         return payload
     if isinstance(payload, (list, tuple)):
+        # Handle the branch where isinstance(payload, (list, tuple)).
         if not payload:
             return {}
         scenario_title = payload[0]
@@ -39,13 +45,16 @@ def _coerce_payload(payload: Any, language: str | None, style: str | None) -> Di
 
 
 def _escape_rtf(text: str) -> str:
+    """Internal helper for escape RTF."""
     return text.replace("\\", r"\\").replace("{", r"\{").replace("}", r"\}")
 
 
 def _build_rtf_events(formatting: Dict[str, Iterable[Tuple[int, int]]]) -> List[Tuple[int, str, str]]:
+    """Build RTF events."""
     events: List[Tuple[int, str, str]] = []
     for tag, ranges in (formatting or {}).items():
         for start, end in ranges:
+            # Process each (start, end) from ranges.
             try:
                 s = int(start)
                 e = int(end)
@@ -60,6 +69,7 @@ def _build_rtf_events(formatting: Dict[str, Iterable[Tuple[int, int]]]) -> List[
 
 
 def _rtf_control_for_tag(tag: str, is_open: bool, default_size: int) -> str:
+    """Internal helper for RTF control for tag."""
     if tag == "bold":
         return "\\b" if is_open else "\\b0"
     if tag == "italic":
@@ -67,7 +77,9 @@ def _rtf_control_for_tag(tag: str, is_open: bool, default_size: int) -> str:
     if tag == "underline":
         return "\\ul" if is_open else "\\ul0"
     if tag.startswith("size_"):
+        # Handle the branch where tag.startswith('size_').
         if is_open:
+            # Continue with this path when is open is set.
             try:
                 size = int(tag.split("_", 1)[1])
             except (ValueError, IndexError):
@@ -78,6 +90,7 @@ def _rtf_control_for_tag(tag: str, is_open: bool, default_size: int) -> str:
 
 
 def rtf_json_to_rtf_string(rtf_json: Dict[str, Any], font_name: str = DEFAULT_FONT, font_size: int = DEFAULT_FONT_SIZE) -> str:
+    """Handle RTF JSON to RTF string."""
     text = str(rtf_json.get("text", ""))
     formatting = rtf_json.get("formatting", {}) if isinstance(rtf_json, dict) else {}
     events = _build_rtf_events(formatting)
@@ -87,7 +100,9 @@ def rtf_json_to_rtf_string(rtf_json: Dict[str, Any], font_name: str = DEFAULT_FO
 
     event_index = 0
     for idx in range(len(text) + 1):
+        # Process each idx from range(len(text) + 1).
         while event_index < len(events) and events[event_index][0] == idx:
+            # Keep looping while event_index < len(events) and events[event_index][0] == idx.
             _, kind, tag = events[event_index]
             control = _rtf_control_for_tag(tag, kind == "open", font_size)
             if control:
@@ -111,12 +126,14 @@ def build_newsletter_rtf_json_from_payload(
     language: str | None = None,
     style: str | None = None,
 ) -> Dict[str, Any]:
+    """Build newsletter RTF JSON from payload."""
     resolved_payload = _coerce_payload(payload, language, style)
     plain_text = _render_newsletter_plain(resolved_payload)
     return ai_text_to_rtf_json(plain_text)
 
 
 def build_newsletter_rtf_json_from_ai_text(raw_text: Any) -> Dict[str, Any]:
+    """Build newsletter RTF JSON from AI text."""
     parsed = deserialize_possible_json(raw_text)
     if isinstance(parsed, dict) and ("text" in parsed or "formatting" in parsed):
         return parsed
@@ -124,10 +141,12 @@ def build_newsletter_rtf_json_from_ai_text(raw_text: Any) -> Dict[str, Any]:
 
 
 def build_newsletter_rtf_from_payload(payload: Any, language: str | None = None, style: str | None = None) -> str:
+    """Build newsletter RTF from payload."""
     return rtf_json_to_rtf_string(
         build_newsletter_rtf_json_from_payload(payload, language, style),
     )
 
 
 def build_newsletter_rtf_from_ai_text(raw_text: Any) -> str:
+    """Build newsletter RTF from AI text."""
     return rtf_json_to_rtf_string(build_newsletter_rtf_json_from_ai_text(raw_text))

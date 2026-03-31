@@ -25,12 +25,14 @@ log_module_import(__name__)
 
 
 def _resolve_campaign_dir(campaign_dir: str | None) -> Path:
+    """Resolve campaign dir."""
     base = Path(campaign_dir or ConfigHelper.get_campaign_dir()).resolve()
     base.mkdir(parents=True, exist_ok=True)
     return base
 
 
 def _resolve_pdf_path(attachment_path: str, campaign_dir: str | None) -> Path:
+    """Resolve PDF path."""
     campaign_root = _resolve_campaign_dir(campaign_dir)
     pdf_path = Path(attachment_path or "")
     if not pdf_path.is_absolute():
@@ -68,6 +70,7 @@ def render_pdf_page_to_image(
         close_document = True
 
     try:
+        # Keep PDF page to image resilient if this step fails.
         index = page_number - 1
         if index >= document.page_count:
             raise IndexError(f"Page {page_number} is out of range (1-{document.page_count}).")
@@ -133,6 +136,7 @@ def export_pdf_page_range(
     candidate = excerpt_dir / f"{base_name}_{range_label}.pdf"
     counter = 1
     while candidate.exists():
+        # Keep looping while candidate.exists().
         candidate = excerpt_dir / f"{base_name}_{range_label}_{counter}.pdf"
         counter += 1
 
@@ -170,8 +174,10 @@ def _extract_section_heading(page: fitz.Page) -> Optional[str]:
         blocks = []
 
     for block in sorted(blocks, key=lambda b: (b[1], b[0])):
+        # Process each block from sorted(blocks, key=lambda b: (b[1], b[0])).
         text = (block[4] or "").strip()
         if text:
+            # Continue with this path when text is set.
             heading_line = text.splitlines()[0].strip()
             if heading_line:
                 return heading_line
@@ -206,6 +212,7 @@ def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
 
     labels: Dict[int, str] = {}
     for info in image_info:
+        # Process each info from image_info.
         bbox = info.get("bbox") or ()
         xref = info.get("xref")
         if xref is None or len(bbox) != 4:
@@ -223,9 +230,11 @@ def _extract_paragraph_labels(page: fitz.Page) -> Dict[int, str]:
 
 
 def _collect_text(block: dict) -> str:
+    """Collect text."""
     lines = block.get("lines") or []
     text_parts: list[str] = []
     for line in lines:
+        # Process each line from lines.
         spans = line.get("spans") or []
         for span in spans:
             text_parts.append(span.get("text", ""))
@@ -233,8 +242,10 @@ def _collect_text(block: dict) -> str:
 
 
 def _collect_text_blocks(blocks: Sequence[dict]) -> List[Tuple[Tuple[float, float, float, float], str]]:
+    """Collect text blocks."""
     collected: List[Tuple[Tuple[float, float, float, float], str]] = []
     for block in blocks:
+        # Process each block from blocks.
         if block.get("type") != 0:
             continue
         bbox = block.get("bbox") or ()
@@ -247,8 +258,10 @@ def _collect_text_blocks(blocks: Sequence[dict]) -> List[Tuple[Tuple[float, floa
 
 
 def _collect_image_blocks(blocks: Sequence[dict]) -> List[Tuple[float, float, float, float]]:
+    """Collect image blocks."""
     collected: List[Tuple[float, float, float, float]] = []
     for block in blocks:
+        # Process each block from blocks.
         if block.get("type") != 1:
             continue
         bbox = block.get("bbox") or ()
@@ -262,9 +275,11 @@ def _label_image_blocks(
     image_blocks: Sequence[Tuple[float, float, float, float]],
     text_blocks: Sequence[Tuple[Tuple[float, float, float, float], str]],
 ) -> Dict[int, str]:
+    """Internal helper for label image blocks."""
     labels: Dict[int, str] = {}
 
     for index, image_bbox in enumerate(image_blocks):
+        # Process each (index, image_bbox) from enumerate(image_blocks).
         nearest_text = _find_nearest_text(image_bbox, text_blocks)
         if not nearest_text:
             continue
@@ -287,6 +302,7 @@ def _find_nearest_text(
     best_score: Optional[float] = None
 
     for text_bbox, text in text_blocks:
+        # Process each (text_bbox, text) from text_blocks.
         score = _bbox_distance(image_bbox, text_bbox)
         if best_score is None or score < best_score:
             best_score = score
@@ -316,6 +332,7 @@ def _bbox_distance(
 
 
 def _bbox_center(box: Tuple[float, float, float, float]) -> Tuple[float, float]:
+    """Internal helper for bbox center."""
     x0, y0, x1, y1 = box
     return ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
 
@@ -330,6 +347,7 @@ def _match_image_to_block(
     best_score: Optional[float] = None
 
     for index, block_bbox in enumerate(image_blocks):
+        # Process each (index, block_bbox) from enumerate(image_blocks).
         score = _bbox_distance(bbox, block_bbox)
         if best_score is None or score < best_score:
             best_score = score
@@ -364,7 +382,9 @@ def extract_images_with_names(
     )
 
     try:
+        # Keep images with names resilient if this step fails.
         for page_index in range(document.page_count):
+            # Process each page_index from range(document.page_count).
             page = document.load_page(page_index)
             section_heading = _extract_section_heading(page)
             paragraph_labels = _extract_paragraph_labels(page)
@@ -378,9 +398,11 @@ def extract_images_with_names(
                 continue
 
             for image_position, image_info in enumerate(images, start=1):
+                # Process each (image_position, image_info) from enumerate(images, start=1).
                 xref = image_info[0]
                 original_name = None
                 if len(image_info) > 7 and image_info[7]:
+                    # Handle the branch where len(image_info) > 7 and image_info[7].
                     original_name = image_info[7]
                     if isinstance(original_name, bytes):
                         original_name = original_name.decode(errors="ignore")
@@ -399,6 +421,7 @@ def extract_images_with_names(
                 candidate = image_dir / f"{base_name}.png"
                 counter = 1
                 while candidate.exists():
+                    # Keep looping while candidate.exists().
                     candidate = image_dir / f"{base_name}_{counter}.png"
                     counter += 1
 

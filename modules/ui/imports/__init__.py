@@ -1,3 +1,5 @@
+"""Imports package."""
+
 from modules.ui.imports.text_import_dialog import TextImportDialog
 from modules.ui.imports.web_text_import_dialog import WebTextImportDialog
 from modules.ui.imports.text_import_mappings import (

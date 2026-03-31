@@ -1,3 +1,4 @@
+"""Geometry helpers for detail UI window."""
 from modules.helpers.logging_helper import log_function
 
 

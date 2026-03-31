@@ -7,6 +7,7 @@ __all__ = ["AutoImproveOrchestrator"]
 
 
 def __getattr__(name: str):
+    """Handle getattr."""
     if name == "AutoImproveOrchestrator":
         from .orchestrator import AutoImproveOrchestrator
 

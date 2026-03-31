@@ -1,3 +1,5 @@
+"""Regression tests for arcs read only preview."""
+
 import importlib.util
 import sys
 import types
@@ -15,6 +17,7 @@ ReadOnlyArcsPreview = module.ReadOnlyArcsPreview
 
 
 def test_coerce_arcs_from_dict_wrapper_with_arcs_key():
+    """Verify that coerce arcs from dict wrapper with arcs key."""
     raw = {
         "arcs": [
             {"name": "Arc Alpha", "status": "Running"},
@@ -32,6 +35,7 @@ def test_coerce_arcs_from_dict_wrapper_with_arcs_key():
 
 
 def test_coerce_arcs_from_dict_wrapper_with_text_payload():
+    """Verify that coerce arcs from dict wrapper with text payload."""
     raw = {
         "text": '[{"name": "Arc Through Text", "objective": "Find relic"}]'
     }
@@ -42,6 +46,7 @@ def test_coerce_arcs_from_dict_wrapper_with_text_payload():
 
 
 def test_coerce_arcs_from_stringified_dict_wrapper():
+    """Verify that coerce arcs from stringified dict wrapper."""
     raw = '{"arcs": [{"name": "Nested Arc", "summary": "setup"}]}'
 
     arcs = ReadOnlyArcsPreview._coerce_to_arc_list(raw)

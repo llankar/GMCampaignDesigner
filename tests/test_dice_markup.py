@@ -1,3 +1,5 @@
+"""Regression tests for dice markup."""
+
 from dataclasses import dataclass, replace
 
 import pytest
@@ -96,15 +98,18 @@ _SYSTEM_CASES = (
 
 @pytest.fixture(params=_SYSTEM_CASES, ids=lambda case: case.slug)
 def system_case(monkeypatch, request):
+    """Handle system case."""
     case: _SystemCase = request.param
 
     def _get_config():
+        """Return config."""
         return case.config
 
     invalidate_action_pattern_cache()
     monkeypatch.setattr(dice_markup.system_config_helper, "get_current_system_config", _get_config)
     monkeypatch.setattr(dice_preferences.system_config, "get_current_system_config", _get_config)
     def _make_attack_roll(bonus):
+        """Internal helper for make attack roll."""
         text = str(bonus or "").strip()
         if not text:
             return case.base_roll
@@ -116,6 +121,7 @@ def system_case(monkeypatch, request):
 
 
 def _expected_roll(case: _SystemCase, bonus: str) -> str:
+    """Internal helper for expected roll."""
     normalized = bonus.strip()
     if not normalized.startswith(("+", "-")):
         normalized = f"+{normalized}"
@@ -123,6 +129,7 @@ def _expected_roll(case: _SystemCase, bonus: str) -> str:
 
 
 def test_parse_inline_actions_basic_attack_and_damage(system_case: _SystemCase):
+    """Verify that parse inline actions basic attack and damage."""
     text = "Attacks: [Strike +7|1d8+4 piercing]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -144,6 +151,7 @@ def test_parse_inline_actions_basic_attack_and_damage(system_case: _SystemCase):
 
 
 def test_parse_inline_actions_multiple_segments(system_case: _SystemCase):
+    """Verify that parse inline actions multiple segments."""
     text = "[Strike +7|1d8+4 slashing] and [Fireball|8d6 fire]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -170,6 +178,7 @@ def test_parse_inline_actions_multiple_segments(system_case: _SystemCase):
 
 
 def test_parse_inline_actions_ignores_non_combat_segments(system_case: _SystemCase):
+    """Verify that parse inline actions ignores non combat segments."""
     text = """Lore [Some note]\n[Strike +6|1d8+3 slashing]\nFlavor [Another note]\n"""
 
     display, actions, errors = parse_inline_actions(text)
@@ -186,6 +195,7 @@ def test_parse_inline_actions_ignores_non_combat_segments(system_case: _SystemCa
 
 
 def test_parse_inline_actions_reports_errors_and_retains_markup(system_case: _SystemCase):
+    """Verify that parse inline actions reports errors and retains markup."""
     text = "Broken [Strike +7|bad] text"
     display, actions, errors = parse_inline_actions(text)
 
@@ -198,6 +208,7 @@ def test_parse_inline_actions_reports_errors_and_retains_markup(system_case: _Sy
 
 
 def test_parse_inline_actions_handles_unclosed_segment(system_case: _SystemCase):
+    """Verify that parse inline actions handles unclosed segment."""
     text = "Broken [Strike +7|1d8"
     display, actions, errors = parse_inline_actions(text)
 
@@ -208,6 +219,7 @@ def test_parse_inline_actions_handles_unclosed_segment(system_case: _SystemCase)
 
 
 def test_parse_inline_actions_rejects_nested_segments(system_case: _SystemCase):
+    """Verify that parse inline actions rejects nested segments."""
     text = "Nested [[Strike +7|1d8+4]]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -218,6 +230,7 @@ def test_parse_inline_actions_rejects_nested_segments(system_case: _SystemCase):
 
 
 def test_parse_inline_actions_defaults_label_when_missing(system_case: _SystemCase):
+    """Verify that parse inline actions defaults label when missing."""
     text = "[+7|1d6]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -230,6 +243,7 @@ def test_parse_inline_actions_defaults_label_when_missing(system_case: _SystemCa
 
 
 def test_parse_inline_actions_interprets_damage_plus_modifier_as_system_default(system_case: _SystemCase):
+    """Verify that parse inline actions interprets damage plus modifier as system default."""
     text = "[Smite +8|+6 radiant]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -244,6 +258,7 @@ def test_parse_inline_actions_interprets_damage_plus_modifier_as_system_default(
 
 
 def test_parse_inline_actions_supports_dm_separator(system_case: _SystemCase):
+    """Verify that parse inline actions supports dm separator."""
     text = "[Strike +5 DM 1d8+3 slashing]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -260,6 +275,7 @@ def test_parse_inline_actions_supports_dm_separator(system_case: _SystemCase):
 
 
 def test_parse_inline_actions_supports_dm_with_modifier_damage(system_case: _SystemCase):
+    """Verify that parse inline actions supports dm with modifier damage."""
     text = "[Bash +4 DM +6 bludgeoning]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -277,6 +293,7 @@ def test_parse_inline_actions_supports_dm_with_modifier_damage(system_case: _Sys
 
 
 def test_parse_inline_actions_infers_unmarked_dm_segments(system_case: _SystemCase):
+    """Verify that parse inline actions infers unmarked dm segments."""
     text = (
         "[Archétype standard] NC¥, créature humanoïde FOR +1 DEX +1 CON +1 INT +0 SAG +0 CHA -2 "
         "DEF 14 PV 9 Init 12 Serres et bec +8 DM 2d6+6 Epée +2 DM 1d8+1"
@@ -306,6 +323,7 @@ def test_parse_inline_actions_infers_unmarked_dm_segments(system_case: _SystemCa
 
 
 def test_parse_inline_actions_adds_default_difficulty_buttons(system_case: _SystemCase):
+    """Verify that parse inline actions adds default difficulty buttons."""
     text = "[Strike +4|1d8 slashing]"
     display, actions, errors = parse_inline_actions(text)
 
@@ -335,6 +353,7 @@ def test_parse_inline_actions_adds_default_difficulty_buttons(system_case: _Syst
 
 
 def test_parse_inline_actions_pattern_difficulties_for_2d20(system_case: _SystemCase, monkeypatch: pytest.MonkeyPatch):
+    """Verify that parse inline actions pattern difficulties for 2d20."""
     if system_case.slug != "2d20":
         pytest.skip("Pattern-specific checks only apply to the 2d20 configuration")
 
@@ -372,6 +391,7 @@ def test_parse_inline_actions_pattern_difficulties_for_2d20(system_case: _System
 
 
 def test_build_token_macros_uses_parsed_actions(system_case: _SystemCase):
+    """Verify that build token macros uses parsed actions."""
     actions = [
         {
             "label": "Strike",

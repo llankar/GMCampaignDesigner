@@ -1,3 +1,5 @@
+"""Dialog for generic entity selection."""
+
 import customtkinter as ctk
 import os
 from tkinter import messagebox
@@ -15,6 +17,7 @@ MAX_PORTRAIT_SIZE = (64, 64)
 
 class EntitySelectionDialog(ctk.CTkToplevel):
     def __init__(self, master, entity_type, model_wrapper, template, on_entity_selected):
+        """Initialize the EntitySelectionDialog instance."""
         super().__init__(master)
         self.title(f"Select {entity_type}")
 
@@ -69,6 +72,7 @@ class EntitySelectionDialog(ctk.CTkToplevel):
         ctk.CTkButton(self, text="Open Selected", command=self.open_selected).pack(side="bottom", pady=5)
 
     def create_table_header(self):
+        """Create table header."""
         for col_index, header_text in enumerate(self.headers):
             header_button = ctk.CTkButton(
                 self.table_frame, text=header_text, anchor="w",
@@ -77,6 +81,7 @@ class EntitySelectionDialog(ctk.CTkToplevel):
             header_button.grid(row=0, column=col_index, sticky="ew", padx=5, pady=2)
 
     def refresh_list(self):
+        """Refresh list."""
         for child in self.table_frame.winfo_children():
             if int(child.grid_info()["row"]) > 0:
                 child.destroy()
@@ -85,13 +90,16 @@ class EntitySelectionDialog(ctk.CTkToplevel):
             self.create_item_row(item, row_index)
 
     def create_item_row(self, item, row_index):
+        """Create item row."""
         col_index = 0
 
         if self.has_portrait:
+            # Continue with this path when has portrait is set.
             portrait_value = item.get("Portrait", "")
             portrait_path = primary_portrait(portrait_value)
             resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
             if resolved_portrait and os.path.exists(resolved_portrait):
+                # Handle the branch where resolved portrait is set and os.path.exists(resolved_portrait).
                 if resolved_portrait not in self.image_cache:
                     img = Image.open(resolved_portrait)
                     img.thumbnail(MAX_PORTRAIT_SIZE)
@@ -107,6 +115,7 @@ class EntitySelectionDialog(ctk.CTkToplevel):
             col_index += 1
 
         for field in self.template["fields"]:
+            # Process each field from template['fields'].
             if field["name"] == "Portrait":
                 continue
 
@@ -119,6 +128,7 @@ class EntitySelectionDialog(ctk.CTkToplevel):
             col_index += 1
 
     def filter_items(self):
+        """Handle filter items."""
         query = self.search_var.get().strip().lower()
         self.filtered_items = [
             i for i in self.items if any(query in str(v).lower() for v in i.values())
@@ -126,14 +136,17 @@ class EntitySelectionDialog(ctk.CTkToplevel):
         self.refresh_list()
 
     def sort_column(self, column):
+        """Sort column."""
         self.filtered_items.sort(key=lambda x: str(x.get(column, "")).lower())
         self.refresh_list()
 
     def select_entity(self, item):
+        """Select entity."""
         self.on_entity_selected(item)
         self.destroy()
 
     def open_selected(self):
+        """Open selected."""
         if self.filtered_items:
             self.select_entity(self.filtered_items[0])
         else:

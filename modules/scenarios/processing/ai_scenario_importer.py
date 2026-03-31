@@ -1,3 +1,5 @@
+"""Import helpers for processing AI scenario."""
+
 import json
 import re
 
@@ -20,8 +22,10 @@ def parse_json_relaxed(s: str):
             start = i
             break
     if start is not None:
+        # Handle the branch where start is available.
         tail = s[start:]
         for j in range(len(tail), max(len(tail) - 2000, 0), -1):
+            # Process each j from range(len(tail), max(len(tail) - 2000, 0), -1).
             chunk = tail[:j]
             try:
                 return json.loads(chunk)
@@ -31,13 +35,16 @@ def parse_json_relaxed(s: str):
 
 
 def _clean_code_fence(text: str) -> str:
+    """Internal helper for clean code fence."""
     if text and text.strip().startswith("```"):
         return re.sub(r"^```(?:[a-zA-Z]+)?", "", text, flags=re.IGNORECASE).strip().rstrip("`").strip()
     return text
 
 
 def request_outline(client, compressed_context: str, chunk_range_hint: str, source_label: str, multiple_scenarios: bool):
+    """Handle request outline."""
     if multiple_scenarios:
+        # Continue with this path when multiple scenarios is set.
         outline_schema = {
             "Scenarios": [
                 {
@@ -87,6 +94,7 @@ def request_outline(client, compressed_context: str, chunk_range_hint: str, sour
     outline = parse_json_relaxed(outline_raw)
 
     if multiple_scenarios:
+        # Continue with this path when multiple scenarios is set.
         scenarios = []
         if isinstance(outline, dict):
             scenarios = outline.get("Scenarios") or []
@@ -102,6 +110,7 @@ def request_outline(client, compressed_context: str, chunk_range_hint: str, sour
 
 
 def expand_summary(client, title: str, summary_draft: str, compressed_context: str, chunk_range_hint: str) -> str:
+    """Handle expand summary."""
     prompt_summary = (
         "Rewrite the following scenario summary into a richer, evocative, GM-friendly 2–4 paragraph summary.\n"
         "- Keep the original language.\n\n"
@@ -123,6 +132,7 @@ def expand_summary(client, title: str, summary_draft: str, compressed_context: s
 
 
 def expand_scenes(client, title: str, outline_scenes, compressed_context: str, chunk_range_hint: str):
+    """Handle expand scenes."""
     scenes_schema = {"Scenes": [{"Title": "text", "Text": "multi-paragraph detailed scene"}]}
     prompt_scenes = (
         "Using the outline below and the source text, produce detailed scene writeups.\n"
@@ -146,6 +156,7 @@ def expand_scenes(client, title: str, outline_scenes, compressed_context: str, c
     scenes_expanded_list = []
     for sc in scenes_obj.get("Scenes", []) or []:
         if isinstance(sc, dict):
+            # Handle the branch where isinstance(sc, dict).
             txt = sc.get("Text") or ""
             if isinstance(txt, dict) and "text" in txt:
                 txt = txt.get("text", "")
@@ -154,6 +165,7 @@ def expand_scenes(client, title: str, outline_scenes, compressed_context: str, c
 
 
 def extract_entities(client, compressed_context: str, chunk_range_hint: str, stats_examples: list):
+    """Extract entities."""
     entities_schema = {
         "npcs": [
             {

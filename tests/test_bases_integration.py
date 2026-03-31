@@ -1,3 +1,5 @@
+"""Regression tests for bases integration."""
+
 import sqlite3
 
 from db.db import load_schema_from_json
@@ -8,11 +10,13 @@ from modules.helpers.template_loader import load_entity_definitions, load_templa
 
 
 def _create_table_from_template(db_path, entity_slug):
+    """Create table from template."""
     schema = load_schema_from_json(entity_slug)
     cols = ", ".join(f"{name} {kind}" for name, kind in schema)
     pk = schema[0][0]
     conn = sqlite3.connect(db_path)
     try:
+        # Keep table from template resilient if this step fails.
         conn.execute(
             f"CREATE TABLE {entity_slug} ({cols}, PRIMARY KEY({pk}))"
         )
@@ -22,6 +26,7 @@ def _create_table_from_template(db_path, entity_slug):
 
 
 def test_bases_entity_is_registered_and_template_has_expected_links():
+    """Verify that bases entity is registered and template has expected links."""
     definitions = load_entity_definitions()
     assert definitions["bases"]["label"] == "Bases"
 
@@ -35,6 +40,7 @@ def test_bases_entity_is_registered_and_template_has_expected_links():
 
 
 def test_bases_persistence_round_trip(tmp_path):
+    """Verify that bases persistence round trip."""
     db_path = tmp_path / "bases.db"
     _create_table_from_template(str(db_path), "bases")
     wrapper = GenericModelWrapper("bases", db_path=str(db_path))
@@ -66,6 +72,7 @@ def test_bases_persistence_round_trip(tmp_path):
 
 
 def test_bases_link_groups_include_maps_npcs_and_factions():
+    """Verify that bases link groups include maps NPCs and factions."""
     view = GenericListView.__new__(GenericListView)
     view.template = load_template("bases")
 
@@ -84,6 +91,7 @@ def test_bases_link_groups_include_maps_npcs_and_factions():
 
 
 def test_parent_context_includes_base_details_for_generation():
+    """Verify that parent context includes base details for generation."""
     service = AutoGenerationService()
 
     context = service._build_parent_context(

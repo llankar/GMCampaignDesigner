@@ -1,13 +1,18 @@
+"""Regression tests for generation defaults foundation."""
+
 from types import SimpleNamespace
 import sys
 
 
 class _StubWidget:
     def __init__(self, *args, **kwargs):
+        """Initialize the _StubWidget instance."""
         pass
 
     def __getattr__(self, _name):
+        """Handle getattr."""
         def _method(*_args, **_kwargs):
+            """Internal helper for method."""
             return None
 
         return _method
@@ -15,6 +20,7 @@ class _StubWidget:
 
 class _FakeCTkModule(SimpleNamespace):
     def __getattr__(self, _name):
+        """Handle getattr."""
         return _StubWidget
 
 
@@ -40,21 +46,26 @@ from modules.campaigns.ui import campaign_builder_wizard
 
 class _FakeVar:
     def __init__(self, value=""):
+        """Initialize the _FakeVar instance."""
         self._value = value
 
     def get(self):
+        """Return the operation."""
         return self._value
 
 
 class _FakeTextBox:
     def __init__(self, value=""):
+        """Initialize the _FakeTextBox instance."""
         self._value = value
 
     def get(self, *_args, **_kwargs):
+        """Return the operation."""
         return self._value
 
 
 def test_build_arc_generation_foundation_includes_generation_defaults(monkeypatch):
+    """Verify that build arc generation foundation includes generation defaults."""
     monkeypatch.setattr(campaign_builder_wizard, "load_existing_entity_catalog", lambda _types: {"factions": ["Dawn Guard"]})
 
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(campaign_builder_wizard.CampaignBuilderWizard)

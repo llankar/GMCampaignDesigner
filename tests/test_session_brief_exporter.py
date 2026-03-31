@@ -1,3 +1,5 @@
+"""Regression tests for session brief exporter."""
+
 from pathlib import Path
 
 from modules.exports.session_brief import export_session_brief
@@ -5,6 +7,7 @@ from modules.exports.session_brief import exporter as session_brief_exporter
 
 
 def test_export_session_brief_markdown(tmp_path: Path):
+    """Verify that export session brief markdown."""
     output = tmp_path / "brief.md"
     path = export_session_brief(
         campaign_name="Dragonfall",
@@ -31,8 +34,10 @@ def test_export_session_brief_markdown(tmp_path: Path):
 
 
 def test_export_session_brief_docx(tmp_path: Path, monkeypatch):
+    """Verify that export session brief docx."""
     class _FakeDocument:
         def save(self, path: str) -> None:
+            """Save the operation."""
             Path(path).write_bytes(b"fake-docx")
 
     monkeypatch.setattr(session_brief_exporter, "_build_docx_document", lambda **_: _FakeDocument())
@@ -55,6 +60,7 @@ def test_export_session_brief_docx(tmp_path: Path, monkeypatch):
 
 
 def test_export_session_brief_pdf_fallback_returns_non_pdf_file_when_unavailable(tmp_path: Path):
+    """Verify that export session brief PDF fallback returns non PDF file when unavailable."""
     output = tmp_path / "brief.pdf"
 
     path = export_session_brief(

@@ -1,3 +1,5 @@
+"""Panel for audio track."""
+
 from __future__ import annotations
 
 import os
@@ -8,6 +10,7 @@ import customtkinter as ctk
 
 
 def build_track_panel(parent: Any, *, section: str, controller_state: dict[str, Any] | None, get_setting: Callable[[str, str, Any], Any], on_play: Callable[[str], None], on_stop: Callable[[str], None], on_next: Callable[[str], None], on_previous: Callable[[str], None], on_toggle_shuffle: Callable[[str], None], on_toggle_loop: Callable[[str], None], on_toggle_continue: Callable[[str], None], on_volume_change: Callable[[str, float], None], on_add_files: Callable[[str], None], on_add_folder: Callable[[str], None], on_rescan: Callable[[str], None], on_ai_sort: Callable[[str], None], on_remove_tracks: Callable[[str], None], on_classify_moods: Callable[[str], None]) -> dict[str, Any]:
+    """Build track panel."""
     frame = ctk.CTkFrame(parent)
     frame.grid(row=0, column=2, sticky="nsew")
     frame.grid_rowconfigure(1, weight=1)
@@ -75,10 +78,12 @@ def build_track_panel(parent: Any, *, section: str, controller_state: dict[str, 
 
     status_text = ""
     if controller_state:
+        # Continue with this path when controller state is set.
         track_for_status = controller_state.get("current_track") or {}
         if controller_state.get("last_error"):
             status_text = f"Error: {controller_state.get('last_error')}"
         elif controller_state.get("is_playing") and track_for_status:
+            # Continue with this path when controller_state.get('is_playing') and track for status is set.
             name = track_for_status.get("name") or os.path.basename(track_for_status.get("path", ""))
             status_text = f"Playing '{name}'."
         elif track_for_status:
@@ -89,8 +94,10 @@ def build_track_panel(parent: Any, *, section: str, controller_state: dict[str, 
 
     now_playing_text = ""
     if controller_state:
+        # Continue with this path when controller state is set.
         track = controller_state.get("current_track") or {}
         if controller_state.get("is_playing") and track:
+            # Continue with this path when controller_state.get('is_playing') and track is set.
             name = track.get("name") or os.path.basename(track.get("path", ""))
             now_playing_text = f"Now playing: {name}"
         elif track:

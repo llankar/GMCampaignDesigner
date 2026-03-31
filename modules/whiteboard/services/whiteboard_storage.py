@@ -1,3 +1,5 @@
+"""Storage helpers for whiteboard."""
+
 import json
 import os
 from dataclasses import dataclass, field
@@ -12,6 +14,7 @@ DEFAULT_SIZE: Tuple[int, int] = (1920, 1080)
 
 
 def _storage_path() -> str:
+    """Internal helper for storage path."""
     campaign_dir = ConfigHelper.get_campaign_dir()
     os.makedirs(campaign_dir, exist_ok=True)
     return os.path.join(campaign_dir, "whiteboard_state.json")
@@ -32,9 +35,11 @@ class WhiteboardState:
 
     @staticmethod
     def from_dict(raw: Dict[str, Any]) -> "WhiteboardState":
+        """Handle from dict."""
         items = raw.get("items") or []
         size = tuple(raw.get("size") or DEFAULT_SIZE)
         try:
+            # Keep from dict resilient if this step fails.
             if len(size) != 2:
                 size = DEFAULT_SIZE
         except Exception:
@@ -53,6 +58,7 @@ class WhiteboardState:
         )
 
     def to_dict(self) -> Dict[str, Any]:
+        """Handle to dict."""
         serialized_items = []
         for item in self.items:
             clean = {
@@ -80,10 +86,12 @@ class WhiteboardStorage:
 
     @staticmethod
     def load_state() -> WhiteboardState:
+        """Load state."""
         path = _storage_path()
         if not os.path.exists(path):
             return WhiteboardState()
         try:
+            # Keep state resilient if this step fails.
             with open(path, "r", encoding="utf-8") as fh:
                 data = json.load(fh)
             return WhiteboardState.from_dict(data)
@@ -92,8 +100,10 @@ class WhiteboardStorage:
 
     @staticmethod
     def save_state(state: WhiteboardState) -> None:
+        """Save state."""
         path = _storage_path()
         try:
+            # Keep state resilient if this step fails.
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(state.to_dict(), fh, ensure_ascii=False, indent=2)
             log_info("Saved whiteboard state", func_name="WhiteboardStorage.save_state")
@@ -103,6 +113,7 @@ class WhiteboardStorage:
 
     @staticmethod
     def clear_state() -> None:
+        """Clear state."""
         path = _storage_path()
         if os.path.exists(path):
             try:

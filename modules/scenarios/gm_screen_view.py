@@ -1,3 +1,5 @@
+"""View for scenario GM screen."""
+
 import customtkinter as ctk
 import tkinter as tk
 import os
@@ -57,6 +59,7 @@ DEFAULT_MAP_THUMBNAIL_SIZE = (200, 140)
 @log_methods
 class GMScreenView(ctk.CTkFrame):
     def __init__(self, master, scenario_item, *args, initial_layout=None, layout_manager=None, **kwargs):
+        """Initialize the GMScreenView instance."""
         super().__init__(master, *args, **kwargs)
         # Persistent cache for portrait images
         self.portrait_images = {}
@@ -258,6 +261,7 @@ class GMScreenView(ctk.CTkFrame):
 
     # -- Runtime sizing helpers -------------------------------------------------
     def _bind_layout_host(self, host) -> None:
+        """Bind layout host."""
         if host is None:
             return
         host_key = str(host)
@@ -275,6 +279,7 @@ class GMScreenView(ctk.CTkFrame):
             pass
 
     def _ensure_rich_host(self):
+        """Ensure rich host."""
         host = self._rich_host
         if host is None or not host.winfo_exists():
             host = ctk.CTkFrame(self)
@@ -283,6 +288,7 @@ class GMScreenView(ctk.CTkFrame):
         return host
 
     def _get_active_attached_frame(self):
+        """Return active attached frame."""
         if not self.current_tab:
             return None
         tab = self.tabs.get(self.current_tab)
@@ -291,15 +297,18 @@ class GMScreenView(ctk.CTkFrame):
         return tab.get("content_frame")
 
     def _active_tab_layout_ready(self) -> bool:
+        """Internal helper for active tab layout ready."""
         frame = self._get_active_attached_frame()
         if frame is None or not frame.winfo_exists():
             return False
         try:
+            # Keep active tab layout ready resilient if this step fails.
             if not frame.winfo_manager() or not frame.winfo_ismapped():
                 return False
         except Exception:
             return False
         try:
+            # Keep active tab layout ready resilient if this step fails.
             rich_host = getattr(self, "_rich_host", None)
             if rich_host is not None and rich_host.winfo_exists() and frame.master == rich_host:
                 viewport = rich_host
@@ -319,6 +328,7 @@ class GMScreenView(ctk.CTkFrame):
         return True
 
     def _request_active_tab_layout_settle(self) -> None:
+        """Internal helper for request active tab layout settle."""
         self._layout_probe_signature = None
         self._layout_settle_scheduler.schedule(
             "active-tab-layout",
@@ -327,6 +337,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def _settle_active_tab_layout(self) -> None:
+        """Internal helper for settle active tab layout."""
         frame = self._get_active_attached_frame()
         if frame is None:
             return
@@ -342,6 +353,7 @@ class GMScreenView(ctk.CTkFrame):
         self._refresh_scrollregion(frame)
 
     def _should_sync_fullbleed(self, frame, tab_meta: dict | None = None) -> bool:
+        """Return whether sync fullbleed."""
         meta = tab_meta or {}
         if meta.get("host") == "rich":
             return True
@@ -353,6 +365,7 @@ class GMScreenView(ctk.CTkFrame):
         return False
 
     def _refresh_scrollregion(self, container) -> None:
+        """Refresh scrollregion."""
         canvases = []
         scroll_canvas = getattr(container, "_scroll_canvas", None)
         parent_canvas = getattr(container, "_parent_canvas", None)
@@ -363,6 +376,7 @@ class GMScreenView(ctk.CTkFrame):
 
         for canvas in canvases:
             try:
+                # Keep scrollregion resilient if this step fails.
                 bbox = canvas.bbox("all")
                 if bbox:
                     canvas.configure(scrollregion=bbox)
@@ -370,9 +384,11 @@ class GMScreenView(ctk.CTkFrame):
                 continue
 
     def _sync_fullbleed_now(self, container: ctk.CTkFrame | None):
+        """Synchronize fullbleed now."""
         if not container or not container.winfo_exists():
             return
         try:
+            # Keep fullbleed now resilient if this step fails.
             rich_host = getattr(self, "_rich_host", None)
             if rich_host is not None and rich_host.winfo_exists() and container.master == rich_host:
                 viewport = rich_host
@@ -389,18 +405,21 @@ class GMScreenView(ctk.CTkFrame):
             pass
 
     def _build_hidden_tab_content(self, host_parent, content_factory, *, scrollable=False):
+        """Build hidden tab content."""
         container = ctk.CTkFrame(host_parent, fg_color="transparent")
         scroll_host = build_scroll_host(container) if scrollable else None
         build_parent = scroll_host if scroll_host is not None else container
         built = content_factory(build_parent)
         if built is not None and built is not container:
             try:
+                # Keep hidden tab content resilient if this step fails.
                 if not built.winfo_manager():
                     built.pack(fill="both", expand=True)
             except Exception:
                 pass
 
         def _proxy_attr(attr_name):
+            """Internal helper for proxy attr."""
             if built is None or not hasattr(built, attr_name):
                 return
             try:
@@ -436,6 +455,7 @@ class GMScreenView(ctk.CTkFrame):
         return container
 
     def _create_initial_scenario_tab(self):
+        """Create initial scenario tab."""
         scenario_name = self.scenario.get("Title", "Unnamed Scenario")
         factory = lambda master: create_entity_detail_frame(
             "Scenarios",
@@ -460,8 +480,10 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def _build_add_menu(self):
+        """Build add menu."""
         menu = tk.Menu(self, tearoff=0)
         for option in self._add_menu_options:
+            # Process each option from _add_menu_options.
             if option == "separator":
                 menu.add_separator()
                 continue
@@ -474,6 +496,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def _load_map_records(self):
+        """Load map records."""
         try:
             items = self.map_wrapper.load_items() if self.map_wrapper else []
         except Exception as exc:
@@ -485,6 +508,7 @@ class GMScreenView(ctk.CTkFrame):
 
         records = {}
         for item in items or []:
+            # Process each item from items or [].
             name = str(item.get("Name") or "").strip()
             if not name:
                 continue
@@ -492,6 +516,7 @@ class GMScreenView(ctk.CTkFrame):
         return records
 
     def _get_map_record(self, map_name):
+        """Return map record."""
         if not map_name:
             return None
         if map_name not in self._map_records:
@@ -499,6 +524,7 @@ class GMScreenView(ctk.CTkFrame):
         return self._map_records.get(map_name)
 
     def get_map_thumbnail(self, map_name, size=None):
+        """Return map thumbnail."""
         name = (map_name or "").strip()
         if not name:
             return None
@@ -530,6 +556,7 @@ class GMScreenView(ctk.CTkFrame):
             return None
 
         try:
+            # Keep map thumbnail resilient if this step fails.
             with Image.open(image_path) as img:
                 img = img.convert("RGBA")
                 target_w, target_h = size_tuple
@@ -551,6 +578,7 @@ class GMScreenView(ctk.CTkFrame):
         return thumbnail
 
     def open_map_tool(self, map_name):
+        """Open map tool."""
         target = (map_name or "").strip()
         if not target:
             return
@@ -566,6 +594,7 @@ class GMScreenView(ctk.CTkFrame):
 
         current = getattr(host, "master", None)
         while current is not None and current not in candidates:
+            # Keep looping while current is available and current is not in candidates.
             candidates.append(current)
             current = getattr(current, "master", None)
 
@@ -595,6 +624,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def _load_persisted_state(self):
+        """Load persisted state."""
         manager = getattr(self, "layout_manager", None)
         if manager is None:
             self._state_loaded = True
@@ -621,6 +651,7 @@ class GMScreenView(ctk.CTkFrame):
         if top is None or master is not top:
             return
         try:
+            # Keep setup toplevel shortcuts resilient if this step fails.
             self._bound_shortcut_owner = top
             self._ctrl_f_binding = top.bind("<Control-f>", self.open_global_search, add="+")
             self._ctrl_F_binding = top.bind("<Control-F>", self.open_global_search, add="+")
@@ -642,10 +673,12 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_release_binding = None
 
     def _teardown_toplevel_shortcuts(self):
+        """Tear down toplevel shortcuts."""
         top = self._bound_shortcut_owner
         if not top:
             return
         try:
+            # Keep toplevel shortcuts resilient if this step fails.
             if self._ctrl_f_binding:
                 top.unbind("<Control-f>", self._ctrl_f_binding)
             if self._ctrl_F_binding:
@@ -670,12 +703,14 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_release_binding = None
 
     def _on_destroy(self, event=None):
+        """Handle destroy."""
         if event is not None and event.widget is not self:
             return
         self._end_session(silent=True)
         self._teardown_toplevel_shortcuts()
 
     def _build_session_controls(self):
+        """Build session controls."""
         self._load_session_hours()
         ctk.CTkLabel(self._session_controls, text="Session:").pack(side="left", padx=(6, 4))
 
@@ -722,6 +757,7 @@ class GMScreenView(ctk.CTkFrame):
         self._update_session_controls_state()
 
     def _load_session_hours(self):
+        """Load session hours."""
         defaults = {"mid_hours": 1.0, "end_hours": 2.0}
         manager = getattr(self, "layout_manager", None)
         if manager is None:
@@ -735,6 +771,7 @@ class GMScreenView(ctk.CTkFrame):
         self._session_end_var.set("" if end_value is None else str(end_value))
 
     def _parse_hours_value(self, value: str) -> Optional[float]:
+        """Parse hours value."""
         trimmed = value.strip()
         if not trimmed:
             return None
@@ -744,6 +781,7 @@ class GMScreenView(ctk.CTkFrame):
             return None
 
     def _persist_session_hours(self, _event=None):
+        """Persist session hours."""
         mid_value = self._parse_hours_value(self._session_mid_var.get())
         end_value = self._parse_hours_value(self._session_end_var.get())
         manager = getattr(self, "layout_manager", None)
@@ -752,6 +790,7 @@ class GMScreenView(ctk.CTkFrame):
         manager.set_session_hours(self.scenario_name, mid_value, end_value)
 
     def _start_session(self):
+        """Start session."""
         mid_value = self._parse_hours_value(self._session_mid_var.get())
         end_value = self._parse_hours_value(self._session_end_var.get())
         if mid_value is None or end_value is None:
@@ -778,6 +817,7 @@ class GMScreenView(ctk.CTkFrame):
         self._update_session_controls_state()
 
     def _end_session(self, silent: bool = False):
+        """Internal helper for end session."""
         if not self._session_active and not self._plot_twist_scheduler.is_active():
             return
         if not silent:
@@ -790,6 +830,7 @@ class GMScreenView(ctk.CTkFrame):
         self._update_session_controls_state()
 
     def _update_session_controls_state(self):
+        """Update session controls state."""
         is_active = bool(self._session_active)
         try:
             self._session_start_button.configure(state=("disabled" if is_active else "normal"))
@@ -798,6 +839,7 @@ class GMScreenView(ctk.CTkFrame):
             pass
 
     def _handle_mid_plot_twist(self):
+        """Internal helper for handle mid plot twist."""
         result = roll_plot_twist()
         messagebox.showinfo(
             "Plot Twist",
@@ -805,6 +847,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def _handle_end_plot_twist(self):
+        """Internal helper for handle end plot twist."""
         result = roll_plot_twist()
         messagebox.showinfo(
             "Plot Twist",
@@ -812,6 +855,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def _persist_scene_state(self):
+        """Persist scene state."""
         if not self._state_loaded:
             return
         manager = getattr(self, "layout_manager", None)
@@ -826,8 +870,10 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def open_global_search(self, event=None):
+        """Open global search."""
         # Ensure the view is still alive before creating child windows
         try:
+            # Keep global search resilient if this step fails.
             if not int(self.winfo_exists()):
                 return
         except tk.TclError:
@@ -879,6 +925,7 @@ class GMScreenView(ctk.CTkFrame):
 
         # 4) Navigation: ↓ from entry dives into list
         def dive_into_list(evt):
+            """Handle dive into list."""
             if listbox.size() > 0:
                 listbox.selection_clear(0, "end")
                 listbox.selection_set(0)
@@ -892,12 +939,15 @@ class GMScreenView(ctk.CTkFrame):
 
         # 6) Populate & auto-select first
         def populate(initial=False, query=""):
+            """Handle populate."""
             listbox.delete(0, "end")
             search_map.clear()
             for entity_type, wrapper in self.wrappers.items():
+                # Process each (entity_type, wrapper) from wrappers.items().
                 items = wrapper.load_items()
                 key = "Title" if entity_type in ("Scenarios", "Informations") else "Name"
                 for item in items:
+                    # Process each item from items.
                     name = item.get(key, "")
                     if initial or query in name.lower():
                         display = f"{entity_type[:-1]}: {name}"
@@ -913,12 +963,14 @@ class GMScreenView(ctk.CTkFrame):
 
         # 7) Filter on typing
         def on_search(evt):
+            """Handle search."""
             q = entry.get().strip().lower()
             populate(initial=False, query=q)
         entry.bind("<KeyRelease>", on_search)
 
         # 8) Selection handler
         def on_select(evt=None):
+            """Handle select."""
             if not search_map:
                 return
             selection = listbox.curselection()
@@ -937,6 +989,7 @@ class GMScreenView(ctk.CTkFrame):
         listbox.bind("<Double-Button-1>", on_select)
 
     def open_chatbot(self, event=None):
+        """Open chatbot."""
         try:
             host = self.winfo_toplevel()
         except Exception:
@@ -950,6 +1003,7 @@ class GMScreenView(ctk.CTkFrame):
             )
 
     def load_template(self, filename):
+        """Load template."""
         base_path = os.path.dirname(__file__)
         template_path = os.path.join(base_path, "..", filename)
         with open(template_path, "r", encoding="utf-8") as file:
@@ -957,9 +1011,11 @@ class GMScreenView(ctk.CTkFrame):
         # Merge custom_fields if present so GM screen also shows user-defined fields
         fields = list(data.get("fields", []))
         if isinstance(data.get("custom_fields"), list):
+            # Handle the branch where isinstance(data.get('custom_fields'), list).
             existing = {str(f.get("name", "")).strip() for f in fields}
             for f in data["custom_fields"]:
                 try:
+                    # Keep template resilient if this step fails.
                     name = str(f.get("name", "")).strip()
                     if not name or name in existing:
                         continue
@@ -972,6 +1028,7 @@ class GMScreenView(ctk.CTkFrame):
         return {"fields": fields}
 
     def add_tab(self, name, content_frame, content_factory=None, layout_meta=None, activate=True):
+        """Handle add tab."""
         log_info(f"Adding GM screen tab: {name}", func_name="GMScreenView.add_tab")
         tab_frame = ctk.CTkFrame(
             self.tab_bar,
@@ -1053,6 +1110,7 @@ class GMScreenView(ctk.CTkFrame):
         self.reposition_add_button()
 
     def _teardown_tab_content(self, frame):
+        """Tear down tab content."""
         if frame is None:
             return
         controller = getattr(frame, "whiteboard_controller", None)
@@ -1063,6 +1121,7 @@ class GMScreenView(ctk.CTkFrame):
                 pass
 
     def _apply_initial_layout(self):
+        """Apply initial layout."""
         layout_name = self._pending_initial_layout
         if not layout_name:
             layout_name = self.layout_manager.get_scenario_default(self.scenario_name)
@@ -1071,6 +1130,7 @@ class GMScreenView(ctk.CTkFrame):
         self.load_layout(layout_name, silent=True)
 
     def _initialize_context_menu(self):
+        """Internal helper for initialize context menu."""
         if self._context_menu is not None:
             return
 
@@ -1083,17 +1143,20 @@ class GMScreenView(ctk.CTkFrame):
 
         targets = [self, self.content_area, getattr(self.content_area, "_scrollable_frame", None)]
         for widget in targets:
+            # Process each widget from targets.
             if widget is None:
                 continue
             widget.bind("<Button-3>", self._show_context_menu)
             widget.bind("<Control-Button-1>", self._show_context_menu)
 
     def reset_scene_widgets(self):
+        """Reset scene widgets."""
         self._scene_vars = {}
         self._scene_order = []
         self._scene_metadata = {}
 
     def register_scene_widget(self, scene_key, var, checkbox, display_label=None, description=None, note_title=None):
+        """Register scene widget."""
         self._scene_vars[scene_key] = {
             "var": var,
             "checkbox": checkbox,
@@ -1109,6 +1172,7 @@ class GMScreenView(ctk.CTkFrame):
         self._scene_completion_state.setdefault(scene_key, bool(var.get()))
 
         def _on_change(*_):
+            """Handle change."""
             self._on_scene_var_change(scene_key)
 
         try:
@@ -1121,6 +1185,7 @@ class GMScreenView(ctk.CTkFrame):
             checkbox.bind("<Control-Button-1>", self._show_context_menu)
 
     def _on_scene_var_change(self, scene_key):
+        """Handle scene var change."""
         var_info = self._scene_vars.get(scene_key)
         if not var_info:
             return
@@ -1131,9 +1196,11 @@ class GMScreenView(ctk.CTkFrame):
             self._append_scene_to_notes(scene_key)
 
     def get_scene_completion(self, scene_key):
+        """Return scene completion."""
         return self._scene_completion_state.get(scene_key, False)
 
     def _set_scene_var(self, scene_key, value):
+        """Set scene var."""
         var_info = self._scene_vars.get(scene_key)
         if not var_info:
             self._scene_completion_state[scene_key] = bool(value)
@@ -1149,15 +1216,18 @@ class GMScreenView(ctk.CTkFrame):
             self._append_scene_to_notes(scene_key)
 
     def set_active_scene(self, scene_key):
+        """Set active scene."""
         self._active_scene_key = scene_key
 
     def mark_active_scene_complete(self):
+        """Handle mark active scene complete."""
         if self._active_scene_key and self._active_scene_key in self._scene_vars:
             self._set_scene_var(self._active_scene_key, True)
             return True
         return self.mark_next_scene_complete()
 
     def mark_next_scene_complete(self):
+        """Handle mark next scene complete."""
         for key in self._scene_order:
             if not self._scene_completion_state.get(key, False):
                 self._active_scene_key = key
@@ -1166,6 +1236,7 @@ class GMScreenView(ctk.CTkFrame):
         return False
 
     def _append_note_entry(self, entry_text):
+        """Append note entry."""
         if not entry_text:
             return
         text = entry_text.strip()
@@ -1186,6 +1257,7 @@ class GMScreenView(ctk.CTkFrame):
         self._persist_scene_state()
 
     def _capture_scene_snapshot(self):
+        """Internal helper for capture scene snapshot."""
         metadata = self._scene_metadata.get(self._active_scene_key) if self._active_scene_key else {}
         entry = build_scene_snapshot_entry(
             timestamp=datetime.now(),
@@ -1196,6 +1268,7 @@ class GMScreenView(ctk.CTkFrame):
         self._append_note_entry(entry)
 
     def _append_session_debrief(self):
+        """Append session debrief."""
         labels = {}
         for key, metadata in self._scene_metadata.items():
             label = (metadata or {}).get("display_label") or key
@@ -1226,6 +1299,7 @@ class GMScreenView(ctk.CTkFrame):
         self._append_note_entry(entry)
 
     def add_timestamped_note(self):
+        """Handle add timestamped note."""
         if not self.note_widget:
             return
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1236,7 +1310,9 @@ class GMScreenView(ctk.CTkFrame):
         self._update_note_cache()
 
     def open_note_editor(self):
+        """Open note editor."""
         if self._note_editor_window and self._note_editor_window.winfo_exists():
+            # Handle the branch where note editor window is set and _note_editor_window.winfo_exists().
             try:
                 self._note_editor_window.lift()
                 self._note_editor_window.focus_force()
@@ -1276,6 +1352,7 @@ class GMScreenView(ctk.CTkFrame):
             pass
 
         try:
+            # Keep note editor resilient if this step fails.
             editor.attributes("-fullscreen", True)
         except Exception:
             try:
@@ -1305,12 +1382,14 @@ class GMScreenView(ctk.CTkFrame):
         text_box.insert("1.0", self._note_cache)
 
         def save_and_close(event=None):
+            """Save and close."""
             note_text = text_box.get("1.0", "end-1c")
             self._apply_note_editor_changes(note_text)
             self._close_note_editor_window()
             return "break"
 
         def cancel_and_close(event=None):
+            """Handle cancel and close."""
             self._close_note_editor_window()
             return "break"
 
@@ -1339,6 +1418,7 @@ class GMScreenView(ctk.CTkFrame):
         self._note_editor_window = editor
 
     def _apply_note_editor_changes(self, new_text):
+        """Apply note editor changes."""
         self._note_cache = new_text
         widget = self.note_widget
         widget_exists = False
@@ -1349,6 +1429,7 @@ class GMScreenView(ctk.CTkFrame):
                 widget_exists = False
 
         if widget_exists:
+            # Continue with this path when widget exists is set.
             widget.delete("1.0", "end")
             if new_text:
                 widget.insert("1.0", new_text)
@@ -1357,8 +1438,10 @@ class GMScreenView(ctk.CTkFrame):
             self._persist_scene_state()
 
     def _close_note_editor_window(self, event=None):
+        """Close note editor window."""
         window = getattr(self, "_note_editor_window", None)
         if window is not None:
+            # Handle the branch where window is available.
             try:
                 window.grab_release()
             except Exception:
@@ -1370,11 +1453,13 @@ class GMScreenView(ctk.CTkFrame):
         self._note_editor_window = None
 
     def _update_note_cache(self, event=None):
+        """Update note cache."""
         if self.note_widget:
             self._note_cache = self.note_widget.get("1.0", "end-1c")
             self._persist_scene_state()
 
     def register_note_widget(self, widget):
+        """Register note widget."""
         self.note_widget = widget
         widget.delete("1.0", "end")
         if self._note_cache:
@@ -1385,9 +1470,11 @@ class GMScreenView(ctk.CTkFrame):
         widget.bind("<Control-Button-1>", self._show_context_menu)
 
     def get_note_text(self):
+        """Return note text."""
         return self._note_cache
 
     def _append_scene_to_notes(self, scene_key):
+        """Append scene to notes."""
         metadata = self._scene_metadata.get(scene_key) or {}
         description = (metadata.get("description") or "").strip()
         if not description:
@@ -1418,6 +1505,7 @@ class GMScreenView(ctk.CTkFrame):
             self._persist_scene_state()
 
     def _get_active_entity_frame(self):
+        """Return active entity frame."""
         if not self.current_tab:
             return None
         tab_info = self.tabs.get(self.current_tab, {})
@@ -1427,6 +1515,7 @@ class GMScreenView(ctk.CTkFrame):
         return tab_info.get("content_frame")
 
     def _get_active_entity_edit_handler(self):
+        """Return active entity edit handler."""
         frame = self._get_active_entity_frame()
         if frame is None:
             return None
@@ -1434,13 +1523,17 @@ class GMScreenView(ctk.CTkFrame):
         return handler if callable(handler) else None
 
     def _edit_current_entity(self):
+        """Internal helper for edit current entity."""
         handler = self._get_active_entity_edit_handler()
         if not handler:
             return
 
         def _open_editor():
+            """Open editor."""
             try:
+                # Keep editor resilient if this step fails.
                 if self._context_menu is not None:
+                    # Handle the branch where context menu is available.
                     try:
                         # Explicitly close any visible menu before opening the
                         # editor window. Some Tk builds can keep the menu
@@ -1463,6 +1556,7 @@ class GMScreenView(ctk.CTkFrame):
         self.after_idle(_open_editor)
 
     def _show_context_menu(self, event):
+        """Show context menu."""
         if not self._context_menu:
             return
         if self.current_tab == self.scenario_name:
@@ -1478,11 +1572,13 @@ class GMScreenView(ctk.CTkFrame):
         except Exception:
             pass
         try:
+            # Keep context menu resilient if this step fails.
             self._context_menu.tk_popup(event.x_root, event.y_root)
         finally:
             self._context_menu.grab_release()
 
     def _update_layout_status(self, name=None):
+        """Update layout status."""
         self.current_layout_name = name
         if name:
             self.layout_status_label.configure(text=f"Layout: {name}")
@@ -1493,18 +1589,22 @@ class GMScreenView(ctk.CTkFrame):
     # Layout persistence helpers
     # ------------------------------------------------------------------
     def _serialize_current_layout(self):
+        """Serialize current layout."""
         layout_tabs = []
         for tab_name in self.tab_order:
+            # Process each tab_name from tab_order.
             tab_info = self.tabs.get(tab_name)
             if not tab_info:
                 continue
             meta = dict(tab_info.get("meta") or {})
             meta["title"] = tab_name
             if meta.get("kind") == "note":
+                # Handle the branch where meta.get('kind') == 'note'.
                 frame = tab_info.get("content_frame")
                 if frame is not None and hasattr(frame, "text_box"):
                     meta["text"] = frame.text_box.get("1.0", "end-1c")
             elif meta.get("kind") == "world_map":
+                # Handle the branch where meta.get('kind') == 'world_map'.
                 frame = tab_info.get("content_frame")
                 map_name = None
                 panel = getattr(frame, "world_map_panel", None)
@@ -1515,6 +1615,7 @@ class GMScreenView(ctk.CTkFrame):
                 else:
                     meta.pop("map_name", None)
             elif meta.get("kind") == "map_tool":
+                # Handle the branch where meta.get('kind') == 'map_tool'.
                 frame = tab_info.get("content_frame")
                 controller = getattr(frame, "map_controller", None)
                 current = getattr(controller, "current_map", None)
@@ -1526,6 +1627,7 @@ class GMScreenView(ctk.CTkFrame):
                 else:
                     meta.pop("map_name", None)
             elif meta.get("kind") == "scene_flow":
+                # Handle the branch where meta.get('kind') == 'scene_flow'.
                 frame = tab_info.get("content_frame")
                 viewer = getattr(frame, "scene_flow_viewer", None)
                 title = None
@@ -1539,6 +1641,7 @@ class GMScreenView(ctk.CTkFrame):
                 else:
                     meta.pop("scenario_title", None)
             elif meta.get("kind") == "random_tables":
+                # Handle the branch where meta.get('kind') == 'random_tables'.
                 frame = tab_info.get("content_frame")
                 if frame is not None and hasattr(frame, "get_state"):
                     meta["state"] = frame.get_state()
@@ -1556,6 +1659,7 @@ class GMScreenView(ctk.CTkFrame):
         }
 
     def _prompt_save_layout(self):
+        """Internal helper for prompt save layout."""
         data = self._serialize_current_layout()
         if not data["tabs"]:
             messagebox.showwarning("Empty Layout", "There are no tabs to save yet.")
@@ -1592,7 +1696,9 @@ class GMScreenView(ctk.CTkFrame):
         button_bar.pack(fill="x", padx=10, pady=(0, 10))
 
         def _close_dialog():
+            """Close dialog."""
             if dialog.winfo_exists():
+                # Handle the branch where dialog.winfo_exists().
                 try:
                     dialog.grab_release()
                 except Exception:
@@ -1600,6 +1706,7 @@ class GMScreenView(ctk.CTkFrame):
                 dialog.destroy()
 
         def _do_save():
+            """Internal helper for do save."""
             layout_name = entry_var.get().strip()
             if not layout_name:
                 messagebox.showwarning("Invalid Name", "Please enter a name for the layout.")
@@ -1621,11 +1728,13 @@ class GMScreenView(ctk.CTkFrame):
             self._update_layout_status(layout_name)
 
         def _populate_entry(_event=None):
+            """Internal helper for populate entry."""
             selection = listbox.curselection()
             if selection:
                 entry_var.set(listbox.get(selection[0]))
 
         if existing_names:
+            # Continue with this path when existing names is set.
             try:
                 default_index = existing_names.index(self.current_layout_name)
             except ValueError:
@@ -1647,6 +1756,7 @@ class GMScreenView(ctk.CTkFrame):
         dialog.protocol("WM_DELETE_WINDOW", _close_dialog)
 
     def _open_load_layout_dialog(self):
+        """Open load layout dialog."""
         layouts = self.layout_manager.list_layouts()
         if not layouts:
             messagebox.showinfo("No Layouts", "No saved GM screen layouts were found.")
@@ -1673,6 +1783,7 @@ class GMScreenView(ctk.CTkFrame):
         button_bar.pack(fill="x", padx=10, pady=(0, 10))
 
         def _do_load():
+            """Internal helper for do load."""
             selection = listbox.curselection()
             if not selection:
                 return
@@ -1690,7 +1801,9 @@ class GMScreenView(ctk.CTkFrame):
         dialog.bind("<Return>", lambda _e: _do_load())
 
     def _clear_all_tabs(self):
+        """Clear all tabs."""
         for name, tab in list(self.tabs.items()):
+            # Process each (name, tab) from list(tabs.items()).
             if tab.get("detached") and tab.get("window") is not None:
                 try:
                     tab["window"].destroy()
@@ -1710,15 +1823,18 @@ class GMScreenView(ctk.CTkFrame):
         self._update_layout_status(None)
 
     def _restore_tab_from_config(self, tab_def):
+        """Restore tab from config."""
         kind = tab_def.get("kind")
         title = tab_def.get("title")
         if kind == "entity":
+            # Handle the branch where kind == 'entity'.
             entity_type = tab_def.get("entity_type")
             entity_name = tab_def.get("entity_name") or title
             if not entity_type or not entity_name:
                 raise ValueError("Missing entity information")
             self._open_entity_from_layout(entity_type, entity_name)
         elif kind == "note":
+            # Handle the branch where kind == 'note'.
             text = tab_def.get("text", "")
             name = title or f"Note {len(self.tabs) + 1}"
             self.add_tab(
@@ -1737,6 +1853,7 @@ class GMScreenView(ctk.CTkFrame):
                 layout_meta={"kind": "character_graph", "host": "rich"},
             )
         elif kind == "scenario_graph":
+            # Handle the branch where kind == 'scenario_graph'.
             parent = self._ensure_rich_host()
             self.add_tab(
                 title or "Scenario Graph Editor",
@@ -1745,14 +1862,17 @@ class GMScreenView(ctk.CTkFrame):
                 layout_meta={"kind": "scenario_graph", "host": "rich"},
             )
         elif kind == "world_map":
+            # Handle the branch where kind == 'world_map'.
             name = tab_def.get("map_name")
             self.open_world_map_tab(map_name=name, title=title or (f"World Map: {name}" if name else "World Map"))
         elif kind == "campaign_dashboard":
             self.open_campaign_dashboard_tab(title=title or "Campaign Dashboard")
         elif kind == "map_tool":
+            # Handle the branch where kind == 'map_tool'.
             name = tab_def.get("map_name")
             self.open_map_tool_tab(map_name=name, title=title or (f"Map Tool: {name}" if name else "Map Tool"))
         elif kind == "scene_flow":
+            # Handle the branch where kind == 'scene_flow'.
             scen = tab_def.get("scenario_title")
             self.open_scene_flow_tab(scenario_title=scen, title=title or (f"Scene Flow: {scen}" if scen else "Scene Flow"))
         elif kind == "loot_generator":
@@ -1762,6 +1882,7 @@ class GMScreenView(ctk.CTkFrame):
         elif kind == "whiteboard":
             self.open_whiteboard_tab(title=title or "Whiteboard")
         elif kind == "puzzle_display":
+            # Handle the branch where kind == 'puzzle_display'.
             puzzle_name = tab_def.get("puzzle_name")
             puzzle_item = None
             if puzzle_name:
@@ -1773,14 +1894,17 @@ class GMScreenView(ctk.CTkFrame):
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
     def load_layout(self, layout_name, set_default=False, silent=False):
+        """Load layout."""
         layout = self.layout_manager.get_layout(layout_name)
         if not layout:
+            # Handle the branch where layout is unavailable.
             if not silent:
                 messagebox.showwarning("Layout Missing", f"Layout '{layout_name}' was not found.")
             return
 
         tabs = layout.get("tabs", [])
         if not tabs:
+            # Handle the branch where tabs is unavailable.
             if not silent:
                 messagebox.showwarning("Empty Layout", f"Layout '{layout_name}' has no tabs saved.")
             return
@@ -1791,7 +1915,9 @@ class GMScreenView(ctk.CTkFrame):
         pending = deque(tabs)
 
         def _finalize_restore():
+            """Internal helper for finalize restore."""
             if not self.tabs:
+                # Handle the branch where tabs is unavailable.
                 scenario_name = self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
                 frame = create_entity_detail_frame(
                     "Scenarios",
@@ -1840,6 +1966,7 @@ class GMScreenView(ctk.CTkFrame):
                 )
 
         def _restore_next():
+            """Restore next."""
             if not pending:
                 _finalize_restore()
                 return
@@ -1854,7 +1981,9 @@ class GMScreenView(ctk.CTkFrame):
         self.after_idle(_restore_next)
 
     def _open_entity_from_layout(self, entity_type, entity_name):
+        """Open entity from layout."""
         if entity_type == "Scenarios" and (self.scenario.get("Title") == entity_name or self.scenario.get("Name") == entity_name):
+            # Handle this branch separately before continuing.
             factory = lambda master: create_entity_detail_frame(
                 "Scenarios",
                 self.scenario,
@@ -1876,6 +2005,7 @@ class GMScreenView(ctk.CTkFrame):
         self.open_entity_tab(entity_type, entity_name)
 
     def _on_tab_press(self, event, name):
+        """Handle tab press."""
         if event is None:
             return
         # 1) Make sure winfo_x/y are up-to-date
@@ -1899,6 +2029,7 @@ class GMScreenView(ctk.CTkFrame):
         self.tabs[name]["button_frame"].lift()
 
     def _on_tab_motion(self, event, name):
+        """Handle tab motion."""
         if event is None:
             return
         frame = self.tabs[name]["button_frame"]
@@ -1909,6 +2040,7 @@ class GMScreenView(ctk.CTkFrame):
 
         # same midpoint-swap logic as before…
         for idx, other in enumerate(self.tab_order):
+            # Process each (idx, other) from enumerate(tab_order).
             if other == name: continue
             of = self.tabs[other]["button_frame"]
             mid = of.winfo_x() + of.winfo_width() // 2
@@ -1923,12 +2055,14 @@ class GMScreenView(ctk.CTkFrame):
                 break
                 
     def _trigger_shift(self, other_name, dx):
+        """Internal helper for trigger shift."""
         oframe = self.tabs[other_name]["button_frame"]
         start = oframe.winfo_x()
         target = start + dx
         self._animate_shift([oframe], [dx])
 
     def _animate_shift(self, frames, deltas, step=0):
+        """Internal helper for animate shift."""
         if step >= 10: return
         for frame, delta in zip(frames, deltas):
             cur = frame.winfo_x()
@@ -1936,12 +2070,14 @@ class GMScreenView(ctk.CTkFrame):
         self.after(20, lambda: self._animate_shift(frames, deltas, step+1))
     
     def _swap_order(self, name, other):
+        """Internal helper for swap order."""
         old = self.tab_order.index(name)
         new = self.tab_order.index(other)
         self.tab_order.pop(old)
         self.tab_order.insert(new, name)
 
     def _on_tab_release(self, event, name):
+        """Handle tab release."""
         if event is None:
             return
         # snap all headers back into pack()
@@ -1958,6 +2094,7 @@ class GMScreenView(ctk.CTkFrame):
         self.dragging = None
 
     def toggle_detach_tab(self, name):
+        """Toggle detach tab."""
         log_info(f"Toggling detach for tab: {name}", func_name="GMScreenView.toggle_detach_tab")
         if self.tabs[name]["detached"]:
             self.reattach_tab(name)
@@ -1969,6 +2106,7 @@ class GMScreenView(ctk.CTkFrame):
             self.tabs[name]["detach_button"].configure(image=self.reattach_icon)
 
     def detach_tab(self, name):
+        """Handle detach tab."""
         log_info(f"Detaching tab: {name}", func_name="GMScreenView.detach_tab")
         print(f"[DETACH] Start detaching tab: {name}")
         if self.tabs[name].get("detached", False):
@@ -2002,6 +2140,7 @@ class GMScreenView(ctk.CTkFrame):
 
         # If there's a graph editor, restore its state right away
         if hasattr(old_frame, "graph_editor") and hasattr(old_frame.graph_editor, "get_state"):
+            # Handle the branch where hasattr(old_frame, 'graph_editor') and hasattr(old_frame.graph_editor, 'get_state').
             state = old_frame.graph_editor.get_state()
             if state and hasattr(new_frame, "graph_editor") and hasattr(new_frame.graph_editor, "set_state"):
                 ge = new_frame.graph_editor
@@ -2027,15 +2166,18 @@ class GMScreenView(ctk.CTkFrame):
 
         # Portrait & scenario-graph restoration (unchanged)…
         if hasattr(old_frame, "scenario_graph_editor") and hasattr(old_frame.scenario_graph_editor, "get_state"):
+            # Handle this branch separately before continuing.
             scen = old_frame.scenario_graph_editor.get_state()
             if scen and hasattr(new_frame, "scenario_graph_editor") and hasattr(new_frame.scenario_graph_editor, "set_state"):
                 new_frame.scenario_graph_editor.set_state(scen)
 
         if hasattr(new_frame, "portrait_label"):
+            # Handle the branch where hasattr(new_frame, 'portrait_label').
             self.tabs[name]["portrait_label"] = new_frame.portrait_label
         else:
             pl = self.tabs[name].get("portrait_label")
             if pl and pl.winfo_exists():
+                # Handle the branch where pl is set and pl.winfo_exists().
                 key = getattr(pl, "entity_name", None)
                 if key in self.portrait_images:
                     lab = ctk.CTkLabel(new_frame, image=self.portrait_images[key], text="")
@@ -2053,6 +2195,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def create_note_frame(self, master=None, initial_text=""):
+        """Create note frame."""
         if master is None:
             master = self.content_area
         frame = ctk.CTkFrame(master)
@@ -2092,6 +2235,7 @@ class GMScreenView(ctk.CTkFrame):
         container.whiteboard_controller = controller
 
         def _on_destroy(_event=None, ctrl=controller):
+            """Handle destroy."""
             try:
                 ctrl.close()
             except Exception:
@@ -2100,6 +2244,7 @@ class GMScreenView(ctk.CTkFrame):
         container.bind("<Destroy>", _on_destroy, add="+")
 
         def factory(master):
+            """Handle factory."""
             host_parent = master if master is not None else self._ensure_rich_host()
             frame = ctk.CTkFrame(host_parent)
             self._make_fullbleed(frame)
@@ -2132,6 +2277,7 @@ class GMScreenView(ctk.CTkFrame):
         tab_title = title or (f"World Map: {map_name}" if map_name else "World Map")
 
         def factory(master, _name=map_name):
+            """Handle factory."""
             host_parent = master if master is not None else self._ensure_rich_host()
             c = ctk.CTkFrame(host_parent)
             p = WorldMapPanel(c)
@@ -2171,6 +2317,7 @@ class GMScreenView(ctk.CTkFrame):
         tab_title = title or (f"Map Tool: {map_name}" if map_name else "Map Tool")
 
         def factory(master, _name=map_name):
+            """Handle factory."""
             host_parent = master if master is not None else self._ensure_rich_host()
             c = ctk.CTkFrame(host_parent)
             mw = GenericModelWrapper("maps")
@@ -2206,6 +2353,7 @@ class GMScreenView(ctk.CTkFrame):
         tab_title = title or (f"Scene Flow: {scenario_title}" if scenario_title else "Scene Flow")
 
         def factory(master, _title=scenario_title):
+            """Handle factory."""
             host_parent = master if master is not None else self._ensure_rich_host()
             c = ctk.CTkFrame(host_parent)
             self._make_fullbleed(c)
@@ -2232,6 +2380,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
         def factory(master):
+            """Handle factory."""
             return LootGeneratorPanel(
                 master,
                 object_wrapper=self.wrappers.get("Objects"),
@@ -2252,6 +2401,7 @@ class GMScreenView(ctk.CTkFrame):
         panel = RandomTablesPanel(self.content_area, initial_state=initial_state)
 
         def factory(master, tab_ref=tab_name):
+            """Handle factory."""
             state = None
             info = self.tabs.get(tab_ref)
             frame = info.get("content_frame") if info else None
@@ -2288,6 +2438,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def open_plot_twist_popup(self):
+        """Open plot twist popup."""
         host = self.winfo_toplevel()
         popup = ctk.CTkToplevel(host)
         popup.title("Plot Twists")
@@ -2299,6 +2450,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def reattach_tab(self, name):
+        """Handle reattach tab."""
         log_info(f"Reattaching tab: {name}", func_name="GMScreenView.reattach_tab")
         print(f"[REATTACH] Start reattaching tab: {name}")
         # If the tab isn't marked detached, skip
@@ -2331,6 +2483,7 @@ class GMScreenView(ctk.CTkFrame):
         # Recreate or reuse the content frame
         factory = self.tabs[name].get("factory")
         if factory is None:
+            # Handle the branch where factory is missing.
             new_frame = current_frame
         else:
             # Determine host for this tab
@@ -2377,6 +2530,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def close_tab(self, name):
+        """Close tab."""
         if len(self.tabs) == 1:
             return
         if name in self.tab_order:
@@ -2392,6 +2546,7 @@ class GMScreenView(ctk.CTkFrame):
         self.reposition_add_button()
 
     def reposition_add_button(self):
+        """Handle reposition add button."""
         self.add_button.pack_forget()
         self.random_button.pack_forget()
         if self.tab_order:
@@ -2403,6 +2558,7 @@ class GMScreenView(ctk.CTkFrame):
             self.random_button.pack(side="left", padx=2, pady=5)
     
     def _add_random_entity(self):
+        """Internal helper for add random entity."""
         log_info("Adding random entity to GM screen", func_name="GMScreenView._add_random_entity")
         """Pick a random NPC, Creature, Object, Information or Clue and open it.
         """
@@ -2410,6 +2566,7 @@ class GMScreenView(ctk.CTkFrame):
         random.shuffle(types)
 
         for etype in types:
+            # Process each etype from types.
             wrapper = self.wrappers.get(etype)
             if not wrapper:
                 continue
@@ -2438,7 +2595,9 @@ class GMScreenView(ctk.CTkFrame):
             )
 
     def _get_or_open_random_tables_panel(self):
+        """Return or open random tables panel."""
         for name, tab in self.tabs.items():
+            # Process each (name, tab) from tabs.items().
             meta = tab.get("meta") or {}
             if meta.get("kind") != "random_tables":
                 continue
@@ -2454,6 +2613,7 @@ class GMScreenView(ctk.CTkFrame):
         return frame, name
 
     def _reset_scrollable_widget_position(self, widget, *, schedule_after_idle=True):
+        """Reset scrollable widget position."""
         if widget is None:
             return
         try:
@@ -2467,6 +2627,7 @@ class GMScreenView(ctk.CTkFrame):
         scroll_canvas = getattr(widget, "_scroll_canvas", None)
         scrollbar = getattr(widget, "_scrollbar", None)
         if inner is not None:
+            # Handle the branch where inner is available.
             candidates.append(inner)
             inner_canvas = getattr(inner, "_parent_canvas", None)
             inner_scroll_canvas = getattr(inner, "_scroll_canvas", None)
@@ -2486,8 +2647,11 @@ class GMScreenView(ctk.CTkFrame):
             candidates.append(real_canvas)
 
         def _apply_reset():
+            """Apply reset."""
             if real_canvas is not None:
+                # Handle the branch where real canvas is available.
                 try:
+                    # Keep reset resilient if this step fails.
                     bbox = real_canvas.bbox("all")
                     if bbox is not None:
                         real_canvas.configure(scrollregion=bbox)
@@ -2499,6 +2663,7 @@ class GMScreenView(ctk.CTkFrame):
                     pass
             for candidate in candidates:
                 try:
+                    # Keep reset resilient if this step fails.
                     if hasattr(candidate, "yview_moveto"):
                         candidate.yview_moveto(0.0)
                 except Exception:
@@ -2509,6 +2674,7 @@ class GMScreenView(ctk.CTkFrame):
             self.after_idle(lambda w=widget: self._reset_scrollable_widget_position(w, schedule_after_idle=False))
 
     def _reset_tab_scroll_state(self, tab_name):
+        """Reset tab scroll state."""
         tab = self.tabs.get(tab_name) or {}
         frame = tab.get("content_frame")
         if frame is None:
@@ -2518,9 +2684,11 @@ class GMScreenView(ctk.CTkFrame):
         self.after(25, lambda f=frame: self._reset_scrollable_widget_position(f))
 
     def show_tab(self, name):
+        """Show tab."""
         log_info(f"Showing tab: {name}", func_name="GMScreenView.show_tab")
         # Hide content for the current tab if it's not detached.
         if self.current_tab and self.current_tab in self.tabs:
+            # Handle the branch where current tab is set and current tab is in tabs.
             if not self.tabs[self.current_tab]["detached"]:
                 self.tabs[self.current_tab]["content_frame"].pack_forget()
             self.tabs[self.current_tab]["button"].configure(
@@ -2542,6 +2710,7 @@ class GMScreenView(ctk.CTkFrame):
         )
         # Only pack the content into the main content area if the tab is not detached.
         if not self.tabs[name]["detached"]:
+            # Handle the branch where not tabs[name]['detached'].
             tab = self.tabs[name]
             target_host = (tab.get("meta") or {}).get("host") or "scroll"
             # Toggle which host is visible
@@ -2556,6 +2725,7 @@ class GMScreenView(ctk.CTkFrame):
             else:
                 # Show scroll area and hide rich host
                 try:
+                    # Keep tab resilient if this step fails.
                     if getattr(self, "_rich_host", None) and self._rich_host.winfo_exists():
                         self._rich_host.pack_forget()
                 except Exception:
@@ -2568,23 +2738,28 @@ class GMScreenView(ctk.CTkFrame):
             self._request_active_tab_layout_settle()
 
     def add_new_tab(self):
+        """Handle add new tab."""
         log_info("Opening entity selection for new tab", func_name="GMScreenView.add_new_tab")
         self._show_add_menu()
 
     def _show_add_menu(self):
+        """Show add menu."""
         button = self.add_button
         x = button.winfo_rootx()
         y = button.winfo_rooty() + button.winfo_height()
         try:
+            # Keep add menu resilient if this step fails.
             self._add_menu.tk_popup(x, y)
         finally:
             self._add_menu.grab_release()
 
     def open_selection_window(self, entity_type, popup=None):
+        """Open selection window."""
         log_info(f"Opening selection window for {entity_type}", func_name="GMScreenView.open_selection_window")
         if popup:
             popup.destroy()
         if entity_type == "Note Tab":
+            # Handle the branch where entity_type == 'Note Tab'.
             self.add_tab(
                 f"Note {len(self.tabs) + 1}",
                 self.create_note_frame(),
@@ -2593,33 +2768,43 @@ class GMScreenView(ctk.CTkFrame):
             )
             return
         elif entity_type == "World Map":
+            # Handle the branch where entity_type == 'World Map'.
             self.open_world_map_tab()
             return
         elif entity_type == "Campaign Dashboard":
+            # Handle the branch where entity_type == 'Campaign Dashboard'.
             self.open_campaign_dashboard_tab()
             return
         elif entity_type == "Map Tool":
+            # Handle the branch where entity_type == 'Map Tool'.
             self.open_map_tool_tab()
             return
         elif entity_type == "Scene Flow":
+            # Handle the branch where entity_type == 'Scene Flow'.
             self.open_scene_flow_tab()
             return
         elif entity_type == "Loot Generator":
+            # Handle the branch where entity_type == 'Loot Generator'.
             self.open_loot_generator_tab()
             return
         elif entity_type == "Whiteboard":
+            # Handle the branch where entity_type == 'Whiteboard'.
             self.open_whiteboard_tab()
             return
         elif entity_type == "Random Tables":
+            # Handle the branch where entity_type == 'Random Tables'.
             self.open_random_tables_tab()
             return
         elif entity_type == "Puzzle Display":
+            # Handle the branch where entity_type == 'Puzzle Display'.
             self._select_puzzle_for_display()
             return
         elif entity_type == "Plot Twists":
+            # Handle the branch where entity_type == 'Plot Twists'.
             self.open_plot_twist_popup()
             return
         elif entity_type == "Character Graph":
+            # Handle the branch where entity_type == 'Character Graph'.
             host_parent = self._ensure_rich_host()
             self.add_tab(
                 "Character Graph",
@@ -2653,6 +2838,7 @@ class GMScreenView(ctk.CTkFrame):
         view.pack(fill="both", expand=True)
 
     def _select_puzzle_for_display(self) -> None:
+        """Select puzzle for display."""
         selection_popup = ctk.CTkToplevel(self)
         selection_popup.title("Select Puzzle")
         selection_popup.geometry("1200x800")
@@ -2661,6 +2847,7 @@ class GMScreenView(ctk.CTkFrame):
         selection_popup.focus_force()
 
         def _open_puzzle_tab(_entity_type: str, name: str) -> None:
+            """Open puzzle tab."""
             selection_popup.destroy()
             wrapper = self.wrappers.get("Puzzles")
             items = wrapper.load_items() if wrapper else []
@@ -2681,6 +2868,7 @@ class GMScreenView(ctk.CTkFrame):
 
 
     def open_entity_tab(self, entity_type, name):
+        """Open entity tab."""
         log_info(f"Opening entity tab {entity_type}: {name}", func_name="GMScreenView.open_entity_tab")
         """
         Open a new tab for a specific entity with its details.
@@ -2734,6 +2922,7 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def open_campaign_dashboard_tab(self, title="Campaign Dashboard"):
+        """Open campaign dashboard tab."""
         existing_tab = next(
             (
                 tab_name
@@ -2760,11 +2949,13 @@ class GMScreenView(ctk.CTkFrame):
         )
 
     def _focus_existing_tab(self, tab_name):
+        """Internal helper for focus existing tab."""
         if tab_name not in self.tabs:
             return
         self.show_tab(tab_name)
         tab_info = self.tabs.get(tab_name, {})
         if tab_info.get("detached"):
+            # Handle the branch where tab_info.get('detached').
             window = tab_info.get("window")
             if window and window.winfo_exists():
                 try:
@@ -2775,7 +2966,9 @@ class GMScreenView(ctk.CTkFrame):
                     pass
 
     def _find_existing_entity_tab(self, entity_type, entity_name):
+        """Find existing entity tab."""
         for tab_name, tab_info in self.tabs.items():
+            # Process each (tab_name, tab_info) from tabs.items().
             meta = tab_info.get("meta") or {}
             if (
                 meta.get("kind") == "entity"
@@ -2786,6 +2979,7 @@ class GMScreenView(ctk.CTkFrame):
         return None
 
     def create_scenario_graph_frame(self, master=None):
+        """Create scenario graph frame."""
         log_info(f"Creating scenario graph frame", func_name="GMScreenView.create_scenario_graph_frame")
         if master is None:
             master = self.content_area
@@ -2805,6 +2999,7 @@ class GMScreenView(ctk.CTkFrame):
         return frame
 
     def create_entity_frame(self, entity_type, entity, master=None):
+        """Create entity frame."""
         log_info(f"Creating entity frame for {entity_type}: {entity.get('Name') or entity.get('Title')}", func_name="GMScreenView.create_entity_frame")
         if master is None:
             master = self.content_area
@@ -2823,6 +3018,7 @@ class GMScreenView(ctk.CTkFrame):
         return frame
     
     def insert_text(self, parent, header, content):
+        """Handle insert text."""
         label = ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold"))
         label.pack(anchor="w", padx=10)
         box = ctk.CTkTextbox(parent, wrap="word", height=80)
@@ -2845,6 +3041,7 @@ class GMScreenView(ctk.CTkFrame):
         box.pack(fill="x", padx=10, pady=5)
         
     def insert_longtext(self, parent, header, content):
+        """Handle insert longtext."""
         ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
         formatted_text = format_multiline_text(content, max_length=2000)
         box = ctk.CTkTextbox(parent, wrap="word", height=120)
@@ -2853,6 +3050,7 @@ class GMScreenView(ctk.CTkFrame):
         box.pack(fill="x", padx=10, pady=5)
 
     def insert_links(self, parent, header, items, linked_type):
+        """Handle insert links."""
         ctk.CTkLabel(parent, text=f"{header}:", font=("Arial", 14, "bold")).pack(anchor="w", padx=10)
         for item in items:
             label = ctk.CTkLabel(parent, text=item, text_color="#00BFFF", cursor="hand2")
@@ -2860,9 +3058,11 @@ class GMScreenView(ctk.CTkFrame):
             label.bind("<Button-1>", partial(self._on_link_clicked, linked_type, item))
 
     def _on_link_clicked(self, linked_type, item, event=None):
+        """Handle link clicked."""
         self.open_entity_tab(linked_type, item)
 
     def save_note_to_file(self, note_frame, default_name):
+        """Save note to file."""
         file_path = filedialog.asksaveasfilename(
             initialfile=default_name,
             defaultextension=".txt",
@@ -2877,6 +3077,7 @@ class GMScreenView(ctk.CTkFrame):
         messagebox.showinfo("Saved", f"Note saved to {file_path}")
     
     def create_character_graph_frame(self, master=None):
+        """Create character graph frame."""
         if master is None:
             master = self.content_area
         frame = ctk.CTkFrame(master)
@@ -2892,6 +3093,7 @@ class GMScreenView(ctk.CTkFrame):
         return frame
     
     def reorder_detached_windows(self):
+        """Handle reorder detached windows."""
         screen_width = self.winfo_screenwidth()
         margin = 10  # space between windows and screen edge
         current_x = margin
@@ -2900,6 +3102,7 @@ class GMScreenView(ctk.CTkFrame):
 
         for name, tab in self.tabs.items():
             if tab.get("detached") and tab.get("window") is not None:
+                # Handle the branch where tab.get('detached') and tab.get('window') is available.
                 window = tab["window"]
                 window.update_idletasks()
                 req_width = window.winfo_reqwidth()
@@ -2914,6 +3117,7 @@ class GMScreenView(ctk.CTkFrame):
                 if req_height > max_row_height:
                     max_row_height = req_height
     def destroy(self):
+        """Handle destroy."""
         # remove our global Ctrl+F handler
         root = self.winfo_toplevel()
         root.unbind_all("<Control-F>")

@@ -1,3 +1,4 @@
+"""Normalization helpers for story forge."""
 from __future__ import annotations
 
 import json
@@ -13,6 +14,7 @@ def parse_json_strict_with_fallback(raw_text: str, *, fallback: dict[str, Any] |
 
     text = raw_text.strip()
     try:
+        # Keep JSON strict with fallback resilient if this step fails.
         value = json.loads(text)
         if isinstance(value, dict):
             return value
@@ -20,9 +22,11 @@ def parse_json_strict_with_fallback(raw_text: str, *, fallback: dict[str, Any] |
         pass
 
     if text.startswith("```"):
+        # Handle the branch where text.startswith('```').
         text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
         text = text.rstrip("`").strip()
         try:
+            # Keep JSON strict with fallback resilient if this step fails.
             value = json.loads(text)
             if isinstance(value, dict):
                 return value
@@ -31,9 +35,11 @@ def parse_json_strict_with_fallback(raw_text: str, *, fallback: dict[str, Any] |
 
     first_brace = text.find("{")
     if first_brace >= 0:
+        # Handle the branch where first_brace >= 0.
         sliced = text[first_brace:]
         for end in range(len(sliced), max(len(sliced) - 4000, 0), -1):
             try:
+                # Keep JSON strict with fallback resilient if this step fails.
                 value = json.loads(sliced[:end])
                 if isinstance(value, dict):
                     return value
@@ -44,10 +50,12 @@ def parse_json_strict_with_fallback(raw_text: str, *, fallback: dict[str, Any] |
 
 
 def normalize_rewrite_options(payload: dict[str, Any], *, brief: str) -> list[dict[str, str]]:
+    """Normalize rewrite options."""
     options = payload.get("options") if isinstance(payload, dict) else None
     normalized: list[dict[str, str]] = []
     if isinstance(options, list):
         for idx, option in enumerate(options):
+            # Process each (idx, option) from enumerate(options).
             if not isinstance(option, dict):
                 continue
             title = str(option.get("title") or f"Scenario Option {idx + 1}").strip()
@@ -60,6 +68,7 @@ def normalize_rewrite_options(payload: dict[str, Any], *, brief: str) -> list[di
 
 
 def normalize_entities(payload: dict[str, Any]) -> dict[str, list[str]]:
+    """Normalize entities."""
     defaults = {
         "NPCs": [],
         "Creatures": [],
@@ -73,6 +82,7 @@ def normalize_entities(payload: dict[str, Any]) -> dict[str, list[str]]:
     if not isinstance(entities, dict):
         return defaults
     for key in defaults:
+        # Process each key from defaults.
         raw = entities.get(key) or []
         if isinstance(raw, str):
             raw = [raw]
@@ -82,7 +92,9 @@ def normalize_entities(payload: dict[str, Any]) -> dict[str, list[str]]:
 
 
 def normalize_full_draft(payload: dict[str, Any], fallback_option: dict[str, str], fallback_entities: dict[str, list[str]]) -> dict[str, Any]:
+    """Normalize full draft."""
     def _normalize_list_field(raw: Any) -> list[str]:
+        """Normalize list field."""
         if isinstance(raw, str):
             raw = [raw]
         if isinstance(raw, list):
@@ -99,6 +111,7 @@ def normalize_full_draft(payload: dict[str, Any], fallback_option: dict[str, str
     scenes: list[dict[str, Any]] = []
     if isinstance(scenes_raw, list):
         for idx, scene in enumerate(scenes_raw):
+            # Process each (idx, scene) from enumerate(scenes_raw).
             if not isinstance(scene, dict):
                 continue
             scene_title = str(scene.get("Title") or scene.get("title") or f"Scene {idx + 1}").strip()
@@ -115,6 +128,7 @@ def normalize_full_draft(payload: dict[str, Any], fallback_option: dict[str, str
             scenes.append(normalized_scene)
 
     if not scenes:
+        # Handle the branch where scenes is unavailable.
         default_scene: dict[str, Any] = {"Title": "Scene 1", "Summary": summary, "Text": summary, "SceneType": "Setup"}
         for key in scene_entity_keys:
             default_scene[key] = []

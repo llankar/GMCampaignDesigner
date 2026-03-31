@@ -1,3 +1,5 @@
+"""Utilities for campaign generator exporters."""
+
 from __future__ import annotations
 
 import zipfile
@@ -7,6 +9,7 @@ def export_to_docx(campaign: Dict[str, str], filename: str) -> None:
     """Create a DOCX file containing the campaign information with styled headings and text."""
     # Escape special XML characters
     def xml_escape(text: str) -> str:
+        """Handle xml escape."""
         return (
             text.replace("&", "&amp;")
             .replace("<", "&lt;")

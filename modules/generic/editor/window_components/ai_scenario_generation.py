@@ -1,3 +1,5 @@
+"""Utilities for window components AI scenario generation."""
+
 from modules.generic.editor.window_context import *
 from modules.campaigns.services.ai.generation_policy import build_hard_constraints_block
 from modules.campaigns.services.generation_defaults_service import CampaignGenerationDefaultsService
@@ -5,7 +7,9 @@ from modules.campaigns.services.generation_defaults_service import CampaignGener
 
 class GenericEditorWindowAIScenarioGeneration:
     def ai_generate_full_scenario(self):
+        """Handle AI generate full scenario."""
         try:
+            # Keep AI generate full scenario resilient if this step fails.
             theme = self._infer_theme("scenarios")
 
             # 1) Pick and apply linked entities first (so the AI can use them)
@@ -37,9 +41,12 @@ class GenericEditorWindowAIScenarioGeneration:
 
             # Helper to shrink extra rows for a list of CTkEntry widgets
             def _shrink_widget_list(key, new_size):
+                """Internal helper for shrink widget list."""
                 try:
+                    # Keep shrink widget list resilient if this step fails.
                     lst = self.field_widgets.get(key, []) or []
                     if len(lst) > new_size:
+                        # Handle the branch where len(lst) > new_size.
                         for w in lst[new_size:]:
                             try:
                                 w.master.destroy()
@@ -58,10 +65,12 @@ class GenericEditorWindowAIScenarioGeneration:
             # Update widgets for each list type
             # NPCs
             try:
+                # Keep AI generate full scenario resilient if this step fails.
                 npc_widgets = self.field_widgets.get("NPCs", [])
                 npc_vars = self.field_widgets.get("NPCs_vars", [])
                 add_npc_combobox = self.field_widgets.get("NPCs_add_combobox")
                 while len(npc_widgets) < len(selected_npcs) and callable(add_npc_combobox):
+                    # Keep looping until this condition no longer holds.
                     add_npc_combobox()
                     npc_widgets = self.field_widgets.get("NPCs", [])
                     npc_vars = self.field_widgets.get("NPCs_vars", [])
@@ -70,6 +79,7 @@ class GenericEditorWindowAIScenarioGeneration:
                 npc_vars = self.field_widgets.get("NPCs_vars", [])
                 for i in range(min(len(npc_widgets), len(selected_npcs))):
                     try:
+                        # Keep AI generate full scenario resilient if this step fails.
                         npc_vars[i].set(selected_npcs[i])
                     except Exception:
                         widget = npc_widgets[i]
@@ -81,10 +91,12 @@ class GenericEditorWindowAIScenarioGeneration:
                 pass
             # Creatures
             try:
+                # Keep AI generate full scenario resilient if this step fails.
                 creature_widgets = self.field_widgets.get("Creatures", [])
                 creature_vars = self.field_widgets.get("Creatures_vars", [])
                 add_creatures_combobox = self.field_widgets.get("Creatures_add_combobox")
                 while len(creature_widgets) < len(selected_creatures) and callable(add_creatures_combobox):
+                    # Keep looping until this condition no longer holds.
                     add_creatures_combobox()
                     creature_widgets = self.field_widgets.get("Creatures", [])
                     creature_vars = self.field_widgets.get("Creatures_vars", [])
@@ -93,6 +105,7 @@ class GenericEditorWindowAIScenarioGeneration:
                 creature_vars = self.field_widgets.get("Creatures_vars", [])
                 for i in range(min(len(creature_widgets), len(selected_creatures))):
                     try:
+                        # Keep AI generate full scenario resilient if this step fails.
                         creature_vars[i].set(selected_creatures[i])
                     except Exception:
                         widget = creature_widgets[i]
@@ -104,10 +117,12 @@ class GenericEditorWindowAIScenarioGeneration:
                 pass
             # Places
             try:
+                # Keep AI generate full scenario resilient if this step fails.
                 place_widgets = self.field_widgets.get("Places", [])
                 place_vars = self.field_widgets.get("Places_vars", [])
                 add_place_combobox = self.field_widgets.get("Places_add_combobox")
                 while len(place_widgets) < len(selected_places) and callable(add_place_combobox):
+                    # Keep looping until this condition no longer holds.
                     add_place_combobox()
                     place_widgets = self.field_widgets.get("Places", [])
                     place_vars = self.field_widgets.get("Places_vars", [])
@@ -116,6 +131,7 @@ class GenericEditorWindowAIScenarioGeneration:
                 place_vars = self.field_widgets.get("Places_vars", [])
                 for i in range(min(len(place_widgets), len(selected_places))):
                     try:
+                        # Keep AI generate full scenario resilient if this step fails.
                         place_vars[i].set(selected_places[i])
                     except Exception:
                         widget = place_widgets[i]
@@ -127,10 +143,12 @@ class GenericEditorWindowAIScenarioGeneration:
                 pass
             # Factions
             try:
+                # Keep AI generate full scenario resilient if this step fails.
                 faction_widgets = self.field_widgets.get("Factions", [])
                 faction_vars = self.field_widgets.get("Factions_vars", [])
                 add_faction_combobox = self.field_widgets.get("Factions_add_combobox")
                 while len(faction_widgets) < len(selected_factions) and callable(add_faction_combobox):
+                    # Keep looping until this condition no longer holds.
                     add_faction_combobox()
                     faction_widgets = self.field_widgets.get("Factions", [])
                     faction_vars = self.field_widgets.get("Factions_vars", [])
@@ -139,6 +157,7 @@ class GenericEditorWindowAIScenarioGeneration:
                 faction_vars = self.field_widgets.get("Factions_vars", [])
                 for i in range(min(len(faction_widgets), len(selected_factions))):
                     try:
+                        # Keep AI generate full scenario resilient if this step fails.
                         faction_vars[i].set(selected_factions[i])
                     except Exception:
                         widget = faction_widgets[i]
@@ -150,10 +169,12 @@ class GenericEditorWindowAIScenarioGeneration:
                 pass
             # Objects
             try:
+                # Keep AI generate full scenario resilient if this step fails.
                 object_widgets = self.field_widgets.get("Objects", [])
                 object_vars = self.field_widgets.get("Objects_vars", [])
                 add_object_combobox = self.field_widgets.get("Objects_add_combobox")
                 while len(object_widgets) < len(selected_objects) and callable(add_object_combobox):
+                    # Keep looping until this condition no longer holds.
                     add_object_combobox()
                     object_widgets = self.field_widgets.get("Objects", [])
                     object_vars = self.field_widgets.get("Objects_vars", [])
@@ -162,6 +183,7 @@ class GenericEditorWindowAIScenarioGeneration:
                 object_vars = self.field_widgets.get("Objects_vars", [])
                 for i in range(min(len(object_widgets), len(selected_objects))):
                     try:
+                        # Keep AI generate full scenario resilient if this step fails.
                         object_vars[i].set(selected_objects[i])
                     except Exception:
                         widget = object_widgets[i]
@@ -174,10 +196,13 @@ class GenericEditorWindowAIScenarioGeneration:
 
             # 2) Read back values actually present in the UI, to ensure prompt matches what user sees
             def _read_list_from_widgets(name):
+                """Internal helper for read list from widgets."""
                 try:
+                    # Keep read list from widgets resilient if this step fails.
                     widgets = self.field_widgets.get(name, [])
                     vals = []
                     for w in widgets:
+                        # Process each w from widgets.
                         try:
                             v = w.get()
                         except Exception:
@@ -202,7 +227,9 @@ class GenericEditorWindowAIScenarioGeneration:
 
             # 3) Build a context block describing these selected entities for coherence
             def _plain_text(val):
+                """Internal helper for plain text."""
                 try:
+                    # Keep plain text resilient if this step fails.
                     if isinstance(val, dict):
                         return str(val.get("text", ""))
                     return str(val)
@@ -210,8 +237,10 @@ class GenericEditorWindowAIScenarioGeneration:
                     return ""
 
             def _summarize(record, wanted_fields):
+                """Internal helper for summarize."""
                 parts = []
                 for f in wanted_fields:
+                    # Process each f from wanted_fields.
                     v = record.get(f)
                     if not v:
                         continue
@@ -222,12 +251,14 @@ class GenericEditorWindowAIScenarioGeneration:
                 return ", ".join(parts) or "(no details)"
 
             def _index_items(entity_type):
+                """Internal helper for index items."""
                 try:
                     items = GenericModelWrapper(entity_type).load_items()
                 except Exception:
                     items = []
                 by_name = {}
                 for it in items:
+                    # Process each it from items.
                     nm = it.get("Name") or it.get("Title")
                     if nm:
                         by_name[str(nm)] = it
@@ -242,26 +273,31 @@ class GenericEditorWindowAIScenarioGeneration:
             idx_objects = _index_items("objects")
 
             if selected_npcs:
+                # Continue with this path when selected NPCs is set.
                 ctx_lines.append("NPCs:")
                 for n in selected_npcs:
                     rec = idx_npcs.get(n, {})
                     ctx_lines.append(f"- {n}: " + _summarize(rec, ["Role","Description","Background","Traits","Motivation","Personality","RoleplayingCues"]))
             if selected_places:
+                # Continue with this path when selected places is set.
                 ctx_lines.append("Places:")
                 for n in selected_places:
                     rec = idx_places.get(n, {})
                     ctx_lines.append(f"- {n}: " + _summarize(rec, ["Description","Secrets"]))
             if selected_creatures:
+                # Continue with this path when selected creatures is set.
                 ctx_lines.append("Creatures:")
                 for n in selected_creatures:
                     rec = idx_creatures.get(n, {})
                     ctx_lines.append(f"- {n}: " + _summarize(rec, ["Type","Description","Powers","Weakness","Background"]))
             if selected_factions:
+                # Continue with this path when selected factions is set.
                 ctx_lines.append("Factions:")
                 for n in selected_factions:
                     rec = idx_factions.get(n, {})
                     ctx_lines.append(f"- {n}: " + _summarize(rec, ["Description","Secrets"]))
             if selected_objects:
+                # Continue with this path when selected objects is set.
                 ctx_lines.append("Objects:")
                 for n in selected_objects:
                     rec = idx_objects.get(n, {})
@@ -275,6 +311,7 @@ class GenericEditorWindowAIScenarioGeneration:
                 samples = []
             examples = []
             for it in samples[:5]:
+                # Process each it from samples[:5].
                 t = it.get("Title") or it.get("Name")
                 s = it.get("Summary") or it.get("Description")
                 if t:
@@ -333,15 +370,18 @@ class GenericEditorWindowAIScenarioGeneration:
 
             scenes = data.get("Scenes") or []
             if isinstance(scenes, (list, tuple)):
+                # Handle the branch where isinstance(scenes, (list, tuple)).
                 editors = self.field_widgets.get("Scenes", [])
                 add_scene = self.field_widgets.get("Scenes_add_scene")
                 renumber = self.field_widgets.get("Scenes_renumber")
                 # Grow to needed count
                 while len(editors) < len(scenes) and callable(add_scene):
+                    # Keep looping while len(editors) < len(scenes) and callable(add_scene).
                     add_scene({})
                     editors = self.field_widgets.get("Scenes", [])
                 # Shrink extra
                 if len(editors) > len(scenes):
+                    # Handle the branch where len(editors) > len(scenes).
                     for state in editors[len(scenes):]:
                         try:
                             state["frame"].destroy()
@@ -352,6 +392,7 @@ class GenericEditorWindowAIScenarioGeneration:
                         renumber()
                 # Populate content
                 for state, sc in zip(editors, scenes):
+                    # Process each (state, sc) from zip(editors, scenes).
                     editor = state.get("editor")
                     if not editor:
                         continue
@@ -363,6 +404,7 @@ class GenericEditorWindowAIScenarioGeneration:
                             pass
                     state["link_rows"] = []
                     for label, frame in (state.get("entity_chip_frames") or {}).items():
+                        # Process each (label, frame) from (state.get('entity_chip_frames') or {}).items().
                         state["entities"][label] = []
                         for widget in list(frame.winfo_children()):
                             try:
@@ -376,12 +418,14 @@ class GenericEditorWindowAIScenarioGeneration:
                         raw_text = sc.get("Text") or sc.get("text") or sc.get("Summary") or sc
                     if title_entry is not None:
                         try:
+                            # Keep AI generate full scenario resilient if this step fails.
                             title_entry.delete(0, "end")
                             if title_value:
                                 title_entry.insert(0, str(title_value))
                         except Exception:
                             pass
                     try:
+                        # Keep AI generate full scenario resilient if this step fails.
                         if isinstance(raw_text, dict) and "text" in raw_text:
                             editor.load_text_data(raw_text)
                         else:
@@ -399,6 +443,7 @@ class GenericEditorWindowAIScenarioGeneration:
 def _load_editor_hard_constraints_block(
     generation_defaults_service: CampaignGenerationDefaultsService | None = None,
 ) -> str:
+    """Load editor hard constraints block."""
     service = generation_defaults_service or CampaignGenerationDefaultsService()
     try:
         generation_defaults = service.load()
@@ -408,6 +453,7 @@ def _load_editor_hard_constraints_block(
 
 
 def _format_editor_prompt_block(block: str) -> str:
+    """Format editor prompt block."""
     if not block:
         return ""
     return f"{block}\n"
@@ -425,6 +471,7 @@ def _build_one_click_scenario_user_prompt(
     examples_text: str,
     hard_constraints_block: str,
 ) -> str:
+    """Build one click scenario user prompt."""
     return (
         f"Theme: {theme}\n"
         "Use EXACTLY these selected entities (names must match; do not rename or invent new proper nouns):\n"

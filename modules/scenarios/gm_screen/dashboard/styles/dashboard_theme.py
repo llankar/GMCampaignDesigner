@@ -1,3 +1,5 @@
+"""Theme helpers for dashboard."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -28,6 +30,7 @@ class DashboardTheme:
 
 
 def get_dashboard_theme() -> DashboardTheme:
+    """Return dashboard theme."""
     key = theme_manager.get_theme()
     tokens = theme_manager.get_tokens(key)
 
@@ -93,6 +96,7 @@ class _LiveDashboardTheme:
     """Resolve dashboard colors lazily so runtime theme changes are reflected."""
 
     def __getattr__(self, item: str):
+        """Handle getattr."""
         return getattr(get_dashboard_theme(), item)
 
 

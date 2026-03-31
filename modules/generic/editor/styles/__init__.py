@@ -1,3 +1,5 @@
+"""Editor package."""
+
 from .editor_theme import (
     EDITOR_PALETTE,
     get_editor_palette,

@@ -1,3 +1,5 @@
+"""Utilities for event editor palette."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -77,6 +79,7 @@ _THEME_OVERRIDES = {
 
 class _EventEditorPaletteProxy:
     def __getattr__(self, item: str):
+        """Handle getattr."""
         return getattr(get_event_editor_palette(), item)
 
 
@@ -84,6 +87,7 @@ EVENT_EDITOR_PALETTE = _EventEditorPaletteProxy()
 
 
 def get_event_editor_palette(theme: str | None = None) -> EventEditorPalette:
+    """Return event editor palette."""
     key = (theme or theme_manager.get_theme()).strip().lower()
     palette_values = dict(_BASE_PALETTE.__dict__)
     palette_values.update(_THEME_OVERRIDES.get(key, _THEME_OVERRIDES[theme_manager.THEME_DEFAULT]))

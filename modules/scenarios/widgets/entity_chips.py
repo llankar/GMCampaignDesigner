@@ -1,3 +1,5 @@
+"""Utilities for scenario entity chips."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -12,6 +14,7 @@ ENTITY_BASE_TINTS = {
 
 
 def normalize_entity_payload(entity) -> dict:
+    """Normalize entity payload."""
     if isinstance(entity, dict):
         name = str(
             entity.get("name")
@@ -36,6 +39,7 @@ def create_entity_chip(
     palette: dict,
     open_entity_callback=None,
 ):
+    """Create entity chip."""
     chip_style = _resolve_chip_style(group_label, palette)
     entity_name = entity_payload["name"]
     entity_role = entity_payload["role"]
@@ -115,6 +119,7 @@ def create_entity_chip(
         role_label.pack(anchor="w", pady=(-1, 0))
 
     if callable(open_entity_callback):
+        # Handle the branch where callable(open_entity_callback).
         _apply_interaction_state(
             chip,
             hover_fg=chip_style["hover_fg"],
@@ -126,6 +131,7 @@ def create_entity_chip(
             entity_name=entity_name,
         )
         for widget in (row, avatar_shell, avatar_label, text_col, name_label, role_label, badge_label):
+            # Process each widget while updating entity chip.
             if widget is None:
                 continue
             widget.configure(cursor="hand2")
@@ -144,13 +150,17 @@ def _apply_interaction_state(
     group_label,
     entity_name,
 ):
+    """Apply interaction state."""
     def _on_enter(_event=None):
+        """Handle enter."""
         chip.configure(fg_color=hover_fg, border_color=hover_border)
 
     def _on_leave(_event=None):
+        """Handle leave."""
         chip.configure(fg_color=default_fg, border_color=default_border)
 
     def _open_entity(_event=None):
+        """Open entity."""
         open_entity_callback(group_label, entity_name)
 
     _bind_to_tree(chip, "<Enter>", _on_enter)
@@ -159,12 +169,14 @@ def _apply_interaction_state(
 
 
 def _bind_to_tree(root, sequence, callback):
+    """Bind to tree."""
     root.bind(sequence, callback, add="+")
     for child in root.winfo_children():
         _bind_to_tree(child, sequence, callback)
 
 
 def _resolve_chip_style(group_label: str, palette: dict) -> dict:
+    """Resolve chip style."""
     base_tint = ENTITY_BASE_TINTS.get(group_label, palette["accent"])
     return {
         "fg": _mix_hex(palette["surface_soft"], base_tint, 0.18),
@@ -178,6 +190,7 @@ def _resolve_chip_style(group_label: str, palette: dict) -> dict:
 
 
 def _entity_initials(value: str) -> str:
+    """Internal helper for entity initials."""
     tokens = [token for token in value.split() if token]
     if not tokens:
         return "?"
@@ -187,6 +200,7 @@ def _entity_initials(value: str) -> str:
 
 
 def _mix_hex(primary: str, secondary: str, amount: float) -> str:
+    """Internal helper for mix hex."""
     primary = (primary or "").lstrip("#")
     secondary = (secondary or "").lstrip("#")
     if len(primary) != 6 or len(secondary) != 6:

@@ -1,3 +1,4 @@
+"""Briefing helpers for campaign scenario."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -7,6 +8,7 @@ from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOA
 
 class ScenarioBriefingPanel(ctk.CTkFrame):
     def __init__(self, parent, *, summary: str, objective: str = "", hook: str = "", stakes: str = ""):
+        """Initialize the ScenarioBriefingPanel instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=20, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
 
@@ -44,6 +46,7 @@ class ScenarioBriefingPanel(ctk.CTkFrame):
             ("Hook", hook, "#c084fc"),
             ("Stakes", stakes, "#fca5a5"),
         ):
+            # Process each (label, value, accent) while updating init.
             if not value:
                 continue
             panel = ctk.CTkFrame(self, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=16, border_width=1, border_color=DASHBOARD_THEME.card_border)

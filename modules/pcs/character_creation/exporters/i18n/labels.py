@@ -83,9 +83,11 @@ _LABELS = {
 
 
 def normalize_export_language(language: str | None) -> str:
+    """Normalize export language."""
     value = str(language or "fr").strip().lower()
     return value if value in _LABELS else "fr"
 
 
 def get_export_labels(language: str | None) -> dict[str, str]:
+    """Return export labels."""
     return dict(_LABELS[normalize_export_language(language)])

@@ -26,6 +26,7 @@ class PyWebviewClient:
         use_shell: bool = False,
         selection_output: str | None = None,
     ) -> None:
+        """Open the operation."""
         args = [
             sys.executable,
             url,

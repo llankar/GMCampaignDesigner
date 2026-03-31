@@ -1,3 +1,5 @@
+"""Panel for scenario random tables."""
+
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -24,6 +26,7 @@ class RandomTablesPanel(ctk.CTkFrame):
     _instances: List["RandomTablesPanel"] = []
 
     def __init__(self, master=None, data_path: Optional[str] = None, initial_state: Optional[Dict] = None, **kwargs):
+        """Initialize the RandomTablesPanel instance."""
         super().__init__(master, **kwargs)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(1, weight=3)
@@ -46,23 +49,28 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _default_data_path(self) -> str:
+        """Internal helper for default data path."""
         return RandomTableLoader.default_data_path()
 
     def _load_tables(self) -> None:
+        """Load tables."""
         data = self.loader.load()
         self.categories = data.get("categories") or []
         self.tables = data.get("tables") or {}
         self._table_index = list(self.tables.keys())
 
     def _available_categories(self) -> List[str]:
+        """Internal helper for available categories."""
         return ["All"] + [cat.get("name") for cat in self.categories]
 
     def _available_styles(self) -> List[str]:
+        """Internal helper for available styles."""
         styles = sorted({t.get("theme") for t in self.tables.values() if t.get("theme")})
         return ["All"] + styles
 
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build UI."""
         filter_bar = ctk.CTkFrame(self)
         filter_bar.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
         filter_bar.columnconfigure(5, weight=1)
@@ -149,6 +157,7 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _filter_tables(self) -> List[dict]:
+        """Internal helper for filter tables."""
         tag_filter = (self.tag_var.get() or "").strip().lower()
         category_label = (self.category_var.get() or "All").strip()
         style_label = (self.style_var.get() or "All").strip()
@@ -160,11 +169,13 @@ class RandomTablesPanel(ctk.CTkFrame):
 
         matched: List[dict] = []
         for table in self.tables.values():
+            # Process each table from tables.values().
             if selected_category and table.get("category") != selected_category:
                 continue
             if style_label and style_label != "All" and (table.get("theme") or "") != style_label:
                 continue
             if tag_filter:
+                # Continue with this path when tag filter is set.
                 tags = [t.lower() for t in table.get("tags") or []]
                 if table.get("system"):
                     tags.append(f"system:{table['system']}".lower())
@@ -181,6 +192,7 @@ class RandomTablesPanel(ctk.CTkFrame):
         )
 
     def _refresh_table_list(self) -> None:
+        """Refresh table list."""
         tables = self._filter_tables()
         self.table_list.delete(0, "end")
         self._table_index = []
@@ -199,24 +211,30 @@ class RandomTablesPanel(ctk.CTkFrame):
             self._update_metadata(None)
 
     def _on_category_change(self, *_args):
+        """Handle category change."""
         self._refresh_table_list()
 
     def _on_style_change(self, *_args):
+        """Handle style change."""
         self._refresh_table_list()
 
     def _update_filter_values(self) -> None:
+        """Update filter values."""
         if hasattr(self, "category_menu"):
+            # Handle the branch where hasattr(self, 'category_menu').
             categories = self._available_categories()
             self.category_menu.configure(values=categories)
             if self.category_var.get() not in categories:
                 self.category_var.set(categories[0] if categories else "All")
         if hasattr(self, "style_menu"):
+            # Handle the branch where hasattr(self, 'style_menu').
             styles = self._available_styles()
             self.style_menu.configure(values=styles)
             if self.style_var.get() not in styles:
                 self.style_var.set(styles[0] if styles else "All")
 
     def _on_table_select(self):
+        """Handle table select."""
         selection = self.table_list.curselection()
         if not selection:
             return
@@ -229,7 +247,9 @@ class RandomTablesPanel(ctk.CTkFrame):
         self._update_metadata(table)
 
     def _update_metadata(self, table: Optional[dict]) -> None:
+        """Update metadata."""
         if not table:
+            # Handle the branch where table is unavailable.
             self.dice_var.set("-")
             self.tags_var.set("-")
             self.description_box.configure(state="normal")
@@ -269,9 +289,11 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def roll_once(self):
+        """Handle roll once."""
         self._roll_table(times=1)
 
     def roll_multiple(self):
+        """Handle roll multiple."""
         try:
             count = int(self.count_var.get())
         except ValueError:
@@ -280,12 +302,14 @@ class RandomTablesPanel(ctk.CTkFrame):
         self._roll_table(times=max(1, count))
 
     def _roll_table(self, *, times: int):
+        """Internal helper for roll table."""
         table = self.tables.get(self.selected_table_id or "") if self.selected_table_id else None
         if not table:
             messagebox.showinfo("Random Tables", "Select a table to roll first.")
             return
 
         try:
+            # Keep roll table resilient if this step fails.
             parsed_results = [dice_engine.roll_formula(table.get("dice", "1d20")) for _ in range(times)]
         except Exception as exc:
             log_exception(exc, func_name="RandomTablesPanel._roll_table")
@@ -300,18 +324,21 @@ class RandomTablesPanel(ctk.CTkFrame):
             self._append_history(text)
 
     def _match_entry(self, table: dict, value: int) -> dict:
+        """Internal helper for match entry."""
         for entry in table.get("entries", []):
             if entry.get("min", 0) <= value <= entry.get("max", 0):
                 return entry
         return table.get("entries", [{}])[0] if table.get("entries") else {"result": "(no entries)"}
 
     def _append_history(self, line: str) -> None:
+        """Append history."""
         self.history_box.configure(state="normal")
         self.history_box.insert("end", line + "\n")
         self.history_box.see("end")
         self.history_box.configure(state="disabled")
 
     def _edit_selected_table(self) -> None:
+        """Internal helper for edit selected table."""
         if not self.selected_table_id:
             messagebox.showinfo("Random Tables", "Select a table to edit first.")
             return
@@ -320,6 +347,7 @@ class RandomTablesPanel(ctk.CTkFrame):
             messagebox.showinfo("Random Tables", "Selected table is unavailable.")
             return
         try:
+            # Keep edit selected table resilient if this step fails.
             from modules.scenarios.random_tables_editor import RandomTableEditorDialog
 
             dialog = RandomTableEditorDialog(self.winfo_toplevel(), table=table)
@@ -331,6 +359,7 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def _jump_to_plot_twists(self) -> None:
+        """Internal helper for jump to plot twists."""
         if PLOT_TWIST_TABLE_ID not in self.tables:
             messagebox.showinfo("Random Tables", "The Plot Twists table is not available.")
             return
@@ -345,6 +374,7 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def get_state(self) -> Dict:
+        """Return state."""
         return {
             "selected_table": self.selected_table_id,
             "category": self.category_var.get() if hasattr(self, "category_var") else None,
@@ -354,6 +384,7 @@ class RandomTablesPanel(ctk.CTkFrame):
         }
 
     def apply_state(self, state: Dict) -> None:
+        """Apply state."""
         if not state:
             self._refresh_table_list()
             return
@@ -373,6 +404,7 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     # ------------------------------------------------------------------
     def reload_tables(self) -> None:
+        """Handle reload tables."""
         state = self.get_state()
         self.loader = RandomTableLoader(self.data_path)
         self._load_tables()
@@ -380,7 +412,9 @@ class RandomTablesPanel(ctk.CTkFrame):
         self.apply_state(state)
 
     def destroy(self):
+        """Handle destroy."""
         try:
+            # Keep destroy resilient if this step fails.
             if self in self._instances:
                 self._instances.remove(self)
         except Exception:
@@ -389,6 +423,7 @@ class RandomTablesPanel(ctk.CTkFrame):
 
     @classmethod
     def refresh_all(cls) -> None:
+        """Refresh all."""
         for panel in list(cls._instances):
             try:
                 panel.reload_tables()
@@ -396,6 +431,7 @@ class RandomTablesPanel(ctk.CTkFrame):
                 log_exception(exc, func_name="RandomTablesPanel.refresh_all")
 
     def roll_random_table(self) -> Optional[dict]:
+        """Handle roll random table."""
         if not self.tables:
             return None
         table = self.tables.get(self.selected_table_id) if self.selected_table_id else None

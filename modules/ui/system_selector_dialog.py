@@ -32,6 +32,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         *,
         on_selected: SystemSelectedCallback | None = None,
     ) -> None:
+        """Initialize the CampaignSystemSelectorDialog instance."""
         super().__init__(master)
         self.title("Select Campaign System")
         self.geometry("440x420")
@@ -57,6 +58,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
     # UI helpers
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build UI."""
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=18, pady=18)
         container.grid_columnconfigure(0, weight=1)
@@ -108,6 +110,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
             rb.pack(side="left", padx=6)
 
     def _load_systems(self) -> None:
+        """Load systems."""
         container = self._radio_container
         if container is None:
             return
@@ -119,6 +122,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
                 pass
 
         try:
+            # Keep systems resilient if this step fails.
             systems = system_config.list_available_systems()
         except Exception as exc:
             log_exception(
@@ -141,6 +145,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         self._system_var.set(current_slug)
 
         for index, entry in enumerate(systems):
+            # Process each (index, entry) from enumerate(systems).
             row = ctk.CTkFrame(container, fg_color="transparent")
             row.grid(row=index, column=0, sticky="ew", pady=4)
             row.grid_columnconfigure(0, weight=1)
@@ -164,6 +169,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         self._update_confirm_state()
 
     def _display_empty_state(self, message: str) -> None:
+        """Internal helper for display empty state."""
         container = self._radio_container
         if container is None:
             return
@@ -173,6 +179,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
             self._confirm_button.configure(state="disabled")
 
     def _update_confirm_state(self) -> None:
+        """Update confirm state."""
         if self._confirm_button is None:
             return
         state = "normal" if self._system_var.get().strip() else "disabled"
@@ -182,11 +189,14 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
     # Event handlers
     # ------------------------------------------------------------------
     def _cancel(self) -> None:
+        """Internal helper for cancel."""
         self.destroy()
 
     def _confirm_selection(self) -> None:
+        """Internal helper for confirm selection."""
         # Always persist/apply theme selection, even if system doesn't change
         try:
+            # Keep confirm selection resilient if this step fails.
             sel_theme = self._theme_var.get().strip()
             if sel_theme:
                 theme_manager.set_theme(sel_theme)
@@ -207,6 +217,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
             return
 
         try:
+            # Keep confirm selection resilient if this step fails.
             new_config = system_config.set_current_system(slug)
         except ValueError as exc:
             log_warning(
@@ -249,6 +260,7 @@ class CampaignSystemSelectorDialog(ctk.CTkToplevel):
         self.destroy()
 
     def destroy(self) -> None:  # type: ignore[override]
+        """Handle destroy."""
         try:
             self.grab_release()
         except Exception:

@@ -1,3 +1,4 @@
+﻿"""Catalog helpers for Story Forge entity definitions and lookups."""
 from __future__ import annotations
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -24,6 +25,7 @@ def load_db_entity_catalog(entity_types: tuple[str, ...] | None = None, limit: i
     requested = entity_types or tuple(ENTITY_TYPE_TO_FIELD.keys())
     catalog: dict[str, list[str]] = {}
     for entity_type in requested:
+        # Process each entity_type from requested.
         field_name = ENTITY_TYPE_TO_FIELD.get(entity_type)
         if not field_name:
             continue
@@ -34,6 +36,7 @@ def load_db_entity_catalog(entity_types: tuple[str, ...] | None = None, limit: i
             items = []
         names: list[str] = []
         for item in items:
+            # Process each item from items.
             if not isinstance(item, dict):
                 continue
             name = str(item.get("Name") or item.get("Title") or item.get("name") or "").strip()
@@ -47,6 +50,7 @@ def load_db_entity_catalog(entity_types: tuple[str, ...] | None = None, limit: i
 
 
 def load_campaign_arc_context(campaign_context: dict | None = None, arc_context: dict | None = None) -> dict[str, str]:
+    """Load campaign arc context."""
     campaign_context = campaign_context or {}
     arc_context = arc_context or {}
     return {

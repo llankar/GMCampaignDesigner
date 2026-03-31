@@ -1,7 +1,10 @@
+"""Regression tests for scene sections parser."""
+
 from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sections
 
 
 def test_parse_scene_body_sections_accepts_unicode_bullet_key_beats_header():
+    """Verify that parse scene body sections accepts unicode bullet key beats header."""
     parsed = parse_scene_body_sections(
         """
 Scene intro
@@ -16,6 +19,7 @@ Scene intro
 
 
 def test_parse_scene_body_sections_accepts_unicode_bullet_conflicts_header():
+    """Verify that parse scene body sections accepts unicode bullet conflicts header."""
     parsed = parse_scene_body_sections(
         """
 · Conflicts/obstacles:
@@ -29,6 +33,7 @@ def test_parse_scene_body_sections_accepts_unicode_bullet_conflicts_header():
 
 
 def test_parse_scene_body_sections_header_without_bullet_is_unchanged():
+    """Verify that parse scene body sections header without bullet is unchanged."""
     parsed = parse_scene_body_sections(
         """
 Key beats:
@@ -42,6 +47,7 @@ Key beats:
 
 
 def test_parse_scene_body_sections_has_sections_true_with_bulleted_scene_example():
+    """Verify that parse scene body sections has sections true with bulleted scene example."""
     parsed = parse_scene_body_sections(
         """
 A smoky tavern hums with rumors.

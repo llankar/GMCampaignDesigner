@@ -1,3 +1,5 @@
+"""Date Validation package."""
+
 from .date_input_validation import (
     DateAgendaValidationResult,
     max_days_for_month,

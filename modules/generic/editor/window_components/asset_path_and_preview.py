@@ -1,8 +1,11 @@
+"""Utilities for window components asset path and preview."""
+
 from modules.generic.editor.window_context import *
 
 
 class GenericEditorWindowAssetPathAndPreview:
     def select_image(self):
+        """Select image."""
         file_path = filedialog.askopenfilename(
             title="Select Image or Video",
             filetypes=[
@@ -19,6 +22,7 @@ class GenericEditorWindowAssetPathAndPreview:
         )
 
         if file_path:
+            # Continue with this path when file path is set.
             self.image_path = self.copy_and_resize_image(file_path)
             if self.image_path:
                 candidate = Path(self.image_path)
@@ -26,6 +30,7 @@ class GenericEditorWindowAssetPathAndPreview:
             else:
                 abs_path = None
             try:
+                # Keep image resilient if this step fails.
                 if abs_path and abs_path.exists():
                     image = Image.open(abs_path).resize((256, 256))
                     self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
@@ -38,6 +43,7 @@ class GenericEditorWindowAssetPathAndPreview:
                 self.image_image = None
             self.field_widgets["Image"] = self.image_path
     def _campaign_relative_path(self, path):
+        """Internal helper for campaign relative path."""
         if not path or str(path).strip() in ("[No Image]", "[No Portrait]", "[No Attachment]", ""):
             return ""
         try:
@@ -52,6 +58,7 @@ class GenericEditorWindowAssetPathAndPreview:
                 return candidate.resolve().as_posix()
         return candidate.as_posix()
     def _format_audio_label(self, value: str) -> str:
+        """Format audio label."""
         if not value:
             return "[No Audio]"
         resolved = Path(resolve_audio_path(value))
@@ -60,6 +67,7 @@ class GenericEditorWindowAssetPathAndPreview:
             return name
         return f"{name} (missing)"
     def _refresh_portrait_listbox(self, *, select_primary: bool = False, selected_index: int | None = None):
+        """Refresh portrait listbox."""
         if not getattr(self, "portrait_listbox", None):
             return
         self.portrait_listbox.delete(0, "end")
@@ -75,6 +83,7 @@ class GenericEditorWindowAssetPathAndPreview:
         self.portrait_listbox.selection_set(index)
         self.portrait_listbox.activate(index)
     def _on_portrait_select(self, _event=None):
+        """Handle portrait select."""
         if not getattr(self, "portrait_listbox", None):
             return
         selection = self.portrait_listbox.curselection()
@@ -87,6 +96,7 @@ class GenericEditorWindowAssetPathAndPreview:
             return
         self._update_portrait_preview(path=path)
     def _add_portrait_path(self, path: str, *, make_primary: bool = False):
+        """Internal helper for add portrait path."""
         if not path:
             return
         normalized = self._campaign_relative_path(path)
@@ -104,6 +114,7 @@ class GenericEditorWindowAssetPathAndPreview:
         self._refresh_portrait_listbox(select_primary=make_primary)
         self._update_portrait_preview()
     def set_primary_portrait(self):
+        """Set primary portrait."""
         if not getattr(self, "portrait_listbox", None):
             return
         selection = self.portrait_listbox.curselection()
@@ -120,6 +131,7 @@ class GenericEditorWindowAssetPathAndPreview:
         self._refresh_portrait_listbox(select_primary=True)
         self._update_portrait_preview()
     def remove_selected_portrait(self):
+        """Remove selected portrait."""
         if not getattr(self, "portrait_listbox", None):
             return
         selection = list(self.portrait_listbox.curselection())
@@ -131,6 +143,7 @@ class GenericEditorWindowAssetPathAndPreview:
         self._refresh_portrait_listbox(select_primary=True)
         self._update_portrait_preview()
     def _update_portrait_preview(self, *, path: str | None = None, primary_only: bool = False):
+        """Update portrait preview."""
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
         if path is None:
             if primary_only:
@@ -144,6 +157,7 @@ class GenericEditorWindowAssetPathAndPreview:
         else:
             abs_path = None
         try:
+            # Keep portrait preview resilient if this step fails.
             if abs_path and abs_path.exists():
                 image = Image.open(abs_path).resize((256, 256))
                 self.portrait_image = ctk.CTkImage(light_image=image, size=(256, 256))
@@ -156,6 +170,7 @@ class GenericEditorWindowAssetPathAndPreview:
             self.portrait_image = None
         self.field_widgets["Portrait"] = serialize_portrait_value(self.portrait_paths)
     def copy_and_resize_image(self, src_path):
+        """Copy and resize image."""
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
         image_folder = campaign_dir / 'assets' / 'images' / 'map_images'
         MAX_IMAGE_SIZE = (1920, 1080)
@@ -174,6 +189,7 @@ class GenericEditorWindowAssetPathAndPreview:
             relative = dest_path.as_posix()
         return relative
     def copy_and_resize_portrait(self, src_path):
+        """Copy and resize portrait."""
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
         portrait_folder = campaign_dir / 'assets' / 'portraits'
         MAX_PORTRAIT_SIZE = (1024, 1024)
@@ -200,6 +216,7 @@ class GenericEditorWindowAssetPathAndPreview:
             relative = dest_path.as_posix()
         return relative
     def copy_audio_asset(self, src_path: str) -> str:
+        """Copy audio asset."""
         campaign_dir = Path(ConfigHelper.get_campaign_dir())
         audio_folder = campaign_dir / 'assets' / 'audio'
         audio_folder.mkdir(parents=True, exist_ok=True)

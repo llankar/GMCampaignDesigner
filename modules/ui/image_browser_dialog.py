@@ -31,6 +31,7 @@ class ImageBrowserDialog(ctk.CTkToplevel):
         search_query: str = "fantasy portrait",
         provider: str = "unsplash",
     ) -> None:
+        """Initialize the ImageBrowserDialog instance."""
         super().__init__(master)
         self.title("Image Browser")
         self.geometry("1100x760")
@@ -50,6 +51,7 @@ class ImageBrowserDialog(ctk.CTkToplevel):
         self.focus_force()
 
     def _build_ui(self) -> None:
+        """Build UI."""
         container = ctk.CTkFrame(self)
         container.pack(fill="both", expand=True, padx=14, pady=14)
         container.grid_columnconfigure(0, weight=1)
@@ -88,6 +90,7 @@ class ImageBrowserDialog(ctk.CTkToplevel):
 
     @staticmethod
     def build_search_url(query: str, provider: str = "unsplash") -> str:
+        """Build search URL."""
         provider_key = (provider or "").lower().strip()
         template = ImageBrowserDialog._PROVIDER_URLS.get(provider_key)
         if not template:
@@ -96,11 +99,14 @@ class ImageBrowserDialog(ctk.CTkToplevel):
         return template.format(query=encoded_query)
 
     def _resolve_search_url(self) -> str:
+        """Resolve search URL."""
         return self.build_search_url(self._search_query, self._provider)
 
     def _load_initial_page(self) -> None:
+        """Load initial page."""
         url = self._resolve_search_url()
         try:
+            # Keep initial page resilient if this step fails.
             self._browser_client.open(url)
         except Exception as exc:  # pragma: no cover - UI fallback
             log_exception(

@@ -1,3 +1,5 @@
+"""Utilities for scenario epic finale planner."""
+
 import random
 import re
 import tkinter as tk
@@ -134,6 +136,7 @@ class FinaleBlueprintStep(WizardStep):
     """Wizard step for composing an epic finale outline before refinement."""
 
     def __init__(self, master, wizard):
+        """Initialize the FinaleBlueprintStep instance."""
         super().__init__(master)
         self.wizard = wizard
         self.generated_scenario = None
@@ -274,6 +277,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _create_entity_selector(self, parent, row, column, key, button_text):
+        """Create entity selector."""
         container = ctk.CTkFrame(parent, fg_color="transparent")
         container.grid(row=row, column=column, sticky="nsew", padx=10, pady=5)
         container.grid_columnconfigure(0, weight=1)
@@ -292,6 +296,7 @@ class FinaleBlueprintStep(WizardStep):
         }
 
         def remove_row(row_frame, var):
+            """Remove row."""
             row_frame.destroy()
             if var in selector["vars"]:
                 idx = selector["vars"].index(var)
@@ -300,6 +305,7 @@ class FinaleBlueprintStep(WizardStep):
                 selector["rows"].pop(idx)
 
         def add_row(initial_value=None):
+            """Handle add row."""
             options = selector["options"] or ["None"]
             row_frame = ctk.CTkFrame(rows_container, fg_color="transparent")
             row_frame.pack(fill="x", pady=2)
@@ -336,7 +342,9 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _refresh_entities(self):
+        """Refresh entities."""
         def safe_load(wrapper):
+            """Handle safe load."""
             try:
                 return wrapper.load_items()
             except Exception:
@@ -360,6 +368,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _get_selector_items(self, key):
+        """Return selector items."""
         if key == "antagonists":
             return list(self.npcs) + list(self.factions)
         if key == "allied_factions":
@@ -370,6 +379,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _update_entity_selector(self, key, items):
+        """Update entity selector."""
         selector = self.entity_selectors.get(key)
         if not selector:
             return
@@ -383,16 +393,19 @@ class FinaleBlueprintStep(WizardStep):
         selector["options"] = options
 
         for menu, var in zip(selector["menus"], selector["vars"]):
+            # Process each (menu, var) from zip(selector['menus'], selector['vars']).
             menu.configure(values=options)
             if var.get() not in options:
                 var.set(options[0])
 
     # ------------------------------------------------------------------
     def _ensure_selector_option(self, selector, value):
+        """Ensure selector option."""
         if not value:
             return
         options = selector.get("options") or ["None"]
         if value not in options:
+            # Handle the branch where value is not in options.
             options = options + [value]
             selector["options"] = options
             for menu in selector["menus"]:
@@ -400,6 +413,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _set_entity_selector_values(self, key, values):
+        """Set entity selector values."""
         selector = self.entity_selectors.get(key)
         if not selector:
             return
@@ -412,6 +426,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _clear_entity_selector(self, key):
+        """Clear entity selector."""
         selector = self.entity_selectors.get(key)
         if not selector:
             return
@@ -425,12 +440,14 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _collect_entity_selector_values(self, key):
+        """Collect entity selector values."""
         selector = self.entity_selectors.get(key)
         if not selector:
             return []
 
         values = []
         for var in selector["vars"]:
+            # Process each var from selector['vars'].
             value = (var.get() or "").strip()
             if value and value != "None":
                 values.append(value)
@@ -438,8 +455,10 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _build_name_list(self, items):
+        """Build name list."""
         names = []
         for item in items or []:
+            # Process each item from items or [].
             name = self._format_name(item)
             if name:
                 names.append(name)
@@ -447,6 +466,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _build_option_list(self, items):
+        """Build option list."""
         names = [self._format_name(item) for item in items if self._format_name(item)]
         if not names:
             names = ["None"]
@@ -457,6 +477,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _format_name(item):
+        """Format name."""
         if not isinstance(item, dict):
             return None
         return item.get("Title") or item.get("Name") or item.get("label")
@@ -464,6 +485,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _parse_list(text):
+        """Parse list."""
         if not text:
             return []
         if isinstance(text, list):
@@ -477,9 +499,11 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _deduplicate_preserve_order(items):
+        """Internal helper for deduplicate preserve order."""
         seen = set()
         ordered = []
         for item in items:
+            # Process each item from items.
             if not item or item in seen:
                 continue
             seen.add(item)
@@ -489,7 +513,9 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _format_scene_entities(scene):
+        """Format scene entities."""
         def normalise(values):
+            """Handle normalise."""
             if not values:
                 return []
             if isinstance(values, (list, tuple)):
@@ -499,6 +525,7 @@ class FinaleBlueprintStep(WizardStep):
             return []
 
         def join(values):
+            """Handle join."""
             return ", ".join(values) if values else "None"
 
         npcs = normalise(scene.get("NPCs")) if isinstance(scene, dict) else []
@@ -516,10 +543,12 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _entity_hook_text(entity):
+        """Internal helper for entity hook text."""
         if not isinstance(entity, dict):
             return ""
 
         def _normalise(value):
+            """Internal helper for normalise."""
             if value is None:
                 return ""
             if isinstance(value, (list, tuple, set)):
@@ -532,6 +561,7 @@ class FinaleBlueprintStep(WizardStep):
             return flattened
 
         for field in ("Role", "Motivation", "Secrets", "Secret", "Description"):
+            # Process each field while updating entity hook text.
             text = _normalise(entity.get(field))
             if text:
                 return text
@@ -539,6 +569,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _format_entity_suggestion(self, entity):
+        """Format entity suggestion."""
         name = self._format_name(entity)
         if not name:
             return None
@@ -553,9 +584,11 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _refresh_parameter_suggestions(self):
+        """Refresh parameter suggestions."""
         lines = ["Potential Antagonists:"]
         if self.npcs:
             for npc in self.npcs[:8]:
+                # Process each npc from npcs[:8].
                 suggestion = self._format_entity_suggestion(npc)
                 if suggestion:
                     lines.append(f" • {suggestion}")
@@ -565,6 +598,7 @@ class FinaleBlueprintStep(WizardStep):
         lines.append("\nAllied Factions:")
         if self.factions:
             for faction in self.factions[:8]:
+                # Process each faction from factions[:8].
                 suggestion = self._format_entity_suggestion(faction)
                 if suggestion:
                     lines.append(f" • {suggestion}")
@@ -574,6 +608,7 @@ class FinaleBlueprintStep(WizardStep):
         lines.append("\nNPC Allies:")
         if self.npcs:
             for npc in self.npcs[:8]:
+                # Process each npc from npcs[:8].
                 suggestion = self._format_entity_suggestion(npc)
                 if suggestion:
                     lines.append(f" • {suggestion}")
@@ -583,6 +618,7 @@ class FinaleBlueprintStep(WizardStep):
         lines.append("\nSignature Locations:")
         if self.places:
             for place in self.places[:8]:
+                # Process each place from places[:8].
                 suggestion = self._format_entity_suggestion(place)
                 if suggestion:
                     lines.append(f" • {suggestion}")
@@ -604,6 +640,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def load_state(self, state):  # pragma: no cover - UI synchronization
+        """Load state."""
         self._refresh_entities()
         self._refresh_parameter_suggestions()
 
@@ -630,6 +667,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _set_if_available(var, value, options):
+        """Set if available."""
         if not value:
             return
         if isinstance(options, tuple):
@@ -639,6 +677,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def save_state(self, state):  # pragma: no cover - UI synchronization
+        """Save state."""
         if state is None:
             return False
 
@@ -673,6 +712,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def generate_outline(self):  # pragma: no cover - UI interaction
+        """Handle generate outline."""
         scenario = self._build_scenario_from_config()
         if scenario is None:
             return
@@ -682,6 +722,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _build_scenario_from_config(self):
+        """Build scenario from config."""
         climax_name = self.climax_var.get()
         climax = next((item for item in CLIMAX_STRUCTURES if item["name"] == climax_name), None)
         if not climax:
@@ -745,6 +786,7 @@ class FinaleBlueprintStep(WizardStep):
         )
 
         for idx, beat in enumerate(climax["beats"], start=1):
+            # Process each (idx, beat) from enumerate(climax['beats'], start=1).
             beat_text = self._personalise_beat(beat, primary_antagonist, primary_ally, location)
             scene_title = self._scene_title(idx, beat_text)
             (
@@ -815,6 +857,7 @@ class FinaleBlueprintStep(WizardStep):
     def _build_gm_guidance_sentences(
         self, antagonists, allied_factions, npc_allies, location
     ):
+        """Build GM guidance sentences."""
         guidance = []
 
         antagonist_sources = self._get_cached_entities("npcs") + self._get_cached_entities(
@@ -839,6 +882,7 @@ class FinaleBlueprintStep(WizardStep):
         deduplicated = []
         seen = set()
         for sentence in guidance:
+            # Process each sentence from guidance.
             if sentence in seen:
                 continue
             seen.add(sentence)
@@ -847,6 +891,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _extract_entity_guidance(self, name, items):
+        """Extract entity guidance."""
         record = self._find_entity_by_name(name, items)
         if not record:
             return []
@@ -854,6 +899,7 @@ class FinaleBlueprintStep(WizardStep):
         sentences = []
         seen_values = set()
         for key, label in (("Secret", "secret"), ("Secrets", "secret"), ("Motivation", "motivation")):
+            # Process each (key, label) while updating entity guidance.
             value = record.get(key)
             text = self._normalise_secret_value(value)
             if not text or text in seen_values:
@@ -864,6 +910,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _distribute_guidance_across_beats(self, beats, guidance_sentences, rng):
+        """Internal helper for distribute guidance across beats."""
         beat_count = len(beats or [])
         if beat_count <= 0:
             return []
@@ -883,6 +930,7 @@ class FinaleBlueprintStep(WizardStep):
         unmatched = []
 
         for sentence in shuffled:
+            # Process each sentence from shuffled.
             subject = self._extract_guidance_subject(sentence)
             if not subject:
                 unmatched.append(sentence)
@@ -912,6 +960,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _extract_guidance_subject(sentence):
+        """Extract guidance subject."""
         text = (sentence or "").strip()
         if not text:
             return ""
@@ -928,6 +977,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _get_cached_entities(self, attribute):
+        """Return cached entities."""
         items = getattr(self, attribute, None)
         if not items:
             return []
@@ -935,11 +985,13 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _find_entity_by_name(self, name, items):
+        """Find entity by name."""
         cleaned_name = (name or "").strip()
         if not cleaned_name:
             return None
 
         for item in items or []:
+            # Process each item from items or [].
             formatted = self._format_name(item)
             if formatted and formatted.strip() == cleaned_name:
                 return item
@@ -947,6 +999,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _normalise_secret_value(self, value):
+        """Internal helper for normalise secret value."""
         if not value:
             return ""
 
@@ -954,6 +1007,7 @@ class FinaleBlueprintStep(WizardStep):
             # Prefer explicit text/value fields when present
             parts = []
             for key in ("text", "value"):
+                # Process each key from ('text', 'value').
                 part = value.get(key)
                 if part:
                     parts.append(str(part))
@@ -975,6 +1029,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _condense_guidance_text(text, limit=160):
+        """Internal helper for condense guidance text."""
         cleaned = (text or "").strip()
         if not cleaned:
             return ""
@@ -989,6 +1044,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _format_gm_guidance(name, label, text):
+        """Format GM guidance."""
         subject = (name or "").strip()
         descriptor = (label or "secret").strip().lower()
         if not subject or not text:
@@ -998,6 +1054,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _scene_title(index, beat_text):
+        """Internal helper for scene title."""
         headline = beat_text.split(".")[0].strip()
         if not headline:
             headline = f"Phase {index}"
@@ -1008,6 +1065,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _personalise_beat(beat, antagonist, ally, location):
+        """Internal helper for personalise beat."""
         beat_text = beat
         if antagonist and "antagonist" in beat.lower():
             beat_text = beat_text.replace("the antagonist", antagonist)
@@ -1028,6 +1086,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _append_guidance_sentences(base_text, sentences):
+        """Append guidance sentences."""
         text = base_text.rstrip()
         if text and text[-1] not in ".!?":
             text += "."
@@ -1037,6 +1096,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _select_callback_scene_index(beats, rng):
+        """Select callback scene index."""
         if not beats:
             return -1
 
@@ -1052,11 +1112,13 @@ class FinaleBlueprintStep(WizardStep):
         )
         candidate_indexes = []
         for index in range(len(beats) - 2, -1, -1):
+            # Process each index from range(len(beats) - 2, -1, -1).
             beat_lower = beats[index].lower()
             if any(keyword in beat_lower for keyword in keywords):
                 candidate_indexes.append(index)
 
         if candidate_indexes:
+            # Continue with this path when candidate indexes is set.
             chooser = getattr(rng, "choice", None)
             if callable(chooser):
                 return chooser(candidate_indexes)
@@ -1069,6 +1131,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _select_escalation_scene_index(beats, callback_index, rng):
+        """Select escalation scene index."""
         if not beats:
             return -1
 
@@ -1101,9 +1164,11 @@ class FinaleBlueprintStep(WizardStep):
         ally_pointer,
         faction_pointer,
     ):
+        """Internal helper for infer scene participants."""
         beat_lower = (beat or "").lower()
 
         def name_in_text(name):
+            """Handle name in text."""
             if not name:
                 return False
             return name.lower() in beat_lower
@@ -1166,6 +1231,7 @@ class FinaleBlueprintStep(WizardStep):
         scene_factions = []
 
         if include_antagonists:
+            # Continue with this path when include antagonists is set.
             focus, antagonist_pointer = self._draw_from_rotation(
                 antagonist_cycle, antagonist_pointer, rng
             )
@@ -1173,11 +1239,13 @@ class FinaleBlueprintStep(WizardStep):
                 scene_npcs.extend(focus)
 
         if include_allies:
+            # Continue with this path when include allies is set.
             focus, ally_pointer = self._draw_from_rotation(ally_cycle, ally_pointer, rng)
             if focus:
                 scene_npcs.extend(focus)
 
         if include_factions:
+            # Continue with this path when include factions is set.
             focus, faction_pointer = self._draw_from_rotation(
                 faction_cycle, faction_pointer, rng
             )
@@ -1190,9 +1258,11 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _get_rng_for_generation(self):
+        """Return rng for generation."""
         wizard = getattr(self, "wizard", None)
         state = getattr(wizard, "wizard_state", None)
         if isinstance(state, dict):
+            # Handle the branch where isinstance(state, dict).
             seed = state.get("_random_seed")
             counter = state.get("_random_counter", 0)
             if seed is None:
@@ -1206,6 +1276,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _prepare_rotation_cycle(items, rng):
+        """Internal helper for prepare rotation cycle."""
         if not items:
             return []
         cycle = list(items)
@@ -1216,12 +1287,14 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _draw_from_rotation(cycle, pointer, rng):
+        """Internal helper for draw from rotation."""
         if not cycle:
             return [], pointer
         if len(cycle) == 1:
             return [cycle[0]], pointer
 
         if pointer >= len(cycle):
+            # Handle the branch where pointer >= len(cycle).
             pointer = 0
             if hasattr(rng, "shuffle"):
                 rng.shuffle(cycle)
@@ -1236,6 +1309,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _clean_selection(value):
+        """Internal helper for clean selection."""
         if not value or value == "None":
             return ""
         return value
@@ -1243,6 +1317,7 @@ class FinaleBlueprintStep(WizardStep):
     # ------------------------------------------------------------------
     @staticmethod
     def _default_title(climax_name, location):
+        """Internal helper for default title."""
         base = climax_name
         if location:
             base = f"{climax_name} at {location}"
@@ -1250,6 +1325,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _apply_scenario_to_state(self, state, scenario):
+        """Apply scenario to state."""
         state["Title"] = scenario["Title"]
         state["Summary"] = scenario["Summary"]
         state["Secrets"] = scenario["Secrets"]
@@ -1264,6 +1340,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _display_preview(self, scenario):
+        """Internal helper for display preview."""
         lines = [scenario["Title"], "", scenario["Summary"], "", "Scenes:"]
         for scene in scenario["Scenes"]:
             lines.append(f" - {scene.get('Title')}: {scene.get('Summary')}")
@@ -1281,6 +1358,7 @@ class FinaleBlueprintStep(WizardStep):
 
     # ------------------------------------------------------------------
     def _display_preview_from_state(self, state):
+        """Internal helper for display preview from state."""
         if not state:
             self.preview_box.configure(state="normal")
             self.preview_box.delete("1.0", tk.END)
@@ -1321,12 +1399,14 @@ class EpicFinalePlannerWizard(ScenarioBuilderWizard):
     """Scenario builder variant tailored for planning epic finales."""
 
     def __init__(self, master, on_saved=None, *, initial_scenario=None):
+        """Initialize the EpicFinalePlannerWizard instance."""
         super().__init__(master, on_saved=on_saved, initial_scenario=initial_scenario)
         self.title("Epic Finale Planner")
         self.geometry("1500x900")
 
     # ------------------------------------------------------------------
     def _create_steps(self):  # pragma: no cover - UI layout
+        """Create steps."""
         entity_wrappers = {
             "npcs": self.npc_wrapper,
             "places": self.place_wrapper,

@@ -1,3 +1,4 @@
+"""Selection helpers for event multi link."""
 import tkinter as tk
 
 import customtkinter as ctk
@@ -9,6 +10,7 @@ class MultiLinkSelector(ctk.CTkFrame):
     """Search + multi-select widget for event entity links."""
 
     def __init__(self, master, *, label, load_options, helper_text=""):
+        """Initialize the MultiLinkSelector instance."""
         self._palette = get_event_editor_palette()
         super().__init__(
             master,
@@ -85,6 +87,7 @@ class MultiLinkSelector(ctk.CTkFrame):
         self.refresh_options()
 
     def _tk_listbox_theme(self):
+        """Internal helper for tk listbox theme."""
         return {
             "bg": self._palette.input_bg,
             "fg": self._palette.text_primary,
@@ -99,6 +102,7 @@ class MultiLinkSelector(ctk.CTkFrame):
         }
 
     def refresh_options(self, query=""):
+        """Refresh options."""
         self._all_options = list(self._load_options(query) or [])
         self.listbox.delete(0, tk.END)
         for option in self._all_options:
@@ -106,6 +110,7 @@ class MultiLinkSelector(ctk.CTkFrame):
         self._update_selection_count()
 
     def set_values(self, values):
+        """Set values."""
         wanted = {str(value).strip() for value in (values or []) if str(value).strip()}
         self.listbox.selection_clear(0, tk.END)
         for index, option in enumerate(self._all_options):
@@ -114,15 +119,18 @@ class MultiLinkSelector(ctk.CTkFrame):
         self._update_selection_count()
 
     def get_values(self):
+        """Return values."""
         indexes = self.listbox.curselection()
         return [self.listbox.get(index) for index in indexes]
 
     def _update_selection_count(self):
+        """Update selection count."""
         count = len(self.listbox.curselection())
         suffix = "item" if count == 1 else "items"
         self.selection_count.configure(text=f"{count} {suffix}")
 
     def _on_search(self, _event=None):
+        """Handle search."""
         selected_before = set(self.get_values())
         query = self.search_entry.get().strip()
         self.refresh_options(query=query)

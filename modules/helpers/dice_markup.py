@@ -1,3 +1,5 @@
+"""Utilities for dice markup."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -22,6 +24,7 @@ class ParsedDifficulty:
     notes: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Handle to dict."""
         data: dict[str, Any] = {"label": self.label, "formula": self.formula}
         if self.descriptor:
             data["descriptor"] = self.descriptor
@@ -47,6 +50,7 @@ class ParsedAction:
     difficulties: Tuple[ParsedDifficulty, ...] = field(default_factory=tuple)
 
     def to_dict(self) -> dict[str, Any]:
+        """Handle to dict."""
         return {
             "label": self.label,
             "attack_bonus": self.attack_bonus,
@@ -71,6 +75,7 @@ class ParsedError:
     segment: str
 
     def to_dict(self) -> dict[str, Any]:
+        """Handle to dict."""
         return {
             "message": self.message,
             "range": self.span,
@@ -111,6 +116,7 @@ _PATTERN_CACHE: Tuple[_ActionPattern, ...] = tuple()
 
 
 def _coerce_group_name(value: Any, default: str | None) -> str | None:
+    """Coerce group name."""
     if value is None:
         return default
     if value is False:
@@ -122,6 +128,7 @@ def _coerce_group_name(value: Any, default: str | None) -> str | None:
 
 
 def _parse_regex_flags(metadata: Mapping[str, Any]) -> int:
+    """Parse regex flags."""
     flags = 0
     ignore_case = metadata.get("ignore_case")
     if ignore_case is None or bool(ignore_case):
@@ -135,6 +142,7 @@ def _parse_regex_flags(metadata: Mapping[str, Any]) -> int:
         raw_flags = [raw_flags]
     if isinstance(raw_flags, Sequence):
         for flag_name in raw_flags:
+            # Process each flag_name from raw_flags.
             try:
                 flag_value = getattr(re, str(flag_name).upper())
             except AttributeError:
@@ -145,10 +153,12 @@ def _parse_regex_flags(metadata: Mapping[str, Any]) -> int:
 
 
 def _parse_difficulty_specs(raw: Any) -> Tuple[_DifficultyPattern, ...]:
+    """Parse difficulty specs."""
     if not isinstance(raw, Sequence):
         return tuple()
     specs: List[_DifficultyPattern] = []
     for entry in raw:
+        # Process each entry from raw.
         if not isinstance(entry, Mapping):
             continue
         group = _coerce_group_name(entry.get("group"), None)
@@ -171,9 +181,11 @@ def _parse_difficulty_specs(raw: Any) -> Tuple[_DifficultyPattern, ...]:
 
 
 def _build_action_patterns(config) -> Tuple[_ActionPattern, ...]:
+    """Build action patterns."""
     patterns: List[_ActionPattern] = []
     if config:
         for entry in config.analyzer_patterns:
+            # Process each entry from config.analyzer_patterns.
             metadata = dict(entry.metadata) if entry.metadata else {}
             try:
                 regex = re.compile(entry.pattern, _parse_regex_flags(metadata))
@@ -210,6 +222,7 @@ def _build_action_patterns(config) -> Tuple[_ActionPattern, ...]:
 
 
 def _get_action_patterns() -> Tuple[_ActionPattern, ...]:
+    """Return action patterns."""
     global _PATTERN_CACHE_SLUG, _PATTERN_CACHE
     config = system_config_helper.get_current_system_config()
     slug = getattr(config, "slug", None)
@@ -228,6 +241,7 @@ def invalidate_action_pattern_cache() -> None:
 
 
 def _canonicalize_formula_text(value: str | None) -> str | None:
+    """Internal helper for canonicalize formula text."""
     return dice_preferences.canonicalize_formula(value)
 
 
@@ -238,6 +252,7 @@ def _build_template_context(
     value: Any = None,
     extra: Mapping[str, Any] | None = None,
 ) -> dict[str, str]:
+    """Build template context."""
     bonus = (attack_bonus or "").strip()
     sign = bonus[0] if bonus and bonus[0] in "+-" else "+"
     bonus_value = bonus.lstrip("+-")
@@ -262,8 +277,10 @@ def _resolve_default_difficulties(
     attack_bonus: str | None,
     attack_roll: str | None,
 ) -> Tuple[ParsedDifficulty, ...]:
+    """Resolve default difficulties."""
     difficulties: List[ParsedDifficulty] = []
     for entry in dice_preferences.get_difficulty_definitions():
+        # Process each entry from dice_preferences.get_difficulty_definitions().
         label_source = entry.get("label") or entry.get("name")
         label = str(label_source).strip() if isinstance(label_source, str) else ""
         template = entry.get("template") or entry.get("formula_template")
@@ -296,8 +313,10 @@ def _build_pattern_difficulties(
     attack_bonus: str | None,
     attack_roll: str | None,
 ) -> Tuple[ParsedDifficulty, ...]:
+    """Build pattern difficulties."""
     results: List[ParsedDifficulty] = []
     for spec in pattern.difficulties:
+        # Process each spec from pattern.difficulties.
         value = None
         if spec.group:
             try:
@@ -317,6 +336,7 @@ def _build_pattern_difficulties(
             continue
         notes = None
         if spec.notes_group:
+            # Continue with this path when notes group is set.
             try:
                 notes_value = match.group(spec.notes_group)
             except IndexError:
@@ -338,9 +358,11 @@ def _build_pattern_difficulties(
 def _deduplicate_difficulties(
     difficulties: Iterable[ParsedDifficulty],
 ) -> Tuple[ParsedDifficulty, ...]:
+    """Internal helper for deduplicate difficulties."""
     unique: dict[Tuple[str, str], ParsedDifficulty] = {}
     ordered: List[ParsedDifficulty] = []
     for difficulty in difficulties:
+        # Process each difficulty from difficulties.
         key = (difficulty.label, difficulty.formula)
         if key in unique:
             continue
@@ -352,6 +374,7 @@ def _deduplicate_difficulties(
 def _combine_difficulties(
     *groups: Iterable[ParsedDifficulty],
 ) -> Tuple[ParsedDifficulty, ...]:
+    """Internal helper for combine difficulties."""
     combined: List[ParsedDifficulty] = []
     for group in groups:
         combined.extend(list(group))
@@ -359,6 +382,7 @@ def _combine_difficulties(
 
 
 def _spans_overlap(left: Tuple[int, int], right: Tuple[int, int]) -> bool:
+    """Internal helper for spans overlap."""
     return not (left[1] <= right[0] or right[1] <= left[0])
 
 
@@ -388,6 +412,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
     )
 
     while cursor < length:
+        # Keep looping while cursor < length.
         start = text.find("[", cursor)
         if start == -1:
             trailing = text[cursor:]
@@ -404,6 +429,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
         current_offset += len(prefix)
         end = text.find("]", start + 1)
         if end == -1:
+            # Handle the branch where end == -1.
             segment = text[start:]
             error = ParsedError(
                 message="Unclosed dice markup segment.",
@@ -423,6 +449,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
         )
         segment_span = (start, end + 1)
         if "[" in inner:
+            # Handle the branch where '[' is in inner.
             segment = text[start : end + 1]
             error = ParsedError(
                 message="Nested '[' detected inside dice markup. Escape or remove nested brackets.",
@@ -438,6 +465,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
 
         action, error, replacement = _parse_segment(inner, segment_span, base_offset=current_offset)
         if error is not None:
+            # Handle the branch where error is available.
             log_debug(
                 f"parse_inline_actions - segment error: {error.message}",
                 func_name="dice_markup.parse_inline_actions",
@@ -448,6 +476,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
             cleaned_segments.append(fallback)
             current_offset += len(fallback)
         elif action is not None:
+            # Handle the branch where action is available.
             actions.append(action)
             replacement = replacement or ""
             cleaned_segments.append(replacement)
@@ -470,6 +499,7 @@ def parse_inline_actions(raw_text: Any) -> tuple[str, list[dict[str, Any]], list
     cleaned_text = "".join(cleaned_segments)
 
     if not actions:
+        # Handle the branch where actions is unavailable.
         inferred = _infer_actions_from_plain_text(cleaned_text)
         if inferred:
             actions.extend(inferred)
@@ -486,6 +516,7 @@ def _parse_segment(
     *,
     base_offset: int,
 ) -> tuple[ParsedAction | None, ParsedError | None, str | None]:
+    """Parse segment."""
     trimmed = segment.strip()
     if not trimmed:
         return None, ParsedError(
@@ -505,10 +536,12 @@ def _parse_segment(
     damage_formula_text: str | None = None
     notes: str | None = None
     if right.strip():
+        # Handle the branch where right.strip().
         damage_formula_text, notes, damage_error = _extract_damage(right.strip(), span, segment)
         if damage_error is not None:
             return None, damage_error, None
     elif dm_damage_text:
+        # Continue with this path when dm damage text is set.
         damage_formula_text, notes, damage_error = _extract_damage(dm_damage_text, span, segment)
         if damage_error is not None:
             return None, damage_error, None
@@ -555,6 +588,7 @@ def _format_action_display(
     notes: str | None,
     base_offset: int,
 ) -> tuple[str, Tuple[int, int] | None, Tuple[int, int] | None]:
+    """Format action display."""
     parts: List[str] = []
     attack_span: Tuple[int, int] | None = None
     damage_span: Tuple[int, int] | None = None
@@ -562,11 +596,13 @@ def _format_action_display(
     current_length = 0
 
     def append(text: str) -> None:
+        """Append the operation."""
         nonlocal current_length
         parts.append(text)
         current_length += len(text)
 
     def add_separator() -> None:
+        """Handle add separator."""
         if current_length > 0:
             append(" • ")
 
@@ -582,6 +618,7 @@ def _format_action_display(
         attack_span = (base_offset + start, base_offset + current_length)
 
     if damage_formula:
+        # Continue with this path when damage formula is set.
         add_separator()
         damage_text = f"Damage {damage_formula.strip()}"
         if notes:
@@ -606,6 +643,7 @@ def _format_action_display(
 
 
 def _extract_label_and_attack(left: str) -> tuple[str, str | None, str | None]:
+    """Extract label and attack."""
     if not left:
         return "", None, None
 
@@ -615,6 +653,7 @@ def _extract_label_and_attack(left: str) -> tuple[str, str | None, str | None]:
     label = left
 
     if tokens:
+        # Continue with this path when tokens is set.
         candidate = tokens[-1]
         parsed_bonus = _try_parse_formula(candidate, force_sign=True)
         if parsed_bonus is not None:
@@ -626,12 +665,14 @@ def _extract_label_and_attack(left: str) -> tuple[str, str | None, str | None]:
 
 
 def _extract_damage(right: str, span: Tuple[int, int], segment: str) -> tuple[str | None, str | None, ParsedError | None]:
+    """Extract damage."""
     if not right:
         return None, None, None
 
     formula_part = right
     notes_part: str | None = None
     if " " in right:
+        # Handle the branch where ' ' is in right.
         first, remainder = right.split(" ", 1)
         if remainder.strip():
             formula_part = first
@@ -641,6 +682,7 @@ def _extract_damage(right: str, span: Tuple[int, int], segment: str) -> tuple[st
     normalized: str | None = None
 
     if trimmed_formula and trimmed_formula.startswith("+") and "d" not in trimmed_formula.lower():
+        # Handle the branch where trimmed formula is set and trimmed_formula.startswith('+') and 'd' is not in trimmed_formula.lower().
         bonus_text = _try_parse_formula(trimmed_formula, force_sign=True)
         if bonus_text is not None:
             normalized = _make_attack_roll_formula(bonus_text)
@@ -659,6 +701,7 @@ def _extract_damage(right: str, span: Tuple[int, int], segment: str) -> tuple[st
 
 
 def _split_dm_damage(text: str) -> tuple[str, str | None]:
+    """Internal helper for split dm damage."""
     tokens = text.split()
     if not tokens:
         return text, None
@@ -675,6 +718,7 @@ def _split_dm_damage(text: str) -> tuple[str, str | None]:
 
 
 def _try_parse_formula(formula: str, *, force_sign: bool) -> str | None:
+    """Internal helper for try parse formula."""
     stripped = formula.strip()
     if not stripped:
         return None
@@ -688,8 +732,10 @@ def _try_parse_formula(formula: str, *, force_sign: bool) -> str | None:
 
 
 def _format_parsed_formula(parsed: dice_engine.ParsedFormula, *, force_sign: bool) -> str:
+    """Format parsed formula."""
     dice_segments: List[str] = []
     for faces in sorted(parsed.dice):
+        # Process each faces from sorted(parsed.dice).
         count = parsed.dice[faces]
         if count == 1:
             dice_segments.append(f"1d{faces}")
@@ -698,6 +744,7 @@ def _format_parsed_formula(parsed: dice_engine.ParsedFormula, *, force_sign: boo
 
     modifier = parsed.modifier
     if dice_segments:
+        # Continue with this path when dice segments is set.
         parts = ["+".join(dice_segments)]
         if modifier:
             if modifier > 0:
@@ -714,10 +761,12 @@ def _format_parsed_formula(parsed: dice_engine.ParsedFormula, *, force_sign: boo
 
 
 def _make_attack_roll_formula(attack_bonus: str) -> str:
+    """Internal helper for make attack roll formula."""
     return dice_preferences.make_attack_roll_formula(attack_bonus)
 
 
 def _coerce_text(raw: Any) -> str:
+    """Coerce text."""
     if raw is None:
         return ""
     if isinstance(raw, dict):
@@ -727,6 +776,7 @@ def _coerce_text(raw: Any) -> str:
 
 
 def _infer_actions_from_plain_text(text: str) -> list[ParsedAction]:
+    """Internal helper for infer actions from plain text."""
     matches: List[tuple[int, re.Match[str], _ActionPattern]] = []
     for pattern in _get_action_patterns():
         for match in pattern.regex.finditer(text):
@@ -737,6 +787,7 @@ def _infer_actions_from_plain_text(text: str) -> list[ParsedAction]:
     used_spans: List[Tuple[int, int]] = []
 
     for _start, match, pattern in matches:
+        # Process each (_start, match, pattern) from matches.
         span = match.span()
         if any(_spans_overlap(span, other) for other in used_spans):
             continue
@@ -750,6 +801,7 @@ def _infer_actions_from_plain_text(text: str) -> list[ParsedAction]:
 
 
 def _build_action_from_match(match: re.Match[str], pattern: _ActionPattern) -> ParsedAction | None:
+    """Build action from match."""
     segment_source = match.group(0)
     span = match.span()
 
@@ -761,6 +813,7 @@ def _build_action_from_match(match: re.Match[str], pattern: _ActionPattern) -> P
 
     attack_bonus: str | None = None
     if pattern.attack_group:
+        # Continue with this path when attack group is set.
         try:
             attack_source = match.group(pattern.attack_group) or ""
         except IndexError:
@@ -772,6 +825,7 @@ def _build_action_from_match(match: re.Match[str], pattern: _ActionPattern) -> P
     damage_formula: str | None = None
     notes: str | None = None
     if pattern.damage_group:
+        # Continue with this path when damage group is set.
         try:
             damage_source = match.group(pattern.damage_group) or ""
         except IndexError:
@@ -781,11 +835,13 @@ def _build_action_from_match(match: re.Match[str], pattern: _ActionPattern) -> P
             return None
 
     if pattern.notes_group:
+        # Continue with this path when notes group is set.
         try:
             extra_notes = match.group(pattern.notes_group)
         except IndexError:
             extra_notes = None
         if extra_notes:
+            # Continue with this path when extra notes is set.
             extra_text = str(extra_notes).strip()
             if extra_text:
                 notes = f"{notes} {extra_text}".strip() if notes else extra_text

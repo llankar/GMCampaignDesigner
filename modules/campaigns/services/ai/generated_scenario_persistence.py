@@ -1,3 +1,4 @@
+"""Persistence helpers for AI generated scenario."""
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +11,7 @@ class GeneratedScenarioPersistence:
     """Persist AI-generated scenarios and link saved titles back to their parent arcs."""
 
     def __init__(self, scenario_wrapper, entity_wrappers: dict[str, Any] | None = None):
+        """Initialize the GeneratedScenarioPersistence instance."""
         self.scenario_wrapper = scenario_wrapper
         self.entity_wrappers = entity_wrappers or {}
 
@@ -18,14 +20,17 @@ class GeneratedScenarioPersistence:
         generated_payload: dict[str, Any],
         arcs: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
+        """Save generated arc scenarios."""
         existing_titles = self._load_existing_titles()
         reserved_titles = set(existing_titles)
         saved_groups: list[dict[str, Any]] = []
 
         for group in generated_payload.get("arcs") or []:
+            # Process each group from generated_payload.get('arcs') or [].
             arc_name = str(group.get("arc_name") or "").strip()
             saved_scenarios: list[dict[str, Any]] = []
             for scenario in group.get("scenarios") or []:
+                # Process each scenario from group.get('scenarios') or [].
                 self._save_created_entities(scenario)
                 payload = dict(scenario)
                 payload.pop("EntityCreations", None)
@@ -39,23 +44,27 @@ class GeneratedScenarioPersistence:
         return saved_groups
 
     def _load_existing_titles(self) -> set[str]:
+        """Load existing titles."""
         try:
             items = self.scenario_wrapper.load_items() if self.scenario_wrapper else []
         except Exception:
             items = []
         titles: set[str] = set()
         for item in items or []:
+            # Process each item from items or [].
             title = str(item.get("Title") or item.get("Name") or "").strip()
             if title:
                 titles.add(title.casefold())
         return titles
 
     def _save_created_entities(self, scenario: dict[str, Any]) -> None:
+        """Save created entities."""
         entity_creations = scenario.get("EntityCreations")
         if not isinstance(entity_creations, dict):
             return
 
         for entity_type, spec in ENTITY_WRAPPER_SPECS.items():
+            # Process each (entity_type, spec) from ENTITY_WRAPPER_SPECS.items().
             records = entity_creations.get(entity_type)
             if not isinstance(records, list) or not records:
                 continue
@@ -70,6 +79,7 @@ class GeneratedScenarioPersistence:
             }
             updated = False
             for record in records:
+                # Process each record from records.
                 if not isinstance(record, dict):
                     continue
                 name = str(record.get(key_field) or "").strip()
@@ -85,6 +95,7 @@ class GeneratedScenarioPersistence:
                 wrapper.save_items(list(index.values()))
 
     def _resolve_entity_wrapper(self, entity_type: str):
+        """Resolve entity wrapper."""
         wrapper = self.entity_wrappers.get(entity_type)
         if wrapper is not None:
             return wrapper
@@ -99,12 +110,14 @@ class GeneratedScenarioPersistence:
 
     @staticmethod
     def _make_unique_title(title: Any, reserved_titles: set[str]) -> str:
+        """Internal helper for make unique title."""
         base_title = str(title or "").strip() or "Untitled Scenario"
         if base_title.casefold() not in reserved_titles:
             return base_title
 
         suffix = 2
         while True:
+            # Keep looping while True.
             candidate = f"{base_title} ({suffix})"
             if candidate.casefold() not in reserved_titles:
                 return candidate
@@ -112,8 +125,10 @@ class GeneratedScenarioPersistence:
 
     @staticmethod
     def _append_title_to_parent_arc(arcs: list[dict[str, Any]], arc_name: str, title: str) -> None:
+        """Append title to parent arc."""
         target_key = str(arc_name or "").strip().casefold()
         for arc in arcs:
+            # Process each arc from arcs.
             if str(arc.get("name") or "").strip().casefold() != target_key:
                 continue
             scenarios = arc.setdefault("scenarios", [])

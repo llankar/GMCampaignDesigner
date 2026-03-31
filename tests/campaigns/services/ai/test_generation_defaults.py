@@ -1,3 +1,5 @@
+"""Regression tests for generation defaults."""
+
 import json
 
 import pytest
@@ -14,11 +16,13 @@ from modules.helpers.config_helper import ConfigHelper
 
 @pytest.fixture
 def campaign_db(monkeypatch, tmp_path):
+    """Handle campaign DB."""
     db_path = tmp_path / "campaign.db"
 
     original_get = ConfigHelper.get
 
     def fake_get(cls, section, key, fallback=None):
+        """Handle fake get."""
         if (section, key) == ("Database", "path"):
             return str(db_path)
         if (section, key) == ("Logging", "enabled"):
@@ -34,6 +38,7 @@ def campaign_db(monkeypatch, tmp_path):
 
 
 def test_ai_generation_defaults_save_and_load_round_trip(campaign_db):
+    """Verify that AI generation defaults save and load round trip."""
     saved = save_ai_generation_defaults(
         {
             "main_pc_factions": ["Dawn Guard", "dawn guard"],
@@ -58,10 +63,12 @@ def test_ai_generation_defaults_save_and_load_round_trip(campaign_db):
 
 
 def test_ai_generation_defaults_invalid_json_falls_back_to_defaults(campaign_db):
+    """Verify that AI generation defaults invalid JSON falls back to defaults."""
     db_module.set_campaign_setting("ai_generation_defaults_json", "{invalid}")
 
     assert load_ai_generation_defaults() == DEFAULT_AI_GENERATION_DEFAULTS
 
 
 def test_ai_generation_defaults_defaults_when_missing(campaign_db):
+    """Verify that AI generation defaults defaults when missing."""
     assert load_ai_generation_defaults() == DEFAULT_AI_GENERATION_DEFAULTS

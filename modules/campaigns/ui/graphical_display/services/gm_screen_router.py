@@ -1,3 +1,5 @@
+"""Routing helpers for campaign GM screen."""
+
 from __future__ import annotations
 
 from typing import Callable

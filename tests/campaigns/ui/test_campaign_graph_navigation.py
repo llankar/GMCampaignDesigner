@@ -1,3 +1,5 @@
+"""Regression tests for campaign graph navigation."""
+
 import importlib.util
 import sys
 import types
@@ -32,6 +34,7 @@ spec.loader.exec_module(module)
 
 
 def test_truncate_middle_preserves_start_and_end_of_long_titles():
+    """Verify that truncate middle preserves start and end of long titles."""
     title = "Protéger un site PharmaCorp contre une attaque de terroristes Novatek"
 
     truncated = module._truncate_middle(title, 26)

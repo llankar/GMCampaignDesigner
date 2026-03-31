@@ -1,11 +1,15 @@
+"""Regression tests for calendar event links."""
+
 from main_window import MainWindow
 
 
 class _MemoryWrapper:
     def __init__(self):
+        """Initialize the _MemoryWrapper instance."""
         self.items = []
 
     def save_item(self, item, key_field="Name"):
+        """Save item."""
         key = item.get(key_field)
         for index, existing in enumerate(self.items):
             if existing.get(key_field) == key:
@@ -14,10 +18,12 @@ class _MemoryWrapper:
         self.items.append(dict(item))
 
     def load_items(self):
+        """Load items."""
         return [dict(item) for item in self.items]
 
 
 def test_calendar_event_preserves_extended_links():
+    """Verify that calendar event preserves extended links."""
     window = MainWindow.__new__(MainWindow)
     wrapper = _MemoryWrapper()
     window.entity_wrappers = {"events": wrapper}

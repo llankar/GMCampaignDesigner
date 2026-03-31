@@ -121,6 +121,7 @@ class SystemConfigManager:
             cls._listeners.add(callback)
 
         def _unsubscribe() -> None:
+            """Internal helper for unsubscribe."""
             cls.unregister_change_listener(callback)
 
         return _unsubscribe
@@ -174,6 +175,7 @@ class SystemConfigManager:
         """Load the system configuration for ``slug`` (falling back to defaults)."""
 
         if slug:
+            # Continue with this path when slug is set.
             config = cls._load_config_for_slug(slug)
             if config:
                 return config
@@ -191,6 +193,7 @@ class SystemConfigManager:
 
     @classmethod
     def _load_config_for_slug(cls, slug: str) -> Optional[SystemConfig]:
+        """Load config for slug."""
         query = (
             "SELECT slug, label, default_formula, supported_faces_json, analyzer_config_json "
             "FROM campaign_systems WHERE slug = ?"
@@ -202,6 +205,7 @@ class SystemConfigManager:
 
     @classmethod
     def _load_first_system(cls) -> Optional[SystemConfig]:
+        """Load first system."""
         query = (
             "SELECT slug, label, default_formula, supported_faces_json, analyzer_config_json "
             "FROM campaign_systems ORDER BY slug LIMIT 1"
@@ -213,6 +217,7 @@ class SystemConfigManager:
 
     @classmethod
     def _fetch_all_system_rows(cls) -> Sequence[Tuple[Any, ...]]:
+        """Internal helper for fetch all system rows."""
         query = (
             "SELECT slug, label, default_formula, supported_faces_json, analyzer_config_json "
             "FROM campaign_systems ORDER BY label, slug"
@@ -224,6 +229,7 @@ class SystemConfigManager:
 
     @classmethod
     def _row_to_config(cls, row: Optional[Sequence[Any]]) -> Optional[SystemConfig]:
+        """Internal helper for row to config."""
         if not row:
             return None
         slug, label, default_formula, supported_faces_json, analyzer_config_json = row
@@ -243,6 +249,7 @@ class SystemConfigManager:
 
     @staticmethod
     def _parse_supported_faces(raw_json: Optional[str]) -> Tuple[FaceValue, ...]:
+        """Parse supported faces."""
         if not raw_json:
             return tuple()
         try:
@@ -252,6 +259,7 @@ class SystemConfigManager:
             return tuple()
 
         if isinstance(parsed, list):
+            # Handle the branch where isinstance(parsed, list).
             faces: List[FaceValue] = []
             for face in parsed:
                 if isinstance(face, (int, str)):
@@ -265,6 +273,7 @@ class SystemConfigManager:
     def _parse_analyzer_config(
         cls, raw_json: Optional[str]
     ) -> Tuple[Tuple[AnalyzerPattern, ...], Mapping[str, Any]]:
+        """Parse analyzer config."""
         if not raw_json:
             return tuple(), _EMPTY_MAPPING
 
@@ -285,6 +294,7 @@ class SystemConfigManager:
         patterns: List[AnalyzerPattern] = []
         if isinstance(patterns_source, list):
             for index, entry in enumerate(patterns_source):
+                # Process each (index, entry) from enumerate(patterns_source).
                 if not isinstance(entry, dict):
                     continue
                 name = entry.get("name") or entry.get("label") or f"pattern_{index}"
@@ -310,6 +320,7 @@ class SystemConfigManager:
 
     @staticmethod
     def _mapping_proxy(data: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
+        """Internal helper for mapping proxy."""
         if not data:
             return _EMPTY_MAPPING
         try:
@@ -320,6 +331,7 @@ class SystemConfigManager:
 
     @classmethod
     def _system_exists(cls, slug: str) -> bool:
+        """Internal helper for system exists."""
         query = "SELECT 1 FROM campaign_systems WHERE slug = ?"
         with closing(get_connection()) as conn:
             cursor = conn.execute(query, (slug,))
@@ -327,10 +339,12 @@ class SystemConfigManager:
 
     @classmethod
     def _compute_db_signature(cls) -> Tuple[Optional[str], Optional[float], Optional[int], Optional[int]]:
+        """Internal helper for compute DB signature."""
         db_path: Optional[str] = None
         schema_version: Optional[int] = None
         user_version: Optional[int] = None
         with closing(get_connection()) as conn:
+            # Keep this resource scoped to compute DB signature.
             cursor = conn.execute("PRAGMA database_list")
             for row in cursor.fetchall():
                 if len(row) >= 3 and row[1] == "main":
@@ -356,6 +370,7 @@ class SystemConfigManager:
 
     @classmethod
     def _notify_listeners(cls, config: SystemConfig) -> None:
+        """Notify listeners."""
         # Copy listeners to avoid holding the lock while invoking callbacks.
         with cls._lock:
             listeners = tuple(cls._listeners)

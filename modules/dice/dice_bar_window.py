@@ -51,6 +51,7 @@ class DiceBarWindow(ctk.CTkToplevel):
     """Compact dice roller that mirrors the behaviour of the full window."""
 
     def __init__(self, master: tk.Misc | None = None) -> None:
+        """Initialize the DiceBarWindow instance."""
         super().__init__(master)
         self.overrideredirect(True)
         self.resizable(False, False)
@@ -102,6 +103,7 @@ class DiceBarWindow(ctk.CTkToplevel):
     # UI construction
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
+        """Build UI."""
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -237,6 +239,7 @@ class DiceBarWindow(ctk.CTkToplevel):
     # Actions
     # ------------------------------------------------------------------
     def roll(self) -> None:
+        """Handle roll."""
         formula_text = self.formula_var.get()
         supported_faces = self._supported_faces or dice_preferences.get_supported_faces()
         try:
@@ -266,6 +269,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._set_total_text(formatted.total_text)
 
     def _append_die(self, faces: int) -> None:
+        """Append die."""
         fragment = f"1d{faces}"
         current = self.formula_var.get().strip()
         combined = fragment if not current else f"{current} + {fragment}"
@@ -280,6 +284,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._set_total_text("")
 
     def _clear_formula(self) -> None:
+        """Clear formula."""
         self.formula_var.set("")
         self._display_segments([TextSegment("Formula cleared.")])
         self._set_total_text("")
@@ -308,6 +313,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._last_roll_options = defaults
 
     def _rebuild_preset_buttons(self) -> None:
+        """Internal helper for rebuild preset buttons."""
         frame = self._preset_frame
         if frame is None or not frame.winfo_exists():
             return
@@ -332,6 +338,7 @@ class DiceBarWindow(ctk.CTkToplevel):
     def _format_roll_output(
         self, result: dice_engine.RollResult, separate: bool
     ) -> FormattedRoll:
+        """Format roll output."""
         canonical = result.canonical()
         modifier = result.modifier
         total = result.total
@@ -345,9 +352,11 @@ class DiceBarWindow(ctk.CTkToplevel):
         chips: List[ResultChip] = []
 
         if separate:
+            # Continue with this path when separate is set.
             parts: List[List[TextSegment]] = []
             counters: dict[int, int] = {}
             for chain in result.chains:
+                # Process each chain from result.chains.
                 counters[chain.faces] = counters.get(chain.faces, 0) + 1
                 label = f"d{chain.faces}"
                 if result.parsed.dice.get(chain.faces, 0) > 1:
@@ -388,6 +397,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         parts: List[List[TextSegment]] = []
         for summary in result.face_summaries:
+            # Process each summary from result.face_summaries.
             values = summary.display_values
             detail = ", ".join(values) if values else "—"
             if values:
@@ -425,8 +435,10 @@ class DiceBarWindow(ctk.CTkToplevel):
         return FormattedRoll(segments=segments, total_text=f"{total}", header=header, chips=chips)
 
     def _join_parts(self, parts: List[List[TextSegment]]) -> List[TextSegment]:
+        """Internal helper for join parts."""
         segments: List[TextSegment] = []
         for index, part in enumerate(parts):
+            # Process each (index, part) from enumerate(parts).
             if index:
                 segments.append(TextSegment(" | "))
             segments.extend(part)
@@ -436,7 +448,9 @@ class DiceBarWindow(ctk.CTkToplevel):
     # Window helpers
     # ------------------------------------------------------------------
     def show(self) -> None:
+        """Show the operation."""
         try:
+            # Keep show resilient if this step fails.
             self.deiconify()
             self._apply_geometry()
             self.lift()
@@ -447,13 +461,17 @@ class DiceBarWindow(ctk.CTkToplevel):
             pass
 
     def _apply_geometry(self) -> None:
+        """Apply geometry."""
         try:
+            # Keep geometry resilient if this step fails.
             self.update_idletasks()
             if self._is_collapsed:
+                # Continue with this path when is collapsed is set.
                 target = self._collapse_button or self
                 width = max(40, int(target.winfo_reqwidth() + 8))
                 height_source = target
                 if self._collapsed_height_hint is None and height_source is not None:
+                    # Handle the branch where collapsed height hint is missing and height source is available.
                     try:
                         measured = int(height_source.winfo_reqheight() or 0)
                     except Exception:
@@ -464,6 +482,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 width = self.winfo_screenwidth()
                 height_source = self._bar_frame or self
                 if self._expanded_height_hint is None and height_source is not None:
+                    # Handle the branch where expanded height hint is missing and height source is available.
                     try:
                         measured = int(height_source.winfo_reqheight() or 0)
                     except Exception:
@@ -483,9 +502,11 @@ class DiceBarWindow(ctk.CTkToplevel):
             audio_window = getattr(self.master, "audio_bar_window", None)
             if audio_window is not None and audio_window.winfo_exists():
                 try:
+                    # Keep geometry resilient if this step fails.
                     audio_window.update_idletasks()
                     audio_height = int(audio_window.winfo_height() or 0)
                     if audio_height <= 1:
+                        # Handle the branch where audio_height <= 1.
                         geometry = audio_window.geometry()
                         try:
                             size_part = geometry.split("x", 1)[1]
@@ -506,19 +527,23 @@ class DiceBarWindow(ctk.CTkToplevel):
             pass
 
     def _show_error(self, message: str) -> None:
+        """Show error."""
         self._display_segments([TextSegment(f"⚠️ {message}")])
         self._set_total_text("")
 
     def _toggle_collapsed(self) -> None:
+        """Toggle collapsed."""
         self._set_collapsed(not self._is_collapsed)
 
     def _set_collapsed(self, collapsed: bool) -> None:
+        """Set collapsed."""
         if collapsed == self._is_collapsed:
             return
         self._is_collapsed = collapsed
         frame = self._content_frame
         if frame is not None:
             if collapsed:
+                # Continue with this path when collapsed is set.
                 frame.grid_remove()
             else:
                 options = self._content_grid_options or {}
@@ -530,14 +555,17 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._apply_geometry()
 
     def _update_collapse_button(self) -> None:
+        """Update collapse button."""
         if self._collapse_button is None:
             return
         self._collapse_button.configure(text="▶" if self._is_collapsed else "◀")
 
     def _on_drag_start(self, event: tk.Event) -> None:
+        """Handle drag start."""
         self._drag_offset = (event.x_root - self.winfo_x(), event.y_root - self.winfo_y())
 
     def _on_drag_motion(self, event: tk.Event) -> None:
+        """Handle drag motion."""
         if self._drag_offset is None:
             return
         x = event.x_root - self._drag_offset[0]
@@ -545,14 +573,17 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.geometry(f"+{x}+{y}")
 
     def _on_drag_end(self, _event: tk.Event) -> None:
+        """Handle drag end."""
         self._drag_offset = None
 
     def _on_close(self) -> None:
+        """Handle close."""
         self.destroy()
 
     def _display_segments(self, segments: List[TextSegment], *,
                       header: str | None = None,
                       chips: List[ResultChip] | None = None) -> None:
+        """Internal helper for display segments."""
         self.result_var.set("".join(segment.text for segment in segments))
         container = self._result_container
         if container is None:
@@ -564,6 +595,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         # One‑line chip display
         if chips:
+            # Continue with this path when chips is set.
             tokens = theme_manager.get_tokens()
             base_color   = tokens.get("panel_alt_bg", "#132133")
             accent_color = tokens.get("accent_button_fg", "#2d3a57")
@@ -595,6 +627,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             measure_font = tkfont.nametofont(self._result_detail_font.name)
 
             for idx, chip in enumerate(chips):
+                # Process each (idx, chip) from enumerate(chips).
                 detail_text = (chip.detail or "—").strip()
                 chip_text   = f"{chip.title.upper()}: {detail_text} = {chip.total}"
 
@@ -640,6 +673,7 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         column_index = 0
         for segment in segments:
+            # Process each segment from segments.
             if not segment.text:
                 continue
             label = ctk.CTkLabel(
@@ -658,28 +692,35 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.after_idle(self._apply_geometry)
 
     def _register_drag_target(self, widget: tk.Widget) -> None:
+        """Register drag target."""
         widget.bind("<ButtonPress-1>", self._on_drag_start)
         widget.bind("<B1-Motion>", self._on_drag_motion)
         widget.bind("<ButtonRelease-1>", self._on_drag_end)
 
     def _set_total_text(self, text: str) -> None:
+        """Set total text."""
         self.total_var.set(text)
         prefix = self._total_prefix_label
         if prefix is not None:
             prefix.configure(text="Total" if text else "")
 
     def _capture_height_hint(self, *, collapsed: bool) -> None:
+        """Internal helper for capture height hint."""
         try:
+            # Keep capture height hint resilient if this step fails.
             self.update_idletasks()
             if collapsed:
+                # Continue with this path when collapsed is set.
                 target = self._collapse_button or self
                 if target is not None:
+                    # Handle the branch where target is available.
                     measured = int(target.winfo_reqheight() or 0)
                     if measured:
                         self._collapsed_height_hint = measured
             else:
                 source = self._bar_frame or self
                 if source is not None:
+                    # Handle the branch where source is available.
                     measured = int(source.winfo_reqheight() or 0)
                     if measured:
                         self._expanded_height_hint = measured

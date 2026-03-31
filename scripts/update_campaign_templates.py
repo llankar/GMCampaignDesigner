@@ -14,19 +14,23 @@ CAMPAIGNS_DIR = REPO_ROOT / "Campaigns"
 
 
 def load_json(path: Path) -> dict:
+    """Load JSON."""
     with path.open("r", encoding="utf-8") as fh:
         return json.load(fh)
 
 
 def dump_json(path: Path, data: dict) -> None:
+    """Handle dump JSON."""
     with path.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
         fh.write("\n")
 
 
 def get_module_templates() -> Dict[str, dict]:
+    """Return module templates."""
     templates: Dict[str, dict] = {}
     for module_dir in MODULES_DIR.iterdir():
+        # Process each module_dir from MODULES_DIR.iterdir().
         if not module_dir.is_dir():
             continue
         template_path = module_dir / f"{module_dir.name}_template.json"
@@ -36,10 +40,12 @@ def get_module_templates() -> Dict[str, dict]:
 
 
 def update_campaign_templates() -> Dict[Path, bool]:
+    """Update campaign templates."""
     module_templates = get_module_templates()
     updates: Dict[Path, bool] = {}
 
     for campaign_dir in CAMPAIGNS_DIR.iterdir():
+        # Process each campaign_dir from CAMPAIGNS_DIR.iterdir().
         if not campaign_dir.is_dir():
             continue
         templates_dir = campaign_dir / "templates"
@@ -47,6 +53,7 @@ def update_campaign_templates() -> Dict[Path, bool]:
             continue
 
         for module_name, template_data in module_templates.items():
+            # Process each (module_name, template_data) from module_templates.items().
             template_filename = f"{module_name}_template.json"
             campaign_template_path = templates_dir / template_filename
             if not campaign_template_path.exists():
@@ -62,6 +69,7 @@ def update_campaign_templates() -> Dict[Path, bool]:
 
 
 def main() -> None:
+    """Run the module entry point."""
     updates = update_campaign_templates()
     if not updates:
         print("No campaign templates found to update.")
@@ -69,6 +77,7 @@ def main() -> None:
 
     updated = [path for path, changed in updates.items() if changed]
     if updated:
+        # Continue with this path when updated is set.
         print("Updated the following campaign templates:")
         for path in sorted(updated):
             print(f" - {path.relative_to(REPO_ROOT)}")

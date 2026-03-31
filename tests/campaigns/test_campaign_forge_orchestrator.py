@@ -1,3 +1,5 @@
+"""Regression tests for campaign forge orchestrator."""
+
 from __future__ import annotations
 
 import pytest
@@ -15,38 +17,47 @@ from tests.campaigns.fixtures.campaign_forge_payloads import (
 
 class _FakeScenarioWrapper:
     def __init__(self, items=None):
+        """Initialize the _FakeScenarioWrapper instance."""
         self.items = list(items or [])
 
     def load_items(self):
+        """Load items."""
         return list(self.items)
 
 
 class _FakeArcGenerationService:
     def __init__(self, ai_client, scenario_wrapper):
+        """Initialize the _FakeArcGenerationService instance."""
         self.ai_client = ai_client
         self.scenario_wrapper = scenario_wrapper
 
     def generate_arcs(self, foundation):
+        """Handle generate arcs."""
         return generated_arc_payload()
 
 
 class _HappyExpansionService:
     def __init__(self, ai_client):
+        """Initialize the _HappyExpansionService instance."""
         self.ai_client = ai_client
 
     def generate_scenarios(self, foundation, arcs, *, existing_scenarios=None):
+        """Handle generate scenarios."""
         return generated_scenario_payload()
 
 
 class _MalformedExpansionService:
     def __init__(self, ai_client):
+        """Initialize the _MalformedExpansionService instance."""
         self.ai_client = ai_client
 
     def generate_scenarios(self, foundation, arcs, *, existing_scenarios=None):
+        """Handle generate scenarios."""
         return malformed_but_normalizable_scenario_payload()
 
 
 def test_happy_path_full_generation(monkeypatch):
+    """Verify that happy path full generation."""
     from modules.ai.campaign_forge import orchestrator as orchestrator_module
 
     monkeypatch.setattr(orchestrator_module, "ArcGenerationService", _FakeArcGenerationService)
@@ -67,6 +78,7 @@ def test_happy_path_full_generation(monkeypatch):
 
 
 def test_malformed_ai_payload_is_normalized_before_validation(monkeypatch):
+    """Verify that malformed AI payload is normalized before validation."""
     from modules.ai.campaign_forge import orchestrator as orchestrator_module
 
     monkeypatch.setattr(orchestrator_module, "ArcGenerationService", _FakeArcGenerationService)
@@ -82,6 +94,7 @@ def test_malformed_ai_payload_is_normalized_before_validation(monkeypatch):
 
 
 def test_arc_scenario_minimum_validation_failures():
+    """Verify that arc scenario minimum validation failures."""
     orchestrator = CampaignForgeOrchestrator(ai_client=object(), scenario_wrapper=_FakeScenarioWrapper())
 
     with pytest.raises(CampaignForgeValidationError, match="at least one linked scenario"):

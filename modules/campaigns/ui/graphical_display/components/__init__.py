@@ -1,3 +1,5 @@
+"""Campaign package."""
+
 from .campaign_overview import CampaignOverviewHero
 from .navigation import ArcSelectorStrip, ScenarioSelectorStrip
 from .scenario_entities import ScenarioEntityBrowser

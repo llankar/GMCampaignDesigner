@@ -1,3 +1,5 @@
+"""Regression tests for character exporters."""
+
 from types import SimpleNamespace
 
 from modules.pcs.character_creation.exporters import BACKENDS, export_character_sheet
@@ -5,6 +7,7 @@ from modules.pcs.character_creation.exporters import html_renderer
 
 
 def _payload():
+    """Internal helper for payload."""
     return {
         "name": "Alya",
         "player": "Unit",
@@ -24,10 +27,12 @@ def _payload():
 
 
 def _rules():
+    """Internal helper for rules."""
     return SimpleNamespace(rank_name="Novice", rank_index=0, superficial_health=15, skill_dice={"Combat": "d6"}, extra_assets=["Atout: Vigilance"])
 
 
 def test_render_character_sheet_html_contains_core_fields():
+    """Verify that render character sheet HTML contains core fields."""
     html = html_renderer.render_character_sheet_html(_payload(), _rules())
 
     assert "Alya" in html
@@ -46,6 +51,7 @@ def test_render_character_sheet_html_contains_core_fields():
 
 
 def test_render_character_sheet_html_supports_english_language():
+    """Verify that render character sheet HTML supports english language."""
     html = html_renderer.render_character_sheet_html(_payload(), _rules(), language="en")
 
     assert "Character sheet" in html
@@ -55,6 +61,7 @@ def test_render_character_sheet_html_supports_english_language():
 
 
 def test_export_character_sheet_html_only_writes_file(tmp_path):
+    """Verify that export character sheet HTML only writes file."""
     output = tmp_path / "sheet.pdf"
 
     path, backend = export_character_sheet(_payload(), _rules(), str(output), backend="html", export_html_only=True)
@@ -65,6 +72,7 @@ def test_export_character_sheet_html_only_writes_file(tmp_path):
 
 
 def test_export_character_sheet_forces_html_backend(tmp_path):
+    """Verify that export character sheet forces HTML backend."""
     path, backend = export_character_sheet(_payload(), _rules(), str(tmp_path / "sheet.pdf"), backend="fitz")
 
     assert BACKENDS == ("html",)
@@ -73,6 +81,7 @@ def test_export_character_sheet_forces_html_backend(tmp_path):
 
 
 def test_export_character_sheet_writes_english_html(tmp_path):
+    """Verify that export character sheet writes english HTML."""
     output = tmp_path / "sheet.pdf"
 
     path, _ = export_character_sheet(_payload(), _rules(), str(output), language="en")
@@ -83,6 +92,7 @@ def test_export_character_sheet_writes_english_html(tmp_path):
 
 
 def test_render_character_sheet_html_formats_bonus_dommages_by_mode():
+    """Verify that render character sheet HTML formats bonus dommages by mode."""
     payload = _payload()
     payload["feats"] = [
         {

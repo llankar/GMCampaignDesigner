@@ -1,3 +1,5 @@
+"""Regression tests for session prep summary."""
+
 import sys
 import importlib.util
 from pathlib import Path
@@ -12,6 +14,7 @@ build_session_prep_summary = module.build_session_prep_summary
 
 
 def test_build_session_prep_summary_extracts_priority_sections():
+    """Verify that build session prep summary extracts priority sections."""
     fields = [
         {"name": "MainObjective", "type": "longtext", "value": "Stop the ritual\nSecure artifact"},
         {
@@ -34,6 +37,7 @@ def test_build_session_prep_summary_extracts_priority_sections():
 
 
 def test_build_session_prep_summary_dedupes_and_handles_missing_arcs():
+    """Verify that build session prep summary dedupes and handles missing arcs."""
     fields = [
         {"name": "CurrentGoals", "type": "longtext", "value": "Protect envoy\nProtect envoy"},
         {"name": "NPC Reminders", "type": "longtext", "value": "• Watch Selene\nWatch Selene"},

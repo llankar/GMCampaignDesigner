@@ -68,6 +68,7 @@ def extract_text_from_book(
     reader = PdfReader(str(pdf_path))
     page_texts: List[str] = []
     for index, page in enumerate(reader.pages, start=1):
+        # Process each (index, page) from enumerate(reader.pages, start=1).
         try:
             text = page.extract_text() or ""
         except Exception as exc:  # pragma: no cover - defensive catch
@@ -91,11 +92,13 @@ def extract_text_from_book(
 def _prepare_books(
     paths: Iterable[Path], *, base_dir: Path | None, campaign_dir: str | None
 ) -> List[dict]:
+    """Internal helper for prepare books."""
     campaign_dir = _resolve_campaign_dir(campaign_dir)
     records: List[dict] = []
     seen_sources = set()
 
     for source in paths:
+        # Process each source from paths.
         if not isinstance(source, Path):
             continue
         if not source.exists() or not source.is_file():
@@ -132,10 +135,12 @@ def _prepare_books(
 
 
 def _resolve_campaign_dir(campaign_dir: str | None) -> str:
+    """Resolve campaign dir."""
     return campaign_dir or ConfigHelper.get_campaign_dir()
 
 
 def _copy_pdf_to_assets(source: Path, campaign_dir: str) -> Tuple[Path, str]:
+    """Copy PDF to assets."""
     dest_dir = Path(campaign_dir) / "assets" / ASSET_SUBDIR
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -144,6 +149,7 @@ def _copy_pdf_to_assets(source: Path, campaign_dir: str) -> Tuple[Path, str]:
 
     counter = 1
     while dest_path.exists() and dest_path.resolve() != source_resolved:
+        # Keep looping until this condition no longer holds.
         dest_path = dest_dir / f"{source.stem}_{counter}{source.suffix}"
         counter += 1
 
@@ -159,12 +165,14 @@ def _copy_pdf_to_assets(source: Path, campaign_dir: str) -> Tuple[Path, str]:
 
 
 def _title_from_filename(path: Path) -> str:
+    """Internal helper for title from filename."""
     stem = path.stem
     cleaned = re.sub(r"[_-]+", " ", stem).strip()
     return cleaned.title() if cleaned else path.name
 
 
 def _folder_and_tags_for(path: Path, base_dir: Path | None) -> Tuple[str, List[str]]:
+    """Internal helper for folder and tags for."""
     if base_dir and base_dir.exists():
         try:
             rel_parent = path.parent.resolve().relative_to(base_dir.resolve())
@@ -178,6 +186,7 @@ def _folder_and_tags_for(path: Path, base_dir: Path | None) -> Tuple[str, List[s
     tags: List[str] = []
     seen = set()
     for part in parts:
+        # Process each part from parts.
         label = re.sub(r"[_-]+", " ", part).strip()
         if not label:
             continue
@@ -191,6 +200,7 @@ def _folder_and_tags_for(path: Path, base_dir: Path | None) -> Tuple[str, List[s
 
 
 def _count_pdf_pages(path: Path) -> int:
+    """Internal helper for count PDF pages."""
     try:
         reader = PdfReader(str(path))
         return len(reader.pages)
@@ -203,10 +213,12 @@ def _count_pdf_pages(path: Path) -> int:
 
 
 def _run_ocr_on_page(pdf_path: Path, page_number: int) -> str:
+    """Run ocr on page."""
     if not _OCR_AVAILABLE:
         return ""
 
     try:
+        # Keep ocr on page resilient if this step fails.
         images = convert_from_path(
             str(pdf_path),
             first_page=page_number,
@@ -221,6 +233,7 @@ def _run_ocr_on_page(pdf_path: Path, page_number: int) -> str:
 
     texts: List[str] = []
     for image in images:
+        # Process each image from images.
         try:
             text = pytesseract.image_to_string(image)  # type: ignore[attr-defined]
         except Exception as exc:  # pragma: no cover - defensive catch

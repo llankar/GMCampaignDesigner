@@ -1,3 +1,5 @@
+"""Utilities for handouts newsletter plain renderer."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Sequence
@@ -22,6 +24,7 @@ ENTITY_KEYS = {
 
 
 def _ensure_sentence(text: str) -> str:
+    """Ensure sentence."""
     cleaned = text.strip()
     if not cleaned:
         return ""
@@ -31,8 +34,10 @@ def _ensure_sentence(text: str) -> str:
 
 
 def _related_summary(related: Dict[str, Iterable[Any]]) -> str:
+    """Internal helper for related summary."""
     related_parts = []
     for key, entries in related.items():
+        # Process each (key, entries) from related.items().
         names = []
         for entry in entries or []:
             if isinstance(entry, dict) and entry.get("Name"):
@@ -48,9 +53,11 @@ def _related_summary(related: Dict[str, Iterable[Any]]) -> str:
 
 
 def _extract_item_sentences(item: Any) -> List[str]:
+    """Extract item sentences."""
     if item is None:
         return []
     if isinstance(item, dict):
+        # Handle the branch where isinstance(item, dict).
         title = str(item.get("Title") or item.get("Name") or "").strip()
         text = str(item.get("Text") or item.get("Description") or item.get("Summary") or "").strip()
         if title and text:
@@ -61,11 +68,13 @@ def _extract_item_sentences(item: Any) -> List[str]:
             return [_ensure_sentence(title)]
         related = item.get("Related")
         if isinstance(related, dict) and related:
+            # Continue with this path when isinstance(related, dict) and related is set.
             summary = _related_summary(related)
             if summary:
                 return [_ensure_sentence(summary)]
         return []
     if isinstance(item, (list, tuple)):
+        # Handle the branch where isinstance(item, (list, tuple)).
         sentences = []
         for entry in item:
             sentences.extend(_extract_item_sentences(entry))
@@ -75,6 +84,7 @@ def _extract_item_sentences(item: Any) -> List[str]:
 
 
 def _collect_section_sentences(items: Iterable[Any] | None) -> List[str]:
+    """Collect section sentences."""
     sentences: List[str] = []
     for item in items or []:
         sentences.extend(_extract_item_sentences(item))
@@ -82,6 +92,7 @@ def _collect_section_sentences(items: Iterable[Any] | None) -> List[str]:
 
 
 def _find_section_items(payload: Dict[str, Iterable[Any]], keys: Sequence[str]) -> tuple[str, Iterable[Any]] | None:
+    """Find section items."""
     for section_name, items in payload.items():
         if str(section_name).strip().lower() in keys:
             return section_name, items
@@ -89,6 +100,7 @@ def _find_section_items(payload: Dict[str, Iterable[Any]], keys: Sequence[str]) 
 
 
 def _build_paragraphs(sentences: List[str]) -> List[str]:
+    """Build paragraphs."""
     if not sentences:
         return []
     paragraph_count = 3 if len(sentences) <= 6 else 4
@@ -111,6 +123,7 @@ def _build_paragraphs(sentences: List[str]) -> List[str]:
 
 
 def render_plain_newsletter(payload: Dict[str, Iterable[Any]] | None) -> str:
+    """Render plain newsletter."""
     if not payload:
         return ""
 
@@ -134,6 +147,7 @@ def render_plain_newsletter(payload: Dict[str, Iterable[Any]] | None) -> str:
         sentences.extend(_collect_section_sentences(entity_section[1]))
 
     for section_name, items in payload.items():
+        # Process each (section_name, items) from payload.items().
         if section_name in used_keys:
             continue
         sentences.extend(_collect_section_sentences(items))

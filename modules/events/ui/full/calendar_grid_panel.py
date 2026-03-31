@@ -1,3 +1,5 @@
+"""Panel for event calendar grid."""
+
 import calendar
 from datetime import timedelta
 
@@ -21,6 +23,7 @@ class CalendarGridPanel(ctk.CTkFrame):
         on_event_moved=None,
         on_event_click=None,
     ):
+        """Initialize the CalendarGridPanel instance."""
         super().__init__(master)
         self.get_events_for_day = get_events_for_day
         self.get_events_for_range = get_events_for_range
@@ -38,9 +41,11 @@ class CalendarGridPanel(ctk.CTkFrame):
 
     @staticmethod
     def _start_of_week(target_date):
+        """Start of week."""
         return target_date - timedelta(days=target_date.weekday())
 
     def render(self, *, view_mode, anchor_date, active_date, filters=None, filter_predicate=None):
+        """Render the operation."""
         for child in self.winfo_children():
             child.destroy()
 
@@ -58,6 +63,7 @@ class CalendarGridPanel(ctk.CTkFrame):
             self._render_day(active_date, predicate)
 
     def _render_month(self, anchor_date, active_date, filter_predicate):
+        """Render month."""
         frame = ctk.CTkFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
@@ -69,6 +75,7 @@ class CalendarGridPanel(ctk.CTkFrame):
 
         for week_idx, week in enumerate(matrix):
             for day_idx, day_date in enumerate(week):
+                # Process each (day_idx, day_date) from enumerate(week).
                 is_current_month = day_date.month == anchor_date.month
                 is_selected = day_date == active_date
                 day_events = [event for event in self.get_events_for_day(day_date) if filter_predicate(event)]
@@ -88,12 +95,14 @@ class CalendarGridPanel(ctk.CTkFrame):
                 button.bind("<ButtonRelease-1>", lambda _event, current=day_date: self._drop_event_on_day(current))
 
     def _render_week(self, anchor_date, active_date, filter_predicate):
+        """Render week."""
         frame = ctk.CTkFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
         frame.grid_columnconfigure(0, weight=1)
 
         start = self._start_of_week(anchor_date)
         for offset in range(7):
+            # Process each offset from range(7).
             day = start + timedelta(days=offset)
             events = [event for event in self.get_events_for_day(day) if filter_predicate(event)]
             marker = " •" if events else ""
@@ -111,6 +120,7 @@ class CalendarGridPanel(ctk.CTkFrame):
             button.bind("<ButtonRelease-1>", lambda _event, current=day: self._drop_event_on_day(current))
 
     def _render_day(self, active_date, filter_predicate):
+        """Render day."""
         frame = ctk.CTkFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
@@ -129,12 +139,14 @@ class CalendarGridPanel(ctk.CTkFrame):
             self._render_event_chip(frame, event)
 
     def _render_timeline(self, active_date, filter_predicate):
+        """Render timeline."""
         frame = ctk.CTkScrollableFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
         events = [event for event in self.get_events_for_day(active_date) if filter_predicate(event)]
         mapped = {str(event.get("time", "")): event for event in events}
         for hour in range(0, 24):
+            # Process each hour from range(0, 24).
             key = f"{hour:02d}:00"
             event = mapped.get(key)
             title = event.get("title", "Free") if event else "Free"
@@ -152,6 +164,7 @@ class CalendarGridPanel(ctk.CTkFrame):
             button.bind("<ButtonRelease-1>", lambda _event, current=active_date, start_time=key: self._drop_event_on_day(current, start_time))
 
     def _render_agenda(self, active_date, filters, filter_predicate):
+        """Render agenda."""
         frame = ctk.CTkScrollableFrame(self)
         frame.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
 
@@ -175,6 +188,7 @@ class CalendarGridPanel(ctk.CTkFrame):
             self._render_event_chip(frame, event, include_date=True)
 
     def _render_event_chip(self, frame, event, include_date=False):
+        """Render event chip."""
         event_type = get_event_type(event.get("type"))
         event_date = event.get("date")
         date_prefix = f"[{event_date.strftime('%d/%m')}] " if include_date and event_date else ""
@@ -199,9 +213,11 @@ class CalendarGridPanel(ctk.CTkFrame):
         label.bind("<ButtonPress-1>", lambda _event, current=event: self._emit_event_click(current))
 
     def _start_drag(self, event):
+        """Start drag."""
         self._dragged_event = event
 
     def _drop_event_on_day(self, target_date, target_time=None):
+        """Internal helper for drop event on day."""
         if not self._dragged_event:
             return
         moving = self._dragged_event
@@ -211,6 +227,7 @@ class CalendarGridPanel(ctk.CTkFrame):
 
     @staticmethod
     def _timeline_badge(event):
+        """Internal helper for timeline badge."""
         event_date = event.get("date")
         if event_date is None:
             return "upcoming"
@@ -225,24 +242,29 @@ class CalendarGridPanel(ctk.CTkFrame):
         return "upcoming"
 
     def _emit_day_selected(self, selected_date):
+        """Internal helper for emit day selected."""
         if callable(self._on_day_selected):
             self._on_day_selected(selected_date)
 
     def _emit_cell_click(self, selected_date, start_time=None):
+        """Internal helper for emit cell click."""
         self._emit_day_selected(selected_date)
         if callable(self._on_cell_click):
             self._on_cell_click(selected_date, start_time)
 
     def _emit_cell_double_click(self, selected_date, start_time=None):
+        """Internal helper for emit cell double click."""
         if callable(self._on_cell_double_click):
             self._on_cell_double_click(selected_date, start_time)
 
     def _emit_event_click(self, event):
+        """Internal helper for emit event click."""
         if callable(self._on_event_click):
             self._on_event_click(event)
 
     @staticmethod
     def _day_color(events):
+        """Internal helper for day color."""
         if not events:
             return "transparent"
         first = events[0] or {}

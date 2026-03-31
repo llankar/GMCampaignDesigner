@@ -1,3 +1,5 @@
+"""Utilities for window helper."""
+
 from modules.helpers.logging_helper import log_debug, log_function
 from modules.helpers.logging_helper import log_module_import
 
@@ -19,6 +21,7 @@ def position_window_at_top(window, width=None, height=None):
 
     # Prefer the current geometry if already set (e.g., after window.geometry("900x650"))
     try:
+        # Keep window at top resilient if this step fails.
         geo = window.geometry().split("+", 1)[0]
         parsed_w, parsed_h = map(int, geo.split("x"))
         g_width = parsed_w if parsed_w > 10 else None

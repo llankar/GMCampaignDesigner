@@ -1,3 +1,5 @@
+"""Regression tests for timeline simulator dialog."""
+
 from datetime import date
 
 from modules.events.services.timeline_simulator import TimelineSimulationResult
@@ -5,6 +7,7 @@ from modules.events.ui.full.timeline_simulator_dialog import format_timeline_res
 
 
 def test_format_timeline_result_summary_includes_main_counts():
+    """Verify that format timeline result summary includes main counts."""
     result = TimelineSimulationResult(
         start_date=date(2026, 3, 10),
         end_date=date(2026, 3, 12),

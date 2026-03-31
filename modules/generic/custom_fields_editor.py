@@ -1,3 +1,5 @@
+"""Editor helpers for generic custom fields."""
+
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
@@ -37,6 +39,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
     """
 
     def __init__(self, master):
+        """Initialize the CustomFieldsEditor instance."""
         super().__init__(master)
         self.title("Customize Fields")
         self.geometry("900x600")
@@ -107,6 +110,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self._on_entity_change(self.entity_var.get())
 
     def _on_close(self):
+        """Handle close."""
         try:
             self.grab_release()
         except Exception:
@@ -114,6 +118,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.destroy()
 
     def _on_entity_change(self, entity: str):
+        """Handle entity change."""
         log_info(f"Loading custom fields for {entity}", func_name="CustomFieldsEditor._on_entity_change")
         # Load base fields
         try:
@@ -138,6 +143,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
 
 
     def _refresh_linked_options(self):
+        """Refresh linked options."""
         dynamic_labels = list_known_entity_labels()
         values = [""] + dynamic_labels
         existing_linked = {
@@ -155,8 +161,10 @@ class CustomFieldsEditor(ctk.CTkToplevel):
             pass
 
     def _refresh_custom_list(self):
+        """Refresh custom list."""
         self.custom_list.delete(0, tk.END)
         for f in self._custom_current:
+            # Process each f from _custom_current.
             label = f"{f.get('name','')}  [{f.get('type','text')}]"
             lt = f.get("linked_type")
             if lt:
@@ -164,6 +172,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
             self.custom_list.insert(tk.END, label)
 
     def _on_type_change(self, *_):
+        """Handle type change."""
         t = self.type_var.get().strip().lower()
         # show linked type only for list types
         state = tk.NORMAL if t in ("list", "list_longtext") else tk.DISABLED
@@ -173,6 +182,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
             pass
 
     def _add_or_update(self):
+        """Internal helper for add or update."""
         log_info(f"Custom field add/update requested for {self.entity_var.get()}", func_name="CustomFieldsEditor._add_or_update")
         name = self.name_var.get().strip()
         ftype = self.type_var.get().strip() or "text"
@@ -204,12 +214,14 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.linked_var.set("")
 
     def _remove_selected(self):
+        """Remove selected."""
         log_info(f"Removing selected custom field for {self.entity_var.get()}", func_name="CustomFieldsEditor._remove_selected")
         sel = self.custom_list.curselection()
         if not sel:
             return
         idx = sel[0]
         try:
+            # Keep selected resilient if this step fails.
             self._custom_current.pop(idx)
             self._custom_buffer[self.entity_var.get()] = list(self._custom_current)
             self._refresh_linked_options()
@@ -218,6 +230,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
             pass
 
     def _on_select_custom(self, _evt=None):
+        """Handle select custom."""
         sel = self.custom_list.curselection()
         if not sel:
             return
@@ -232,6 +245,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self._on_type_change()
 
     def _save_current(self):
+        """Save current."""
         log_info(f"Saving custom fields for {self.entity_var.get()}", func_name="CustomFieldsEditor._save_current")
         entity = self.entity_var.get()
         # Filter out any entries that accidentally collide with base names

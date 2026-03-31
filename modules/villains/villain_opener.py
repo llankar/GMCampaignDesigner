@@ -1,3 +1,4 @@
+"""Opening helpers for villain."""
 from tkinter import messagebox
 
 from modules.generic.generic_editor_window import GenericEditorWindow
@@ -9,6 +10,7 @@ log_module_import(__name__)
 
 
 def open_villain_editor_window(villain_name):
+    """Open villain editor window."""
     villain_wrapper = GenericModelWrapper("villains")
     items = villain_wrapper.load_items()
     villain_item = next((i for i in items if i.get("Name") == villain_name), None)

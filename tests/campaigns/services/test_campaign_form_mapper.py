@@ -1,7 +1,10 @@
+"""Regression tests for campaign form mapper."""
+
 from modules.campaigns.services.campaign_form_mapper import build_form_state_from_campaign
 
 
 def test_build_form_state_from_campaign_reads_rich_text_and_arcs_payloads():
+    """Verify that build form state from campaign reads rich text and arcs payloads."""
     payload = {
         "Name": {"text": "Icewind"},
         "Genre": {"text": "Fantasy"},

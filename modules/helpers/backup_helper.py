@@ -38,6 +38,7 @@ class ManifestError(BackupError):
 
 
 def _call_progress(callback: Optional[ProgressCallback], message: str, fraction: float) -> None:
+    """Internal helper for call progress."""
     if callback is None:
         return
     try:
@@ -50,6 +51,7 @@ def _call_progress(callback: Optional[ProgressCallback], message: str, fraction:
 
 
 def _read_app_version() -> str:
+    """Internal helper for read app version."""
     version_file = Path("version.txt")
     if not version_file.exists():
         return "unknown"
@@ -66,6 +68,7 @@ def _read_app_version() -> str:
 
 
 def _relative_arcname(path: Path, base: Path) -> str:
+    """Internal helper for relative arcname."""
     try:
         rel = path.resolve().relative_to(base.resolve())
     except Exception:
@@ -74,12 +77,14 @@ def _relative_arcname(path: Path, base: Path) -> str:
 
 
 def _iter_files(root: Path) -> Iterable[Path]:
+    """Internal helper for iter files."""
     for entry in sorted(root.rglob("*")):
         if entry.is_file():
             yield entry
 
 
 def _resolve_database_path() -> Path:
+    """Resolve database path."""
     db_value = ConfigHelper.get("Database", "path", fallback="campaign.db") or "campaign.db"
     db_path = Path(db_value)
     if db_path.exists() and db_path.is_file():
@@ -128,6 +133,7 @@ def create_backup_archive(
     missing: list[str] = []
 
     def add_file(path: Path) -> None:
+        """Handle add file."""
         if path.exists() and path.is_file():
             sources.append((path, _relative_arcname(path, campaign_dir)))
         else:
@@ -138,6 +144,7 @@ def create_backup_archive(
             )
 
     def add_directory(path: Path) -> None:
+        """Handle add directory."""
         if not path.exists():
             missing.append(str(path))
             log_warning(
@@ -178,7 +185,9 @@ def create_backup_archive(
 
     success = False
     try:
+        # Keep backup archive resilient if this step fails.
         with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            # Keep this resource scoped to backup archive.
             total_items = len(sources) + 1  # Manifest counts as last step.
             for index, (src, arcname) in enumerate(sources, start=1):
                 _call_progress(
@@ -209,6 +218,7 @@ def create_backup_archive(
                 )
 
     try:
+        # Keep backup archive resilient if this step fails.
         os.replace(tmp_path, destination)
     except PermissionError as exc:
         os.remove(tmp_path)
@@ -246,7 +256,9 @@ def read_backup_manifest(archive_path: str | os.PathLike[str]) -> dict:
         raise BackupError(f"Backup archive not found: {archive}")
 
     try:
+        # Keep read backup manifest resilient if this step fails.
         with zipfile.ZipFile(archive, "r") as zf:
+            # Keep this resource scoped to read backup manifest.
             try:
                 manifest_data = json.loads(zf.read(BACKUP_MANIFEST_NAME))
             except KeyError as exc:
@@ -293,7 +305,9 @@ def restore_backup_archive(
     manifest_data = read_backup_manifest(archive)
 
     try:
+        # Keep backup archive resilient if this step fails.
         with zipfile.ZipFile(archive, "r") as zf:
+            # Keep this resource scoped to backup archive.
             original_db_path = manifest_data.get("database_path")
             if isinstance(original_db_path, str) and original_db_path:
                 original_db_name = Path(original_db_path).name
@@ -305,6 +319,7 @@ def restore_backup_archive(
             total = max(len(members), 1)
 
             for index, name in enumerate(members, start=1):
+                # Process each (index, name) from enumerate(members, start=1).
                 _call_progress(
                     progress_callback,
                     f"Restoring {name}",
@@ -318,6 +333,7 @@ def restore_backup_archive(
 
                 member_path.parent.mkdir(parents=True, exist_ok=True)
                 try:
+                    # Keep backup archive resilient if this step fails.
                     with zf.open(name, "r") as src, open(resolved_target, "wb") as dst:
                         shutil.copyfileobj(src, dst)
                 except PermissionError as exc:
@@ -345,11 +361,14 @@ def restore_backup_archive(
         manifest_data["campaign_name"] = campaign_name
 
     if database_filename:
+        # Continue with this path when database filename is set.
         new_db_path = destination / database_filename
         if original_db_name:
+            # Continue with this path when original DB name is set.
             original_db_path = destination / original_db_name
             if original_db_path.exists() and original_db_path != new_db_path:
                 try:
+                    # Keep backup archive resilient if this step fails.
                     if new_db_path.exists():
                         new_db_path.unlink()
                     original_db_path.rename(new_db_path)

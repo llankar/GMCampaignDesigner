@@ -15,6 +15,7 @@ def _normalize_face_value(value: Any) -> int | None:
     if isinstance(value, int):
         return value if value > 0 else None
     if isinstance(value, str):
+        # Handle the branch where isinstance(value, str).
         stripped = value.strip()
         if not stripped:
             return None
@@ -22,6 +23,7 @@ def _normalize_face_value(value: Any) -> int | None:
         if lowered.startswith("d"):
             lowered = lowered[1:]
         if lowered.isdigit():
+            # Handle the branch where lowered.isdigit().
             try:
                 result = int(lowered, 10)
             except ValueError:
@@ -38,6 +40,7 @@ def get_supported_faces() -> Tuple[int, ...]:
     seen: set[int] = set()
     if config:
         for face in config.supported_faces:
+            # Process each face from config.supported_faces.
             normalized = _normalize_face_value(face)
             if normalized is None or normalized in seen:
                 continue
@@ -82,8 +85,10 @@ def get_rollable_default_formula() -> str:
         "savage_fate": "d6",
     }
     if config:
+        # Continue with this path when config is set.
         forced = forced_defaults.get(config.slug.lower())
         if forced:
+            # Continue with this path when forced is set.
             canonical = canonicalize_formula(forced)
             if canonical:
                 return canonical
@@ -101,6 +106,7 @@ def get_rollable_default_formula() -> str:
 
 
 def _dice_roll_config() -> Mapping[str, Any]:
+    """Internal helper for dice roll config."""
     config = system_config.get_current_system_config()
     if not config:
         return {}
@@ -116,6 +122,7 @@ def get_default_roll_options() -> Mapping[str, bool]:
     config = system_config.get_current_system_config()
     dice_config: Mapping[str, Any] = {}
     if config:
+        # Continue with this path when config is set.
         raw = config.analyzer_config.get("dice")
         if isinstance(raw, Mapping):
             dice_config = raw
@@ -134,6 +141,7 @@ def get_default_roll_options() -> Mapping[str, bool]:
 
 
 def _attack_roll_config() -> Mapping[str, Any]:
+    """Internal helper for attack roll config."""
     config = system_config.get_current_system_config()
     if not config:
         return {}
@@ -144,6 +152,7 @@ def _attack_roll_config() -> Mapping[str, Any]:
 
 
 def _template_context(*, attack_bonus: str, base: str) -> dict[str, str]:
+    """Internal helper for template context."""
     stripped = attack_bonus.strip()
     sign = stripped[0] if stripped and stripped[0] in "+-" else "+"
     bonus_value = stripped.lstrip("+-")
@@ -170,7 +179,9 @@ def make_attack_roll_formula(attack_bonus: str) -> str:
     )
 
     def _fallback_formula() -> str:
+        """Internal helper for fallback formula."""
         for candidate in base_candidates:
+            # Process each candidate from base_candidates.
             canonical = canonicalize_formula(candidate)
             if canonical:
                 return canonical
@@ -182,6 +193,7 @@ def make_attack_roll_formula(attack_bonus: str) -> str:
     normalized = normalized_input
 
     try:
+        # Keep make attack roll formula resilient if this step fails.
         parsed_bonus = dice_engine.parse_formula(
             normalized,
             supported_faces=get_supported_faces(),
@@ -215,6 +227,7 @@ def make_attack_roll_formula(attack_bonus: str) -> str:
 
     template = config.get("template")
     if isinstance(template, str) and template.strip():
+        # Handle the branch where isinstance(template, str) and template.strip().
         try:
             candidate = template.format(**context)
         except Exception:

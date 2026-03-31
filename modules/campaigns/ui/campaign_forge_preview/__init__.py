@@ -1,3 +1,5 @@
+"""Campaign package."""
+
 from .models import CampaignForgeArcPreview, CampaignForgeScenarioPreview, ForgeValidationResult
 from .validation import evaluate_forge_warnings
 

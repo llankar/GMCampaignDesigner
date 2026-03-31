@@ -17,6 +17,7 @@ class CheckboxDialog(ctk.CTkToplevel):
         confirm_label: str = "OK",
         cancel_label: str = "Cancel",
     ):
+        """Initialize the CheckboxDialog instance."""
         super().__init__(master)
         self.title(title)
         self.resizable(False, False)
@@ -47,9 +48,11 @@ class CheckboxDialog(ctk.CTkToplevel):
         self.protocol("WM_DELETE_WINDOW", self._cancel)
 
     def _confirm(self):
+        """Internal helper for confirm."""
         self.result = bool(self._value.get())
         self.destroy()
 
     def _cancel(self):
+        """Internal helper for cancel."""
         self.result = None
         self.destroy()

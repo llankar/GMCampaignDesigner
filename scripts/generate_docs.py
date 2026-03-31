@@ -1,4 +1,6 @@
-﻿import os
+﻿"""Script entry point for generating project documentation snapshots."""
+
+import os
 import sys
 import ast
 import re
@@ -16,9 +18,11 @@ IMAGES_DIR = DOCS_DIR / "images"
 
 
 def discover_python_files():
+    """Handle discover python files."""
     files = []
     # Include top-level key files
     for name in ["main_window.py", "campaign_generator.py"]:
+        # Process each name from ['main_window.py', 'campaign_generator.py'].
         p = ROOT / name
         if p.exists():
             files.append(p)
@@ -29,6 +33,7 @@ def discover_python_files():
 
 
 def discover_html_files():
+    """Handle discover HTML files."""
     files = []
     for p in (MODULES_DIR / "web" / "templates").rglob("*.html"):
         files.append(p)
@@ -37,9 +42,11 @@ def discover_html_files():
 
 
 def _safe_get_source(src: str, node):
+    """Internal helper for safe get source."""
     if node is None:
         return None
     try:
+        # Keep safe get source resilient if this step fails.
         segment = ast.get_source_segment(src, node)
         if segment is not None:
             return segment.strip()
@@ -52,6 +59,7 @@ def _safe_get_source(src: str, node):
 
 
 def _format_arg(arg, src: str):
+    """Format arg."""
     name = arg.arg
     annotation = _safe_get_source(src, getattr(arg, "annotation", None))
     if annotation:
@@ -60,6 +68,7 @@ def _format_arg(arg, src: str):
 
 
 def _collect_param_info(node: ast.FunctionDef, src: str):
+    """Collect param info."""
     params = []
     args = node.args
     positional = list(args.posonlyargs) + list(args.args)
@@ -102,8 +111,10 @@ def _collect_param_info(node: ast.FunctionDef, src: str):
 
 
 def _summarize_params(params):
+    """Internal helper for summarize params."""
     parts = []
     for info in params:
+        # Process each info from params.
         if info["base_name"] in {"self", "cls"}:
             continue
         traits = []
@@ -132,15 +143,18 @@ def _summarize_params(params):
 
 
 def _build_signature(node: ast.FunctionDef, src: str):
+    """Build signature."""
     args = node.args
     pieces = []
     positional = list(args.posonlyargs) + list(args.args)
     defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
     posonly_count = len(args.posonlyargs)
     for idx, arg in enumerate(positional):
+        # Process each (idx, arg) from enumerate(positional).
         text = _format_arg(arg, src)
         default_node = defaults[idx]
         if default_node is not None:
+            # Handle the branch where default node is available.
             default_text = _safe_get_source(src, default_node)
             if default_text is not None:
                 text = f"{text}={default_text}"
@@ -152,8 +166,10 @@ def _build_signature(node: ast.FunctionDef, src: str):
     elif args.kwonlyargs:
         pieces.append("*")
     for arg, default in zip(args.kwonlyargs, args.kw_defaults):
+        # Process each (arg, default) from zip(args.kwonlyargs, args.kw_defaults).
         text = _format_arg(arg, src)
         if default is not None:
+            # Handle the branch where default is available.
             default_text = _safe_get_source(src, default)
             if default_text is not None:
                 text = f"{text}={default_text}"
@@ -165,6 +181,7 @@ def _build_signature(node: ast.FunctionDef, src: str):
 
 
 def _describe_function(node: ast.FunctionDef, src: str):
+    """Internal helper for describe function."""
     doc = (ast.get_docstring(node) or "").strip()
     params = _summarize_params(_collect_param_info(node, src))
     returns = _safe_get_source(src, node.returns)
@@ -176,6 +193,7 @@ def _describe_function(node: ast.FunctionDef, src: str):
 
 
 def parse_module_api(py_path: Path):
+    """Parse module API."""
     api = {"module": str(py_path.relative_to(ROOT)), "doc": None, "functions": [], "classes": []}
     try:
         src = py_path.read_text(encoding="utf-8", errors="ignore")
@@ -195,8 +213,10 @@ def parse_module_api(py_path: Path):
                 "doc": _describe_function(node, src),
             })
         elif isinstance(node, ast.ClassDef):
+            # Handle the branch where isinstance(node, ast.ClassDef).
             bases = []
             for base in node.bases:
+                # Process each base from node.bases.
                 base_src = _safe_get_source(src, base)
                 if base_src:
                     bases.append(base_src)
@@ -227,6 +247,7 @@ MENU_PATTERNS = [
 
 
 def parse_context_menus(py_path: Path):
+    """Parse context menus."""
     try:
         src = py_path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
@@ -234,6 +255,7 @@ def parse_context_menus(py_path: Path):
     menus = []
     # Heuristic: find right-click handlers and nearby menu definitions
     if "<Button-3>" in src or "Menu(" in src:
+        # Handle the branch where '<Button-3>' is in src or 'Menu(' is in src.
         labels = []
         for pat in MENU_PATTERNS:
             for m in pat.finditer(src):
@@ -247,6 +269,7 @@ def parse_context_menus(py_path: Path):
 
 
 def parse_html_context_menus(html_path: Path):
+    """Parse HTML context menus."""
     menus = []
     try:
         src = html_path.read_text(encoding="utf-8", errors="ignore")
@@ -271,15 +294,19 @@ def parse_html_context_menus(html_path: Path):
 
 
 def ensure_dirs():
+    """Ensure dirs."""
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def grab_widget_screenshot(widget, name: str):
+    """Handle grab widget screenshot."""
     # Update geometry and bring to front
     top = None
     try:
+        # Keep grab widget screenshot resilient if this step fails.
         top = widget.winfo_toplevel()
         if top is not None:
+            # Handle the branch where top is available.
             top.lift()
             top.focus_force()
             try:
@@ -292,6 +319,7 @@ def grab_widget_screenshot(widget, name: str):
     widget.update()
     # Compute absolute screen bbox
     try:
+        # Keep grab widget screenshot resilient if this step fails.
         x = widget.winfo_rootx()
         y = widget.winfo_rooty()
         w = widget.winfo_width()
@@ -323,6 +351,7 @@ def grab_widget_screenshot(widget, name: str):
     # Small sleep to ensure visuals are drawn
     time.sleep(0.2)
     try:
+        # Keep grab widget screenshot resilient if this step fails.
         img = ImageGrab.grab(bbox=bbox)
         img.save(img_path)
         return img_path
@@ -338,9 +367,11 @@ def grab_widget_screenshot(widget, name: str):
 
 
 def screenshot_app_views():
+    """Handle screenshot app views."""
     os.environ["DOCS_MODE"] = "1"
     sys.path.insert(0, str(ROOT))
     try:
+        # Keep screenshot app views resilient if this step fails.
         import tkinter as tk  # noqa: F401 - imported to ensure Tk initialises
         import customtkinter as ctk
         from main_window import MainWindow
@@ -362,7 +393,9 @@ def screenshot_app_views():
     shots["main_window"] = str(grab_widget_screenshot(app, "main_window") or "")
 
     def capture_sidebar_sections():
+        """Handle capture sidebar sections."""
         try:
+            # Keep capture sidebar sections resilient if this step fails.
             children = list(app.sidebar_inner.winfo_children())
             if not children:
                 return
@@ -375,6 +408,7 @@ def screenshot_app_views():
                 ("accordion_utilities", "Utilities"),
             ]
             for idx, (shot_key, _title) in enumerate(keys):
+                # Process each (idx, (shot_key, _title)) from enumerate(keys).
                 if idx >= len(sections):
                     break
                 section_frame = sections[idx]
@@ -390,6 +424,7 @@ def screenshot_app_views():
                 app.update()
                 shots[shot_key] = str(grab_widget_screenshot(app, shot_key) or "")
             if len(sections) > 1:
+                # Handle the branch where len(sections) > 1.
                 header = None
                 for child in sections[1].winfo_children():
                     if isinstance(child, ctk.CTkFrame):
@@ -405,9 +440,11 @@ def screenshot_app_views():
     capture_sidebar_sections()
 
     def wait_for_entity_list(timeout=8.0):
+        """Handle wait for entity list."""
         deadline = time.time() + timeout
         last_view = None
         while time.time() < deadline:
+            # Keep looping while time.time() < deadline.
             try:
                 app.update_idletasks()
                 app.update()
@@ -415,9 +452,12 @@ def screenshot_app_views():
                 break
             candidates = [child for child in app.inner_content_frame.winfo_children() if isinstance(child, GenericListView)]
             if candidates:
+                # Continue with this path when candidates is set.
                 last_view = candidates[-1]
                 try:
+                    # Keep wait for entity list resilient if this step fails.
                     if getattr(last_view, "_initial_dataset_ready", False):
+                        # Handle the branch where getattr(last_view, '_initial_dataset_ready', False).
                         tree = getattr(last_view, "tree", None)
                         if tree is not None and tree.winfo_exists() and tree.get_children():
                             return last_view
@@ -429,6 +469,7 @@ def screenshot_app_views():
         return last_view
 
     def ensure_pc_banner():
+        """Ensure PC banner."""
         try:
             app.banner_frame.grid(row=0, column=0, sticky="ew")
             app.inner_content_frame.grid(row=1, column=0, sticky="nsew")
@@ -441,6 +482,7 @@ def screenshot_app_views():
             pass
         app.banner_visible = True
         try:
+            # Keep PC banner resilient if this step fails.
             for child in app.banner_frame.winfo_children():
                 child.destroy()
         except Exception:
@@ -473,6 +515,7 @@ def screenshot_app_views():
 
     for ent in ["scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "books", "maps"]:
         try:
+            # Keep screenshot app views resilient if this step fails.
             ensure_pc_banner()
             app.open_entity(ent)
             app.update()
@@ -515,6 +558,7 @@ def screenshot_app_views():
     except Exception:
         pass
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_scene_flow_viewer()
         app.update(); app.update_idletasks()
         import customtkinter as ctk
@@ -526,8 +570,10 @@ def screenshot_app_views():
         pass
 
     def build_sample_scenario(template):
+        """Build sample scenario."""
         sample = {}
         for field in template.get("fields", []):
+            # Process each field from template.get('fields', []).
             name = field.get("name")
             ftype = field.get("type")
             if not name:
@@ -567,6 +613,7 @@ def screenshot_app_views():
     except Exception:
         scenario_template = None
     try:
+        # Keep screenshot app views resilient if this step fails.
         scenario_wrapper = GenericModelWrapper("scenarios")
         existing = scenario_wrapper.load_items()
         if existing:
@@ -582,8 +629,10 @@ def screenshot_app_views():
             scenario_template = None
 
     if scenario_item:
+        # Continue with this path when scenario item is set.
         detail_top = None
         try:
+            # Keep screenshot app views resilient if this step fails.
             detail_top = ctk.CTkToplevel(app)
             detail_top.title("Scenario Detail Preview")
             detail_top.geometry("1400x900")
@@ -597,6 +646,7 @@ def screenshot_app_views():
             pass
         finally:
             if detail_top is not None:
+                # Handle the branch where detail top is available.
                 try:
                     detail_top.destroy()
                 except Exception:
@@ -604,8 +654,10 @@ def screenshot_app_views():
                 app.update()
 
     if scenario_item and scenario_template:
+        # Continue with this path when scenario item is set and scenario template is set.
         editor_window = None
         try:
+            # Keep screenshot app views resilient if this step fails.
             editor_window = GenericEditorWindow(
                 app,
                 copy.deepcopy(scenario_item),
@@ -620,6 +672,7 @@ def screenshot_app_views():
             pass
         finally:
             if editor_window is not None:
+                # Handle the branch where editor window is available.
                 try:
                     editor_window.destroy()
                 except Exception:
@@ -628,6 +681,7 @@ def screenshot_app_views():
 
     fields_editor = None
     try:
+        # Keep screenshot app views resilient if this step fails.
         fields_editor = CustomFieldsEditor(app)
         fields_editor.update_idletasks()
         fields_editor.update()
@@ -636,6 +690,7 @@ def screenshot_app_views():
         pass
     finally:
         if fields_editor is not None:
+            # Handle the branch where fields editor is available.
             try:
                 fields_editor.destroy()
             except Exception:
@@ -643,6 +698,7 @@ def screenshot_app_views():
             app.update()
 
     def ensure_map_samples(ctrl):
+        """Ensure map samples."""
         if not ctrl:
             return []
         try:
@@ -657,6 +713,7 @@ def screenshot_app_views():
         valid_names = []
         if campaign_dir is not None:
             for key, item in existing.items():
+                # Process each (key, item) from existing.items().
                 if not isinstance(item, dict):
                     continue
                 image_rel = item.get('Image')
@@ -683,6 +740,7 @@ def screenshot_app_views():
         ]
         generated = {}
         for idx, src in enumerate(sample_sources, 1):
+            # Process each (idx, src) from enumerate(sample_sources, 1).
             if not src.exists():
                 continue
             dest = map_dir / f'docs_sample_map_{idx}.png'
@@ -710,17 +768,21 @@ def screenshot_app_views():
 
 
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.map_tool()
         app.update(); app.update_idletasks()
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
         map_top = tops[-1] if tops else None
         if map_top:
+            # Continue with this path when map top is set.
             shots["map_tool_selector"] = str(grab_widget_screenshot(map_top, "map_tool_selector") or "")
             ctrl = getattr(app, 'map_controller', None)
             map_names = ensure_map_samples(ctrl)
             if ctrl and map_names:
+                # Continue with this path when ctrl is set and map names is set.
                 for idx, name in enumerate(map_names[:2], 1):
                     try:
+                        # Keep screenshot app views resilient if this step fails.
                         ctrl._on_display_map("maps", name)
                         app.update(); app.update_idletasks()
                         key = f"map_tool_map{idx}"
@@ -728,6 +790,7 @@ def screenshot_app_views():
                     except Exception:
                         continue
                 try:
+                    # Keep screenshot app views resilient if this step fails.
                     ctrl._on_drawing_tool_change("Rectangle"); app.update()
                     shots["map_tool_rectangle"] = str(grab_widget_screenshot(map_top, "map_tool_rectangle") or "")
                     ctrl._on_drawing_tool_change("Oval"); app.update()
@@ -740,6 +803,7 @@ def screenshot_app_views():
 
     # Whiteboard (GM view)
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_whiteboard()
         app.update(); app.update_idletasks()
         ensure_pc_banner()
@@ -749,6 +813,7 @@ def screenshot_app_views():
 
     # World Map (nested navigation)
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_world_map()
         app.update(); app.update_idletasks()
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
@@ -760,6 +825,7 @@ def screenshot_app_views():
 
     # Dice Roller and Dice Bar
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_dice_roller()
         app.update(); app.update_idletasks()
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
@@ -769,6 +835,7 @@ def screenshot_app_views():
     except Exception:
         pass
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_dice_bar()
         app.update(); app.update_idletasks()
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
@@ -780,6 +847,7 @@ def screenshot_app_views():
 
     # Sound & Music Manager + Audio Controls Bar
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_sound_manager()
         app.update(); app.update_idletasks()
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
@@ -789,6 +857,7 @@ def screenshot_app_views():
     except Exception:
         pass
     try:
+        # Keep screenshot app views resilient if this step fails.
         app.open_audio_bar()
         app.update(); app.update_idletasks()
         tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
@@ -800,6 +869,7 @@ def screenshot_app_views():
 
     # Book Viewer (generate a sample PDF if needed)
     try:
+        # Keep screenshot app views resilient if this step fails.
         from modules.helpers.config_helper import ConfigHelper
         from modules.books.book_viewer import open_book_viewer
         try:
@@ -813,6 +883,7 @@ def screenshot_app_views():
         sample_pdf = books_dir / "docs_sample.pdf"
         if not sample_pdf.exists() and PdfWriter is not None:
             try:
+                # Keep screenshot app views resilient if this step fails.
                 writer = PdfWriter()
                 # A4 portrait in points
                 writer.add_blank_page(width=595, height=842)
@@ -821,6 +892,7 @@ def screenshot_app_views():
             except Exception:
                 pass
         if sample_pdf.exists():
+            # Handle the branch where sample_pdf.exists().
             rel = sample_pdf.relative_to(campaign_dir).as_posix()
             book_record = {"Title": "Docs Sample Book", "Attachment": rel, "PageCount": 1}
             open_book_viewer(app, book_record)
@@ -833,6 +905,7 @@ def screenshot_app_views():
         pass
 
     try:
+        # Keep screenshot app views resilient if this step fails.
         try:
             app._prime_content_frames_for_gm_screen()
         except Exception:
@@ -841,12 +914,14 @@ def screenshot_app_views():
         app.update()
         ensure_pc_banner()
         try:
+            # Keep screenshot app views resilient if this step fails.
             list_selection = None
             for child in app.inner_content_frame.winfo_children():
                 if isinstance(child, GenericListSelectionView):
                     list_selection = child
                     break
             if list_selection is not None:
+                # Handle the branch where list selection is available.
                 items = list_selection.tree.get_children()
                 if items:
                     list_selection.tree.selection_set(items[0])
@@ -892,10 +967,13 @@ def screenshot_app_views():
 
 
 def build_html(api_data, menu_data, shots):
+    """Build HTML."""
     def esc(s):
+        """Handle esc."""
         return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     def render_image(key):
+        """Render image."""
         path = shots.get(key)
         if not path:
             return ""
@@ -919,13 +997,16 @@ def build_html(api_data, menu_data, shots):
     )
 
     if shots:
+        # Continue with this path when shots is set.
         used = set()
         group_chunks = []
 
         def add_group(title, keys):
+            """Handle add group."""
             items = []
             for key in keys:
                 if key in shots and key not in used:
+                    # Handle the branch where key is in shots and key is not in used.
                     rendered = render_image(key)
                     if rendered:
                         items.append(rendered)
@@ -960,6 +1041,7 @@ def build_html(api_data, menu_data, shots):
         sections.append("<section id='screenshots'><h2>UI Screenshots</h2>" + "".join(group_chunks) + "</section>")
 
     if menu_data:
+        # Continue with this path when menu data is set.
         blocks = []
         for m in menu_data:
             items = ''.join(f"<li>{esc(lbl)}</li>" for lbl in m["items"])
@@ -968,6 +1050,7 @@ def build_html(api_data, menu_data, shots):
 
     api_blocks = []
     for mod in api_data:
+        # Process each mod from api_data.
         fn_list = ''.join(
             f"<li><code>{esc(f['signature'])}</code> &ndash; {esc(f['doc'])}</li>" for f in mod["functions"]
         )
@@ -1029,6 +1112,7 @@ def build_html(api_data, menu_data, shots):
 
 
 def main():
+    """Run the module entry point."""
     ensure_dirs()
 
     files = discover_python_files()
@@ -1059,7 +1143,9 @@ def main():
 
 
 def build_user_manual(shots, menu_data, py_files):
+    """Build user manual."""
     def img(key, alt=None):
+        """Handle img."""
         p = shots.get(key)
         if not p:
             return ""
@@ -1071,9 +1157,11 @@ def build_user_manual(shots, menu_data, py_files):
         return f"<figure class='shot'><img class='manual-shot' src='{rel}' alt='{caption}' /><figcaption>{caption}</figcaption></figure>"
 
     def section(title, body):
+        """Handle section."""
         return f"<section><h2 id='{title.lower().replace(' ', '-')}'>{title}</h2>{body}</section>"
 
     def collect_items(filter_fn):
+        """Collect items."""
         items = []
         for m in menu_data:
             if filter_fn(m.get('module', '')):

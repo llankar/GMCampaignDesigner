@@ -1,3 +1,4 @@
+"""Section definitions for event editor."""
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -9,6 +10,7 @@ class EventEditorSection(ctk.CTkFrame):
     """Card-like section used by the calendar event editor."""
 
     def __init__(self, master, *, title: str, description: str = ""):
+        """Initialize the EventEditorSection instance."""
         self._palette = get_event_editor_palette()
         super().__init__(
             master,
@@ -47,6 +49,7 @@ class EventEditorHero(ctk.CTkFrame):
     """Top summary block with a live snapshot of the event state."""
 
     def __init__(self, master):
+        """Initialize the EventEditorHero instance."""
         self._palette = get_event_editor_palette()
         super().__init__(
             master,
@@ -111,6 +114,7 @@ class EventEditorHero(ctk.CTkFrame):
         self.color_code_label.place(relx=0.5, rely=0.5, anchor="center")
 
     def _build_chip(self, master, column: int):
+        """Build chip."""
         chip = ctk.CTkLabel(
             master,
             text="",
@@ -124,6 +128,7 @@ class EventEditorHero(ctk.CTkFrame):
         return chip
 
     def update_preview(self, *, title: str, event_type: str, schedule: str, status: str, color: str):
+        """Update preview."""
         display_title = (title or "Untitled event").strip() or "Untitled event"
         self.title_label.configure(text=display_title)
         self.type_chip.configure(text=f"Type · {event_type or 'Session'}")

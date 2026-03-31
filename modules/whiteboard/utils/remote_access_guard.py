@@ -1,3 +1,5 @@
+"""Utilities for whiteboard remote access guard."""
+
 import hmac
 from typing import Optional
 
@@ -8,26 +10,32 @@ class RemoteAccessGuard:
     """Small helper to gate remote whiteboard edits behind a GM token and runtime toggle."""
 
     def __init__(self, *, enabled: bool = False, token: Optional[str] = None):
+        """Initialize the RemoteAccessGuard instance."""
         self._enabled = bool(enabled)
         self._token = (token or "").strip()
 
     @classmethod
     def from_config(cls, enabled: bool = False) -> "RemoteAccessGuard":
+        """Handle from config."""
         token = str(ConfigHelper.get("WhiteboardServer", "gm_token", fallback="") or "")
         return cls(enabled=enabled, token=token)
 
     @property
     def enabled(self) -> bool:
+        """Handle enabled."""
         return self._enabled
 
     @property
     def token(self) -> str:
+        """Handle token."""
         return self._token
 
     def set_enabled(self, value: bool) -> None:
+        """Set enabled."""
         self._enabled = bool(value)
 
     def is_request_authorized(self, provided_token: Optional[str]) -> bool:
+        """Return whether request authorized."""
         if not self._enabled:
             return False
         if not self._token:

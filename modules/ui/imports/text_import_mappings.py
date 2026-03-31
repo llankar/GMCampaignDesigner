@@ -1,3 +1,5 @@
+"""Utilities for imports text import mappings."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -57,10 +59,12 @@ TARGETS = (
 
 
 def list_target_labels() -> list[str]:
+    """Handle list target labels."""
     return [target.label for target in TARGETS]
 
 
 def target_for_label(label: str) -> TextImportTarget:
+    """Handle target for label."""
     for target in TARGETS:
         if target.label == label:
             return target
@@ -68,6 +72,7 @@ def target_for_label(label: str) -> TextImportTarget:
 
 
 def target_for_slug(slug: str) -> TextImportTarget:
+    """Handle target for slug."""
     for target in TARGETS:
         if target.slug == slug:
             return target
@@ -75,8 +80,10 @@ def target_for_slug(slug: str) -> TextImportTarget:
 
 
 def extract_default_name(text: str, url: str | None) -> str:
+    """Extract default name."""
     if text:
         for line in text.splitlines():
+            # Process each line from text.splitlines().
             cleaned = line.strip()
             if cleaned:
                 return cleaned[:120]
@@ -86,6 +93,7 @@ def extract_default_name(text: str, url: str | None) -> str:
 
 
 def build_source_metadata(text: str, url: str | None, *, excerpt_length: int = 280) -> dict:
+    """Build source metadata."""
     safe_text = (text or "").strip().replace("\n", " ")
     excerpt = safe_text[:excerpt_length]
     if len(safe_text) > excerpt_length:

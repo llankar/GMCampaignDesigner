@@ -26,50 +26,61 @@ GENERIC_ALLOWED_FIELDS = ("damage", "pierce_armor", "armor", "special_effect", "
 
 class _FallbackWidget:
     def __init__(self, master=None, *args, **kwargs):
+        """Initialize the _FallbackWidget instance."""
         self.master = master
         self._grid_visible = True
         self._grid_kwargs = {}
 
     def grid(self, *args, **kwargs):
+        """Handle grid."""
         self._grid_visible = True
         self._grid_kwargs = dict(kwargs)
         return None
 
     def grid_remove(self):
+        """Handle grid remove."""
         self._grid_visible = False
         return None
 
     def grid_configure(self, *args, **kwargs):
+        """Handle grid configure."""
         self._grid_kwargs.update(kwargs)
         return None
 
     def grid_columnconfigure(self, *args, **kwargs):
+        """Handle grid columnconfigure."""
         return None
 
     def destroy(self):
+        """Handle destroy."""
         return None
 
 
 class _FallbackComboBox(_FallbackWidget):
     def __init__(self, master=None, *args, values=None, command=None, **kwargs):
+        """Initialize the _FallbackComboBox instance."""
         super().__init__(master, *args, **kwargs)
         self._values = list(values or [])
         self._value = ""
         self._command = command
 
     def set(self, value):
+        """Set the operation."""
         self._value = value
 
     def get(self):
+        """Return the operation."""
         return self._value
 
     def configure(self, **kwargs):
+        """Handle configure."""
         if "values" in kwargs:
             self._values = list(kwargs["values"])
         if "command" in kwargs:
             self._command = kwargs["command"]
 
     def cget(self, key):
+        """Handle cget."""
         if key == "values":
             return self._values
         raise KeyError(key)
@@ -77,12 +88,14 @@ class _FallbackComboBox(_FallbackWidget):
 
 class _FallbackButton(_FallbackWidget):
     def __init__(self, master=None, *args, command=None, **kwargs):
+        """Initialize the _FallbackButton instance."""
         super().__init__(master, *args, **kwargs)
         self.command = command
 
 
 class EquipmentEditor:
     def __init__(self, parent, on_change, max_level_provider, grid_row: int = 11):
+        """Initialize the EquipmentEditor instance."""
         self._on_change = on_change
         self._max_level_provider = max_level_provider
         self._columns: dict[str, dict] = {}
@@ -112,6 +125,7 @@ class EquipmentEditor:
         self._render_object_grid()
 
     def _build_column(self, object_key: str) -> dict:
+        """Build column."""
         box = self._make_frame(self.frame)
         box.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
         box.grid_columnconfigure(0, weight=1)
@@ -155,6 +169,7 @@ class EquipmentEditor:
         }
 
     def add_object_slot(self) -> None:
+        """Handle add object slot."""
         hidden = [key for key in self._columns if key not in self._active_object_keys]
         if hidden:
             next_key = hidden[0]
@@ -168,6 +183,7 @@ class EquipmentEditor:
         self._on_internal_change()
 
     def remove_object_slot(self, object_key: str) -> None:
+        """Remove object slot."""
         if object_key not in self._active_object_keys:
             return
         if len(self._active_object_keys) <= 1:
@@ -183,6 +199,7 @@ class EquipmentEditor:
         self._on_internal_change()
 
     def _render_object_grid(self) -> None:
+        """Render object grid."""
         for index, object_key in enumerate(self._active_object_keys):
             row = 1 + (index // MAX_OBJECTS_PER_ROW)
             col = index % MAX_OBJECTS_PER_ROW
@@ -193,6 +210,7 @@ class EquipmentEditor:
                 column["box"].grid_remove()
 
     def add_effect_row(self, object_key: str) -> None:
+        """Handle add effect row."""
         column = self._columns[object_key]
         row_index = len(column["rows"])
         row_box = self._make_frame(column["rows_frame"])
@@ -240,34 +258,41 @@ class EquipmentEditor:
         self._on_internal_change()
 
     def _make_frame(self, master):
+        """Internal helper for make frame."""
         if self._headless:
             return _FallbackWidget(master)
         return ctk.CTkFrame(master)
 
     def _make_label(self, master, **kwargs):
+        """Internal helper for make label."""
         if self._headless:
             return _FallbackWidget(master, **kwargs)
         return ctk.CTkLabel(master, **kwargs)
 
     def _make_entry(self, master, **kwargs):
+        """Internal helper for make entry."""
         if self._headless:
             return _FallbackWidget(master, **kwargs)
         return ctk.CTkEntry(master, **kwargs)
 
     def _make_button(self, master, **kwargs):
+        """Internal helper for make button."""
         if self._headless:
             return _FallbackButton(master, **kwargs)
         return ctk.CTkButton(master, **kwargs)
 
     def _make_combobox(self, master, **kwargs):
+        """Internal helper for make combobox."""
         if self._headless:
             return _FallbackComboBox(master, **kwargs)
         return ctk.CTkComboBox(master, **kwargs)
 
     def remove_effect_row(self, object_key: str, row_frame) -> None:
+        """Remove effect row."""
         column = self._columns[object_key]
         updated_rows = []
         for row in column["rows"]:
+            # Process each row from column['rows'].
             if row["frame"] is row_frame:
                 row["frame"].destroy()
                 continue
@@ -280,17 +305,21 @@ class EquipmentEditor:
         self._on_internal_change()
 
     def _set_field_from_label(self, object_key: str, var: tk.StringVar, label: str) -> None:
+        """Set field from label."""
         allowed_fields = self._allowed_fields_for(object_key)
         mapping = {FIELD_LABELS[field]: field for field in allowed_fields}
         var.set(mapping.get(label, allowed_fields[0]))
 
     def _allowed_fields_for(self, object_key: str) -> tuple[str, ...]:
+        """Internal helper for allowed fields for."""
         return ALLOWED_FIELDS.get(object_key, GENERIC_ALLOWED_FIELDS)
 
     def _object_title_for(self, object_key: str) -> str:
+        """Internal helper for object title for."""
         return OBJECT_TITLES.get(object_key, f"Objet {self._next_object_number - 1}")
 
     def _create_object_slot(self) -> str:
+        """Create object slot."""
         object_key = f"object_{self._next_object_number}"
         OBJECT_TITLES[object_key] = f"Objet {self._next_object_number}"
         self._next_object_number += 1
@@ -299,10 +328,12 @@ class EquipmentEditor:
         return object_key
 
     def _ensure_object_slot_exists(self, object_key: str) -> None:
+        """Ensure object slot exists."""
         if object_key in self._columns:
             return
 
         if object_key.startswith("object_"):
+            # Handle the branch where object_key.startswith('object_').
             _, _, suffix = object_key.partition("_")
             try:
                 target_number = int(suffix)
@@ -310,6 +341,7 @@ class EquipmentEditor:
                 target_number = self._next_object_number
 
             while self._next_object_number <= target_number:
+                # Keep looping while _next_object_number <= target_number.
                 self._create_object_slot()
             return
 
@@ -319,6 +351,7 @@ class EquipmentEditor:
         self.add_effect_row(object_key)
 
     def _level_values_for(self, field: str) -> list[str]:
+        """Internal helper for level values for."""
         max_level = max(self._max_level_provider(), 0)
         if field == "skill_bonus":
             values = [str(v) for v in range(0, max_level + 1, 2)]
@@ -326,8 +359,11 @@ class EquipmentEditor:
         return [str(v) for v in range(0, max_level + 1)]
 
     def _on_internal_change(self, *_args) -> None:
+        """Handle internal change."""
         for object_key, column in self._columns.items():
+            # Process each (object_key, column) from _columns.items().
             for row in column["rows"]:
+                # Process each row from column['rows'].
                 allowed = self._level_values_for(row["effect_var"].get())
                 row["level_combo"].configure(values=allowed)
                 if row["level_var"].get() not in allowed:
@@ -337,10 +373,12 @@ class EquipmentEditor:
         self._on_change()
 
     def _update_summary(self, object_key: str) -> None:
+        """Update summary."""
         payload = self.get_purchase_payload()[object_key]
         name = self._columns[object_key]["name_var"].get().strip() or self._object_title_for(object_key)
         effects = []
         for field in self._allowed_fields_for(object_key):
+            # Process each field from _allowed_fields_for(object_key).
             value = int(payload.get(field, 0) or 0)
             if value > 0:
                 effects.append(f"{FIELD_LABELS[field]} {value}")
@@ -349,11 +387,14 @@ class EquipmentEditor:
         )
 
     def get_equipment_names(self) -> dict[str, str]:
+        """Return equipment names."""
         return {key: col["name_var"].get().strip() for key, col in self._columns.items()}
 
     def get_purchase_payload(self) -> dict[str, dict[str, int | str]]:
+        """Return purchase payload."""
         payload: dict[str, dict[str, int | str]] = {}
         for object_key, column in self._columns.items():
+            # Process each (object_key, column) from _columns.items().
             if object_key not in self._active_object_keys:
                 payload[object_key] = {field: 0 for field in self._allowed_fields_for(object_key)}
                 payload[object_key]["special_effect_details"] = ""
@@ -361,6 +402,7 @@ class EquipmentEditor:
                 continue
             values: dict[str, int | str] = {field: 0 for field in self._allowed_fields_for(object_key)}
             for row in column["rows"]:
+                # Process each row from column['rows'].
                 field = row["effect_var"].get()
                 if field not in values:
                     continue
@@ -374,6 +416,7 @@ class EquipmentEditor:
         return payload
 
     def get_allocated_pe(self) -> dict[str, int]:
+        """Return allocated pe."""
         payload = self.get_purchase_payload()
         return {
             key: sum(int(payload[key].get(field, 0) or 0) for field in self._allowed_fields_for(key))
@@ -381,11 +424,13 @@ class EquipmentEditor:
         }
 
     def apply_payload(self, equipment: dict, purchases: dict) -> None:
+        """Apply payload."""
         for object_key in set(equipment.keys()) | set(purchases.keys()):
             self._ensure_object_slot_exists(object_key)
 
         active_keys = []
         for object_key, column in self._columns.items():
+            # Process each (object_key, column) from _columns.items().
             column["name_var"].set((equipment.get(object_key) or "").strip())
             for row in list(column["rows"]):
                 row["frame"].destroy()
@@ -401,6 +446,7 @@ class EquipmentEditor:
                 fields = [self._allowed_fields_for(object_key)[0]]
 
             for field in fields:
+                # Process each field from fields.
                 self.add_effect_row(object_key)
                 row = column["rows"][-1]
                 row["effect_var"].set(field)
@@ -416,6 +462,7 @@ class EquipmentEditor:
         self._active_object_keys = active_keys
         for object_key, column in self._columns.items():
             if object_key not in self._active_object_keys:
+                # Handle the branch where object key is not in active object keys.
                 column["name_var"].set("")
                 for row in list(column["rows"]):
                     row["frame"].destroy()

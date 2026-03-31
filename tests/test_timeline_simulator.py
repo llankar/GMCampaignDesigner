@@ -1,3 +1,5 @@
+"""Regression tests for timeline simulator."""
+
 import sqlite3
 
 import pytest
@@ -12,11 +14,13 @@ from modules.helpers.template_loader import list_known_entities
 
 @pytest.fixture
 def campaign_db(monkeypatch, tmp_path):
+    """Handle campaign DB."""
     db_path = tmp_path / "campaign.db"
 
     original_get = ConfigHelper.get
 
     def fake_get(cls, section, key, fallback=None):
+        """Handle fake get."""
         if (section, key) == ("Database", "path"):
             return str(db_path)
         if (section, key) == ("Logging", "enabled"):
@@ -32,6 +36,7 @@ def campaign_db(monkeypatch, tmp_path):
 
 
 def test_events_entity_is_built_in(campaign_db):
+    """Verify that events entity is built in."""
     assert "events" in list_known_entities()
 
     with sqlite3.connect(str(campaign_db)) as conn:
@@ -42,6 +47,7 @@ def test_events_entity_is_built_in(campaign_db):
 
 
 def test_timeline_simulator_advances_world_state(campaign_db):
+    """Verify that timeline simulator advances world state."""
     set_campaign_setting("timeline_current_date", "2026-03-10")
 
     wrappers = {

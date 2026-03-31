@@ -1,3 +1,5 @@
+"""Regression tests for cross campaign asset service."""
+
 import sys
 import types
 
@@ -10,6 +12,7 @@ if "winsound" not in sys.modules:
     winsound_stub.SND_PURGE = 0
 
     def _noop(*_args, **_kwargs):
+        """Internal helper for noop."""
         return None
 
     winsound_stub.PlaySound = _noop
@@ -22,6 +25,7 @@ from modules.generic.cross_campaign_asset_service import (
 
 
 def test_export_bundle_raises_when_database_missing(tmp_path):
+    """Verify that export bundle raises when database missing."""
     destination = tmp_path / "export.zip"
     source_campaign = CampaignDatabase(
         name="MissingDB",

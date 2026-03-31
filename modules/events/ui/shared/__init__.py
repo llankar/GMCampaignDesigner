@@ -1,3 +1,5 @@
+"""Event package."""
+
 from importlib import import_module
 
 __all__ = ["MultiLinkSelector", "RelatedEventsPanel"]
@@ -10,6 +12,7 @@ _MODULE_MAP = {
 
 
 def __getattr__(name: str):
+    """Handle getattr."""
     module_name = _MODULE_MAP.get(name)
     if module_name is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -20,4 +23,5 @@ def __getattr__(name: str):
 
 
 def __dir__():
+    """Handle dir."""
     return sorted(set(globals()) | set(__all__))

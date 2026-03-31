@@ -1,9 +1,13 @@
+"""Utilities for window components AI character generation."""
+
 from modules.generic.editor.window_context import *
 
 
 class GenericEditorWindowAICharacterGeneration:
     def ai_generate_full_npc(self):
+        """Handle AI generate full NPC."""
         try:
+            # Keep AI generate full NPC resilient if this step fails.
             theme = self._infer_theme("npcs")
             # Gather sample names/roles
             try:
@@ -12,6 +16,7 @@ class GenericEditorWindowAICharacterGeneration:
                 samples = []
             examples = []
             for it in samples[:8]:
+                # Process each it from samples[:8].
                 n = it.get("Name")
                 r = it.get("Role") or it.get("Traits")
                 if n:
@@ -62,12 +67,14 @@ class GenericEditorWindowAICharacterGeneration:
 
             # Apply simple text fields
             for key in ("Name", "Role", "Quote", "Genre"):
+                # Process each key from ('Name', 'Role', 'Quote', 'Genre').
                 val = data.get(key)
                 if val:
                     self._set_field_text(key, str(val))
 
             # Apply longtext fields
             for key in ("Description", "Secret", "RoleplayingCues", "Personality", "Motivation", "Background", "Traits"):
+                # Process each key while updating AI generate full NPC.
                 val = data.get(key)
                 if val:
                     self._set_field_text(key, str(val))
@@ -75,6 +82,7 @@ class GenericEditorWindowAICharacterGeneration:
         except Exception as e:
             messagebox.showerror("AI Error", f"Failed to generate NPC: {e}")
     def ai_generate_full_creature(self):
+        """Handle AI generate full creature."""
         try:
             # Prefer explicit Genre from existing creatures; fallback to inferred theme
             try:
@@ -84,6 +92,7 @@ class GenericEditorWindowAICharacterGeneration:
 
             genre_counts = {}
             for it in existing:
+                # Process each it from existing.
                 g = (it.get("Genre") or "").strip()
                 if not g:
                     continue
@@ -99,6 +108,7 @@ class GenericEditorWindowAICharacterGeneration:
             samples = existing
             examples = []
             for it in samples[:8]:
+                # Process each it from samples[:8].
                 n = it.get("Name")
                 t = it.get("Type")
                 if n:
@@ -108,6 +118,7 @@ class GenericEditorWindowAICharacterGeneration:
             # Extract representative Stats examples to enforce format consistency
             stats_examples = []
             for it in existing:
+                # Process each it from existing.
                 s = it.get("Stats")
                 if not s:
                     continue
@@ -172,12 +183,14 @@ class GenericEditorWindowAICharacterGeneration:
 
             # Apply simple text fields
             for key in ("Name", "Type", "Genre"):
+                # Process each key from ('Name', 'Type', 'Genre').
                 val = data.get(key)
                 if val:
                     self._set_field_text(key, str(val))
 
             # Apply longtext fields
             for key in ("Description", "Weakness", "Powers", "Stats", "Background"):
+                # Process each key while updating AI generate full creature.
                 val = data.get(key)
                 if val:
                     self._set_field_text(key, str(val))

@@ -1,3 +1,5 @@
+"""Utilities for AI constraints."""
+
 from __future__ import annotations
 
 

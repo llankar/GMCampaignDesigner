@@ -1,3 +1,5 @@
+"""Regression tests for generic list selection view."""
+
 import tkinter as tk
 
 from modules.generic.generic_list_selection_view import GenericListSelectionView
@@ -5,13 +7,16 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 
 class _StubMaster:
     def __init__(self):
+        """Initialize the _StubMaster instance."""
         self.destroy_called = False
 
     def destroy(self):
+        """Handle destroy."""
         self.destroy_called = True
 
 
 def test_select_entity_closes_host_toplevel(monkeypatch):
+    """Verify that select entity closes host toplevel."""
     monkeypatch.setattr(tk, "Toplevel", _StubMaster)
 
     master = _StubMaster()
@@ -30,14 +35,18 @@ def test_select_entity_closes_host_toplevel(monkeypatch):
 
 
 def test_on_double_click_open_selected_mode_uses_open_selected():
+    """Verify that on double click open selected mode uses open selected."""
     class _Tree:
         def identify_row(self, _y):
+            """Handle identify row."""
             return "row-1"
 
         def focus(self):
+            """Handle focus."""
             return ""
 
         def selection_set(self, iid):
+            """Handle selection set."""
             self.selected = iid
 
     view = GenericListSelectionView.__new__(GenericListSelectionView)

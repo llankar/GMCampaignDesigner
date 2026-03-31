@@ -1,3 +1,5 @@
+"""Utilities for campaign entity constellation."""
+
 from __future__ import annotations
 
 import math
@@ -39,6 +41,7 @@ class EntityConstellation(ctk.CTkFrame):
         on_open_entity: Callable[[str, str], None],
         accent: str | None = None,
     ):
+        """Initialize the EntityConstellation instance."""
         super().__init__(parent, fg_color="#0d1728", corner_radius=20, border_width=1, border_color="#22395d")
         self._scenario_title = scenario_title
         self._links = list(links)
@@ -89,6 +92,7 @@ class EntityConstellation(ctk.CTkFrame):
         self.after_idle(self._render)
 
     def _render(self, *_args, **_kwargs) -> None:
+        """Render the operation."""
         canvas = getattr(self, "canvas", None)
         if canvas is None or not canvas.winfo_exists():
             return
@@ -130,6 +134,7 @@ class EntityConstellation(ctk.CTkFrame):
 
         node_index = 0
         for type_index, entity_type in enumerate(type_order):
+            # Process each (type_index, entity_type) from enumerate(type_order).
             links = grouped[entity_type]
             start_angle = (math.tau / type_count) * type_index - math.pi / 2
             sweep = max(math.tau / type_count * 0.72, 0.42)
@@ -150,6 +155,7 @@ class EntityConstellation(ctk.CTkFrame):
                 )
 
             for local_index, link in enumerate(links):
+                # Process each (local_index, link) from enumerate(links).
                 fraction = (local_index + 1) / (len(links) + 1)
                 angle = start_angle - sweep / 2 + sweep * fraction
                 x = cx + math.cos(angle) * radius
@@ -159,6 +165,7 @@ class EntityConstellation(ctk.CTkFrame):
                 self._draw_link(canvas, cx, cy, x, y, color, entity_type, link, tag)
 
     def _draw_link(self, canvas, cx: float, cy: float, x: float, y: float, color: str, entity_type: str, link: ScenarioEntityLink, tag: str) -> None:
+        """Internal helper for draw link."""
         canvas.create_line(cx, cy, x, y, fill="#1e3657", width=2)
         canvas.create_oval(x - 24, y - 24, x + 24, y + 24, fill="#10233a", outline="#25476d", width=2, tags=(tag, f"halo:{tag}"))
         canvas.create_oval(x - 20, y - 20, x + 20, y + 20, fill="#0e1d31", outline=color, width=3, tags=(tag,))
@@ -179,6 +186,7 @@ class EntityConstellation(ctk.CTkFrame):
         self._node_bounds[tag] = (x - 30, y - 30, x + 30, y + 42)
 
     def _render_legend(self) -> None:
+        """Render legend."""
         for child in self._legend.winfo_children():
             child.destroy()
 
@@ -200,6 +208,7 @@ class EntityConstellation(ctk.CTkFrame):
             ).grid(row=0, column=1, padx=(0, 10), pady=5)
 
     def _handle_motion(self, event) -> None:
+        """Internal helper for handle motion."""
         for tag, (x1, y1, x2, y2) in self._node_bounds.items():
             if x1 <= event.x <= x2 and y1 <= event.y <= y2:
                 self._set_hover(tag)
@@ -207,6 +216,7 @@ class EntityConstellation(ctk.CTkFrame):
         self._set_hover(None)
 
     def _set_hover(self, tag: str | None) -> None:
+        """Set hover."""
         if self._hover_tag == tag:
             return
         canvas = getattr(self, "canvas", None)
@@ -223,6 +233,7 @@ class EntityConstellation(ctk.CTkFrame):
 
 
 def _truncate(value: str, limit: int) -> str:
+    """Internal helper for truncate."""
     text = str(value or "").strip()
     if len(text) <= limit:
         return text
@@ -230,6 +241,7 @@ def _truncate(value: str, limit: int) -> str:
 
 
 def _entity_glyph(entity_type: str) -> str:
+    """Internal helper for entity glyph."""
     mapping = {
         "NPCs": "🧙",
         "PCs": "🛡",

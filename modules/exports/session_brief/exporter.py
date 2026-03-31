@@ -1,3 +1,5 @@
+"""Utilities for session brief exporter."""
+
 from __future__ import annotations
 
 import os
@@ -12,6 +14,7 @@ if TYPE_CHECKING:
 
 
 def _sanitize_filename(value: str) -> str:
+    """Internal helper for sanitize filename."""
     safe = "".join(ch if ch.isalnum() or ch in "-_ " else "_" for ch in value)
     safe = "_".join(safe.split())
     return safe or "session_brief"
@@ -26,6 +29,7 @@ def _build_markdown(
     dashboard_fields: list[str],
     gm_priority_notes: list[str],
 ) -> str:
+    """Build markdown."""
     lines: list[str] = [
         f"# Session brief — {campaign_name}",
         "",
@@ -63,6 +67,7 @@ def _build_markdown(
 
 
 def _convert_docx_to_pdf(docx_path: str, pdf_path: str) -> bool:
+    """Internal helper for convert docx to PDF."""
     try:
         from docx2pdf import convert
     except Exception:
@@ -88,12 +93,14 @@ def _build_docx_document(
     dashboard_fields: list[str],
     gm_priority_notes: list[str],
 ):
+    """Build docx document."""
     from docx import Document
 
     document = Document()
     document.add_heading(f"Session brief — {campaign_name}", level=1)
 
     def add_section(title: str, values: list[str] | None = None, paragraph_text: str | None = None) -> None:
+        """Handle add section."""
         document.add_heading(title, level=2)
         if paragraph_text is not None:
             document.add_paragraph(paragraph_text)
@@ -130,6 +137,7 @@ def export_session_brief(
     target_path = Path(output_path)
 
     if export_format == "markdown":
+        # Handle the branch where export_format == 'markdown'.
         if target_path.suffix.lower() != ".md":
             target_path = target_path.with_suffix(".md")
         payload = _build_markdown(
@@ -144,8 +152,10 @@ def export_session_brief(
         return str(target_path)
 
     if export_format in {"docx", "pdf"}:
+        # Handle the branch where export format is in {'docx', 'pdf'}.
         docx_path = target_path.with_suffix(".docx")
         try:
+            # Keep session brief resilient if this step fails.
             document = _build_docx_document(
                 campaign_name=campaign_name,
                 summary=summary,
@@ -179,6 +189,7 @@ def export_session_brief(
 
         pdf_path = target_path.with_suffix(".pdf")
         if _convert_docx_to_pdf(str(docx_path), str(pdf_path)):
+            # Handle the branch where _convert_docx_to_pdf(str(docx_path), str(pdf_path)).
             try:
                 docx_path.unlink(missing_ok=True)
             except Exception:

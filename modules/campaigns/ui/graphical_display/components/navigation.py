@@ -1,3 +1,4 @@
+"""Navigation helpers for campaign."""
 from __future__ import annotations
 
 import tkinter as tk
@@ -11,6 +12,7 @@ from ..data import CampaignGraphArc, CampaignGraphScenario
 
 class _CanvasSelector(ctk.CTkFrame):
     def __init__(self, parent, *, height: int, bg_color: str):
+        """Initialize the _CanvasSelector instance."""
         super().__init__(parent, fg_color="transparent")
         self._bg_color = bg_color
         self.canvas = tk.Canvas(
@@ -25,6 +27,7 @@ class _CanvasSelector(ctk.CTkFrame):
         self.after_idle(self._render)
 
     def _render(self, *_args, **_kwargs) -> None:
+        """Render the operation."""
         raise NotImplementedError
 
 
@@ -39,12 +42,14 @@ class ArcSelectorStrip(_CanvasSelector):
         selected_index: int,
         on_select: Callable[[int], None],
     ):
+        """Initialize the ArcSelectorStrip instance."""
         self._arcs = list(arcs)
         self._selected_index = selected_index
         self._on_select = on_select
         super().__init__(parent, height=124, bg_color=DASHBOARD_THEME.panel_alt_bg)
 
     def _render(self, *_args, **_kwargs) -> None:
+        """Render the operation."""
         canvas = getattr(self, "canvas", None)
         if canvas is None or not canvas.winfo_exists():
             return
@@ -62,6 +67,7 @@ class ArcSelectorStrip(_CanvasSelector):
         start_x = max((width - total_width) / 2, margin)
 
         for index, arc in enumerate(self._arcs):
+            # Process each (index, arc) from enumerate(_arcs).
             x1 = start_x + index * (card_width + gap)
             x2 = x1 + card_width
             y1 = 18
@@ -118,6 +124,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         selected_index: int,
         on_select: Callable[[int], None],
     ):
+        """Initialize the ScenarioSelectorStrip instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=18)
         self._scenarios = list(scenarios)
         self._selected_index = selected_index
@@ -139,12 +146,14 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self.after_idle(self._render)
 
     def _render(self) -> None:
+        """Render the operation."""
         for child in self.inner.winfo_children():
             child.destroy()
 
         many_scenarios = len(self._scenarios) >= 7
         card_width = 196 if many_scenarios else 224
         for index, scenario in enumerate(self._scenarios):
+            # Process each (index, scenario) from enumerate(_scenarios).
             selected = index == self._selected_index
             card = ctk.CTkFrame(
                 self.inner,
@@ -185,13 +194,16 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self.after_idle(self._sync_scrollregion)
 
     def _sync_scrollregion(self, _event=None) -> None:
+        """Synchronize scrollregion."""
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _resize_window(self, event) -> None:
+        """Internal helper for resize window."""
         self.canvas.itemconfigure(self.canvas_window, height=event.height)
 
 
 def _truncate(value: str, limit: int) -> str:
+    """Internal helper for truncate."""
     text = str(value or "").strip()
     if len(text) <= limit:
         return text
@@ -199,6 +211,7 @@ def _truncate(value: str, limit: int) -> str:
 
 
 def _truncate_middle(value: str, limit: int) -> str:
+    """Internal helper for truncate middle."""
     text = str(value or "").strip()
     if len(text) <= limit:
         return text

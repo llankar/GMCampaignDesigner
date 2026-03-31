@@ -1,3 +1,5 @@
+"""Validation helpers for scenes scene entity."""
+
 from __future__ import annotations
 
 import difflib
@@ -71,6 +73,7 @@ def validate_and_fix_scene_entity_links(
     )
 
     if any(final_unknown.values()):
+        # Handle the branch where any(final_unknown.values()).
         entity_creations = _append_placeholders_for_unknown(
             entity_creations=entity_creations,
             unknown_by_type=final_unknown,
@@ -78,6 +81,7 @@ def validate_and_fix_scene_entity_links(
         )
         # Make sure scenario-level links include newly auto-created entities.
         for entity_type, names in final_unknown.items():
+            # Process each (entity_type, names) from final_unknown.items().
             if not names:
                 continue
             _extend_unique(fixed_links[entity_type], names)
@@ -93,9 +97,11 @@ def _collect_unknown_entities(
     entity_creations: dict[str, list[dict[str, Any]]],
     existing_entities: dict[str, set[str]],
 ) -> dict[str, list[str]]:
+    """Collect unknown entities."""
     unknown: dict[str, list[str]] = {entity_type: [] for entity_type in SCENE_ENTITY_TYPES}
 
     for entity_type in SCENE_ENTITY_TYPES:
+        # Process each entity_type from SCENE_ENTITY_TYPES.
         known_existing = existing_entities.get(entity_type, set())
         known_created = {
             str(item.get("Name") or "").strip().casefold()
@@ -105,6 +111,7 @@ def _collect_unknown_entities(
 
         merged_values = list(links.get(entity_type) or []) + list(scene_entities.get(entity_type) or [])
         for value in merged_values:
+            # Process each value from merged_values.
             cleaned = str(value or "").strip()
             if not cleaned:
                 continue
@@ -122,12 +129,15 @@ def _resolve_with_similarity(
     unknown_by_type: dict[str, list[str]],
     existing_entities: dict[str, set[str]],
 ) -> dict[str, str]:
+    """Resolve with similarity."""
     mapping: dict[str, str] = {}
     for entity_type, unknown_values in unknown_by_type.items():
+        # Process each (entity_type, unknown_values) from unknown_by_type.items().
         existing_names = sorted(existing_entities.get(entity_type) or set())
         if not existing_names:
             continue
         for value in unknown_values:
+            # Process each value from unknown_values.
             match = difflib.get_close_matches(value.casefold(), existing_names, n=1, cutoff=0.88)
             if not match:
                 continue
@@ -142,6 +152,7 @@ def _resolve_with_ai(
     unknown_by_type: dict[str, list[str]],
     existing_entities: dict[str, set[str]],
 ) -> dict[str, str]:
+    """Resolve with AI."""
     if ai_client is None:
         return {}
 
@@ -190,11 +201,13 @@ def _resolve_with_ai(
 
     mapping: dict[str, str] = {}
     for entity_type in SCENE_ENTITY_TYPES:
+        # Process each entity_type from SCENE_ENTITY_TYPES.
         entries = resolved.get(entity_type)
         if not isinstance(entries, list):
             continue
         allowed = existing_entities.get(entity_type) or set()
         for entry in entries:
+            # Process each entry from entries.
             if not isinstance(entry, dict):
                 continue
             source = str(entry.get("source") or "").strip()
@@ -209,6 +222,7 @@ def _resolve_with_ai(
 
 
 def _parse_json_object(raw: Any) -> dict[str, Any]:
+    """Parse JSON object."""
     text = str(raw or "").strip()
     if not text:
         raise SceneEntityValidationError("AI returned empty scene entity resolution response")
@@ -234,9 +248,11 @@ def _append_placeholders_for_unknown(
     unknown_by_type: dict[str, list[str]],
     title: str,
 ) -> dict[str, list[dict[str, Any]]]:
+    """Append placeholders for unknown."""
     created = {entity_type: list(entity_creations.get(entity_type) or []) for entity_type in SCENE_ENTITY_TYPES}
 
     for entity_type, names in unknown_by_type.items():
+        # Process each (entity_type, names) from unknown_by_type.items().
         if not names:
             continue
         existing = {
@@ -245,6 +261,7 @@ def _append_placeholders_for_unknown(
             if str(item.get("Name") or "").strip()
         }
         for name in names:
+            # Process each name from names.
             key = name.casefold()
             if key in existing:
                 continue
@@ -255,6 +272,7 @@ def _append_placeholders_for_unknown(
 
 
 def _build_placeholder(entity_type: str, name: str, title: str) -> dict[str, Any]:
+    """Build placeholder."""
     note = f"Auto-created by Scene Validator from scenario '{title}'."
     if entity_type == "villains":
         return {
@@ -295,6 +313,7 @@ def _apply_rename_mapping(
     scene_entities: dict[str, list[str]],
     mapping: dict[str, str],
 ) -> None:
+    """Apply rename mapping."""
     if not mapping:
         return
 
@@ -304,8 +323,10 @@ def _apply_rename_mapping(
 
 
 def _replace_values(values: list[str], mapping: dict[str, str]) -> list[str]:
+    """Internal helper for replace values."""
     replaced: list[str] = []
     for value in values:
+        # Process each value from values.
         target = mapping.get(value, value)
         if target.casefold() in {existing.casefold() for existing in replaced}:
             continue
@@ -314,6 +335,7 @@ def _replace_values(values: list[str], mapping: dict[str, str]) -> list[str]:
 
 
 def _restore_original_case(target: str, existing_values: list[str]) -> str:
+    """Restore original case."""
     for value in existing_values:
         if value.casefold() == target.casefold():
             return value
@@ -321,8 +343,10 @@ def _restore_original_case(target: str, existing_values: list[str]) -> str:
 
 
 def _extend_unique(target: list[str], values: list[str]) -> None:
+    """Internal helper for extend unique."""
     seen = {name.casefold() for name in target}
     for value in values:
+        # Process each value from values.
         if value.casefold() in seen:
             continue
         target.append(value)

@@ -1,3 +1,5 @@
+"""Utilities for automation entity generator."""
+
 import sqlite3
 from typing import Dict, List, Any
 
@@ -18,10 +20,12 @@ log_module_import(__name__)
 
 class EntityAutoGenerator:
     def __init__(self, *, db_path: str | None = None):
+        """Initialize the EntityAutoGenerator instance."""
         self._db_path = db_path
         self._ai = LocalAIClient()
 
     def generate(self, entity_slug: str, count: int, user_prompt: str) -> List[Dict[str, Any]]:
+        """Handle generate."""
         prompt = build_entity_prompt(entity_slug, count, user_prompt, db_path=self._db_path)
         response = self._ai.chat(
             [
@@ -40,6 +44,7 @@ class EntityAutoGenerator:
         user_prompt: str,
         parent_context: str,
     ) -> List[Dict[str, Any]]:
+        """Handle generate with names."""
         if not names:
             return []
         prompt = build_linked_entities_prompt(
@@ -60,6 +65,7 @@ class EntityAutoGenerator:
         return items
 
     def save(self, entity_slug: str, items: List[Dict[str, Any]]) -> None:
+        """Save the operation."""
         self._ensure_schema(entity_slug)
         wrapper = GenericModelWrapper(entity_slug, db_path=self._db_path)
         for item in items:
@@ -70,6 +76,7 @@ class EntityAutoGenerator:
         )
 
     def generate_story_arc(self, scenario_count: int, user_prompt: str) -> Dict[str, Any]:
+        """Handle generate story arc."""
         prompt = build_story_arc_prompt(scenario_count, user_prompt, db_path=self._db_path)
         response = self._ai.chat(
             [
@@ -80,6 +87,7 @@ class EntityAutoGenerator:
         return parse_story_arc_json(response)
 
     def save_story_arc(self, arc: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Save story arc."""
         scenarios = arc.get("Scenarios", [])
         if not isinstance(scenarios, list):
             return []
@@ -88,6 +96,7 @@ class EntityAutoGenerator:
         saved_items: List[Dict[str, Any]] = []
 
         for scenario in scenarios:
+            # Process each scenario from scenarios.
             if not isinstance(scenario, dict):
                 continue
             title = str(scenario.get("Title", "")).strip()
@@ -139,6 +148,7 @@ class EntityAutoGenerator:
         *,
         expected_names: List[str] | None = None,
     ) -> List[Dict[str, Any]]:
+        """Normalize payload."""
         items: List[Dict[str, Any]] = []
         if isinstance(payload, dict):
             items = [payload]
@@ -158,12 +168,15 @@ class EntityAutoGenerator:
         normalized = []
         name_source = expected_names or []
         if name_source:
+            # Continue with this path when name source is set.
             items_by_name = {}
             for item in items:
+                # Process each item from items.
                 key = item.get(key_field)
                 if isinstance(key, str):
                     items_by_name[key] = item
             for idx, name in enumerate(name_source, start=1):
+                # Process each (idx, name) from enumerate(name_source, start=1).
                 item = items_by_name.get(name, {})
                 filled = self._fill_fields(item, typed_fields)
                 if not filled.get(key_field):
@@ -172,6 +185,7 @@ class EntityAutoGenerator:
             return normalized
 
         for idx, item in enumerate(items, start=1):
+            # Process each (idx, item) from enumerate(items, start=1).
             filled = self._fill_fields(item, typed_fields)
             if not filled.get(key_field):
                 filled[key_field] = f"{entity_slug.capitalize()} {idx}"
@@ -179,6 +193,7 @@ class EntityAutoGenerator:
         return normalized
 
     def _fill_fields(self, item: Dict[str, Any], typed_fields: Dict[str, str]) -> Dict[str, Any]:
+        """Internal helper for fill fields."""
         filled: Dict[str, Any] = {}
         for name, field_type in typed_fields.items():
             if name in item:
@@ -188,11 +203,13 @@ class EntityAutoGenerator:
         return filled
 
     def _infer_key_field(self, entity_slug: str) -> str:
+        """Internal helper for infer key field."""
         if entity_slug in {"scenarios", "books"}:
             return "Title"
         return "Name"
 
     def _ensure_schema(self, entity_slug: str) -> None:
+        """Ensure schema."""
         if not self._db_path:
             return
         schema = load_schema_from_json(entity_slug)
@@ -203,6 +220,7 @@ class EntityAutoGenerator:
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
         try:
+            # Keep schema resilient if this step fails.
             cursor.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
                 (entity_slug,),

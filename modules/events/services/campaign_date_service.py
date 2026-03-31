@@ -1,3 +1,5 @@
+"""Utilities for event campaign date service."""
+
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -14,11 +16,13 @@ class CampaignDateService:
 
     @classmethod
     def get_today(cls) -> date:
+        """Return today."""
         stored = get_campaign_setting(_CAMPAIGN_DATE_KEY)
         return cls.parse(stored) or date.today()
 
     @classmethod
     def set_today(cls, value: date | str) -> date:
+        """Set today."""
         parsed = cls.parse(value)
         if parsed is None:
             raise ValueError("value must be a valid date")
@@ -27,6 +31,7 @@ class CampaignDateService:
 
     @staticmethod
     def parse(value: Any) -> date | None:
+        """Parse the operation."""
         if isinstance(value, date):
             return value
         if value in (None, ""):

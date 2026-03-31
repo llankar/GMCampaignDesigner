@@ -1,3 +1,5 @@
+"""Controller for whiteboard."""
+
 import io
 import math
 import os
@@ -36,6 +38,7 @@ log_module_import(__name__)
 
 class WhiteboardController:
     def __init__(self, parent, *, root_app=None):
+        """Initialize the WhiteboardController instance."""
         self.parent = parent
         self._root_app = root_app
         self._ui_dispatch_lock = threading.Lock()
@@ -134,7 +137,9 @@ class WhiteboardController:
         done = threading.Event()
 
         def _runner():
+            """Internal helper for runner."""
             try:
+                # Keep runner resilient if this step fails.
                 result["value"] = func()
             except Exception as exc:  # noqa: BLE001
                 result["error"] = exc
@@ -143,6 +148,7 @@ class WhiteboardController:
 
         with self._ui_dispatch_lock:
             try:
+                # Keep dispatch to UI thread resilient if this step fails.
                 self.parent.after(0, _runner)
             except Exception:
                 # If "after" is unavailable, execute immediately to avoid deadlock
@@ -160,6 +166,7 @@ class WhiteboardController:
     # View Helpers
     # ------------------------------------------------------------------
     def _refresh_viewport(self):
+        """Refresh viewport."""
         if not getattr(self, "canvas", None):
             return
         try:
@@ -183,14 +190,17 @@ class WhiteboardController:
         )
 
     def _board_to_screen(self, x: float, y: float) -> Tuple[float, float]:
+        """Internal helper for board to screen."""
         px, py = self._view_pan
         return px + x * self.view_zoom, py + y * self.view_zoom
 
     def _screen_to_board(self, x: float, y: float) -> Tuple[float, float]:
+        """Internal helper for screen to board."""
         px, py = self._view_pan
         return (x - px) / self.view_zoom, (y - py) / self.view_zoom
 
     def _set_zoom(self, value: float):
+        """Set zoom."""
         clamped = max(self._min_zoom, min(self._max_zoom, float(value)))
         if math.isclose(clamped, self.view_zoom, rel_tol=1e-3):
             return
@@ -201,17 +211,20 @@ class WhiteboardController:
         self._update_web_display_whiteboard()
 
     def _update_view_pan(self):
+        """Update view pan."""
         base_x, base_y = self._base_pan
         off_x, off_y = self._view_pan_offset
         self._view_pan = (base_x + off_x, base_y + off_y)
 
     def _set_view_pan_offset(self, offset: Tuple[float, float]):
+        """Set view pan offset."""
         self._view_pan_offset = offset
         self._update_view_pan()
         self._redraw_canvas()
         self._update_player_view()
 
     def _compute_base_pan(self, canvas_width: int, canvas_height: int) -> Tuple[float, float]:
+        """Internal helper for compute base pan."""
         content_width = float(self.board_size[0]) * float(self.view_zoom)
         content_height = float(self.board_size[1]) * float(self.view_zoom)
         return (
@@ -220,6 +233,7 @@ class WhiteboardController:
         )
 
     def _get_canvas_size(self) -> Tuple[int, int]:
+        """Return canvas size."""
         if getattr(self, "canvas", None):
             try:
                 return max(1, int(self.canvas.winfo_width())), max(1, int(self.canvas.winfo_height()))
@@ -228,9 +242,11 @@ class WhiteboardController:
         return max(1, int(self.board_size[0])), max(1, int(self.board_size[1]))
 
     def _current_view_origin(self) -> Tuple[float, float]:
+        """Internal helper for current view origin."""
         return self._screen_to_board(0, 0)
 
     def _view_board_size(self) -> Tuple[int, int]:
+        """Internal helper for view board size."""
         canvas_width, canvas_height = self._get_canvas_size()
         return (
             max(1, int(canvas_width / max(0.05, self.view_zoom))),
@@ -238,10 +254,12 @@ class WhiteboardController:
         )
 
     def _translate_item_for_view(self, item: Dict, origin: Tuple[float, float]) -> Dict:
+        """Internal helper for translate item for view."""
         origin_x, origin_y = origin
         translated = dict(item)
         item_type = item.get("type")
         if item_type == "stroke":
+            # Handle the branch where item_type == 'stroke'.
             points = item.get("points") or []
             translated["points"] = [(x - origin_x, y - origin_y) for x, y in points]
         elif item_type in ("text", "stamp", "image"):
@@ -253,7 +271,9 @@ class WhiteboardController:
     # UI Construction
     # ------------------------------------------------------------------
     def _resolve_ctk_color(self, value):
+        """Resolve ctk color."""
         if isinstance(value, (tuple, list)):
+            # Handle the branch where isinstance(value, (tuple, list)).
             colors = list(value)
             if not colors:
                 return None
@@ -261,7 +281,9 @@ class WhiteboardController:
             secondary = colors[1] if len(colors) > 1 else primary
             return secondary if ctk.get_appearance_mode() == "Dark" else primary
         if isinstance(value, str):
+            # Handle the branch where isinstance(value, str).
             if " " in value:
+                # Handle the branch where ' ' is in value.
                 parts = value.split()
                 if len(parts) >= 2:
                     return parts[1] if ctk.get_appearance_mode() == "Dark" else parts[0]
@@ -272,6 +294,7 @@ class WhiteboardController:
             return None
 
     def _build_ui(self):
+        """Build UI."""
         toolbar_container = ctk.CTkFrame(self.parent)
         toolbar_container.pack(fill="x", side="top", padx=6, pady=(2, 4))
 
@@ -288,9 +311,11 @@ class WhiteboardController:
         toolbar_canvas.create_window((0, 0), window=toolbar, anchor="nw")
 
         def _update_scroll_region(_event=None):
+            """Update scroll region."""
             bbox = toolbar_canvas.bbox("all")
             toolbar_canvas.configure(scrollregion=bbox)
             if not bbox:
+                # Handle the branch where bbox is unavailable.
                 if scrollbar.winfo_ismapped():
                     scrollbar.pack_forget()
                 return
@@ -303,6 +328,7 @@ class WhiteboardController:
                 scrollbar.pack_forget()
 
         def _sync_canvas_width(event):
+            """Synchronize canvas width."""
             toolbar_canvas.configure(width=event.width)
             _update_scroll_region()
 
@@ -327,6 +353,7 @@ class WhiteboardController:
         self.canvas.bind("<Configure>", self._on_canvas_resize)
 
         def _resize_canvas(_event=None):
+            """Internal helper for resize canvas."""
             toolbar_height = self._toolbar_container.winfo_height()
             try:
                 parent_width = int(self.parent.winfo_width())
@@ -341,6 +368,7 @@ class WhiteboardController:
         _resize_canvas()
 
     def _build_toolbar(self, toolbar: ctk.CTkFrame):
+        """Build toolbar."""
         tool_label = ctk.CTkLabel(toolbar, text="Tool")
         tool_label.pack(side="left", padx=(0, 4))
         tool_menu = ctk.CTkOptionMenu(
@@ -503,6 +531,7 @@ class WhiteboardController:
         self._update_tool_controls()
 
     def _build_toggle_menu(self, toolbar: ctk.CTkFrame):
+        """Build toggle menu."""
         menu_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         menu_frame.pack(side="left", padx=(0, 6))
         ctk.CTkLabel(menu_frame, text="Visibility/Grid").pack(side="left", padx=(0, 4))
@@ -517,6 +546,7 @@ class WhiteboardController:
         self._toggle_menu = toggle_menu
 
     def _build_save_controls(self, toolbar: ctk.CTkFrame):
+        """Build save controls."""
         scenario_frame = ctk.CTkFrame(toolbar, fg_color="transparent")
         scenario_frame.pack(side="left", padx=(0, 6))
         ctk.CTkLabel(scenario_frame, text="Scenario").pack(side="left", padx=(0, 4))
@@ -544,6 +574,7 @@ class WhiteboardController:
    
 
     def _handle_save_action(self, selection: str):
+        """Internal helper for handle save action."""
         if selection == "Save now":
             self._persist_state(update_only=False)
         elif selection == "Restore last save":
@@ -557,13 +588,16 @@ class WhiteboardController:
 
     
     def _on_scenario_change(self, selection: str):
+        """Handle scenario change."""
         scenario = selection or "Unassigned"
         self._scenario_var.set(scenario)
         state, saved_at = self._load_state_for_scenario(scenario)
         self._apply_loaded_state(state, saved_at)
 
     def _load_scenarios(self) -> List[str]:
+        """Load scenarios."""
         try:
+            # Keep scenarios resilient if this step fails.
             titles = [
                 str(item.get("Title")).strip()
                 for item in GenericModelWrapper("scenarios").load_items()
@@ -575,6 +609,7 @@ class WhiteboardController:
             return ["Unassigned"]
 
     def _load_state_for_scenario(self, scenario_title: str) -> tuple[WhiteboardState, Optional[str]]:
+        """Load state for scenario."""
         state, saved_at = self._repository.load_latest_state(scenario_title)
         if state:
             return state, saved_at
@@ -582,6 +617,7 @@ class WhiteboardController:
         return fallback, None
 
     def _apply_loaded_state(self, state: WhiteboardState, saved_at: Optional[str]):
+        """Apply loaded state."""
         self.state = state
         self.whiteboard_items = list(state.items)
         self.board_size = (int(self.state.size[0]), int(self.state.size[1]))
@@ -601,10 +637,12 @@ class WhiteboardController:
         self._update_web_display_whiteboard()
 
     def _restore_latest_snapshot(self):
+        """Restore latest snapshot."""
         state, saved_at = self._load_state_for_scenario(self._scenario_var.get())
         self._apply_loaded_state(state, saved_at)
 
     def _open_history_dialog(self):
+        """Open history dialog."""
         scenario = self._scenario_var.get()
         entries = self._repository.list_history(scenario, limit=20)
         dialog = ctk.CTkToplevel(self.parent)
@@ -621,6 +659,7 @@ class WhiteboardController:
         list_frame.pack(padx=12, pady=(0, 12), fill="both", expand=True)
 
         for entry in entries:
+            # Process each entry from entries.
             try:
                 ts = datetime.fromisoformat(entry.saved_at.replace("Z", "+00:00"))
                 label = ts.strftime("%Y-%m-%d %H:%M:%S")
@@ -634,6 +673,7 @@ class WhiteboardController:
             btn.pack(fill="x", padx=6, pady=4)
 
     def _restore_snapshot(self, snapshot_id: int, dialog: Optional[ctk.CTkToplevel] = None):
+        """Restore snapshot."""
         state = self._repository.load_snapshot(snapshot_id)
         if not state:
             log_warning("Snapshot missing", func_name="WhiteboardController._restore_snapshot")
@@ -646,6 +686,7 @@ class WhiteboardController:
                 pass
 
     def _toggle_menu_values(self):
+        """Toggle menu values."""
         return [
             self._format_toggle_option("Shared visible", self.show_shared_layer),
             self._format_toggle_option("GM visible", self.show_gm_layer),
@@ -654,9 +695,11 @@ class WhiteboardController:
         ]
 
     def _format_toggle_option(self, label: str, enabled: bool) -> str:
+        """Format toggle option."""
         return f"☑ {label}" if enabled else f"☐ {label}"
 
     def _handle_toggle_menu_selection(self, selection: str):
+        """Internal helper for handle toggle menu selection."""
         label = selection[2:].strip() if selection.startswith(("☑", "☐")) else selection
         handlers = {
             "Shared visible": lambda: self._on_toggle_shared_layer(not self.show_shared_layer),
@@ -670,6 +713,7 @@ class WhiteboardController:
         self._refresh_toggle_menu()
 
     def _refresh_toggle_menu(self):
+        """Refresh toggle menu."""
         toggle_menu = getattr(self, "_toggle_menu", None)
         if not toggle_menu:
             return
@@ -681,13 +725,16 @@ class WhiteboardController:
             pass
 
     def _on_remote_toggle(self):
+        """Handle remote toggle."""
         enabled = bool(self._remote_toggle_var.get())
         self.remote_access_guard.set_enabled(enabled)
         self._ensure_web_display_running()
         self._persist_state(update_only=False)
 
     def _local_ip_address(self) -> str:
+        """Internal helper for local ip address."""
         try:
+            # Keep local ip address resilient if this step fails.
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
                 probe.connect(("8.8.8.8", 80))
                 return probe.getsockname()[0]
@@ -698,6 +745,7 @@ class WhiteboardController:
                 return "127.0.0.1"
 
     def _resolve_public_host(self) -> str:
+        """Resolve public host."""
         raw_host = str(ConfigHelper.get("WhiteboardServer", "public_host", fallback="") or "").strip()
         cleaned_host = raw_host.split("://", 1)[-1].split("/", 1)[0]
 
@@ -709,6 +757,7 @@ class WhiteboardController:
 
         if cleaned_host:
             try:
+                # Keep public host resilient if this step fails.
                 resolved = socket.gethostbyname(cleaned_host)
                 if resolved:
                     return resolved
@@ -718,6 +767,7 @@ class WhiteboardController:
         return self._local_ip_address()
 
     def _build_share_url(self) -> str:
+        """Build share URL."""
         configured_port = ConfigHelper.get("WhiteboardServer", "port", fallback="") or getattr(self, "_whiteboard_port", None)
         port = str(configured_port or "").strip()
         host = self._resolve_public_host()
@@ -729,7 +779,9 @@ class WhiteboardController:
         return f"{base}/{query}"
 
     def _build_qr_image(self, url: str) -> ctk.CTkImage | None:
+        """Build qr image."""
         try:
+            # Keep qr image resilient if this step fails.
             import qrcode
             from qrcode.image.pil import PilImage
 
@@ -742,11 +794,13 @@ class WhiteboardController:
             return None
 
     def _open_share_dialog(self):
+        """Open share dialog."""
         self._ensure_web_display_running()
         dialog = ctk.CTkToplevel(self.parent)
         dialog.title("Share Whiteboard")
         dialog.geometry("580x460")
         try:
+            # Keep share dialog resilient if this step fails.
             dialog.transient(self.parent)
             dialog.lift()
             dialog.focus_force()
@@ -767,6 +821,7 @@ class WhiteboardController:
         entry.pack(padx=10, pady=(0, 6))
 
         def _copy_url():
+            """Copy URL."""
             try:
                 dialog.clipboard_clear()
                 dialog.clipboard_append(entry.get())
@@ -788,6 +843,7 @@ class WhiteboardController:
     # Event Handling
     # ------------------------------------------------------------------
     def _update_tool_controls(self):
+        """Update tool controls."""
         frames = getattr(self, "_tool_frames", {})
         active = frames.get(self.tool)
         for frame in frames.values():
@@ -802,12 +858,15 @@ class WhiteboardController:
                 pass
 
     def _on_tool_change(self, selection: str):
+        """Handle tool change."""
         self.tool = selection.lower()
         self._update_tool_controls()
 
     def _on_pick_color(self):
+        """Handle pick color."""
         result = colorchooser.askcolor(color=self.ink_color)
         if result and result[1]:
+            # Handle the branch where result is set and result[1].
             self.ink_color = result[1]
             try:
                 self._color_button.configure(fg_color=self.ink_color, hover_color=self.ink_color)
@@ -815,6 +874,7 @@ class WhiteboardController:
                 pass
 
     def _on_select_stamp_asset(self):
+        """Handle select stamp asset."""
         selection = filedialog.askopenfilename(
             title="Choose Stamp Image",
             filetypes=[
@@ -826,29 +886,34 @@ class WhiteboardController:
             self.stamp_asset = selection
             
     def _on_width_change(self, value):
+        """Handle width change."""
         try:
             self.stroke_width = max(1, float(value))
         except Exception:
             self.stroke_width = 4
 
     def _on_eraser_change(self, value):
+        """Handle eraser change."""
         try:
             self.eraser_radius = max(2, float(value))
         except Exception:
             self.eraser_radius = 10
 
     def _on_text_size_change(self, value: str):
+        """Handle text size change."""
         try:
             self.text_size = int(value)
         except Exception:
             self.text_size = 24
 
     def _on_layer_change(self, selection: str):
+        """Handle layer change."""
         self.active_layer = WhiteboardLayer.GM.value if selection.lower().startswith("gm") else WhiteboardLayer.SHARED.value
         self.state.active_layer = self.active_layer
         self._persist_state(update_only=True)
 
     def _on_toggle_shared_layer(self, value=None):
+        """Handle toggle shared layer."""
         if value is None:
             value = not self.show_shared_layer
         self.show_shared_layer = bool(value)
@@ -857,6 +922,7 @@ class WhiteboardController:
         self._persist_state(update_only=True)
 
     def _on_toggle_gm_layer(self, value=None):
+        """Handle toggle GM layer."""
         if value is None:
             value = not self.show_gm_layer
         self.show_gm_layer = bool(value)
@@ -865,6 +931,7 @@ class WhiteboardController:
         self._persist_state(update_only=True)
 
     def _on_toggle_grid(self, value=None):
+        """Handle toggle grid."""
         if value is None:
             value = not self.grid_enabled
         self.grid_enabled = bool(value)
@@ -873,6 +940,7 @@ class WhiteboardController:
         self._persist_state(update_only=True)
 
     def _on_grid_size_change(self, value):
+        """Handle grid size change."""
         try:
             self.grid_size = max(10, int(float(value)))
         except Exception:
@@ -881,6 +949,7 @@ class WhiteboardController:
         self._persist_state(update_only=True)
 
     def _on_toggle_snap(self, value=None):
+        """Handle toggle snap."""
         if value is None:
             value = not self.snap_to_grid
         self.snap_to_grid = bool(value)
@@ -889,12 +958,14 @@ class WhiteboardController:
         self._persist_state(update_only=True)
 
     def _on_stamp_size_change(self, value):
+        """Handle stamp size change."""
         try:
             self.stamp_size = max(16, int(float(value)))
         except Exception:
             self.stamp_size = 64
 
     def _on_canvas_resize(self, event):
+        """Handle canvas resize."""
         new_size: Tuple[int, int] = (max(1, int(event.width)), max(1, int(event.height)))
         self._refresh_viewport()
         if new_size != self.board_size:
@@ -904,6 +975,7 @@ class WhiteboardController:
             self._redraw_canvas()
 
     def _on_mouse_wheel(self, event):
+        """Handle mouse wheel."""
         delta = 0
         if hasattr(event, "delta") and event.delta:
             delta = event.delta
@@ -917,11 +989,13 @@ class WhiteboardController:
         self._set_zoom(self.view_zoom * step)
 
     def _on_middle_mouse_down(self, event):
+        """Handle middle mouse down."""
         self._panning_active = True
         self._pan_start = (event.x, event.y)
         self._pan_origin_offset = self._view_pan_offset
 
     def _on_middle_mouse_move(self, event):
+        """Handle middle mouse move."""
         if not self._panning_active:
             return
         dx = event.x - self._pan_start[0]
@@ -930,15 +1004,19 @@ class WhiteboardController:
         self._set_view_pan_offset(new_offset)
 
     def _on_middle_mouse_up(self, _event):
+        """Handle middle mouse up."""
         self._panning_active = False
 
     def _on_mouse_down(self, event):
+        """Handle mouse down."""
         board_x, board_y = self._screen_to_board(event.x, event.y)
         if self.tool == "pen":
+            # Handle the branch where tool == 'pen'.
             snapped = self._snap_point(board_x, board_y) if self.snap_to_grid else (board_x, board_y)
             self._active_points = [snapped]
             self._clear_preview()
         elif self.tool == "text":
+            # Handle the branch where tool == 'text'.
             hit = self._find_text_item_at(board_x, board_y)
             if hit:
                 self._history.checkpoint(self.whiteboard_items)
@@ -946,6 +1024,7 @@ class WhiteboardController:
             else:
                 self._create_text_at(board_x, board_y)
         elif self.tool == "stamp":
+            # Handle the branch where tool == 'stamp'.
             hit = self._find_stamp_item_at(board_x, board_y)
             if hit:
                 self._history.checkpoint(self.whiteboard_items)
@@ -953,14 +1032,17 @@ class WhiteboardController:
             else:
                 self._add_stamp_at(board_x, board_y)
         elif self.tool == "eraser":
+            # Handle the branch where tool == 'eraser'.
             self._eraser_active = True
             if self._erase_at(board_x, board_y):
                 self._eraser_dirty = True
                 self._eraser_recorded = True
 
     def _on_mouse_move(self, event):
+        """Handle mouse move."""
         board_x, board_y = self._screen_to_board(event.x, event.y)
         if self.tool == "pen" and self._active_points:
+            # Continue with this path when tool == 'pen' and active points is set.
             last = self._active_points[-1]
             target_point = self._snap_point(board_x, board_y) if self.snap_to_grid else (board_x, board_y)
             dx = target_point[0] - last[0]
@@ -977,15 +1059,18 @@ class WhiteboardController:
                 self._eraser_dirty = True
 
     def _on_mouse_up(self, _event):
+        """Handle mouse up."""
         if self.tool == "pen" and self._active_points:
             self._finalize_stroke()
         elif self.tool == "eraser":
+            # Handle the branch where tool == 'eraser'.
             if self._eraser_dirty:
                 self._persist_state()
             self._eraser_active = False
             self._eraser_dirty = False
             self._eraser_recorded = False
         elif self.tool == "text" and self._dragging_text_item:
+            # Continue with this path when tool == 'text' and dragging text item is set.
             self._persist_state()
             self._dragging_text_item = None
             self._dragging_text_offset = (0.0, 0.0)
@@ -995,6 +1080,7 @@ class WhiteboardController:
             self._dragging_stamp_offset = (0.0, 0.0)
 
     def _on_double_click(self, event):
+        """Handle double click."""
         if self.tool != "text":
             return
         board_x, board_y = self._screen_to_board(event.x, event.y)
@@ -1014,6 +1100,7 @@ class WhiteboardController:
     # Drawing Helpers
     # ------------------------------------------------------------------
     def _update_preview(self):
+        """Update preview."""
         if len(self._active_points) < 2:
             return
         flattened = []
@@ -1022,6 +1109,7 @@ class WhiteboardController:
             flattened.extend([sx, sy])
         width = max(1.0, float(self.stroke_width) * float(self.view_zoom))
         if self._preview_id and self.canvas.type(self._preview_id):
+            # Handle the branch where preview ID is set and canvas.type(_preview_id).
             self.canvas.coords(self._preview_id, *flattened)
             self.canvas.itemconfig(
                 self._preview_id,
@@ -1042,6 +1130,7 @@ class WhiteboardController:
             )
 
     def _clear_preview(self):
+        """Clear preview."""
         if self._preview_id:
             try:
                 self.canvas.delete(self._preview_id)
@@ -1050,6 +1139,7 @@ class WhiteboardController:
         self._preview_id = None
 
     def _finalize_stroke(self):
+        """Internal helper for finalize stroke."""
         points = self._simplify_polyline(self._active_points)
         self._active_points = []
         self._clear_preview()
@@ -1067,10 +1157,12 @@ class WhiteboardController:
         self._persist_state()
 
     def _simplify_polyline(self, points: List[Tuple[float, float]], tolerance: float = 1.5):
+        """Internal helper for simplify polyline."""
         if len(points) < 3:
             return list(points)
 
         def _distance(p1, p2):
+            """Internal helper for distance."""
             return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
         simplified = [points[0]]
@@ -1081,9 +1173,11 @@ class WhiteboardController:
         return simplified
 
     def _parse_image_size(self, size) -> Tuple[float, float]:
+        """Parse image size."""
         width = None
         height = None
         if isinstance(size, dict):
+            # Handle the branch where isinstance(size, dict).
             width = size.get("width")
             height = size.get("height")
         elif isinstance(size, (list, tuple)) and len(size) >= 2:
@@ -1100,7 +1194,9 @@ class WhiteboardController:
     # Remote Submissions
     # ------------------------------------------------------------------
     def handle_remote_stroke(self, *, points, color: str, width: float):
+        """Handle handle remote stroke."""
         def _apply():
+            """Apply the operation."""
             clean_points: List[Tuple[float, float]] = []
             for point in points:
                 try:
@@ -1125,7 +1221,9 @@ class WhiteboardController:
         self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_text(self, *, text: str, position, color: str, size: float):
+        """Handle handle remote text."""
         def _apply():
+            """Apply the operation."""
             if not isinstance(position, (list, tuple)) or len(position) != 2:
                 raise ValueError("Position must include x and y")
             pos = (float(position[0]), float(position[1]))
@@ -1145,7 +1243,9 @@ class WhiteboardController:
         self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_image(self, *, asset_key: str, position, size) -> str:
+        """Handle handle remote image."""
         def _apply():
+            """Apply the operation."""
             if not asset_key:
                 raise ValueError("Image asset is required")
 
@@ -1175,7 +1275,9 @@ class WhiteboardController:
         return cast(str, self._dispatch_to_ui_thread(_apply))
 
     def handle_remote_image_resize(self, *, image_id: str, size) -> None:
+        """Handle handle remote image resize."""
         def _apply():
+            """Apply the operation."""
             if not image_id:
                 raise ValueError("Image id is required")
 
@@ -1193,7 +1295,9 @@ class WhiteboardController:
         self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_image_move(self, *, image_id: str, position) -> None:
+        """Handle handle remote image move."""
         def _apply():
+            """Apply the operation."""
             if not image_id:
                 raise ValueError("Image id is required")
 
@@ -1213,13 +1317,16 @@ class WhiteboardController:
         self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_image_delete(self, *, image_id: str) -> None:
+        """Handle handle remote image delete."""
         def _apply():
+            """Apply the operation."""
             if not image_id:
                 raise ValueError("Image id is required")
 
             remaining = []
             removed = False
             for item in self.whiteboard_items:
+                # Process each item from whiteboard_items.
                 if item.get("type") == "image" and item.get("image_id") == image_id:
                     removed = True
                     continue
@@ -1235,7 +1342,9 @@ class WhiteboardController:
         self._dispatch_to_ui_thread(_apply)
 
     def handle_remote_undo(self):
+        """Handle handle remote undo."""
         def _apply():
+            """Apply the operation."""
             restored, changed = self._history.undo(self.whiteboard_items)
             if changed:
                 self.whiteboard_items = restored
@@ -1244,6 +1353,7 @@ class WhiteboardController:
         self._dispatch_to_ui_thread(_apply)
 
     def _create_text_at(self, x: float, y: float):
+        """Create text at."""
         text = prompt_for_text(self.canvas, title="Add Text", prompt="Enter text:")
         if text is None:
             return
@@ -1262,6 +1372,7 @@ class WhiteboardController:
         self._persist_state()
 
     def _add_stamp_at(self, x: float, y: float):
+        """Internal helper for add stamp at."""
         if not self.stamp_asset:
             return
         self._history.checkpoint(self.whiteboard_items)
@@ -1277,7 +1388,9 @@ class WhiteboardController:
         self._persist_state()
 
     def _find_stamp_item_at(self, x: float, y: float):
+        """Find stamp item at."""
         for item in reversed(self.whiteboard_items):
+            # Process each item from reversed(whiteboard_items).
             if item.get("type") != "stamp":
                 continue
             layer = normalize_layer(item.get("layer"))
@@ -1292,7 +1405,9 @@ class WhiteboardController:
         return None
 
     def _find_text_item_at(self, x: float, y: float, *, radius: float = 6.0):
+        """Find text item at."""
         for item in reversed(self.whiteboard_items):
+            # Process each item from reversed(whiteboard_items).
             if item.get("type") != "text":
                 continue
             screen_point = self._board_to_screen(x, y)
@@ -1301,11 +1416,13 @@ class WhiteboardController:
         return None
 
     def _start_stamp_drag(self, item: Dict, x: float, y: float):
+        """Start stamp drag."""
         position = item.get("position", (0.0, 0.0))
         self._dragging_stamp_item = item
         self._dragging_stamp_offset = (x - position[0], y - position[1])
 
     def _update_stamp_drag(self, x: float, y: float):
+        """Update stamp drag."""
         item = self._dragging_stamp_item
         if not item:
             return
@@ -1317,6 +1434,7 @@ class WhiteboardController:
         self._apply_stamp_update(item)
 
     def _apply_stamp_update(self, item: Dict):
+        """Apply stamp update."""
         canvas_ids = item.get("canvas_ids") or ()
         if canvas_ids:
             try:
@@ -1327,11 +1445,13 @@ class WhiteboardController:
                 pass
 
     def _start_text_drag(self, item: Dict, x: float, y: float):
+        """Start text drag."""
         position = item.get("position", (0.0, 0.0))
         self._dragging_text_item = item
         self._dragging_text_offset = (x - position[0], y - position[1])
 
     def _update_text_drag(self, x: float, y: float):
+        """Update text drag."""
         item = self._dragging_text_item
         if not item:
             return
@@ -1343,9 +1463,11 @@ class WhiteboardController:
         self._apply_text_update(item)
 
     def _apply_text_update(self, item: Dict):
+        """Apply text update."""
         canvas_ids = item.get("canvas_ids") or ()
         if canvas_ids:
             try:
+                # Keep text update resilient if this step fails.
                 position = item.get("position", (0, 0))
                 screen_pos = self._board_to_screen(*position)
                 font_size = int(item.get("size", self.text_size))
@@ -1362,11 +1484,14 @@ class WhiteboardController:
                 pass
 
     def _iter_visible_items(self, *, for_player: bool = False) -> Iterable[Dict]:
+        """Internal helper for iter visible items."""
         for item in self.whiteboard_items:
+            # Process each item from whiteboard_items.
             layer = normalize_layer(item.get("layer"))
             if for_player and layer == WhiteboardLayer.GM.value:
                 continue
             if not for_player:
+                # Handle the branch where for player is unavailable.
                 if layer == WhiteboardLayer.SHARED.value and not self.show_shared_layer:
                     continue
                 if layer == WhiteboardLayer.GM.value and not self.show_gm_layer:
@@ -1374,6 +1499,7 @@ class WhiteboardController:
             yield item
 
     def _erase_at(self, x: float, y: float) -> bool:
+        """Internal helper for erase at."""
         changed = False
         remaining = []
         point = (x, y)
@@ -1381,6 +1507,7 @@ class WhiteboardController:
         radius = float(self.eraser_radius)
         radius_screen = radius * self.view_zoom
         for item in self.whiteboard_items:
+            # Process each item from whiteboard_items.
             layer = normalize_layer(item.get("layer"))
             if layer == WhiteboardLayer.SHARED.value and not self.show_shared_layer:
                 remaining.append(item)
@@ -1398,12 +1525,14 @@ class WhiteboardController:
                     changed = True
                     continue
             elif item_type == "stamp":
+                # Handle the branch where item_type == 'stamp'.
                 pos = item.get("position") or (0, 0)
                 size = float(item.get("size", self.stamp_size))
                 if abs(pos[0] - x) <= radius + size / 2 and abs(pos[1] - y) <= radius + size / 2:
                     changed = True
                     continue
             elif item_type == "image":
+                # Handle the branch where item_type == 'image'.
                 pos = item.get("position") or (0.0, 0.0)
                 size = item.get("size") or {}
                 width = float(size.get("width", 0) or 0)
@@ -1415,6 +1544,7 @@ class WhiteboardController:
                     continue
             remaining.append(item)
         if changed:
+            # Continue with this path when changed is set.
             if not self._eraser_recorded:
                 self._history.checkpoint(self.whiteboard_items)
                 self._eraser_recorded = True
@@ -1423,6 +1553,7 @@ class WhiteboardController:
         return changed
 
     def _polyline_hits_point(self, points: List[Tuple[float, float]], target: Tuple[float, float], radius: float) -> bool:
+        """Internal helper for polyline hits point."""
         if len(points) < 2:
             return False
         for start, end in zip(points, points[1:]):
@@ -1431,6 +1562,7 @@ class WhiteboardController:
         return False
 
     def _point_to_segment_distance(self, point, start, end):
+        """Internal helper for point to segment distance."""
         px, py = point
         x1, y1 = start
         x2, y2 = end
@@ -1445,6 +1577,7 @@ class WhiteboardController:
         return math.hypot(px - proj_x, py - proj_y)
 
     def _snap_point(self, x: float, y: float) -> Tuple[float, float]:
+        """Internal helper for snap point."""
         grid = max(1, int(self.grid_size))
         snapped_x = round(x / grid) * grid
         snapped_y = round(y / grid) * grid
@@ -1454,6 +1587,7 @@ class WhiteboardController:
     # Persistence and Rendering
     # ------------------------------------------------------------------
     def _persist_state(self, update_only: bool = False):
+        """Persist state."""
         self._sync_state_from_session()
         if update_only:
             self._schedule_save()
@@ -1463,6 +1597,7 @@ class WhiteboardController:
         self._update_web_display_whiteboard()
 
     def _sync_state_from_session(self):
+        """Synchronize state from session."""
         self.state.items = list(self.whiteboard_items)
         self.state.size = (int(self.board_size[0]), int(self.board_size[1]))
         self.state.grid_enabled = self.grid_enabled
@@ -1475,6 +1610,7 @@ class WhiteboardController:
         self.state.remote_edit_enabled = bool(getattr(self, "remote_access_guard", None) and self.remote_access_guard.enabled)
 
     def _schedule_save(self):
+        """Schedule save."""
         if self._pending_save_job:
             try:
                 self.parent.after_cancel(self._pending_save_job)
@@ -1486,6 +1622,7 @@ class WhiteboardController:
             self._perform_save()
 
     def _perform_save(self):
+        """Internal helper for perform save."""
         self._pending_save_job = None
         try:
             _, saved_at = self._repository.save_snapshot(self._scenario_var.get(), self.state)
@@ -1494,18 +1631,21 @@ class WhiteboardController:
             return
 
     def _undo_action(self):
+        """Internal helper for undo action."""
         restored, changed = self._history.undo(self.whiteboard_items)
         if changed:
             self.whiteboard_items = restored
             self._persist_state()
 
     def _redo_action(self):
+        """Internal helper for redo action."""
         restored, changed = self._history.redo(self.whiteboard_items)
         if changed:
             self.whiteboard_items = restored
             self._persist_state()
 
     def _redraw_canvas(self):
+        """Internal helper for redraw canvas."""
         self._refresh_viewport()
         self.canvas.delete("all")
         if self.grid_enabled:
@@ -1521,6 +1661,7 @@ class WhiteboardController:
             )
         for item in self._iter_visible_items():
             if item.get("type") == "stroke":
+                # Handle the branch where item.get('type') == 'stroke'.
                 points = item.get("points") or []
                 if len(points) < 2:
                     continue
@@ -1539,6 +1680,7 @@ class WhiteboardController:
                 )
                 item["canvas_ids"] = (line_id,)
             elif item.get("type") == "text":
+                # Handle the branch where item.get('type') == 'text'.
                 pos = item.get("position") or (0, 0)
                 size = int(item.get("size", self.text_size))
                 item["text_size"] = size
@@ -1554,6 +1696,7 @@ class WhiteboardController:
                 )
                 item["canvas_ids"] = (text_id,)
             elif item.get("type") == "stamp":
+                # Handle the branch where item.get('type') == 'stamp'.
                 asset_path = item.get("asset")
                 if not asset_path:
                     continue
@@ -1561,6 +1704,7 @@ class WhiteboardController:
                 size = int(item.get("size", self.stamp_size))
                 scaled_size = max(1, int(size * self.view_zoom))
                 try:
+                    # Keep redraw canvas resilient if this step fails.
                     photo = load_tk_asset(asset_path, scaled_size)
                     screen_pos = self._board_to_screen(*pos)
                     stamp_id = self.canvas.create_image(screen_pos[0], screen_pos[1], image=photo, anchor="nw")
@@ -1569,6 +1713,7 @@ class WhiteboardController:
                 except Exception:
                     continue
             elif item.get("type") == "image":
+                # Handle the branch where item.get('type') == 'image'.
                 asset_key = item.get("asset")
                 if not asset_key:
                     continue
@@ -1611,6 +1756,7 @@ class WhiteboardController:
         zoom: float | None = None,
         text_scale: float = 1.0,
     ):
+        """Render whiteboard image."""
         viewport_size = viewport_size or self._view_board_size()
         origin = origin if origin is not None else self._current_view_origin()
         zoom_value = self.view_zoom if zoom is None else float(zoom)
@@ -1632,7 +1778,9 @@ class WhiteboardController:
         )
 
     def get_web_text_scale(self) -> float:
+        """Return web text scale."""
         try:
+            # Keep web text scale resilient if this step fails.
             configured_scale = ConfigHelper.get("WhiteboardServer", "web_text_scale", fallback=None)
             if configured_scale is not None:
                 return max(0.1, float(configured_scale))
@@ -1641,12 +1789,14 @@ class WhiteboardController:
         return 1.0
 
     def _web_content_bounds(self) -> Tuple[float, float, float, float]:
+        """Internal helper for web content bounds."""
         min_x = 0.0
         min_y = 0.0
         max_x = float(getattr(self, "board_size", (1920, 1080))[0])
         max_y = float(getattr(self, "board_size", (1920, 1080))[1])
 
         for item in self.whiteboard_items:
+            # Process each item from whiteboard_items.
             item_type = item.get("type")
             if item_type == "stroke":
                 for x, y in item.get("points", ()):  # type: ignore[arg-type]
@@ -1665,6 +1815,7 @@ class WhiteboardController:
         return min_x, min_y, max_x, max_y
 
     def _web_render_geometry(self) -> Tuple[Tuple[int, int], Tuple[float, float], float]:
+        """Internal helper for web render geometry."""
         padding = 256.0
         min_x, min_y, max_x, max_y = self._web_content_bounds()
         origin = (min_x - padding, min_y - padding)
@@ -1682,6 +1833,7 @@ class WhiteboardController:
         return viewport_size, origin, zoom_value
 
     def render_web_whiteboard_image(self):
+        """Render web whiteboard image."""
         viewport_size, origin, zoom_value = self._web_render_geometry()
         return self._render_whiteboard_image(
             for_player=True,
@@ -1692,6 +1844,7 @@ class WhiteboardController:
         )
 
     def _update_web_display_whiteboard(self):
+        """Update web display whiteboard."""
         if not getattr(self, "_whiteboard_web_thread", None):
             self._update_player_view()
             return
@@ -1700,6 +1853,7 @@ class WhiteboardController:
             return
         buffer = io.BytesIO()
         try:
+            # Keep web display whiteboard resilient if this step fails.
             img.save(buffer, format="PNG")
             self._whiteboard_image_bytes = buffer.getvalue()
         finally:
@@ -1707,6 +1861,7 @@ class WhiteboardController:
         self._update_player_view()
 
     def _ensure_web_display_running(self):
+        """Ensure web display running."""
         if getattr(self, "_whiteboard_web_thread", None):
             return
         try:
@@ -1715,6 +1870,7 @@ class WhiteboardController:
             log_warning("Unable to start whiteboard web display", func_name="WhiteboardController._ensure_web_display_running")
 
     def clear_board(self):
+        """Clear board."""
         if not self.whiteboard_items:
             return
         self._history.checkpoint(self.whiteboard_items)
@@ -1726,6 +1882,7 @@ class WhiteboardController:
     # Player View management
     # ------------------------------------------------------------------
     def open_player_view(self):
+        """Open player view."""
         monitors = get_monitors()
         if not monitors:
             log_warning("No monitors available for whiteboard player view", func_name="WhiteboardController.open_player_view")
@@ -1754,9 +1911,11 @@ class WhiteboardController:
         self._player_view_photo = None
 
         def _on_resize(_event=None):
+            """Handle resize."""
             self._update_player_view()
 
         def _on_close():
+            """Handle close."""
             self.close_player_view()
 
         win.bind("<Configure>", _on_resize)
@@ -1766,10 +1925,12 @@ class WhiteboardController:
         self._update_player_view()
 
     def close_player_view(self):
+        """Close player view."""
         close_whiteboard_display(self)
         window = getattr(self, "_player_view_window", None)
         if window is not None:
             try:
+                # Keep player view resilient if this step fails.
                 if window.winfo_exists():
                     window.destroy()
             except Exception:
@@ -1780,6 +1941,7 @@ class WhiteboardController:
         self._player_view_photo = None
 
     def _update_player_view(self):
+        """Update player view."""
         if threading.current_thread() is not threading.main_thread():
             return self._dispatch_to_ui_thread(self._update_player_view)
 
@@ -1821,6 +1983,7 @@ class WhiteboardController:
         # Render text using canvas primitives to mirror map second-screen behavior
         canvas.delete("player_text")
         for item in self._iter_visible_items(for_player=True):
+            # Process each item from _iter_visible_items(for_player=True).
             if item.get("type") != "text":
                 continue
             pos = item.get("position") or (0, 0)
@@ -1841,7 +2004,9 @@ class WhiteboardController:
             )
 
     def close(self):
+        """Close the operation."""
         if self._pending_save_job:
+            # Continue with this path when pending save job is set.
             try:
                 self.parent.after_cancel(self._pending_save_job)
             except Exception:

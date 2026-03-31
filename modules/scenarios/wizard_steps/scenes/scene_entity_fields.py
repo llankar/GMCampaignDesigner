@@ -1,7 +1,10 @@
+"""Field helpers for scenes scene entity."""
+
 SCENE_ENTITY_FIELDS = ("NPCs", "Creatures", "Bases", "Places", "Maps")
 
 
 def normalise_entity_list(value):
+    """Handle normalise entity list."""
     if value is None:
         return []
     if isinstance(value, str):
@@ -14,6 +17,7 @@ def normalise_entity_list(value):
     seen = set()
     deduped = []
     for item in values:
+        # Process each item from values.
         key = item.casefold()
         if key in seen:
             continue

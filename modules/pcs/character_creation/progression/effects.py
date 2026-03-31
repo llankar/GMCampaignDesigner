@@ -15,6 +15,7 @@ class AdvancementEffects:
 
 
 def _extract_matching_skills(raw_details: str) -> list[str]:
+    """Extract matching skills."""
     if not raw_details:
         return []
 
@@ -22,6 +23,7 @@ def _extract_matching_skills(raw_details: str) -> list[str]:
     separators = [",", ";", "/", "|", "+"]
     tokens = [raw_details]
     for separator in separators:
+        # Process each separator from separators.
         split_tokens: list[str] = []
         for token in tokens:
             split_tokens.extend(token.split(separator))
@@ -29,6 +31,7 @@ def _extract_matching_skills(raw_details: str) -> list[str]:
 
     resolved: list[str] = []
     for token in tokens:
+        # Process each token from tokens.
         skill = normalized_lookup.get(token.strip().lower())
         if skill:
             resolved.append(skill)
@@ -41,12 +44,14 @@ def apply_advancement_effects(
     advancement_choices: list[dict],
     is_superhero: bool,
 ) -> AdvancementEffects:
+    """Apply advancement effects."""
     effective_skill_points = dict(base_skill_points)
     superficial_health_bonus = 0
     extra_assets: list[str] = []
     favorite_set = set(favorites)
 
     for choice in advancement_choices:
+        # Process each choice from advancement_choices.
         choice_type = (choice or {}).get("type", "").strip()
         details = (choice or {}).get("details", "").strip()
 
@@ -64,12 +69,14 @@ def apply_advancement_effects(
                 effective_skill_points[skill] = max(effective_skill_points.get(skill, 0), 1)
 
         elif choice_type == "skill_improvement":
+            # Handle the branch where choice_type == 'skill_improvement'.
             selected_skills = _extract_matching_skills(details)
             if not selected_skills:
                 continue
 
             selected_favorites = [skill for skill in selected_skills if skill in favorite_set]
             if len(selected_favorites) >= 2:
+                # Handle the branch where len(selected_favorites) >= 2.
                 for skill in selected_favorites[:2]:
                     effective_skill_points[skill] = effective_skill_points.get(skill, 0) + 1
                 continue

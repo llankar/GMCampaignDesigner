@@ -1,3 +1,5 @@
+"""Utilities for handouts newsletter AI."""
+
 import json
 
 from modules.ai.local_ai_client import LocalAIClient
@@ -9,7 +11,9 @@ log_module_import(__name__)
 
 
 def _coerce_payload(payload, language, style):
+    """Coerce payload."""
     if isinstance(payload, dict):
+        # Handle the branch where isinstance(payload, dict).
         scenario_title = payload.get("scenario_title")
         if scenario_title:
             sections = payload.get("sections")
@@ -25,6 +29,7 @@ def _coerce_payload(payload, language, style):
             )
         return payload
     if isinstance(payload, (list, tuple)):
+        # Handle the branch where isinstance(payload, (list, tuple)).
         if not payload:
             return {}
         scenario_title = payload[0]
@@ -38,22 +43,27 @@ def _coerce_payload(payload, language, style):
 
 
 def _render_plain_newsletter(payload, language, style):
+    """Render plain newsletter."""
     return render_plain_newsletter(payload)
 
 
 def _extract_base_text(payload):
+    """Extract base text."""
     if not isinstance(payload, dict):
         return ""
     for key, items in payload.items():
+        # Process each (key, items) from payload.items().
         if str(key).strip().lower() not in BASE_KEYS:
             continue
         if isinstance(items, dict):
             text = items.get("Text") or items.get("Description") or items.get("Summary")
             return str(text).strip() if text else ""
         if isinstance(items, (list, tuple)):
+            # Handle the branch where isinstance(items, (list, tuple)).
             parts = []
             for item in items:
                 if isinstance(item, dict):
+                    # Handle the branch where isinstance(item, dict).
                     text = item.get("Text") or item.get("Description") or item.get("Summary")
                     if text:
                         parts.append(str(text).strip())
@@ -66,6 +76,7 @@ def _extract_base_text(payload):
 
 
 def generate_newsletter_ai(payload, language, style):
+    """Handle generate newsletter AI."""
     resolved_payload = _coerce_payload(payload, language, style)
     fallback_render = _render_plain_newsletter(resolved_payload, language, style)
 
@@ -98,6 +109,7 @@ def generate_newsletter_ai(payload, language, style):
 
     log_info("Generating AI newsletter", func_name="generate_newsletter_ai")
     try:
+        # Keep generate newsletter AI resilient if this step fails.
         client = LocalAIClient()
         response = client.chat([
             {"role": "system", "content": "Write clear, spoiler-free RPG newsletters."},

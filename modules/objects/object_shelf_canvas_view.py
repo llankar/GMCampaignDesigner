@@ -58,6 +58,7 @@ class ObjectShelfView:
     """Canvas‑based shelves with background image."""
 
     def __init__(self, host, allowed_categories: Sequence[str]):
+        """Initialize the ObjectShelfView instance."""
         self.host = host
         self.allowed_categories = list(allowed_categories)
 
@@ -147,6 +148,7 @@ class ObjectShelfView:
 
         html_text = None
         if isinstance(raw_desc, dict):
+            # Handle the branch where isinstance(raw_desc, dict).
             plain_text = (format_multiline_text(raw_desc) or "").strip()
             if plain_text and HTMLLabel is not None:
                 try:
@@ -158,6 +160,7 @@ class ObjectShelfView:
         return plain_text, html_text
 
     def _is_description_widget(self, widget) -> bool:
+        """Return whether description widget."""
         return widget in {
             self._detail_desc,
             self._detail_html_label,
@@ -167,21 +170,26 @@ class ObjectShelfView:
 
     # ----- Public API ----------------------------------------------------
     def is_available(self) -> bool:
+        """Return whether available."""
         return getattr(self.host.model_wrapper, "entity_type", None) == "objects"
 
     def is_visible(self) -> bool:
+        """Return whether visible."""
         return bool(self.frame.winfo_manager())
 
     def show(self, before_widget):
+        """Show the operation."""
         self.frame.pack(fill="both", expand=True, padx=5, pady=5, before=before_widget)
 
     def hide(self):
+        """Hide the operation."""
         self.frame.pack_forget()
         self.stop_visibility_monitor()
         # Optional: stop listening when hidden
         # (kept active to reflect theme changes when shown again)
 
     def populate(self):
+        """Handle populate."""
         if not self.is_available():
             return
         self._rows = self._build_rows()
@@ -190,10 +198,12 @@ class ObjectShelfView:
         self.update_summary()
 
     def refresh_selection(self):
+        """Refresh selection."""
         # No per‑item selection in this canvas view; no‑op for compatibility
         return
 
     def update_summary(self):
+        """Update summary."""
         total = len(getattr(self.host, "filtered_items", []) or [])
         filters = []
         query = self._current_search_query()
@@ -207,6 +217,7 @@ class ObjectShelfView:
         )
 
     def _build_search_bar(self):
+        """Build search bar."""
         var = getattr(self.host, "search_var", None)
         if var is None:
             return
@@ -235,6 +246,7 @@ class ObjectShelfView:
         self.search_button.pack(side="left", padx=(0, 12), pady=6)
 
     def _trigger_search(self, event=None):
+        """Internal helper for trigger search."""
         var = getattr(self.host, "search_var", None)
         if var is None or not hasattr(self.host, "filter_items"):
             return "break" if event is not None else None
@@ -242,6 +254,7 @@ class ObjectShelfView:
         return "break" if event is not None else None
 
     def _current_search_query(self) -> str:
+        """Internal helper for current search query."""
         var = getattr(self.host, "search_var", None)
         if var is None:
             return ""
@@ -251,6 +264,7 @@ class ObjectShelfView:
             return ""
 
     def _expand_rows_for_search(self):
+        """Internal helper for expand rows for search."""
         q = self._current_search_query()
         if not q:
             return
@@ -259,11 +273,13 @@ class ObjectShelfView:
                 row.expanded = True
 
     def start_visibility_monitor(self):
+        """Start visibility monitor."""
         # Keep background and panels sized properly during idle
         self.stop_visibility_monitor()
         self._visibility_job = self.host.after(250, self._on_visibility_tick)
 
     def stop_visibility_monitor(self):
+        """Stop visibility monitor."""
         job = getattr(self, "_visibility_job", None)
         if job is not None:
             try:
@@ -274,6 +290,7 @@ class ObjectShelfView:
 
     # ----- Internals -----------------------------------------------------
     def _load_background(self):
+        """Load background."""
         assets_dir = Path(__file__).resolve().parents[2] / "assets"
         theme = get_theme()
         filename = "objects_shelves_background.jpg"
@@ -283,7 +300,9 @@ class ObjectShelfView:
             filename = "objects_shelves_background_sf.png"
         image_path = assets_dir / filename
         if image_path.exists():
+            # Handle the branch where image_path.exists().
             try:
+                # Keep background resilient if this step fails.
                 with Image.open(image_path) as img:
                     self._bg_source = img.convert("RGBA")
             except Exception:
@@ -292,6 +311,7 @@ class ObjectShelfView:
             # Fall back to default if themed image missing
             fallback = assets_dir / "objects_shelves_background.jpg"
             try:
+                # Keep background resilient if this step fails.
                 if fallback.exists():
                     with Image.open(fallback) as img:
                         self._bg_source = img.convert("RGBA")
@@ -304,6 +324,7 @@ class ObjectShelfView:
             pass
 
     def _on_theme_changed(self):
+        """Handle theme changed."""
         # Invalidate cached background and reload per theme
         self._bg_source = None
         self._bg_photo = None
@@ -311,18 +332,21 @@ class ObjectShelfView:
         self._load_background()
 
     def _on_visibility_tick(self):
+        """Handle visibility tick."""
         # Redraw if needed and keep monitoring while visible
         if self.is_visible():
             self._request_redraw()
             self._visibility_job = self.host.after(500, self._on_visibility_tick)
 
     def _on_mousewheel(self, event):
+        """Handle mousewheel."""
         if getattr(self.host, "view_mode", "") != "shelf":
             return
         delta = -1 * (event.delta if event.delta else 0)
         self.canvas.yview_scroll(int(delta / 120), "units")
 
     def _on_detail_mousewheel(self, event):
+        """Handle detail mousewheel."""
         # Scroll only the detail area's own scrollable canvas (fixed or legacy)
         candidates = []
         fb = getattr(self, "_fixed_body", None)
@@ -333,10 +357,12 @@ class ObjectShelfView:
             candidates.append(db)
         candidates.append(getattr(event, "widget", None))
         for c in candidates:
+            # Process each c from candidates.
             if c is None:
                 continue
             inner_canvas = getattr(c, "_parent_canvas", None)
             if inner_canvas is not None:
+                # Handle the branch where inner canvas is available.
                 delta = -1 * (event.delta if getattr(event, "delta", 0) else 0)
                 try:
                     inner_canvas.yview_scroll(int(delta / 120), "units")
@@ -393,6 +419,7 @@ class ObjectShelfView:
 
         panel = getattr(self, "_detail_panel", None)
         if panel and panel.winfo_exists():
+            # Handle the branch where panel is set and panel.winfo_exists().
             total = header_h + header_pad + desired + body_pad_bottom
             total = min(max_panel_height, max(total, header_h + header_pad + body_pad_bottom))
             try:
@@ -401,9 +428,11 @@ class ObjectShelfView:
                 pass
 
     def _on_canvas_configure(self, _event):
+        """Handle canvas configure."""
         self._request_redraw()
 
     def _request_redraw(self):
+        """Internal helper for request redraw."""
         if self._pending_redraw is not None:
             return
         try:
@@ -412,6 +441,7 @@ class ObjectShelfView:
             self._redraw()
 
     def _redraw(self):
+        """Internal helper for redraw."""
         self._pending_redraw = None
         w = max(self.canvas.winfo_width(), 1)
         h = max(self.canvas.winfo_height(), 1)
@@ -432,6 +462,7 @@ class ObjectShelfView:
 
         # Draw rows
         for row in self._rows:
+            # Process each row from _rows.
             row.y1 = y
             row.y2 = y + shelf_h
             self._draw_shelf_row(0, row.y1, w, row.y2, row)
@@ -439,6 +470,7 @@ class ObjectShelfView:
             # Expanded content
             self.canvas.delete(f"items:{row.category_key}")
             if row.expanded:
+                # Continue with this path when expanded is set.
                 content_h = self._measure_items_height(w - 2 * margin_x, row)
                 row.content_y1 = y
                 row.content_y2 = y + content_h
@@ -460,6 +492,7 @@ class ObjectShelfView:
         self.canvas.configure(scrollregion=(0, 0, w, total_h))
 
     def _ensure_background(self, w: int, h: int):
+        """Ensure background."""
         # Scale/crop background to fill the canvas
         if not self._bg_source:
             # fallback to a solid rect so drawing order stays stable
@@ -486,6 +519,7 @@ class ObjectShelfView:
         self.canvas.tag_lower("bg")
 
     def _draw_shelf_row(self, x1: int, y1: int, x2: int, y2: int, row: _ShelfRow):
+        """Internal helper for draw shelf row."""
         width = max(1, x2 - x1)
         height = max(1, y2 - y1)
         # Guard against very small widths during early geometry phases
@@ -493,6 +527,7 @@ class ObjectShelfView:
         panel_h = max(1, height)
         # Draw wood-like shelf plank (fast cached image) and label, then return
         try:
+            # Keep draw shelf row resilient if this step fails.
             shelf_img = self._get_shelf_image(panel_w, panel_h)
             self.canvas.create_image(
                 x1 + 16, y1, image=shelf_img, anchor="nw", tags=("shelf", f"row:{row.category_key}")
@@ -532,6 +567,7 @@ class ObjectShelfView:
         )
 
     def _get_panel_image(self, width: int, height: int, radius: int = 12) -> ImageTk.PhotoImage:
+        """Return panel image."""
         key = (width, height)
         cached = self._panel_cache.get(key)
         if cached is not None:
@@ -581,6 +617,7 @@ class ObjectShelfView:
         plank_h = max(16, height // 2)
         y = 3 + plank_h
         while y < height - 3:
+            # Keep looping while y < height - 3.
             draw.line([(6, y), (width - 6, y)], fill=seam_color, width=1)
             y += plank_h
         # Screw heads at corners
@@ -614,6 +651,7 @@ class ObjectShelfView:
         slat_h = max(6, height // 3)
         y = pad
         for _ in range(3):
+            # Process each _ from range(3).
             if y + slat_h > height - pad:
                 break
             draw.rectangle((pad, y, width - pad, y + slat_h), fill=slat_color)
@@ -628,6 +666,7 @@ class ObjectShelfView:
 
     @staticmethod
     def _rounded_rect(draw: ImageDraw.ImageDraw, box, radius, fill=None, outline=None, width: int = 1):
+        """Internal helper for rounded rect."""
         x1, y1, x2, y2 = box
         if radius <= 0:
             draw.rectangle(box, fill=fill, outline=outline, width=width)
@@ -636,10 +675,12 @@ class ObjectShelfView:
         draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
     def _build_rows(self) -> List[_ShelfRow]:
+        """Build rows."""
         # Group filtered items by normalized category
         items = getattr(self.host, "filtered_items", []) or []
         groups: Dict[str, Tuple[str, List[dict]]] = {}
         for item in items:
+            # Process each item from items.
             raw = (
                 item.get("Category")
                 or item.get("category")
@@ -669,6 +710,7 @@ class ObjectShelfView:
 
     @staticmethod
     def _normalize_category_display(value: object) -> str:
+        """Normalize category display."""
         text = str(value or "").strip()
         if not text:
             return "Uncategorized"
@@ -676,12 +718,14 @@ class ObjectShelfView:
 
     # ----- Interaction & item drawing -----------------------------------
     def _find_row_by_y(self, y: int) -> Optional[_ShelfRow]:
+        """Find row by y."""
         for row in self._rows:
             if row.y1 <= y <= row.y2:
                 return row
         return None
 
     def _on_click(self, event):
+        """Handle click."""
         if getattr(self.host, "view_mode", "") != "shelf":
             return
         y = self.canvas.canvasy(event.y)
@@ -696,6 +740,7 @@ class ObjectShelfView:
         self._request_redraw()
 
     def _measure_items_height(self, inner_width: int, row: _ShelfRow) -> int:
+        """Internal helper for measure items height."""
         padding = 16
         tile_h = 36
         min_tile_w = 180
@@ -704,6 +749,7 @@ class ObjectShelfView:
         return padding * 2 + rows * tile_h + (rows - 1) * 6
 
     def _draw_row_items(self, x: int, y: int, right: int, row: _ShelfRow):
+        """Internal helper for draw row items."""
         inner_width = right - x
         padding = 16
         tile_h = 36
@@ -717,6 +763,7 @@ class ObjectShelfView:
         ox = x + padding
         oy = y + padding
         for idx, item in enumerate(row.items):
+            # Process each (idx, item) from enumerate(row.items).
             r, c = divmod(idx, cols)
             iy = oy + r * (tile_h + gap_y)
             ix = ox + c * (col_w + gap_x)
@@ -746,14 +793,17 @@ class ObjectShelfView:
         self.canvas.tag_bind("shelf", "<Button-1>", self._on_item_click)
 
     def _on_item_click(self, event):
+        """Handle item click."""
         # Determine if an item chip was clicked and open its editor
         x = self.canvas.canvasx(event.x)
         y = self.canvas.canvasy(event.y)
         items = self.canvas.find_overlapping(x, y, x, y)
         for item_id in reversed(items):  # topmost first
+            # Process each item_id from reversed(items).
             tags = self.canvas.gettags(item_id)
             for t in tags:
                 if t.startswith("obj:"):
+                    # Handle the branch where t.startswith('obj:').
                     it = self._item_by_tag.get(t)
                     if it is not None:
                         # Use the new fixed-height lower bar with its own scrollbar
@@ -763,6 +813,7 @@ class ObjectShelfView:
 
     # ----- Fixed lower bar (new implementation) -------------------------
     def _ensure_fixed_detail_bar(self):
+        """Ensure fixed detail bar."""
         if self._fixed_panel and self._fixed_panel.winfo_exists():
             return
         panel = ctk.CTkFrame(
@@ -805,10 +856,12 @@ class ObjectShelfView:
         self._fixed_meta = meta
 
     def _hide_fixed_detail_bar(self):
+        """Hide fixed detail bar."""
         if self._fixed_panel and self._fixed_panel.winfo_exists():
             self._fixed_panel.place_forget()
 
     def _show_item_detail_fixed(self, item: dict):
+        """Show item detail fixed."""
         # Build bar if needed and keep constant size; also hide legacy panel
         self._ensure_fixed_detail_bar()
         try:
@@ -837,8 +890,10 @@ class ObjectShelfView:
         self._fixed_html_label = None
         self._fixed_desc = None
         if plain_desc:
+            # Continue with this path when plain desc is set.
             if html_desc and HTMLLabel is not None:
                 try:
+                    # Keep item detail fixed resilient if this step fails.
                     hl = HTMLLabel(
                         self._fixed_body,
                         html=html_desc,
@@ -860,6 +915,7 @@ class ObjectShelfView:
                 )
                 lbl.pack(fill="x", padx=10, pady=(4, 8))
                 def _wrap(_e=None, l=lbl, p=self._fixed_body):
+                    """Internal helper for wrap."""
                     try:
                         l.configure(wraplength=max(100, p.winfo_width() - 40))
                     except Exception:
@@ -890,6 +946,7 @@ class ObjectShelfView:
 
     # ----- Detail panel --------------------------------------------------
     def _ensure_detail_panel(self):
+        """Ensure detail panel."""
         if self._detail_panel and self._detail_panel.winfo_exists():
             return
         panel = ctk.CTkFrame(
@@ -944,6 +1001,7 @@ class ObjectShelfView:
         # Description (HTML if available, else wrapped label that autosizes)
         if HTMLLabel is not None:
             try:
+                # Keep detail panel resilient if this step fails.
                 self._detail_html_label = HTMLLabel(
                     body,
                     html="",
@@ -965,6 +1023,7 @@ class ObjectShelfView:
             self._detail_desc.pack(fill="x", padx=10, pady=(6, 8))
             # Bind wraplength to container width for natural height
             def _resize_wrap(_e=None, lbl=self._detail_desc, parent=body):
+                """Internal helper for resize wrap."""
                 try:
                     wrap = max(100, parent.winfo_width() - 40)
                     lbl.configure(wraplength=wrap)
@@ -978,10 +1037,12 @@ class ObjectShelfView:
         self._detail_panel = panel
 
     def _hide_item_detail(self):
+        """Hide item detail."""
         if self._detail_panel and self._detail_panel.winfo_exists():
             self._detail_panel.place_forget()
 
     def _show_item_detail(self, item: dict):
+        """Show item detail."""
         self._ensure_detail_panel()
         if not self._detail_panel:
             return
@@ -996,6 +1057,7 @@ class ObjectShelfView:
         plain_desc, html_desc = self._extract_description(raw_desc)
 
         def _pack_if_needed(widget, **opts):
+            """Pack if needed."""
             if widget and widget.winfo_manager() != "pack":
                 widget.pack(**opts)
 
@@ -1017,6 +1079,7 @@ class ObjectShelfView:
                 self._detail_desc.pack_forget()
         elif self._detail_desc is not None:
             try:
+                # Keep item detail resilient if this step fails.
                 self._detail_desc.configure(state="normal")
                 self._detail_desc.delete("1.0", "end")
                 if plain_desc:
@@ -1037,6 +1100,7 @@ class ObjectShelfView:
         self._update_detail_body_height()
 
     def _rebuild_stats(self, body: ctk.CTkScrollableFrame, item: dict):
+        """Internal helper for rebuild stats."""
         # Remove any previous stat frames, preserving description widgets when present
         kids = list(body.winfo_children())
         keep_description = bool(kids) and self._is_description_widget(kids[0])
@@ -1046,12 +1110,15 @@ class ObjectShelfView:
         # Optional longtext stats block
         stats_long = item.get("Stats") or item.get("stats") or item.get("Rules") or item.get("rules")
         if stats_long:
+            # Continue with this path when stats long is set.
             stats_block = ctk.CTkFrame(body, fg_color="#1f1f1f", corner_radius=10)
             stats_block.pack(fill="x", padx=10, pady=(0, 6))
             ctk.CTkLabel(stats_block, text="Rules & Stats", font=("Segoe UI", 14, "bold")).pack(anchor="w", padx=10, pady=(6, 4))
             # Render as HTML if available, else plain text
             if isinstance(stats_long, dict) and HTMLLabel is not None:
+                # Handle the branch where isinstance(stats_long, dict) and htmllabel is available.
                 try:
+                    # Keep rebuild stats resilient if this step fails.
                     html_text = rtf_to_html(stats_long)
                     HTMLLabel(stats_block, html=html_text, background="#1f1f1f", foreground="#F0F0F0").pack(
                         fill="x", padx=10, pady=(0, 10)
@@ -1067,6 +1134,7 @@ class ObjectShelfView:
                     )
                     lbl.pack(fill="x", padx=10, pady=(0, 6))
                     def _wrap(_e=None, l=lbl, p=stats_block):
+                        """Internal helper for wrap."""
                         try:
                             l.configure(wraplength=max(100, p.winfo_width() - 40))
                         except Exception:
@@ -1086,6 +1154,7 @@ class ObjectShelfView:
                 )
                 lbl.pack(fill="x", padx=10, pady=(0, 6))
                 def _wrap2(_e=None, l=lbl, p=stats_block):
+                    """Internal helper for wrap2."""
                     try:
                         l.configure(wraplength=max(100, p.winfo_width() - 40))
                     except Exception:
@@ -1103,6 +1172,7 @@ class ObjectShelfView:
         stats_rows = []
         shown = set()
         for key in common_keys:
+            # Process each key from common_keys.
             val = item.get(key)
             if val is None:
                 continue
@@ -1111,11 +1181,13 @@ class ObjectShelfView:
         # Add other small/simple fields
         exclude = {"Name", "name", "Category", "category", "Type", "type", "Description", "description", "Text", "text", "Portrait", "Image", "image"}
         for k, v in item.items():
+            # Process each (k, v) from item.items().
             if k in shown or k in exclude:
                 continue
             if isinstance(v, (int, float)) or (isinstance(v, str) and len(v) <= 40):
                 stats_rows.append((k, v))
         if stats_rows:
+            # Continue with this path when stats rows is set.
             section = ctk.CTkFrame(body, fg_color="#1f1f1f", corner_radius=10)
             section.pack(fill="x", padx=10, pady=(0, 6))
             ctk.CTkLabel(section, text="Stats", font=("Segoe UI", 14, "bold")).pack(
@@ -1128,6 +1200,7 @@ class ObjectShelfView:
 
     @staticmethod
     def _add_stat_row(parent, row: int, key: str, value):
+        """Internal helper for add stat row."""
         k = ctk.CTkLabel(parent, text=str(key), font=("Segoe UI", 12, "bold"))
         v = ctk.CTkLabel(parent, text=str(value), font=("Segoe UI", 12))
         k.grid(row=row, column=0, sticky="w", padx=(10, 8), pady=4)

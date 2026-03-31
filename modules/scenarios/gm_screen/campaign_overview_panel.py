@@ -1,3 +1,5 @@
+"""Panel for GM screen campaign overview."""
+
 from __future__ import annotations
 
 import math
@@ -33,6 +35,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         map_count: int = 0,
         **kwargs,
     ):
+        """Initialize the CampaignOverviewPanel instance."""
         super().__init__(master, **kwargs)
         self.scenario_item = scenario_item or {}
         self.wrappers = wrappers or {}
@@ -60,6 +63,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
             self._on_entity_selected(self._entity_options[0])
 
     def _build_left_column(self, parent: ctk.CTkFrame) -> None:
+        """Build left column."""
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(5, weight=1)
 
@@ -105,6 +109,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         self._populate_linked_entities(quick_links)
 
     def _build_entity_picker(self, parent: ctk.CTkFrame) -> None:
+        """Build entity picker."""
         selector_wrap = ctk.CTkFrame(parent)
         selector_wrap.grid(row=3, column=0, sticky="ew", padx=12, pady=(12, 8))
         selector_wrap.grid_columnconfigure((0, 1), weight=1)
@@ -143,6 +148,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
             ctk.CTkLabel(card, text=label, text_color="gray70").pack(pady=(0, 10))
 
     def _build_right_column(self, parent: ctk.CTkFrame) -> None:
+        """Build right column."""
         parent.grid_columnconfigure(0, weight=1)
         parent.grid_rowconfigure(2, weight=1)
 
@@ -161,6 +167,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         self.details_scroll.grid_columnconfigure(0, weight=1)
 
     def _on_entity_selected(self, selected_option: str) -> None:
+        """Handle entity selected."""
         entry = self._option_to_entity.get(selected_option)
         for child in self.details_scroll.winfo_children():
             child.destroy()
@@ -193,6 +200,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
 
         row = 0
         for field in fields:
+            # Process each field from fields.
             block = ctk.CTkFrame(self.details_scroll, corner_radius=10)
             block.grid(row=row, column=0, sticky="ew", padx=6, pady=5)
             block.grid_columnconfigure(0, weight=1)
@@ -206,6 +214,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
             ).grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 2))
 
             if field["type"] == "list":
+                # Handle the branch where field['type'] == 'list'.
                 values_wrap = ctk.CTkFrame(block, fg_color="transparent")
                 values_wrap.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
                 values_wrap.grid_columnconfigure(0, weight=1)
@@ -230,6 +239,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
             row += 1
 
     def _render_read_only_field(self, parent: ctk.CTkFrame, raw_value: str | None) -> None:
+        """Render read only field."""
         value = raw_value or ""
         if self._should_use_compact_render(value):
             ctk.CTkLabel(
@@ -248,14 +258,17 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         body.configure(state="disabled")
 
     def _should_use_compact_render(self, value: str) -> bool:
+        """Return whether use compact render."""
         return "\n" not in value and len(value) <= self._COMPACT_VALUE_MAX_LENGTH
 
     def _compute_textbox_height(self, value: str) -> int:
+        """Internal helper for compute textbox height."""
         line_count = max(value.count("\n") + 1, math.ceil(len(value) / self._TEXTBOX_WIDTH_CHARS))
         content_height = line_count * self._TEXTBOX_LINE_HEIGHT
         return max(self._TEXTBOX_MIN_HEIGHT, min(self._TEXTBOX_MAX_HEIGHT, content_height))
 
     def _open_selected_entity(self) -> None:
+        """Open selected entity."""
         selected = self.entity_picker_var.get()
         entry = self._option_to_entity.get(selected)
         if not entry:
@@ -263,6 +276,7 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         self.open_entity_callback(entry["entity_type"], entry["name"])
 
     def _collect_counts(self):
+        """Collect counts."""
         linked_total = sum(len(self.scenario_item.get(entity_type) or []) for entity_type in self._linked_types())
         cards = [
             ("Scenes", len(self.scenario_item.get("Scenes") or [])),
@@ -275,13 +289,16 @@ class CampaignOverviewPanel(ctk.CTkFrame):
         return cards
 
     def _linked_types(self) -> list[str]:
+        """Internal helper for linked types."""
         return ["NPCs", "Places", "Clues", "Factions", "Objects", "Creatures", "Villains", "PCs", "Informations", "Books"]
 
     def _populate_linked_entities(self, parent: ctk.CTkScrollableFrame) -> None:
+        """Internal helper for populate linked entities."""
         preferred_order = self._linked_types()
         row = 0
         has_any = False
         for entity_type in preferred_order:
+            # Process each entity_type from preferred_order.
             names = self.scenario_item.get(entity_type) or []
             if not names:
                 continue

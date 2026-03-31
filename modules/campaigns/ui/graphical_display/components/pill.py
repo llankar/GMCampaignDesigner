@@ -1,3 +1,5 @@
+"""Utilities for campaign pill."""
+
 from __future__ import annotations
 
 import customtkinter as ctk
@@ -18,6 +20,7 @@ class OutlinedPill(ctk.CTkFrame):
         pady: int = 4,
         font=None,
     ):
+        """Initialize the OutlinedPill instance."""
         super().__init__(
             parent,
             fg_color=fg_color,

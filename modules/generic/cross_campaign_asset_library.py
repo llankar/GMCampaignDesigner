@@ -41,6 +41,7 @@ from modules.helpers.template_loader import load_entity_definitions, list_known_
 
 class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
     def __init__(self, master):
+        """Initialize the CrossCampaignAssetLibraryWindow instance."""
         super().__init__(master)
         self.title("Cross-campaign Asset Library")
         self.geometry("1200x720")
@@ -69,6 +70,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self):
+        """Build UI."""
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
@@ -105,6 +107,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
 
         for entity_type in self.entity_types:
+            # Process each entity_type from entity_types.
             label = self.entity_definitions.get(entity_type, {}).get("label") or entity_type.replace("_", " ").title()
             tab = self.tabview.add(label)
             tab.grid_rowconfigure(0, weight=1)
@@ -181,6 +184,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # --------------------------------------------------------- Campaign list
     def refresh_campaign_list(self):
+        """Refresh campaign list."""
         for btn in self.campaign_buttons:
             btn.destroy()
         self.campaign_buttons.clear()
@@ -188,6 +192,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.source_campaigns = list_sibling_campaigns(include_current=True)
         active_db_path = self.active_campaign.db_path.resolve() if self.active_campaign else None
         for index, campaign in enumerate(self.source_campaigns):
+            # Process each (index, campaign) from enumerate(source_campaigns).
             label = campaign.name
             if active_db_path and campaign.db_path.resolve() == active_db_path:
                 label = f"{label} (Current)"
@@ -207,6 +212,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             self.clear_entities()
 
     def browse_for_campaign(self):
+        """Handle browse for campaign."""
         directory = filedialog.askdirectory(title="Select Campaign Directory")
         if not directory:
             return
@@ -231,6 +237,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 break
 
     def select_campaign(self, campaign: CampaignDatabase):
+        """Select campaign."""
         self.selected_campaign = campaign
         log_info(
             f"Selected campaign for asset browsing: {campaign.db_path}",
@@ -240,10 +247,12 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # -------------------------------------------------------------- Loading
     def reload_source(self):
+        """Handle reload source."""
         if not self.selected_campaign:
             return
         with self._busy_cursor():
             try:
+                # Keep reload source resilient if this step fails.
                 for entity_type in self.entity_types:
                     self.entity_records[entity_type] = load_entities(entity_type, self.selected_campaign.db_path)
             except Exception as exc:
@@ -260,7 +269,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.populate_lists()
 
     def clear_entities(self):
+        """Clear entities."""
         for entity_type in self.entity_types:
+            # Process each entity_type from entity_types.
             self.entity_records[entity_type] = []
             tree = self.treeviews.get(entity_type)
             if tree:
@@ -268,13 +279,17 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._set_preview(None, None)
 
     def populate_lists(self):
+        """Handle populate lists."""
         for entity_type, tree in self.treeviews.items():
+            # Process each (entity_type, tree) from treeviews.items().
             tree.delete(*tree.get_children())
             records = self.entity_records.get(entity_type, [])
             for idx, record in enumerate(records):
+                # Process each (idx, record) from enumerate(records).
                 name = record.get("Name") or record.get("Title") or "<Unnamed>"
                 summary = None
                 for field in ("Description", "Summary", "Information", "Notes", "Background", "Secret"):
+                    # Process each field while updating populate lists.
                     value = record.get(field)
                     if value:
                         summary = value
@@ -287,6 +302,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # ------------------------------------------------------------- Preview
     def update_preview_from_tree(self, entity_type: str):
+        """Update preview from tree."""
         tree = self.treeviews.get(entity_type)
         if not tree:
             return
@@ -308,7 +324,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._set_preview(entity_type, record[index])
 
     def _set_preview(self, entity_type: str | None, record: dict | None):
+        """Set preview."""
         if not record or not entity_type:
+            # Handle the branch where record is unavailable or entity type is unavailable.
             self.preview_name.configure(text="")
             self.preview_text.configure(state="normal")
             self.preview_text.delete("1.0", END)
@@ -322,6 +340,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         description = ""
         for field in ("Description", "Summary", "Information", "Notes", "Background", "Secret"):
+            # Process each field while updating preview.
             value = record.get(field)
             if value:
                 description = value
@@ -350,9 +369,11 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             image_path = record.get("Image")
 
         if image_path:
+            # Continue with this path when image path is set.
             resolved = self._resolve_asset_path(image_path)
             if resolved and resolved.exists():
                 try:
+                    # Keep preview resilient if this step fails.
                     pil_image = Image.open(resolved)
                     pil_image.thumbnail((360, 360))
                     self._preview_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=pil_image.size)
@@ -378,6 +399,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.preview_image_label.configure(image=image, text=text)
 
     def _resolve_asset_path(self, value: str) -> Path | None:
+        """Resolve asset path."""
         if not value or not self.selected_campaign:
             return None
         normalized = str(value).strip()
@@ -388,6 +410,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # ----------------------------------------------------------- Exporting
     def export_selected(self):
+        """Export selected."""
         if not self.selected_campaign:
             messagebox.showwarning("No Source", "Select a source campaign first.")
             return
@@ -423,6 +446,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
 
         def worker(callback):
+            """Handle worker."""
             return export_bundle(
                 Path(destination),
                 self.selected_campaign,
@@ -433,6 +457,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             )
 
         def detail(manifest: dict) -> str:
+            """Handle detail."""
             lines = [f"Saved to: {manifest.get('archive_path')}"]
             for entity_type, meta in manifest.get("entities", {}).items():
                 lines.append(f"{entity_type.title()}: {meta.get('count', 0)}")
@@ -444,6 +469,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._run_progress_task("Exporting Assets", worker, "Asset bundle created successfully.", detail)
 
     def publish_selected_to_github(self):
+        """Handle publish selected to github."""
         if not self.selected_campaign:
             messagebox.showwarning("No Source", "Select a source campaign first.")
             return
@@ -457,6 +483,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         selections = self._gather_selected_records()
         publishing_full_campaign = False
         if not selections:
+            # Handle the branch where selections is unavailable.
             if not messagebox.askyesno(
                 "Publish Entire Campaign",
                 "No assets are selected.\n\nDo you want to publish the entire campaign database, including all attachments?",
@@ -501,7 +528,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         archive_path = temp_dir / f"{slug}.zip"
 
         def worker(callback):
+            """Handle worker."""
             try:
+                # Keep worker resilient if this step fails.
                 manifest = export_bundle(
                     archive_path,
                     self.selected_campaign,
@@ -521,12 +550,14 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
         def on_success(summary: GalleryBundleSummary):
+            """Handle success."""
             lines = [
                 f"Release: {summary.display_title}",
                 f"Tag: {summary.tag or '—'}",
                 f"Download URL: {summary.download_url}",
             ]
             if summary.entity_counts:
+                # Continue with this path when entity counts is set.
                 lines.append("")
                 lines.append("Entities:")
                 for entity_type, count in sorted(summary.entity_counts.items()):
@@ -541,6 +572,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._run_progress_task("Publishing Bundle", worker, None, None, on_success=on_success)
 
     def copy_selected_to_current_campaign(self):
+        """Copy selected to current campaign."""
         if not self.selected_campaign:
             messagebox.showwarning("No Source", "Select a source campaign first.")
             return
@@ -552,6 +584,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         duplicates = detect_duplicates(selections, self.active_campaign)
         if duplicates:
+            # Continue with this path when duplicates is set.
             details = []
             for entity_type, names in duplicates.items():
                 details.append(f"{entity_type.title()}: {len(names)}")
@@ -568,6 +601,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             overwrite = True
 
         def worker(callback):
+            """Handle worker."""
             return apply_direct_copy(
                 selections,
                 source_campaign=self.selected_campaign,
@@ -577,6 +611,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             )
 
         def detail(summary: dict) -> str:
+            """Handle detail."""
             return (
                 f"Imported: {summary.get('imported', 0)}\n"
                 f"Updated: {summary.get('updated', 0)}\n"
@@ -593,6 +628,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # ------------------------------------------------------------- Importing
     def import_bundle(self):
+        """Import bundle."""
         bundle_path = filedialog.askopenfilename(
             title="Import Asset Bundle",
             filetypes=[("Zip Files", "*.zip"), ("All Files", "*.*")],
@@ -602,6 +638,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._start_import_from_bundle(Path(bundle_path))
 
     def _post_import(self, summary: dict, overwrite: bool):
+        """Internal helper for post import."""
         if hasattr(self.master, "refresh_entities"):
             try:
                 self.master.refresh_entities()
@@ -620,9 +657,11 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         )
 
     def _start_import_from_bundle(self, bundle_path: Path, *, cleanup: Optional[Callable[[], None]] = None):
+        """Start import from bundle."""
         target_campaign = self.active_campaign
 
         def analyze_worker(_callback):
+            """Handle analyze worker."""
             try:
                 return analyze_bundle(bundle_path, target_campaign.db_path)
             except Exception:
@@ -631,8 +670,10 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 raise
 
         def after_analysis(analysis):
+            """Handle after analysis."""
             duplicates = analysis.duplicates
             if duplicates:
+                # Continue with this path when duplicates is set.
                 details = []
                 for entity_type, names in duplicates.items():
                     details.append(f"{entity_type.title()}: {len(names)}")
@@ -643,6 +684,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     f"{detail_text}\n\nSelect Yes to overwrite them, No to skip duplicates, or Cancel to abort.",
                 )
                 if response is None:
+                    # Handle the branch where response is missing.
                     cleanup_analysis(analysis)
                     if cleanup:
                         cleanup()
@@ -652,7 +694,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 overwrite = True
 
             def import_worker(callback):
+                """Import worker."""
                 try:
+                    # Keep worker resilient if this step fails.
                     return apply_import(analysis, target_campaign, overwrite=overwrite, progress_callback=callback)
                 except Exception:
                     cleanup_analysis(analysis)
@@ -661,6 +705,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     raise
 
             def detail(summary: dict) -> str:
+                """Handle detail."""
                 return (
                     f"Imported: {summary.get('imported', 0)}\n"
                     f"Updated: {summary.get('updated', 0)}\n"
@@ -671,7 +716,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 )
 
             def finalize(result):
+                """Handle finalize."""
                 try:
+                    # Keep finalize resilient if this step fails.
                     self._post_import(result, overwrite)
                 finally:
                     cleanup_analysis(analysis)
@@ -689,7 +736,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._run_progress_task("Analyzing Bundle", analyze_worker, None, None, on_success=after_analysis)
 
     def open_online_gallery(self):
+        """Open online gallery."""
         if self._online_dialog and self._online_dialog.winfo_exists():
+            # Handle the branch where online dialog is set and _online_dialog.winfo_exists().
             try:
                 self._online_dialog.lift()
                 self._online_dialog.focus_force()
@@ -700,11 +749,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._online_dialog.update_permissions(self.gallery_client.can_publish)
 
     def _refresh_online_dialog(self):
+        """Refresh online dialog."""
         dialog = self._online_dialog
         if dialog and dialog.winfo_exists():
             dialog.refresh()
 
     def configure_github_token(self):
+        """Handle configure github token."""
         raw_value = (ConfigHelper.get("Gallery", "github_token", fallback="") or "").strip()
         existing_token = decrypt_secret(raw_value)
 
@@ -746,9 +797,11 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._update_publish_button_state()
 
     def _github_token_button_label(self) -> str:
+        """Internal helper for github token button label."""
         return "Set GitHub Token…" if not self.gallery_client.can_publish else "Update GitHub Token…"
 
     def _update_publish_button_state(self):
+        """Update publish button state."""
         state = "normal" if self.gallery_client.can_publish else "disabled"
         try:
             self.publish_btn.configure(state=state)
@@ -761,6 +814,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._update_online_dialog_permissions()
 
     def _update_online_dialog_permissions(self):
+        """Update online dialog permissions."""
         dialog = self._online_dialog
         if dialog and dialog.winfo_exists():
             try:
@@ -769,6 +823,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 pass
 
     def _download_gallery_bundle(self, bundle: GalleryBundleSummary, *, install_full_campaign: bool = False):
+        """Internal helper for download gallery bundle."""
         temp_dir = Path(tempfile.mkdtemp(prefix="gallery_download_"))
         asset_name = bundle.asset_name or (bundle.tag or "bundle")
         asset_name = Path(asset_name).name
@@ -777,6 +832,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         archive_path = temp_dir / asset_name
 
         def worker(callback):
+            """Handle worker."""
             try:
                 return self.gallery_client.download_bundle(bundle, archive_path, progress_callback=callback)
             except Exception:
@@ -784,6 +840,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 raise
 
         def handle_success(path: Path):
+            """Handle handle success."""
             cleanup = lambda: shutil.rmtree(temp_dir, ignore_errors=True)
             if install_full_campaign:
                 self._install_full_campaign_from_archive(bundle, path, cleanup=cleanup)
@@ -799,6 +856,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         *,
         cleanup: Optional[Callable[[], None]] = None,
     ) -> None:
+        """Internal helper for install full campaign from archive."""
         default_name = bundle.source_campaign or bundle.display_title or Path(archive_path).stem
         folder_name = simpledialog.askstring(
             "Install Campaign",
@@ -807,12 +865,14 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             initialvalue=default_name,
         )
         if folder_name is None:
+            # Handle the branch where folder name is missing.
             if cleanup:
                 cleanup()
             return
 
         folder_name = folder_name.strip()
         if not folder_name:
+            # Handle the branch where folder name is unavailable.
             messagebox.showwarning("Invalid Name", "Enter a non-empty folder name for the campaign.")
             if cleanup:
                 cleanup()
@@ -832,14 +892,17 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         target_dir = (parent_dir / folder_name).resolve()
 
         if target_dir.exists():
+            # Handle the branch where target_dir.exists().
             if not messagebox.askyesno(
                 "Replace Campaign",
                 "A campaign with that name already exists.\n\nDo you want to replace it?",
             ):
+                # Handle this branch separately before continuing.
                 if cleanup:
                     cleanup()
                 return
             try:
+                # Keep install full campaign from archive resilient if this step fails.
                 shutil.rmtree(target_dir)
             except Exception as exc:
                 messagebox.showerror(
@@ -851,13 +914,16 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 return
 
         def worker(callback):
+            """Handle worker."""
             try:
+                # Keep worker resilient if this step fails.
                 return install_full_campaign_bundle(archive_path, target_dir, progress_callback=callback)
             finally:
                 if cleanup:
                     cleanup()
 
         def on_success(campaign: CampaignDatabase):
+            """Handle success."""
             messagebox.showinfo(
                 "Campaign Installed",
                 (
@@ -880,10 +946,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         )
 
     def _delete_gallery_bundle(self, bundle: GalleryBundleSummary):
+        """Delete gallery bundle."""
         def worker(callback):
+            """Handle worker."""
             return self.gallery_client.delete_bundle(bundle, progress_callback=callback)
 
         def handle_success(_result):
+            """Handle handle success."""
             messagebox.showinfo(
                 "Bundle Deleted",
                 f"Bundle '{bundle.display_title}' has been removed from GitHub releases.",
@@ -893,6 +962,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._run_progress_task("Deleting Bundle", worker, None, None, on_success=handle_success)
 
     def _post_copy(self, summary: dict):
+        """Internal helper for post copy."""
         if hasattr(self.master, "refresh_entities"):
             try:
                 self.master.refresh_entities()
@@ -908,11 +978,14 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         )
 
     def _gather_selected_records(self) -> Dict[str, List[dict]]:
+        """Internal helper for gather selected records."""
         selections: Dict[str, List[dict]] = {}
         for entity_type, tree in self.treeviews.items():
+            # Process each (entity_type, tree) from treeviews.items().
             records = self.entity_records.get(entity_type, [])
             items: List[dict] = []
             for item_id in tree.selection():
+                # Process each item_id from tree.selection().
                 try:
                     _, index_str = item_id.split(":", 1)
                     index = int(index_str)
@@ -925,6 +998,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         return selections
 
     def _gather_all_records(self) -> Dict[str, List[dict]]:
+        """Internal helper for gather all records."""
         return {
             entity_type: [copy.deepcopy(record) for record in records]
             for entity_type, records in self.entity_records.items()
@@ -933,6 +1007,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # ------------------------------------------------------- Busy handling
     def _run_progress_task(self, title, worker, success_message, detail_builder, on_success=None):
+        """Run progress task."""
         progress_win = ctk.CTkToplevel(self)
         progress_win.title(title)
         progress_win.geometry("420x160")
@@ -948,7 +1023,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         bar.set(0.0)
 
         def update(message: str, fraction: float):
+            """Update the operation."""
             def apply():
+                """Apply the operation."""
                 label.configure(text=message)
                 try:
                     bar.set(max(0.0, min(1.0, float(fraction))))
@@ -958,7 +1035,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             self.after(0, apply)
 
         def close():
+            """Close the operation."""
             if progress_win.winfo_exists():
+                # Handle the branch where progress_win.winfo_exists().
                 try:
                     progress_win.grab_release()
                 except Exception:
@@ -966,6 +1045,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 progress_win.destroy()
 
         def handle_success(result):
+            """Handle handle success."""
             close()
             if on_success:
                 on_success(result)
@@ -976,6 +1056,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 messagebox.showinfo("Success", message)
 
         def handle_error(exc: Exception):
+            """Handle handle error."""
             close()
             details = str(exc).strip()
             if details:
@@ -985,7 +1066,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             messagebox.showerror("Operation Failed", message)
 
         def run():
+            """Run the operation."""
             try:
+                # Keep run resilient if this step fails.
                 result = worker(update)
             except Exception as exc:
                 log_exception(
@@ -1000,11 +1083,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     @contextmanager
     def _busy_cursor(self):
+        """Internal helper for busy cursor."""
         try:
             self.configure(cursor="watch")
         except Exception:
             pass
         try:
+            # Keep busy cursor resilient if this step fails.
             yield
         finally:
             try:
@@ -1015,6 +1100,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
 class OnlineGalleryDialog(ctk.CTkToplevel):
     def __init__(self, master, client: GithubGalleryClient, parent_window: CrossCampaignAssetLibraryWindow):
+        """Initialize the OnlineGalleryDialog instance."""
         super().__init__(master)
         self.client = client
         self.parent_window = parent_window
@@ -1086,12 +1172,14 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
 
     # ----------------------------------------------------------------- Helpers
     def refresh(self):
+        """Refresh the operation."""
         self.status_label.configure(text="Loading bundles…")
         self.tree.delete(*self.tree.get_children())
         self._bundle_map.clear()
         self._show_detail(None)
 
         def worker():
+            """Handle worker."""
             try:
                 bundles = self.client.list_bundles()
             except Exception as exc:
@@ -1102,15 +1190,18 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         threading.Thread(target=worker, daemon=True).start()
 
     def _populate(self, bundles: List[GalleryBundleSummary]):
+        """Internal helper for populate."""
         if bundles:
             self.status_label.configure(text=f"Found {len(bundles)} bundle(s).")
         else:
             self.status_label.configure(text="No bundles available.")
         for bundle in bundles:
+            # Process each bundle from bundles.
             iid = str(bundle.asset_id)
             self._bundle_map[iid] = bundle
             size_text = self._format_size(bundle.size)
             if bundle.published_at:
+                # Continue with this path when published at is set.
                 published = bundle.published_at
                 if published.tzinfo:
                     published = published.astimezone()
@@ -1121,10 +1212,12 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             self.tree.insert("", END, iid=iid, values=(bundle.display_title, size_text, date_text, author_text))
 
     def _handle_error(self, exc: Exception):
+        """Internal helper for handle error."""
         self.status_label.configure(text=f"Failed to load bundles: {exc}")
         messagebox.showerror("Gallery Error", f"Unable to fetch GitHub releases.\n{exc}")
 
     def _on_select(self, _event):
+        """Handle select."""
         selection = self.tree.selection()
         if not selection:
             self._show_detail(None)
@@ -1133,6 +1226,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         self._show_detail(bundle)
 
     def _show_detail(self, bundle: Optional[GalleryBundleSummary]):
+        """Show detail."""
         self.detail_text.configure(state="normal")
         self.detail_text.delete("1.0", END)
         if not bundle:
@@ -1145,6 +1239,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             f"Size: {self._format_size(bundle.size)}",
         ]
         if bundle.published_at:
+            # Continue with this path when published at is set.
             published = bundle.published_at
             if published.tzinfo:
                 published = published.astimezone()
@@ -1154,6 +1249,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         if bundle.source_campaign:
             lines.append(f"Source campaign: {bundle.source_campaign}")
         if bundle.entity_counts:
+            # Continue with this path when entity counts is set.
             lines.append("")
             lines.append("Entities:")
             for entity_type, count in sorted(bundle.entity_counts.items()):
@@ -1167,6 +1263,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         self.detail_text.configure(state="disabled")
 
     def _download_selected(self):
+        """Internal helper for download selected."""
         bundle = self._current_selection()
         if not bundle:
             messagebox.showinfo("No Selection", "Select a bundle to download.")
@@ -1174,6 +1271,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         self.parent_window._download_gallery_bundle(bundle)
 
     def _install_selected(self):
+        """Internal helper for install selected."""
         bundle = self._current_selection()
         if not bundle:
             messagebox.showinfo("No Selection", "Select a bundle to install.")
@@ -1181,6 +1279,7 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         self.parent_window._download_gallery_bundle(bundle, install_full_campaign=True)
 
     def _delete_selected(self):
+        """Delete selected."""
         if not self.client.can_publish:
             messagebox.showerror("Unavailable", "Configure a GitHub token to delete bundles.")
             return
@@ -1198,12 +1297,14 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         self.parent_window._delete_gallery_bundle(bundle)
 
     def _current_selection(self) -> Optional[GalleryBundleSummary]:
+        """Internal helper for current selection."""
         selection = self.tree.selection()
         if not selection:
             return None
         return self._bundle_map.get(selection[0])
 
     def _on_close(self):
+        """Handle close."""
         try:
             self.parent_window._online_dialog = None
         except Exception:
@@ -1212,14 +1313,17 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
 
     @staticmethod
     def _format_size(size: int) -> str:
+        """Format size."""
         units = ["B", "KB", "MB", "GB", "TB"]
         value = float(size)
         for unit in units:
+            # Process each unit from units.
             if value < 1024 or unit == units[-1]:
                 return f"{value:.1f} {unit}" if unit != "B" else f"{int(value)} {unit}"
             value /= 1024
 
     def update_permissions(self, can_publish: bool) -> None:
+        """Update permissions."""
         state = "normal" if can_publish else "disabled"
         try:
             self.delete_btn.configure(state=state)

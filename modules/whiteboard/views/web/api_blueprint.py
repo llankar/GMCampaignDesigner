@@ -1,3 +1,4 @@
+"""Blueprint helpers for whiteboard API."""
 from __future__ import annotations
 
 from flask import jsonify, request
@@ -7,12 +8,15 @@ from modules.whiteboard.utils.uploaded_images import save_uploaded_image
 
 
 def _extract_token() -> str | None:
+    """Extract token."""
     return request.headers.get("X-Whiteboard-Token") or request.args.get("token")
 
 
 def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | None):
+    """Register whiteboard API."""
     access_guard = access_guard or RemoteAccessGuard(enabled=False, token="")
     def _require_access():
+        """Internal helper for require access."""
         token = _extract_token()
         if not access_guard.enabled:
             return jsonify({"message": "Editing is currently disabled"}), 403
@@ -22,6 +26,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/status", methods=["GET"])
     def api_status():
+        """Handle API status."""
         viewport_size = getattr(controller, "_web_view_size", None)
         origin = getattr(controller, "_web_view_origin", None)
         if viewport_size is None or origin is None:
@@ -33,6 +38,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
         images = []
         for item in getattr(controller, "whiteboard_items", []) or []:
+            # Process each item from getattr(controller, 'whiteboard_items', []) or [].
             if not isinstance(item, dict) or item.get("type") != "image":
                 continue
             position = item.get("position") or (0.0, 0.0)
@@ -71,6 +77,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/strokes", methods=["POST"])
     def api_strokes():
+        """Handle API strokes."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -90,6 +97,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/text", methods=["POST"])
     def api_text():
+        """Handle API text."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -112,6 +120,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/images/upload", methods=["POST"])
     def api_image_upload():
+        """Handle API image upload."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -137,6 +146,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/images/place", methods=["POST"])
     def api_image_place():
+        """Handle API image place."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -159,6 +169,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/images/resize", methods=["POST"])
     def api_image_resize():
+        """Handle API image resize."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -180,6 +191,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/images/move", methods=["POST"])
     def api_image_move():
+        """Handle API image move."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -201,6 +213,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/images/delete", methods=["POST"])
     def api_image_delete():
+        """Handle API image delete."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized
@@ -221,6 +234,7 @@ def register_whiteboard_api(app, controller, access_guard: RemoteAccessGuard | N
 
     @app.route("/api/undo", methods=["POST"])
     def api_undo():
+        """Handle API undo."""
         unauthorized = _require_access()
         if unauthorized:
             return unauthorized

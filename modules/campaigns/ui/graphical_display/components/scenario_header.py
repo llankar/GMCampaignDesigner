@@ -1,3 +1,5 @@
+"""Utilities for campaign scenario header."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -21,6 +23,7 @@ class ScenarioHeroStrip(ctk.CTkFrame):
         on_open_gm_screen: Callable[[], None] | None = None,
         accent: str | None = None,
     ):
+        """Initialize the ScenarioHeroStrip instance."""
         accent = accent or DASHBOARD_THEME.accent
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=24, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
@@ -105,6 +108,7 @@ class ScenarioIdentityPanel(ctk.CTkFrame):
         on_edit: Callable[[], None],
         on_open_gm_screen: Callable[[], None] | None = None,
     ):
+        """Initialize the ScenarioIdentityPanel instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=20, border_width=1, border_color=DASHBOARD_THEME.card_border)
         self.grid_columnconfigure(0, weight=1)
 

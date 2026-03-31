@@ -10,9 +10,11 @@ import pytest
 class _DummyCTkModule:
     class CTkToplevel:
         def __init__(self, *args: Any, **kwargs: Any) -> None:  # pragma: no cover - simple stub
+            """Initialize the CTkToplevel instance."""
             pass
 
     def __getattr__(self, name: str):  # pragma: no cover - simple stub
+        """Handle getattr."""
         return type(name, (), {"__init__": lambda self, *args, **kwargs: None})
 
 
@@ -53,9 +55,11 @@ from modules.ui import chatbot_dialog
     ],
 )
 def test_collect_book_excerpts_uses_path(monkeypatch: pytest.MonkeyPatch, record: dict[str, Any], expected_label: str) -> None:
+    """Verify that collect book excerpts uses path."""
     calls: list[str] = []
 
     def fake_extract(path: str) -> str:
+        """Handle fake extract."""
         calls.append(path)
         return "The wandering wizard uncovers hidden lore."  # contains query word
 

@@ -1,3 +1,5 @@
+"""Utilities for detail UI scroll host."""
+
 import tkinter as tk
 import customtkinter as ctk
 
@@ -8,7 +10,9 @@ def _resolve_canvas_background(widget) -> str:
     current = widget
 
     while current is not None:
+        # Keep looping while current is available.
         if hasattr(current, "cget"):
+            # Handle the branch where hasattr(current, 'cget').
             try:
                 fg_color = current.cget("fg_color")
             except Exception:
@@ -18,6 +22,7 @@ def _resolve_canvas_background(widget) -> str:
                 index = 1 if appearance == "Dark" else 0
                 fg_color = fg_color[min(index, len(fg_color) - 1)]
             if isinstance(fg_color, str):
+                # Handle the branch where isinstance(fg_color, str).
                 candidate = fg_color.strip()
                 if candidate and candidate.lower() != "transparent":
                     return candidate
@@ -39,6 +44,7 @@ def build_scroll_host(parent):
     background = _resolve_canvas_background(parent)
 
     try:
+        # Keep scroll host resilient if this step fails.
         canvas = tk.Canvas(shell, highlightthickness=0, bd=0, background=background)
     except Exception:
         fallback = ctk.CTkScrollableFrame(parent, fg_color="transparent")
@@ -54,12 +60,14 @@ def build_scroll_host(parent):
     window_id = canvas.create_window((0, 0), window=content, anchor="nw")
 
     def _on_content_configure(_event=None):
+        """Handle content configure."""
         try:
             canvas.configure(scrollregion=canvas.bbox("all"))
         except Exception:
             pass
 
     def _on_canvas_configure(event):
+        """Handle canvas configure."""
         try:
             canvas.itemconfigure(window_id, width=max(1, event.width))
         except Exception:
@@ -67,6 +75,7 @@ def build_scroll_host(parent):
         _on_content_configure()
 
     def _on_mousewheel(event):
+        """Handle mousewheel."""
         delta = getattr(event, "delta", 0)
         if delta:
             direction = -1 if delta > 0 else 1

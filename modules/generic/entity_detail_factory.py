@@ -1,3 +1,5 @@
+"""Factory helpers for generic entity detail."""
+
 import os
 import re
 import customtkinter as ctk
@@ -71,6 +73,7 @@ _open_entity_windows = {}
 
 
 def _portrait_debug(entity_type, entity, message):
+    """Internal helper for portrait debug."""
     entity_name = ""
     if isinstance(entity, dict):
         entity_name = str(entity.get("Name") or entity.get("Title") or "").strip()
@@ -78,7 +81,9 @@ def _portrait_debug(entity_type, entity, message):
   
 
 def _bring_window_to_front(window, parent=None):
+    """Internal helper for bring window to front."""
     try:
+        # Keep bring window to front resilient if this step fails.
         if parent is not None:
             window.transient(parent)
     except Exception:
@@ -107,6 +112,7 @@ def _compute_wraplength_from_widths(*candidate_widths, minimum=200, safety_margi
 
     usable_widths = []
     for width in candidate_widths:
+        # Process each width from candidate_widths.
         try:
             width_value = int(width or 0)
         except Exception:
@@ -119,6 +125,7 @@ def _compute_wraplength_from_widths(*candidate_widths, minimum=200, safety_margi
 
 
 def _configure_wraplength_if_changed(label, *candidate_widths, minimum=200, safety_margin=32):
+    """Internal helper for configure wraplength if changed."""
     wrap_px = _compute_wraplength_from_widths(
         *candidate_widths,
         minimum=minimum,
@@ -145,9 +152,11 @@ TOOLTIP_FIELDS = {
 
 
 def _format_tooltip_value(value, max_length=200):
+    """Format tooltip value."""
     if value is None:
         return ""
     if isinstance(value, list):
+        # Handle the branch where isinstance(value, list).
         joined = ", ".join(str(v).strip() for v in value if str(v).strip())
         if not joined:
             return ""
@@ -167,6 +176,7 @@ def build_entity_tooltip(entity_type, data):
         lines.append(name_value)
 
     for field in TOOLTIP_FIELDS.get(entity_type, ()):  # type: ignore[arg-type]
+        # Process each field from TOOLTIP_FIELDS.get(entity_type, ()).
         if field == name_field:
             continue
         raw_value = data.get(field)
@@ -178,11 +188,13 @@ def build_entity_tooltip(entity_type, data):
 
 
 def _attach_portrait_tooltip(widget, entity_type, data):
+    """Internal helper for attach portrait tooltip."""
     tooltip_text = build_entity_tooltip(entity_type, data)
     if tooltip_text:
         widget.tooltip = ToolTip(widget, tooltip_text)
 
 def _wrapper_for(entity_type: str):
+    """Internal helper for wrapper for."""
     slug = resolve_entity_slug(entity_type)
     if not slug:
         return None
@@ -193,6 +205,7 @@ def _wrapper_for(entity_type: str):
 
 @log_function
 def _open_book_link(parent, book_title: str) -> None:
+    """Open book link."""
     title = str(book_title or "").strip()
     if not title:
         return
@@ -212,6 +225,7 @@ def _open_book_link(parent, book_title: str) -> None:
     open_book_viewer(master, record)
 
 def _adaptive_wraplength(widget, min_width=320, padding=40):
+    """Internal helper for adaptive wraplength."""
     try:
         return max(min_width, widget.winfo_width() - padding)
     except Exception:
@@ -219,14 +233,17 @@ def _adaptive_wraplength(widget, min_width=320, padding=40):
 
 
 def _spotlight_fallback(entity_type: str) -> str:
+    """Internal helper for spotlight fallback."""
     label = entity_type[:-1] if entity_type.endswith("s") else entity_type
     return f"No {label.lower()} portrait is linked yet."
 
 
 def _collect_highlight_lines(entity_type, entity):
+    """Collect highlight lines."""
     preferred_fields = TOOLTIP_FIELDS.get(entity_type, ())
     lines = []
     for field in preferred_fields:
+        # Process each field from preferred_fields.
         if field in {"Portrait", "Name", "Title"}:
             continue
         raw_value = entity.get(field)
@@ -239,6 +256,7 @@ def _collect_highlight_lines(entity_type, entity):
 
 
 def _build_portrait_widget(parent, entity_type, entity, *, size):
+    """Build portrait widget."""
     portrait_sources = (
         ("Portrait", entity.get("Portrait")),
         ("Image", entity.get("Image")),
@@ -254,6 +272,7 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
     )
 
     for field_name, portrait_value in portrait_sources:
+        # Process each (field_name, portrait_value) from portrait_sources.
         portrait_path = primary_portrait(portrait_value)
         resolved_portrait = resolve_portrait_path(portrait_value, campaign_dir)
         resolved_exists = bool(resolved_portrait and os.path.exists(resolved_portrait))
@@ -272,6 +291,7 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
         return None, portrait_path
 
     try:
+        # Keep portrait widget resilient if this step fails.
         _portrait_debug(entity_type, entity, f"loading portrait image from '{resolved_portrait}'")
         img = Image.open(resolved_portrait).convert("RGBA")
         framed_image = ImageOps.fit(
@@ -320,8 +340,10 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
 
 
 def _populate_generic_columns(columns, fields, entity, open_entity_callback):
+    """Internal helper for populate generic columns."""
     column_heights = [0 for _ in columns]
     for field in fields:
+        # Process each field from fields.
         field_name = field["name"]
         field_type = field["type"]
         linked_type = field.get("linked_type")
@@ -335,6 +357,7 @@ def _populate_generic_columns(columns, fields, entity, open_entity_callback):
         elif field_type == "text":
             insert_text(parent, field_name, value)
         elif field_type == "list":
+            # Handle the branch where field_type == 'list'.
             items = value or []
             if linked_type:
                 insert_links(parent, field_name, items, linked_type, open_entity_callback)
@@ -344,6 +367,7 @@ def _populate_generic_columns(columns, fields, entity, open_entity_callback):
 
 @log_function
 def insert_text(parent, header, content):
+    """Handle insert text."""
     card, body = create_section_card(parent, header, compact=True)
     card.pack(fill="x", padx=10, pady=(0, 12))
     box = ctk.CTkTextbox(body, wrap="word", height=58, **get_textbox_style())
@@ -354,6 +378,7 @@ def insert_text(parent, header, content):
 
 @log_function
 def insert_longtext(parent, header, content):
+    """Handle insert longtext."""
     card, body = create_section_card(parent, header)
     card.pack(fill="x", padx=10, pady=(0, 12))
     box = CTkTextbox(body, wrap="word", **get_textbox_style())
@@ -361,6 +386,7 @@ def insert_longtext(parent, header, content):
     box.pack(fill="x")
 
     def update_height():
+        """Update height."""
         lines = int(box._textbox.count("1.0", "end", "lines")[0])
         font = tkfont.Font(font=box._textbox.cget("font"))
         line_px = font.metrics("linespace")
@@ -372,12 +398,14 @@ def insert_longtext(parent, header, content):
 
 @log_function
 def insert_links(parent, header, items, linked_type, open_entity_callback):
+    """Handle insert links."""
     card, body = create_section_card(parent, header, compact=True)
     card.pack(fill="x", padx=10, pady=(0, 12))
     links_row = ctk.CTkFrame(body, fg_color="transparent")
     links_row.pack(fill="x")
     has_items = False
     for item in items:
+        # Process each item from items.
         display_text = str(item).strip()
         if not display_text:
             continue
@@ -406,6 +434,7 @@ def insert_links(parent, header, items, linked_type, open_entity_callback):
 
 @log_function
 def insert_relationship_table(parent, header, relationships, open_entity_callback):
+    """Handle insert relationship table."""
     if not relationships:
         return
 
@@ -426,6 +455,7 @@ def insert_relationship_table(parent, header, relationships, open_entity_callbac
         ).grid(row=0, column=col, padx=8, pady=(0, 10), sticky="w")
 
     for row_idx, relationship in enumerate(relationships, start=1):
+        # Process each (row_idx, relationship) from enumerate(relationships, start=1).
         source_name = relationship.get("source_name", "")
         relation_text = relationship.get("relation_text", "")
         target_name = relationship.get("target_name", "")
@@ -470,6 +500,7 @@ def insert_relationship_table(parent, header, relationships, open_entity_callbac
 
 @log_function
 def open_entity_tab(entity_type, name, master):
+    """Open entity tab."""
     log_info(f"Opening entity tab for {entity_type}: {name}", func_name="open_entity_tab")
     """
     Opens (or focuses) a detail window for the given entity_type/name.
@@ -479,6 +510,7 @@ def open_entity_tab(entity_type, name, master):
     window_key = f"{entity_type}:{name}"
     existing = _open_entity_windows.get(window_key)
     if existing:
+        # Continue with this path when existing is set.
         alive = existing.winfo_exists()
         if alive:
             parent_window = master.winfo_toplevel() if master is not None else None
@@ -521,6 +553,7 @@ def open_entity_tab(entity_type, name, master):
     _open_entity_windows[window_key] = new_window
 
     def _on_close():
+        """Handle close."""
         _open_entity_windows.pop(window_key, None)
         new_window.destroy()
 
@@ -541,6 +574,7 @@ def unwrap_value(val):
 
 
 def _create_entity_dashboard_card(list_wrap, *, title, portrait_builder=None, portrait_click=None, tooltip_type=None, tooltip_data=None, title_click=None, chips=None, sections=None):
+    """Create entity dashboard card."""
     palette = get_detail_palette()
     row_card = ctk.CTkFrame(
         list_wrap,
@@ -593,6 +627,7 @@ def _create_entity_dashboard_card(list_wrap, *, title, portrait_builder=None, po
 
     rendered_chips = [str(chip).strip() for chip in (chips or []) if str(chip).strip()]
     if rendered_chips:
+        # Continue with this path when rendered chips is set.
         chips_row = ctk.CTkFrame(title_row, fg_color="transparent")
         chips_row.grid(row=1, column=0, sticky="w", pady=(6, 0))
         for idx, chip_text in enumerate(rendered_chips[:6]):
@@ -604,6 +639,7 @@ def _create_entity_dashboard_card(list_wrap, *, title, portrait_builder=None, po
 
     normalized_sections = [(label, value) for label, value in (sections or []) if label]
     for idx, (label, value) in enumerate(normalized_sections):
+        # Process each (idx, (label, value)) from enumerate(normalized_sections).
         block = ctk.CTkFrame(
             details_grid,
             fg_color=palette["surface_card"],
@@ -630,6 +666,7 @@ def _create_entity_dashboard_card(list_wrap, *, title, portrait_builder=None, po
 
 @log_function
 def insert_npc_table(parent, header, npc_names, open_entity_callback):
+    """Handle insert NPC table."""
     card, body = create_section_card(parent, header, compact=True)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
@@ -643,6 +680,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
     list_wrap.grid_columnconfigure(0, weight=1)
 
     for r, name in enumerate(npc_names):
+        # Process each (r, name) from enumerate(npc_names).
         data = npc_map.get(name, {}) or {}
         portrait_value = data.get("Portrait")
         portrait_path = primary_portrait(portrait_value)
@@ -651,11 +689,13 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
             img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(56, 56))
             def _portrait_builder(parent, image=photo):
+                """Internal helper for portrait builder."""
                 label = CTkLabel(parent, image=image, text="")
                 label.image = image
                 return label
         else:
             def _portrait_builder(parent, text="NPC", color=palette["muted_text"]):
+                """Internal helper for portrait builder."""
                 return CTkLabel(parent, text=text, text_color=color)
 
         row_card = _create_entity_dashboard_card(
@@ -677,6 +717,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
 
 @log_function
 def insert_creature_table(parent, header, creature_names, open_entity_callback):
+    """Handle insert creature table."""
     card, body = create_section_card(parent, header, compact=True)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
@@ -690,6 +731,7 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
     list_wrap.grid_columnconfigure(0, weight=1)
 
     for r, name in enumerate(creature_names):
+        # Process each (r, name) from enumerate(creature_names).
         data = creature_map.get(name, {}) or {}
         portrait_value = data.get("Portrait")
         portrait_path = primary_portrait(portrait_value)
@@ -698,11 +740,13 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
             img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(56, 56))
             def _portrait_builder(parent, image=photo):
+                """Internal helper for portrait builder."""
                 label = CTkLabel(parent, image=image, text="")
                 label.image = image
                 return label
         else:
             def _portrait_builder(parent, text="Creature", color=palette["muted_text"]):
+                """Internal helper for portrait builder."""
                 return CTkLabel(parent, text=text, text_color=color)
 
         row_card = _create_entity_dashboard_card(
@@ -725,6 +769,7 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
 
 @log_function
 def insert_villain_table(parent, header, villain_names, open_entity_callback):
+    """Handle insert villain table."""
     card, body = create_section_card(parent, header, compact=True)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
@@ -738,6 +783,7 @@ def insert_villain_table(parent, header, villain_names, open_entity_callback):
     list_wrap.grid_columnconfigure(0, weight=1)
 
     for r, name in enumerate(villain_names):
+        # Process each (r, name) from enumerate(villain_names).
         data = villain_map.get(name, {}) or {}
         portrait_value = data.get("Portrait")
         portrait_path = primary_portrait(portrait_value)
@@ -746,15 +792,18 @@ def insert_villain_table(parent, header, villain_names, open_entity_callback):
             img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
             photo = CTkImage(light_image=img, size=(56, 56))
             def _portrait_builder(parent, image=photo):
+                """Internal helper for portrait builder."""
                 label = CTkLabel(parent, image=image, text="")
                 label.image = image
                 return label
         else:
             def _portrait_builder(parent, text="Villain", color=palette["muted_text"]):
+                """Internal helper for portrait builder."""
                 return CTkLabel(parent, text=text, text_color=color)
 
         chips = []
         for key in ("Archetype", "ThreatLevel"):
+            # Process each key from ('Archetype', 'ThreatLevel').
             value = str(data.get(key) or "").strip()
             if value:
                 chips.append(value)
@@ -793,6 +842,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
     list_wrap.grid_columnconfigure(0, weight=1)
 
     for r, name in enumerate(place_names):
+        # Process each (r, name) from enumerate(place_names).
         data = place_map.get(name, {}) or {}
         portrait = primary_portrait(data.get("Portrait", ""))
         desc = format_longtext(data.get("Description", ""))
@@ -851,12 +901,15 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
             name_label.bind("<Button-1>", lambda _event=None, nm=name: open_entity_callback("Places", nm))
 
         if npcs:
+            # Continue with this path when NPCs is set.
             npc_row = ctk.CTkFrame(title_row, fg_color="transparent")
             npc_row.grid(row=1, column=0, sticky="w", pady=(6, 0))
             for idx, npc_name in enumerate(npcs[:6]):
+                # Process each (idx, npc_name) from enumerate(npcs[:6]).
                 chip = create_chip(npc_row, npc_name)
                 chip.pack(side="left", padx=(0 if idx == 0 else 6, 0), pady=(0, 4))
                 if open_entity_callback:
+                    # Continue with this path when open entity callback is set.
                     for child in chip.winfo_children():
                         child.configure(cursor="hand2")
                         child.bind("<Button-1>", lambda _event=None, nm=npc_name: open_entity_callback("NPCs", nm))
@@ -872,6 +925,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback):
         ]
 
         for idx, (label, value) in enumerate(sections):
+            # Process each (idx, (label, value)) from enumerate(sections).
             block = ctk.CTkFrame(
                 details_grid,
                 fg_color=palette["surface_card"],
@@ -915,14 +969,17 @@ def insert_list_longtext(
             .pack(anchor="w", padx=10, pady=(10, 2))
 
     def _truncate_label(text, max_len=34):
+        """Internal helper for truncate label."""
         cleaned = str(text or "").strip()
         if len(cleaned) <= max_len:
             return cleaned
         return f"{cleaned[:max(0, max_len - 1)].rstrip()}…"
 
     def _flatten_strings(value):
+        """Internal helper for flatten strings."""
         parsed = deserialize_possible_json(value)
         if isinstance(parsed, dict):
+            # Handle the branch where isinstance(parsed, dict).
             for key in ("text", "Text", "value", "Value", "name", "Name"):
                 if key in parsed:
                     return _flatten_strings(parsed[key])
@@ -931,6 +988,7 @@ def insert_list_longtext(
                 results.extend(_flatten_strings(item))
             return results
         if isinstance(parsed, (list, tuple, set)):
+            # Handle the branch where isinstance(parsed, (list, tuple, set)).
             results = []
             for item in parsed:
                 results.extend(_flatten_strings(item))
@@ -941,6 +999,7 @@ def insert_list_longtext(
         return [text] if text else []
 
     def _coerce_names(value):
+        """Coerce names."""
         names = []
         for entry in _flatten_strings(value):
             parts = [part.strip() for part in entry.split(",") if part.strip()]
@@ -948,15 +1007,18 @@ def insert_list_longtext(
         return names
 
     def _coerce_links(value):
+        """Coerce links."""
         links = []
         if value is None:
             return links
         parsed = deserialize_possible_json(value)
         if isinstance(parsed, list):
+            # Handle the branch where isinstance(parsed, list).
             for item in parsed:
                 links.extend(_coerce_links(item))
             return links
         if isinstance(parsed, dict):
+            # Handle the branch where isinstance(parsed, dict).
             payload = {k: deserialize_possible_json(v) for k, v in parsed.items()}
             target = None
             text_val = None
@@ -970,6 +1032,7 @@ def insert_list_longtext(
                     break
 
             if isinstance(target, (int, float)):
+                # Handle the branch where isinstance(target, (int, float)).
                 target_display = int(target)
             else:
                 target_options = _flatten_strings(target)
@@ -1007,15 +1070,18 @@ def insert_list_longtext(
     gm_view_ref = gm_view if is_scenes_field else None
 
     def _build_scene_key(index, data):
+        """Build scene key."""
         if not isinstance(data, dict):
             return str(index)
         for key in ("Id", "ID", "Scene", "scene", "Title", "title"):
+            # Process each key from ('Id', 'ID', 'Scene', 'scene', 'Title', 'title').
             value = data.get(key)
             if value:
                 return f"{index}:{value}"
         return str(index)
 
     def _normalize_scene_entry(entry):
+        """Normalize scene entry."""
         parsed_entry = deserialize_possible_json(entry)
         if isinstance(parsed_entry, dict):
             scene_dict = {key: deserialize_possible_json(val) for key, val in parsed_entry.items()}
@@ -1027,6 +1093,7 @@ def insert_list_longtext(
         text_payload = scene_dict.get("Text") or scene_dict.get("text") or ""
         text_payload = deserialize_possible_json(text_payload)
         if isinstance(text_payload, dict):
+            # Handle the branch where isinstance(text_payload, dict).
             nested_text = deserialize_possible_json(text_payload.get("text") or text_payload.get("Text") or "")
             if isinstance(nested_text, (list, tuple, set)):
                 body_text = "\n".join(str(v).strip() for v in nested_text if str(v).strip())
@@ -1063,6 +1130,7 @@ def insert_list_longtext(
     scene_open_handlers = {}
 
     def _add_scene_reference(reference, scene_key):
+        """Internal helper for add scene reference."""
         if reference is None:
             return
         text = str(reference).strip()
@@ -1078,6 +1146,7 @@ def insert_list_longtext(
     density_style = get_scene_density_style(normalized_density)
 
     for idx, scene_data in enumerate(scene_entries, start=1):
+        # Process each (idx, scene_data) from enumerate(scene_entries, start=1).
         scene_dict = scene_data["scene_dict"]
         scene_key = _build_scene_key(idx, scene_dict)
         _add_scene_reference(idx, scene_key)
@@ -1086,6 +1155,7 @@ def insert_list_longtext(
             _add_scene_reference(scene_dict.get(key_name), scene_key)
 
     def _resolve_scene_target(target):
+        """Resolve scene target."""
         if target is None:
             return None
         if isinstance(target, (int, float)):
@@ -1105,6 +1175,7 @@ def insert_list_longtext(
         return None
 
     def _open_scene_target(scene_key):
+        """Open scene target."""
         handler = scene_open_handlers.get(scene_key)
         if not callable(handler):
             return False
@@ -1115,6 +1186,7 @@ def insert_list_longtext(
             return False
 
     for idx, scene_data in enumerate(scene_entries, start=1):
+        # Process each (idx, scene_data) from enumerate(scene_entries, start=1).
         scene_dict = scene_data["scene_dict"]
         body_text = scene_data["body_text"]
         title_clean = scene_data["title_clean"]
@@ -1214,7 +1286,9 @@ def insert_list_longtext(
         quick_actions.pack(side="right")
 
         def _set_scene_active(*, key=scene_key, gm_view=gm_view_ref):
+            """Set scene active."""
             if gm_view and hasattr(gm_view, "set_active_scene"):
+                # Handle the branch where GM view is set and hasattr(gm_view, 'set_active_scene').
                 gm_view.set_active_scene(key)
                 refreshers = getattr(gm_view, "_scene_state_refreshers", {})
                 for refresher in list(refreshers.values()):
@@ -1224,12 +1298,14 @@ def insert_list_longtext(
                         continue
 
         def _mark_scene_done(*, check=check_var):
+            """Internal helper for mark scene done."""
             if check is None:
                 return
             check.set(True)
             _set_scene_active()
 
         def _add_scene_note(*, gm_view=gm_view_ref, key=scene_key):
+            """Internal helper for add scene note."""
             if gm_view and hasattr(gm_view, "_append_scene_to_notes"):
                 gm_view._append_scene_to_notes(key)
             elif gm_view and hasattr(gm_view, "add_timestamped_note"):
@@ -1277,6 +1353,7 @@ def insert_list_longtext(
             card_outer=outer,
             complete_btn=done_btn,
         ):
+            """Refresh scene state."""
             is_completed = bool(check.get()) if check is not None else False
             is_active = bool(gm_view and getattr(gm_view, "_active_scene_key", None) == key)
             border_color = palette["muted_border"]
@@ -1291,6 +1368,7 @@ def insert_list_longtext(
             complete_btn.configure(text="✓✓" if is_completed else "✓")
 
         if gm_view_ref:
+            # Continue with this path when GM view ref is set.
             refreshers = getattr(gm_view_ref, "_scene_state_refreshers", None)
             if not isinstance(refreshers, dict):
                 refreshers = {}
@@ -1298,7 +1376,9 @@ def insert_list_longtext(
             refreshers[scene_key] = _refresh_scene_state
 
         def _toggle(btn=btn, body=body, lbl=body_label, expanded=expanded, idx=idx, title=title_clean, key=scene_key):
+            """Toggle the operation."""
             if expanded.get():
+                # Handle the branch where expanded.get().
                 body.pack_forget()
                 label = f"▶ {idx}"
                 if title:
@@ -1317,6 +1397,7 @@ def insert_list_longtext(
                 outer.update_idletasks()
 
                 def _refresh_body_wrap(_event=None, *, target_label=lbl, target_body=body, target_outer=outer):
+                    """Refresh body wrap."""
                     try:
                         parent_width = target_body.master.winfo_width() if target_body.master is not None else 0
                     except Exception:
@@ -1341,6 +1422,7 @@ def insert_list_longtext(
             expanded.set(not expanded.get())
 
         def _open_scene_from_link(*, expanded_state=expanded, key=scene_key):
+            """Open scene from link."""
             if not expanded_state.get():
                 _toggle()
                 return
@@ -1351,6 +1433,7 @@ def insert_list_longtext(
         scene_open_handlers[scene_key] = _open_scene_from_link
         btn.configure(command=_toggle)
         if gm_view_ref:
+            # Continue with this path when GM view ref is set.
             checkbox = ctk.CTkCheckBox(
                 quick_actions,
                 text="",
@@ -1372,6 +1455,7 @@ def insert_list_longtext(
                 )
 
             def _on_check(key=scene_key):
+                """Handle check."""
                 if gm_view_ref and hasattr(gm_view_ref, "set_active_scene"):
                     gm_view_ref.set_active_scene(key)
                 _refresh_scene_state()
@@ -1390,17 +1474,20 @@ def insert_list_longtext(
 
 @log_function
 def _collect_character_relationships(scenario_npcs=None):
+    """Collect character relationships."""
     relationships = []
     seen = set()
     scenario_npc_set = None
     if scenario_npcs:
         scenario_npc_set = {str(name).strip().lower() for name in scenario_npcs if str(name).strip()}
     for entity_label, table_key in (("NPCs", "npcs"), ("PCs", "pcs")):
+        # Process each (entity_label, table_key) from (('NPCs', 'npcs'), ('PCs', 'pcs')).
         if scenario_npc_set is not None and entity_label != "NPCs":
             continue
         wrapper = GenericModelWrapper(table_key)
         records = wrapper.load_items()
         for record in records:
+            # Process each record from records.
             source_name = str(record.get("Name") or "").strip()
             if not source_name:
                 continue
@@ -1410,6 +1497,7 @@ def _collect_character_relationships(scenario_npcs=None):
             if not isinstance(links, list):
                 continue
             for link in links:
+                # Process each link from links.
                 if not isinstance(link, dict):
                     continue
                 target_type_raw = str(
@@ -1465,6 +1553,7 @@ def _collect_character_relationships(scenario_npcs=None):
 
 
 def _replace_detail_frame(current_frame, updated_item, entity_type, open_entity_callback, builder):
+    """Internal helper for replace detail frame."""
     parent = current_frame.master
     current_frame.destroy()
 
@@ -1473,6 +1562,7 @@ def _replace_detail_frame(current_frame, updated_item, entity_type, open_entity_
 
     gm_view = getattr(open_entity_callback, "__self__", None)
     if gm_view is not None:
+        # Handle the branch where GM view is available.
         key_field = "Title" if entity_type == "Scenarios" else "Name"
         tab_name = updated_item.get(key_field)
         if tab_name in gm_view.tabs:
@@ -1496,6 +1586,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     section_order = ["Summary", "Scenes", "NPCs", "Villains", "Creatures", "Places", "Secrets", "Notes"]
     section_names = []
     def rebuild_frame(updated_item):
+        """Handle rebuild frame."""
         _replace_detail_frame(
             frame,
             updated_item,
@@ -1510,6 +1601,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         )
 
     def _edit_entity():
+        """Internal helper for edit entity."""
         wrapper = _wrapper_for(entity_type)
         if wrapper is None:
             messagebox.showerror("Edit Entity", f"{entity_type} storage is not available.")
@@ -1552,6 +1644,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             pass
 
     def _get_section_frame(section_name):
+        """Return section frame."""
         section_frame = sections.get(section_name)
         if section_frame is None:
             section_frame = ctk.CTkFrame(scrollable_frame, fg_color="transparent")
@@ -1559,11 +1652,13 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         return section_frame
 
     def _apply_section_visibility():
+        """Apply section visibility."""
         visible_sections = set(pinned_sections)
         if active_section:
             visible_sections.add(active_section)
 
         for name in section_names:
+            # Process each name from section_names.
             section_frame = sections.get(name)
             if section_frame is not None:
                 section_frame.pack_forget()
@@ -1573,11 +1668,15 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 sections[name].pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
     def _reset_scroll_position():
+        """Reset scroll position."""
         try:
+            # Keep scroll position resilient if this step fails.
             scrollable_frame.update_idletasks()
             parent_canvas = getattr(scrollable_frame, "_parent_canvas", None)
             if parent_canvas is not None:
+                # Handle the branch where parent canvas is available.
                 try:
+                    # Keep scroll position resilient if this step fails.
                     bbox = parent_canvas.bbox("all")
                     if bbox is not None:
                         parent_canvas.configure(scrollregion=bbox)
@@ -1589,6 +1688,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             pass
 
     def show_section(section_name):
+        """Show section."""
         nonlocal active_section
         active_section = section_name
         _apply_section_visibility()
@@ -1598,6 +1698,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     tabs = None
 
     def _toggle_pin(section_name):
+        """Toggle pin."""
         if section_name in pinned_sections:
             pinned_sections.discard(section_name)
         else:
@@ -1610,6 +1711,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     scenario_title = str(scenario_item.get("Title") or scenario_item.get("Name") or "Scenario").strip()
     scenario_meta = []
     for label, key in (("Scenes", "Scenes"), ("NPCs", "NPCs"), ("Places", "Places"), ("Villains", "Villains")):
+        # Process each (label, key) while updating scenario detail frame.
         value = scenario_item.get(key)
         if isinstance(value, list) and value:
             scenario_meta.append(f"{len(value)} {label}")
@@ -1656,6 +1758,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
     # render in that order
     for field in ordered_fields:
+        # Process each field from ordered_fields.
         name  = field["name"]
         ftype = field["type"]
         value = scenario_item.get(name) or ""
@@ -1666,6 +1769,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             insert_text(section_frame, name, value)
         elif ftype == "list_longtext":
             if name == "Scenes" and gm_view_instance is not None:
+                # Handle the branch where name == 'Scenes' and GM view instance is available.
                 scenes_field_name = name
                 scenes_items = value if isinstance(value, list) else []
                 scenes_card, scenes_body = create_section_card(
@@ -1686,8 +1790,10 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 ).strip()
 
                 def _extract_scene_text_length(entry):
+                    """Extract scene text length."""
                     parsed_entry = deserialize_possible_json(entry)
                     if isinstance(parsed_entry, dict):
+                        # Handle the branch where isinstance(parsed_entry, dict).
                         scene_dict = {key: deserialize_possible_json(val) for key, val in parsed_entry.items()}
                         text_payload = scene_dict.get("Text") or scene_dict.get("text") or ""
                     elif isinstance(parsed_entry, list):
@@ -1750,6 +1856,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 list_container.pack(fill="x", expand=True)
 
                 def _render_scene_list(selected_density):
+                    """Render scene list."""
                     normalized_density = normalize_scene_density(selected_density)
                     for child in list_container.winfo_children():
                         child.destroy()
@@ -1775,10 +1882,13 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 scene_flow_frame.pack(fill="both", expand=True)
 
                 def _sync_scene_flow_height(_event=None):
+                    """Synchronize scene flow height."""
                     target_height = 520
                     try:
+                        # Keep scene flow height resilient if this step fails.
                         viewport = getattr(gm_view_instance, "content_area", None)
                         if viewport is not None and viewport.winfo_exists():
+                            # Handle the branch where viewport is available and viewport.winfo_exists().
                             viewport.update_idletasks()
                             scenes_container.update_idletasks()
                             header_row.update_idletasks()
@@ -1811,7 +1921,9 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 scene_flow_layout_scheduler = LayoutSettleScheduler(scene_flow_frame)
 
                 def _scene_flow_layout_ready():
+                    """Internal helper for scene flow layout ready."""
                     try:
+                        # Keep scene flow layout ready resilient if this step fails.
                         if view_var.get() != "Scene Flow":
                             return False
                         if not flow_container.winfo_exists() or not flow_container.winfo_ismapped():
@@ -1821,6 +1933,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                         return False
 
                 def _settle_scene_flow_layout():
+                    """Internal helper for settle scene flow layout."""
                     _sync_scene_flow_height()
                     try:
                         scene_flow_frame._on_layout_resize()
@@ -1828,6 +1941,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                         pass
 
                 def _toggle_scene_view(selected_view=None):
+                    """Toggle scene view."""
                     selection = selected_view or view_var.get()
                     if selection not in {"List", "Scene Flow"}:
                         selection = default_scene_view
@@ -1856,6 +1970,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                             pass
 
                 def _toggle_scene_density(selected_density=None):
+                    """Toggle scene density."""
                     density_selection = normalize_scene_density(selected_density or density_var.get())
                     density_var.set(density_selection)
                     if view_var.get() == "List":
@@ -1870,6 +1985,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                             pass
 
                 try:
+                    # Keep scenario detail frame resilient if this step fails.
                     if hasattr(gm_view_instance, "content_area") and gm_view_instance.content_area.winfo_exists():
                         scene_flow_layout_scheduler.bind_configure(
                             gm_view_instance.content_area,
@@ -1904,6 +2020,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         elif ftype == "longtext":
             insert_longtext(section_frame, name, value)
         elif ftype == "list":
+            # Handle the branch where ftype == 'list'.
             linked = field.get("linked_type")
             items  = value if isinstance(value, list) else []
             if linked == "NPCs":
@@ -1911,6 +2028,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
             elif linked == "Villains":
                 insert_villain_table(section_frame, "Villains", items, open_entity_callback)
             elif linked == "Creatures":
+                # Handle the branch where linked == 'Creatures'.
                 filtered_creatures = [
                     creature for creature in items
                     if creature not in scene_entity_tracker.get("Creatures", set())
@@ -1948,6 +2066,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     secrets_text_label.pack(fill="x", anchor="w")
 
     def _update_text_wraplength(_event=None):
+        """Update text wraplength."""
         try:
             available_width = max(260, scrollable_frame.winfo_width() - 80)
             summary_text_label.configure(wraplength=available_width)
@@ -1978,6 +2097,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         related_events_panel.pack(fill="x", padx=10, pady=(0, 10))
 
     if gm_view_instance and hasattr(gm_view_instance, "register_note_widget"):
+        # Handle the branch where GM view instance is set and hasattr(gm_view_instance, 'register_note_widget').
         notes_section = _get_section_frame("Notes")
         notes_card, notes_body = create_section_card(notes_section, "GM Notes", "Scratchpad for timestamps, callbacks, and table reactions.")
         notes_card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
@@ -2023,6 +2143,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
 
 @log_function
 def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save=None):
+    """Handle edit window."""
     key_field = "Title" if model_wrapper.entity_type in {"scenarios", "books"} else "Name"
     key_value = item.get(key_field)
     target = None
@@ -2036,6 +2157,7 @@ def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save
     )
     self.master.wait_window(editor)
     if getattr(editor, "saved", False):
+        # Handle the branch where getattr(editor, 'saved', False).
         model_wrapper.save_item(
             target,
             key_field=key_field,
@@ -2065,6 +2187,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
 
     def rebuild_frame(updated_item):
+        """Handle rebuild frame."""
         _replace_detail_frame(
             content_frame,
             updated_item,
@@ -2079,6 +2202,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         )
 
     def _edit_entity():
+        """Internal helper for edit entity."""
         wrapper = _wrapper_for(entity_type)
         if wrapper is None:
             messagebox.showerror("Edit Entity", f"{entity_type} storage is not available.")
@@ -2101,6 +2225,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     audio_value = get_entity_audio_value(entity)
 
     def _audio_display_name(value: str) -> str:
+        """Internal helper for audio display name."""
         if not value:
             return "Audio"
         base = os.path.basename(str(value)) or "Audio"
@@ -2108,6 +2233,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         return base if resolved and os.path.exists(resolved) else f"{base} (missing)"
 
     def _play_audio_from_menu() -> None:
+        """Internal helper for play audio from menu."""
         if not audio_value:
             messagebox.showinfo("Audio", "No audio file configured for this entry.")
             return
@@ -2116,6 +2242,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     content_frame.portrait_images = {}
     def _make_spotlight_portrait(parent):
+        """Internal helper for make spotlight portrait."""
         portrait_widget, portrait_path = _build_portrait_widget(
             parent,
             entity_type,
@@ -2132,6 +2259,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         return portrait_widget
 
     def _make_hero_portrait(parent):
+        """Internal helper for make hero portrait."""
         portrait_widget, portrait_path = _build_portrait_widget(
             parent,
             entity_type,
@@ -2157,6 +2285,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     template = load_template(entity_type.lower())
     meta_items = []
     for field in template.get("fields", []):
+        # Process each field from template.get('fields', []).
         field_name = field.get("name")
         value = entity.get(field_name)
         if isinstance(value, list) and value:
@@ -2202,6 +2331,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     )
 
     if audio_value:
+        # Continue with this path when audio value is set.
         audio_card, audio_body = create_section_card(
             side_column,
             "Audio ambiance",
@@ -2219,6 +2349,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         audio_label.pack(anchor="w")
 
         def _show_audio_menu(event) -> None:
+            """Show audio menu."""
             menu = tk.Menu(audio_body, tearoff=0)
             menu.add_command(label="Play Audio", command=_play_audio_from_menu)
             menu.add_command(label="Stop Audio", command=stop_entity_audio)
@@ -2238,6 +2369,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     render_fields = []
     for field in template["fields"]:
+        # Process each field from template['fields'].
         field_name = field["name"]
         field_type = field["type"]
         if field_name == "Portrait":
@@ -2247,6 +2379,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         render_fields.append(field)
 
     if summary:
+        # Continue with this path when summary is set.
         summary_card, summary_body = create_section_card(
             column_left,
             "Overview",
@@ -2265,6 +2398,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         render_fields = [field for field in render_fields if field["name"] not in {"Description", "Summary"}]
 
         def _update_summary_wrap(_event=None):
+            """Update summary wrap."""
             try:
                 summary_label.configure(wraplength=max(280, column_left.winfo_width() - 70))
             except Exception:
@@ -2306,6 +2440,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
 @log_function
 def open_entity_window(entity_type, name):
+    """Open entity window."""
     log_info(f"Opening entity window for {entity_type}: {name}", func_name="open_entity_window")
     wrapper = wrappers[entity_type]
     items = wrapper.load_items()

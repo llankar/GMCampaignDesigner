@@ -1,3 +1,4 @@
+"""Resolution helpers for audio filter selection."""
 from __future__ import annotations
 
 from typing import Any
@@ -9,6 +10,7 @@ def resolve_category_mood_selection(
     category: str,
     preferred_mood: str | None,
 ) -> tuple[str, str | None, list[str]]:
+    """Resolve category mood selection."""
     categories = _safe_list_categories(library, section)
     if not categories:
         return "", None, []
@@ -23,6 +25,7 @@ def resolve_category_mood_selection(
 
 
 def _safe_list_categories(library: Any, section: str) -> list[str]:
+    """Internal helper for safe list categories."""
     try:
         return list(library.get_categories(section))
     except Exception:
@@ -30,6 +33,7 @@ def _safe_list_categories(library: Any, section: str) -> list[str]:
 
 
 def _safe_list_moods(library: Any, section: str, category: str) -> list[str]:
+    """Internal helper for safe list moods."""
     if not category:
         return []
     try:

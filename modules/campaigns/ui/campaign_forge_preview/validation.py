@@ -1,14 +1,18 @@
+"""Validation helpers for campaign."""
 from __future__ import annotations
 
 from modules.campaigns.ui.campaign_forge_preview.models import ForgeValidationResult
 
 
 def evaluate_forge_warnings(generated_payload: dict) -> ForgeValidationResult:
+    """Handle evaluate forge warnings."""
     result = ForgeValidationResult()
 
     for arc_group in generated_payload.get("arcs") or []:
+        # Process each arc_group from generated_payload.get('arcs') or [].
         arc_name = str(arc_group.get("arc_name") or "Unnamed arc").strip() or "Unnamed arc"
         for scenario in arc_group.get("scenarios") or []:
+            # Process each scenario from arc_group.get('scenarios') or [].
             title = str(scenario.get("Title") or "Untitled scenario").strip() or "Untitled scenario"
             warnings: list[str] = []
 
@@ -39,11 +43,13 @@ def evaluate_forge_warnings(generated_payload: dict) -> ForgeValidationResult:
 
 
 def _normalize_name_list(value) -> list[str]:
+    """Normalize name list."""
     if not isinstance(value, list):
         return []
     out: list[str] = []
     seen: set[str] = set()
     for item in value:
+        # Process each item from value.
         cleaned = str(item or "").strip()
         if not cleaned:
             continue
@@ -56,7 +62,9 @@ def _normalize_name_list(value) -> list[str]:
 
 
 def _contains_stakes(scenes: list) -> bool:
+    """Internal helper for contains stakes."""
     for scene in scenes:
+        # Process each scene from scenes.
         text = str(scene or "").strip()
         if not text:
             continue
