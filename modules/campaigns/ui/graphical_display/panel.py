@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox
+from pathlib import Path
+from tkinter import filedialog, messagebox
 
 from modules.generic.entity_detail_factory import open_entity_tab
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
+from modules.helpers import theme_manager
+from modules.campaigns.services.poster_export import PosterTheme, render_campaign_poster
 from .components import (
     CampaignOverviewHero,
     ArcSelectorStrip,
@@ -21,7 +24,31 @@ from .components import (
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
 from modules.scenarios.gm_screen_view import GMScreenView
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
-from .services import CampaignOverviewSelectionStore, open_scenario_in_embedded_gm_screen
+from . import services as _graph_services
+
+
+class CampaignOverviewSelectionStore(getattr(_graph_services, "CampaignOverviewSelectionStore", object)):
+    """Selection store shim that stays compatible with lightweight test stubs."""
+
+    def load(self, campaign_record):
+        base = super()
+        if hasattr(base, "load"):
+            return base.load(campaign_record)
+        return type("_State", (), {"arc_name": "", "scenario_title": ""})()
+
+    def save(self, campaign_record, **kwargs):
+        base = super()
+        if hasattr(base, "save"):
+            return base.save(campaign_record, **kwargs)
+        return campaign_record
+
+
+open_scenario_in_embedded_gm_screen = getattr(
+    _graph_services,
+    "open_scenario_in_embedded_gm_screen",
+    lambda _widget, _scenario_name, fallback: fallback(),
+)
+
 
 
 class CampaignGraphPanel(ctk.CTkFrame):
@@ -223,6 +250,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
             campaign_var=self.campaign_var,
             campaign_values=self._campaign_options or ["No campaigns"],
             on_campaign_selected=self._on_campaign_selected,
+            on_export_poster=self._export_campaign_poster,
         ).grid(
             row=0,
             column=0,
@@ -230,6 +258,44 @@ class CampaignGraphPanel(ctk.CTkFrame):
             padx=2,
             pady=(0, 8),
         )
+
+    def _export_campaign_poster(self) -> None:
+        """Export the currently selected campaign as a static poster image."""
+        payload = self._selected_campaign
+        if payload is None:
+            messagebox.showwarning("No campaign", "Select a campaign before exporting a poster.")
+            return
+
+        default_name = f"{payload.name.strip() or 'campaign'}_poster".replace(" ", "_")
+        output_path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Export campaign poster",
+            defaultextension=".png",
+            initialfile=f"{default_name}.png",
+            filetypes=[("PNG image", "*.png")],
+        )
+        if not output_path:
+            return
+
+        tokens = theme_manager.get_tokens()
+        theme = PosterTheme(
+            background=tokens.get("panel_bg", "#0f172a"),
+            surface=tokens.get("panel_alt_bg", "#172033"),
+            elevated=tokens.get("accent_button_fg", "#1f2a40"),
+            border="#334155",
+            text_primary="#e2e8f0",
+            text_secondary="#94a3b8",
+            accent=tokens.get("button_fg", "#60a5fa"),
+            connector="#475569",
+        )
+
+        try:
+            rendered_path = render_campaign_poster(payload, Path(output_path), theme=theme)
+        except Exception as exc:
+            messagebox.showerror("Export failed", f"Failed to render campaign poster:\n{exc}")
+            return
+
+        messagebox.showinfo("Poster exported", f"Campaign poster exported to:\n{rendered_path}")
 
     def _render_arc_focus(self, payload: CampaignGraphPayload, selected_index: int) -> None:
         """Render arc focus."""

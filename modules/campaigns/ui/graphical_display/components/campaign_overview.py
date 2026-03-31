@@ -19,6 +19,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         campaign_var,
         campaign_values: list[str],
         on_campaign_selected,
+        on_export_poster=None,
     ):
         """Initialize the CampaignOverviewHero instance."""
         super().__init__(parent, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=22, border_width=1, border_color=DASHBOARD_THEME.card_border)
@@ -26,6 +27,7 @@ class CampaignOverviewHero(ctk.CTkFrame):
         self._campaign_var = campaign_var
         self._campaign_values = campaign_values
         self._on_campaign_selected = on_campaign_selected
+        self._on_export_poster = on_export_poster
 
         self.grid_columnconfigure(0, weight=3)
         self.grid_columnconfigure(1, weight=2)
@@ -80,6 +82,19 @@ class CampaignOverviewHero(ctk.CTkFrame):
             anchor="w",
             dynamic_resizing=False,
         ).grid(row=0, column=1, sticky="e")
+
+        if callable(self._on_export_poster):
+            ctk.CTkButton(
+                selector_row,
+                text="Export poster",
+                width=120,
+                height=30,
+                command=self._on_export_poster,
+                fg_color=DASHBOARD_THEME.button_fg,
+                hover_color=DASHBOARD_THEME.button_hover,
+                text_color=DASHBOARD_THEME.text_primary,
+                corner_radius=999,
+            ).grid(row=0, column=2, sticky="e", padx=(8, 0))
 
     def _build_identity_column(self) -> None:
         """Build identity column."""
