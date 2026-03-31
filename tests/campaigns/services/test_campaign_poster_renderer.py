@@ -108,3 +108,104 @@ def test_load_fonts_falls_back_to_default_when_truetype_fails(monkeypatch) -> No
     assert title_font is fallback
     assert body_font is fallback
     assert small_font is fallback
+
+
+def _dense_payload() -> CampaignGraphPayload:
+    scenarios = [
+        CampaignGraphScenario(
+            title=f"Scenario {index}",
+            summary="A long summary that should wrap to a second line when space permits in the card body.",
+            has_secrets=index % 2 == 0,
+        )
+        for index in range(1, 7)
+    ]
+    arcs = [
+        CampaignGraphArc(
+            name=f"Arc {index}",
+            status="In Progress",
+            summary="",
+            objective="",
+            scenarios=scenarios,
+        )
+        for index in range(1, 5)
+    ]
+    return CampaignGraphPayload(
+        name="Dense Campaign",
+        logline="City at breaking point.",
+        genre="Thriller",
+        tone="Gritty",
+        status="In Progress",
+        setting="Metroplex",
+        main_objective="Hold the line.",
+        stakes="Everything.",
+        themes="pressure, sacrifice",
+        linked_scenario_count=len(scenarios) * len(arcs),
+        arcs=arcs,
+    )
+
+
+def test_layout_cards_stay_in_bounds_for_1080p() -> None:
+    payload = _dense_payload()
+    width, height = 1920, 1080
+    layout = renderer._build_layout(payload, width=width, height=height)
+    arc_cards = renderer._layout_arc_cards(
+        payload.arcs[:4],
+        margin=layout.margin,
+        top=layout.arc_top,
+        card_height=layout.arc_height,
+        gap=layout.arc_gap,
+        canvas_width=width,
+    )
+    scenario_cards = renderer._layout_scenario_cards(
+        payload,
+        arc_cards,
+        top=layout.scenario_top,
+        max_per_arc=layout.max_per_arc,
+        scenario_height=layout.scenario_height,
+        gap=layout.scenario_gap,
+    )
+
+    assert scenario_cards
+    assert layout.scenario_gap >= 10
+    assert layout.scenario_height >= 90
+    for card in [*arc_cards, *scenario_cards]:
+        assert card.x >= layout.margin
+        assert card.x + card.width <= width - layout.margin
+    for card in scenario_cards:
+        assert card.y >= layout.scenario_top
+        assert card.y + card.height <= layout.scenario_bottom
+        assert "\n" in card.subtitle
+
+
+def test_layout_cards_stay_in_bounds_for_1440p() -> None:
+    payload = _dense_payload()
+    width, height = 2560, 1440
+    layout = renderer._build_layout(payload, width=width, height=height)
+    arc_cards = renderer._layout_arc_cards(
+        payload.arcs[:4],
+        margin=layout.margin,
+        top=layout.arc_top,
+        card_height=layout.arc_height,
+        gap=layout.arc_gap,
+        canvas_width=width,
+    )
+    scenario_cards = renderer._layout_scenario_cards(
+        payload,
+        arc_cards,
+        top=layout.scenario_top,
+        max_per_arc=layout.max_per_arc,
+        scenario_height=layout.scenario_height,
+        gap=layout.scenario_gap,
+    )
+
+    assert scenario_cards
+    assert layout.scenario_gap >= 10
+    assert layout.scenario_height >= 100
+    per_arc = {}
+    for card in scenario_cards:
+        per_arc.setdefault(card.x, []).append(card)
+        assert card.y + card.height <= layout.scenario_bottom
+    for cards in per_arc.values():
+        cards = sorted(cards, key=lambda item: item.y)
+        for first, second in zip(cards, cards[1:]):
+            assert second.y - (first.y + first.height) >= layout.scenario_gap
