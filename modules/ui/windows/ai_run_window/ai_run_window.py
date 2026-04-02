@@ -35,6 +35,7 @@ class AIRunWindow(ctk.CTkToplevel):
 
         ctk.CTkButton(self, text="Close", command=self._on_close).pack(anchor="e", padx=16, pady=(0, 12))
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.transient(master)
         position_window_at_top(self)
 
     def _on_close(self):
@@ -47,7 +48,8 @@ class AIRunWindow(ctk.CTkToplevel):
         """Show the operation."""
         self.deiconify()
         self.lift()
-        self.focus_force()
+        self.attributes("-topmost", True)
+        self.after_idle(lambda: self.attributes("-topmost", False))
 
     def render(self, state: AIRequestState) -> None:
         """Render the operation."""
