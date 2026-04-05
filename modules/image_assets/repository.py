@@ -16,6 +16,10 @@ class ImageAssetsRepository:
         """Initialize repository with optional wrapper override."""
         self.wrapper = wrapper or GenericModelWrapper("image_assets")
 
+    def list_all(self) -> list[dict[str, Any]]:
+        """Return all persisted image-asset rows."""
+        return self.wrapper.load_items() or []
+
     def upsert_by_hash_or_path(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create or update an asset using hash first, then path fallback."""
         existing = self._find_existing(
@@ -41,7 +45,7 @@ class ImageAssetsRepository:
     def delete_stale_files(self, active_paths: Iterable[str]) -> int:
         """Delete rows that no longer map to known file paths."""
         normalized = {str(path).strip() for path in active_paths if str(path).strip()}
-        items = self.wrapper.load_items() or []
+        items = self.list_all()
         kept: list[dict[str, Any]] = []
         stale_count = 0
         for item in items:
@@ -68,7 +72,7 @@ class ImageAssetsRepository:
         page = max(1, int(page or 1))
         page_size = max(1, int(page_size or 50))
 
-        items = self.wrapper.load_items() or []
+        items = self.list_all()
         filtered = self._apply_search(items, search)
         filtered.sort(key=lambda row: str(row.get("UpdatedAt") or ""), reverse=True)
 
@@ -79,7 +83,7 @@ class ImageAssetsRepository:
 
     def _find_existing(self, *, hash_value: str, path: str) -> dict[str, Any] | None:
         """Find one row by exact hash or exact path."""
-        items = self.wrapper.load_items() or []
+        items = self.list_all()
         if hash_value:
             for item in items:
                 if str(item.get("Hash") or "").strip() == hash_value:
@@ -99,14 +103,19 @@ class ImageAssetsRepository:
 
         def _matches(item: dict[str, Any]) -> bool:
             tags = item.get("Tags") or []
+            tokens = item.get("SearchTokens") or []
             if not isinstance(tags, list):
                 tags = [str(tags)]
+            if not isinstance(tokens, list):
+                tokens = [str(tokens)]
             haystack = [
                 str(item.get("Name") or ""),
                 str(item.get("Path") or ""),
                 str(item.get("RelativePath") or ""),
                 str(item.get("Extension") or ""),
                 str(item.get("Hash") or ""),
+                str(item.get("NameNormalized") or ""),
+                " ".join(str(token) for token in tokens),
                 " ".join(str(tag) for tag in tags),
             ]
             return any(term in value.lower() for value in haystack)

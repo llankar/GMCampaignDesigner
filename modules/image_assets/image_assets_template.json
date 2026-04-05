@@ -10,6 +10,8 @@
     {"name": "Height", "type": "int"},
     {"name": "FileSizeBytes", "type": "int"},
     {"name": "Hash", "type": "text"},
+    {"name": "NameNormalized", "type": "text"},
+    {"name": "SearchTokens", "type": "list"},
     {"name": "Tags", "type": "list"},
     {"name": "ImportedAt", "type": "text"},
     {"name": "UpdatedAt", "type": "text"}

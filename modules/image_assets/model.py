@@ -20,6 +20,8 @@ class ImageAssetRecord:
     Height: int | None = None
     FileSizeBytes: int | None = None
     Hash: str = ""
+    NameNormalized: str = ""
+    SearchTokens: list[str] = field(default_factory=list)
     Tags: list[str] = field(default_factory=list)
     ImportedAt: str = ""
     UpdatedAt: str = ""
@@ -37,6 +39,8 @@ class ImageAssetRecord:
             "Height": self.Height,
             "FileSizeBytes": self.FileSizeBytes,
             "Hash": self.Hash,
+            "NameNormalized": self.NameNormalized,
+            "SearchTokens": list(self.SearchTokens),
             "Tags": list(self.Tags),
             "ImportedAt": self.ImportedAt,
             "UpdatedAt": self.UpdatedAt,
