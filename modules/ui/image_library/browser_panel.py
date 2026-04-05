@@ -94,6 +94,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._context_menu.add_command(label="Attach to entity", command=self._context_attach)
 
         self._visible_window: VirtualWindow | None = None
+        self._last_render_signature: tuple[str, int, int, int] | None = None
         self._virtualization_job: str | None = None
         self._row_overscan = 2
 
@@ -157,6 +158,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
                 canvas.yview_moveto(0.0)
 
         self._visible_window = None
+        self._last_render_signature = None
         self._schedule_virtualized_render(force=True)
 
     def _schedule_virtualized_render(self, force: bool = False) -> None:
@@ -170,9 +172,10 @@ class ImageBrowserPanel(ctk.CTkFrame):
         """Render only rows currently visible in viewport (with overscan)."""
         self._virtualization_job = None
 
-        self._clear_rendered_cards()
-
         if not self._filtered_records:
+            self._clear_rendered_cards()
+            self._visible_window = None
+            self._last_render_signature = None
             self._top_spacer.configure(height=1)
             self._bottom_spacer.configure(height=1)
             self._empty_label.grid(row=0, column=0, padx=10, pady=16, sticky="w")
@@ -203,9 +206,16 @@ class ImageBrowserPanel(ctk.CTkFrame):
             end_row = min(total_rows, first_visible_row + visible_row_count + self._row_overscan)
             window = VirtualWindow(start_row, end_row)
 
-        if self._visible_window == window:
+        render_signature = (display_mode, columns, item_height, total_items)
+        should_rerender = not (
+            self._visible_window == window and self._last_render_signature == render_signature
+        )
+        if not should_rerender:
             return
+
+        self._clear_rendered_cards()
         self._visible_window = window
+        self._last_render_signature = render_signature
 
         self._top_spacer.configure(height=max(1, window.start_row * item_height))
         self._bottom_spacer.configure(height=max(1, (total_rows - window.end_row) * item_height))
