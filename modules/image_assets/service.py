@@ -6,6 +6,12 @@ from typing import Any, Iterable
 
 from modules.image_assets.repository import ImageAssetsRepository
 from modules.image_assets.services.import_service import ImageAssetImportService, ImageAssetsImportSummary
+from modules.image_assets.services.search_service import (
+    ImageAssetSearchResultDTO,
+    ImageAssetSearchService,
+    ImageSearchFilters,
+    SortOption,
+)
 
 
 class ImageAssetsService:
@@ -15,6 +21,7 @@ class ImageAssetsService:
         """Initialize service."""
         self.repository = repository or ImageAssetsRepository()
         self.import_service = ImageAssetImportService(self.repository)
+        self.search_service = ImageAssetSearchService(self.repository)
 
     def upsert_asset(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Upsert one image asset by hash/path."""
@@ -33,6 +40,23 @@ class ImageAssetsService:
     ) -> tuple[list[dict[str, Any]], int]:
         """List/search assets with pagination."""
         return self.repository.list_paginated(page=page, page_size=page_size, search=search)
+
+    def search_images(
+        self,
+        query: str | None = None,
+        filters: ImageSearchFilters | dict[str, Any] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+        sort: SortOption = "relevance",
+    ) -> tuple[list[ImageAssetSearchResultDTO], int]:
+        """Search image assets with rich filtering and UI-ready DTO results."""
+        return self.search_service.search_images(
+            query=query,
+            filters=filters,
+            limit=limit,
+            offset=offset,
+            sort=sort,
+        )
 
     def import_directories(
         self,
