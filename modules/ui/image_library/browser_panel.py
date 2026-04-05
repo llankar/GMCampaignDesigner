@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 import tkinter as tk
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable
@@ -23,6 +24,8 @@ SIZE_CONFIG = {
     "Large": {"thumb": (176, 176), "grid_columns": 4, "item_height": 230},
     "Very Large": {"thumb": (220, 220), "grid_columns": 3, "item_height": 280},
 }
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -97,8 +100,13 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._last_render_signature: tuple[str, int, int, int] | None = None
         self._virtualization_job: str | None = None
         self._row_overscan = 2
+        self._scroll_bind_job: str | None = None
+        self._scroll_events_bound = False
+        self._bound_canvas = None
 
-        self._bind_scroll_events()
+        self._ensure_scroll_bindings()
+        self.bind("<Map>", self._on_widget_map, add="+")
+        self.after_idle(self._ensure_scroll_bindings)
         self._apply_filters_and_render()
 
     def set_records(self, records: Iterable[ImageResult]) -> None:
@@ -106,10 +114,38 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._records = list(records)
         self._apply_filters_and_render(reset_scroll=True)
 
-    def _bind_scroll_events(self) -> None:
-        """Subscribe to events that can alter visible viewport."""
+    def _on_widget_map(self, _event=None) -> None:
+        """Retry canvas event binding when widget is mapped."""
+        if not self._scroll_events_bound:
+            self._ensure_scroll_bindings()
+
+    def _ensure_scroll_bindings(self, retries: int = 20, delay_ms: int = 50) -> None:
+        """Attach viewport-change bindings once scrollable canvas exists."""
+        if self._scroll_events_bound:
+            return
+
+        if self._scroll_bind_job:
+            try:
+                self.after_cancel(self._scroll_bind_job)
+            except Exception:
+                pass
+            self._scroll_bind_job = None
+
         canvas = getattr(self.scrollable, "_parent_canvas", None)
         if not canvas:
+            if retries > 0:
+                self._scroll_bind_job = self.after(
+                    delay_ms,
+                    lambda: self._ensure_scroll_bindings(retries=retries - 1, delay_ms=delay_ms),
+                )
+            else:
+                LOGGER.warning(
+                    "ImageBrowserPanel: unable to bind scroll events; scrollable canvas not found after retries."
+                )
+            return
+
+        if self._bound_canvas is canvas:
+            self._scroll_events_bound = True
             return
 
         self._wrap_canvas_yview(canvas)
@@ -117,6 +153,8 @@ class ImageBrowserPanel(ctk.CTkFrame):
         canvas.bind("<MouseWheel>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<Button-4>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<Button-5>", lambda _event: self._schedule_virtualized_render(), add="+")
+        self._bound_canvas = canvas
+        self._scroll_events_bound = True
 
     def _wrap_canvas_yview(self, canvas) -> None:
         """Wrap canvas yview to rerender after vertical scrollbar movement."""
