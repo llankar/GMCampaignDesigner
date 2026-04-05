@@ -162,6 +162,7 @@ class ImageAssetImportService:
                     tags=tags,
                     name_normalized=name_normalized,
                     search_tokens=search_tokens,
+                    source_folder_name=file_path.parent.name,
                 )
 
                 payload = {
@@ -169,6 +170,7 @@ class ImageAssetImportService:
                     "Path": abs_path,
                     "RelativePath": self._compute_relative(file_path=file_path, root_path=root_path),
                     "SourceRoot": str(root_path.resolve()),
+                    "SourceFolderName": file_path.parent.name,
                     "Extension": file_path.suffix.lower().lstrip("."),
                     "Width": width,
                     "Height": height,

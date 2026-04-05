@@ -36,7 +36,7 @@ class ImageSearchFilters:
     filename: str | None = None
     tags: list[str] = field(default_factory=list)
     extension: str | None = None
-    source_folders: list[str] = field(default_factory=list)
+    source_folder_names: list[str] = field(default_factory=list)
     min_width: int | None = None
     max_width: int | None = None
     min_height: int | None = None
@@ -69,7 +69,7 @@ class ImageSearchFilters:
             filename=str(source.get("filename") or "").strip() or None,
             tags=_list("tags"),
             extension=str(source.get("extension") or "").strip() or None,
-            source_folders=_list("source_folders"),
+            source_folder_names=_list("source_folder_names") or _list("source_folders"),
             min_width=_int_or_none("min_width"),
             max_width=_int_or_none("max_width"),
             min_height=_int_or_none("min_height"),
@@ -184,10 +184,14 @@ class ImageAssetSearchService:
                 if normalized_requested and normalized_requested not in row_tags:
                     return False
 
-        if filters.source_folders:
-            source = str(row.get("source_root") or "").lower()
-            allowed_sources = {str(folder).lower() for folder in filters.source_folders if str(folder).strip()}
-            if allowed_sources and source not in allowed_sources:
+        if filters.source_folder_names:
+            source_folder_name = str(row.get("source_folder_name") or "").strip().lower()
+            allowed_source_folders = {
+                str(folder_name).strip().lower()
+                for folder_name in filters.source_folder_names
+                if str(folder_name).strip()
+            }
+            if allowed_source_folders and source_folder_name not in allowed_source_folders:
                 return False
 
         width = self._as_optional_int(row.get("width"))
@@ -253,6 +257,7 @@ class ImageAssetSearchService:
             "path": str(item.get("Path") or ""),
             "relative_path": str(item.get("RelativePath") or ""),
             "source_root": str(item.get("SourceRoot") or ""),
+            "source_folder_name": str(item.get("SourceFolderName") or ""),
             "extension": str(item.get("Extension") or ""),
             "width": self._as_optional_int(item.get("Width")),
             "height": self._as_optional_int(item.get("Height")),
@@ -274,6 +279,7 @@ class ImageAssetSearchService:
             tags=tags,
             name_normalized=str(item.get("NameNormalized") or ""),
             search_tokens=search_tokens,
+            source_folder_name=str(item.get("SourceFolderName") or ""),
         )
 
     @staticmethod
@@ -286,6 +292,7 @@ class ImageAssetSearchService:
             path=preview_path,
             relative_path=str(row.get("relative_path") or ""),
             source_root=str(row.get("source_root") or ""),
+            source_folder_name=str(row.get("source_folder_name") or ""),
             extension=str(row.get("extension") or ""),
             width=ImageAssetSearchService._as_optional_int(row.get("width")),
             height=ImageAssetSearchService._as_optional_int(row.get("height")),

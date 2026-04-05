@@ -16,6 +16,7 @@ class ImageAssetSearchResultDTO:
     path: str
     relative_path: str
     source_root: str
+    source_folder_name: str
     extension: str
     width: int | None
     height: int | None
@@ -31,6 +32,7 @@ class ImageAssetSearchResultDTO:
             "path": self.path,
             "relative_path": self.relative_path,
             "source_root": self.source_root,
+            "source_folder_name": self.source_folder_name,
             "extension": self.extension,
             "width": self.width,
             "height": self.height,

@@ -51,3 +51,25 @@ def test_import_directories_skips_duplicate_content(tmp_path: Path, monkeypatch)
     assert summary.updated == 0
     assert summary.skipped_duplicate == 1
     assert summary.scanned_files == 2
+
+
+def test_import_directories_stores_source_folder_name(tmp_path: Path, monkeypatch) -> None:
+    """Importer should capture the parent directory leaf as SourceFolderName."""
+    root = tmp_path / "assets"
+    nested = root / "portraits"
+    nested.mkdir(parents=True)
+    image = nested / "hero.png"
+    image.write_bytes(b"img")
+
+    repository = _FakeRepository()
+    service = ImageAssetImportService(repository=repository)
+    monkeypatch.setattr(service, "_read_dimensions", lambda _path: (256, 256))
+
+    summary = service.import_directories(
+        paths=[str(root)],
+        recursive=True,
+        reindex_changed_only=True,
+    )
+
+    assert summary.imported_new == 1
+    assert repository.items[0]["SourceFolderName"] == "portraits"

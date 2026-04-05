@@ -5,6 +5,7 @@
     {"name": "Path", "type": "file"},
     {"name": "RelativePath", "type": "text"},
     {"name": "SourceRoot", "type": "text"},
+    {"name": "SourceFolderName", "type": "text"},
     {"name": "Extension", "type": "text"},
     {"name": "Width", "type": "int"},
     {"name": "Height", "type": "int"},
