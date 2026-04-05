@@ -154,6 +154,8 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                         _command("Import Objects (PDF)", app.open_object_importer, icon_key="import_objects_pdf"),
                         _command("Generate Portraits", app.generate_missing_portraits, icon_key="generate_portraits"),
                         _command("Import Portraits from Folder", app.import_portraits_from_directory, icon_key="import_portraits"),
+                        _command("Import Image Directories…", app.open_image_directory_importer),
+                        _command("Open Image Library", app.open_image_library_browser),
                     ],
                 ),
                 MenuGroupSpec(

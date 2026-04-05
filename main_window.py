@@ -60,6 +60,7 @@ from modules.helpers.system_config import register_system_change_listener
 from modules.ui.tooltip import ToolTip
 from modules.ui.icon_button import create_icon_button
 from modules.ui.portrait_importer import PortraitImporter
+from modules.ui.image_library.dialogs import ImageDirectoryImportDialog, ImageLibraryBrowserDialog
 from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
 from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
@@ -182,6 +183,9 @@ class MainWindow(ctk.CTk):
         self.audio_bar_window = None
         self.timer_window = None
         self.portrait_importer = PortraitImporter(self)
+        self._image_assets_service = None
+        self._image_directory_importer_window = None
+        self._image_library_browser_window = None
         self._asset_library_window = None
         self._busy_modal = None
         self._system_selector_dialog = None
@@ -421,6 +425,62 @@ class MainWindow(ctk.CTk):
                 func_name="main_window.MainWindow.open_cross_campaign_asset_library",
             )
             messagebox.showerror("Error", f"Failed to open asset library window:\n{exc}")
+
+
+    def _get_image_assets_service(self):
+        """Return lazy-loaded image assets service."""
+        if self._image_assets_service is None:
+            from modules.image_assets.service import ImageAssetsService
+
+            self._image_assets_service = ImageAssetsService()
+        return self._image_assets_service
+
+    def open_image_directory_importer(self):
+        """Open image directory importer dialog."""
+        try:
+            if self._image_directory_importer_window and self._image_directory_importer_window.winfo_exists():
+                self._image_directory_importer_window.lift()
+                self._image_directory_importer_window.focus_force()
+                return
+
+            window = ImageDirectoryImportDialog(self, service=self._get_image_assets_service())
+            window.bind("<Destroy>", lambda _evt: setattr(self, "_image_directory_importer_window", None))
+            self._image_directory_importer_window = window
+        except Exception as exc:
+            log_exception(
+                f"Failed to open image directory importer: {exc}",
+                func_name="main_window.MainWindow.open_image_directory_importer",
+            )
+            messagebox.showerror("Error", f"Failed to open image directory importer:\n{exc}")
+
+    def open_image_library_browser(self, *, search_query: str = "", on_attach_to_entity=None):
+        """Open shared image library browser dialog."""
+        try:
+            should_reuse = (
+                self._image_library_browser_window
+                and self._image_library_browser_window.winfo_exists()
+                and not str(search_query or "").strip()
+                and on_attach_to_entity is None
+            )
+            if should_reuse:
+                self._image_library_browser_window.lift()
+                self._image_library_browser_window.focus_force()
+                return
+
+            window = ImageLibraryBrowserDialog(
+                self,
+                service=self._get_image_assets_service(),
+                search_query=search_query,
+                on_attach_to_entity=on_attach_to_entity,
+            )
+            window.bind("<Destroy>", lambda _evt: setattr(self, "_image_library_browser_window", None))
+            self._image_library_browser_window = window
+        except Exception as exc:
+            log_exception(
+                f"Failed to open image library browser: {exc}",
+                func_name="main_window.MainWindow.open_image_library_browser",
+            )
+            messagebox.showerror("Error", f"Failed to open image library browser:\n{exc}")
 
     def open_new_entity_type_dialog(self):
         """Open new entity type dialog."""

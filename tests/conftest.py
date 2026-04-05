@@ -364,6 +364,7 @@ except ModuleNotFoundError:
     pil_image_module.Image = _Image
     pil_image_module.LANCZOS = _Resampling.LANCZOS
     pil_module.Image = pil_image_module
+    pil_module.UnidentifiedImageError = OSError
 
     pil_imageops_module = types.ModuleType("PIL.ImageOps")
     pil_imageops_module.exif_transpose = lambda image: image
