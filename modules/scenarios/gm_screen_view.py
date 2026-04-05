@@ -889,7 +889,7 @@ class GMScreenView(ctk.CTkFrame):
 
         # Create popup anchored to the hosting toplevel
         popup = ctk.CTkToplevel(host)
-        popup.title("Search Entities")
+        popup.title("Global Search")
         popup.geometry("400x300")
         popup.transient(host)
         popup.grab_set()
@@ -897,6 +897,21 @@ class GMScreenView(ctk.CTkFrame):
         # 1) Search entry
         entry = ctk.CTkEntry(popup, placeholder_text="Type to search…")
         entry.pack(fill="x", padx=10, pady=(10, 5))
+
+        actions = ctk.CTkFrame(popup, fg_color="transparent")
+        actions.pack(fill="x", padx=10, pady=(0, 6))
+
+        def open_image_search():
+            """Open shared image browser with current query prefilled."""
+            query = entry.get().strip()
+            opener = getattr(host, "open_image_library_browser", None)
+            if callable(opener):
+                opener(search_query=query)
+                popup.destroy()
+
+        image_button = ctk.CTkButton(actions, text="Search Images", width=140, command=open_image_search)
+        image_button.pack(side="right")
+
         # focus once window is up
         popup.after(10, lambda: entry.focus_force())
 
@@ -984,6 +999,8 @@ class GMScreenView(ctk.CTkFrame):
         # 9) Bind Enter to select from either widget
         entry.bind("<Return>", lambda e: on_select())
         listbox.bind("<Return>", lambda e: on_select())
+        entry.bind("<Control-i>", lambda _event: (open_image_search(), "break")[1])
+        listbox.bind("<Control-i>", lambda _event: (open_image_search(), "break")[1])
 
         # 10) Double-click also selects
         listbox.bind("<Double-Button-1>", on_select)

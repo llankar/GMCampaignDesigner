@@ -45,6 +45,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         on_view: Callable[[ImageResult], None] | None = None,
         thumbnail_cache: ThumbnailCache | None = None,
         toolbar_state: ToolbarState | None = None,
+        on_attach_to_entity: Callable[[ImageResult], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self.grid_rowconfigure(1, weight=1)
@@ -58,6 +59,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._open_callback = on_open or self._default_open
         self._view_callback = on_view or self._default_view
         self._thumbnail_cache = thumbnail_cache or ThumbnailCache(max_items=512)
+        self._attach_callback = on_attach_to_entity
 
         self.toolbar = ImageLibraryToolbar(
             self,
@@ -88,6 +90,8 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._context_item: ImageResult | None = None
         self._context_menu.add_command(label="Open", command=self._context_open)
         self._context_menu.add_command(label="View", command=self._context_view)
+        self._context_menu.add_separator()
+        self._context_menu.add_command(label="Attach to entity", command=self._context_attach)
 
         self._visible_window: VirtualWindow | None = None
         self._virtualization_job: str | None = None
@@ -254,6 +258,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
     def _show_context_menu(self, item: ImageResult, x_root: int, y_root: int) -> None:
         """Open right-click context menu for one item."""
         self._context_item = item
+        self._context_menu.entryconfigure("Attach to entity", state=("normal" if self._attach_callback else "disabled"))
         try:
             self._context_menu.tk_popup(x_root, y_root)
         finally:
@@ -268,6 +273,11 @@ class ImageBrowserPanel(ctk.CTkFrame):
         """Handle context menu view action."""
         if self._context_item:
             self._view_callback(self._context_item)
+
+    def _context_attach(self) -> None:
+        """Handle optional attach action for callers embedding this browser."""
+        if self._context_item and self._attach_callback:
+            self._attach_callback(self._context_item)
 
     @staticmethod
     def _default_open(item: ImageResult) -> None:
