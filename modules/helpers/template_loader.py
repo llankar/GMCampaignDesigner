@@ -36,6 +36,7 @@ _BUILTIN_ENTITY_METADATA = {
     "puzzles": {"label": "Puzzles", "icon": "assets/random_table_icon.png"},
     "maps": {"label": "Maps", "icon": "assets/maps_icon.png"},
     "books": {"label": "Books", "icon": "assets/books_icon.png"},
+    "image_assets": {"label": "Image Assets", "icon": "assets/import_icon.png"},
 }
 
 @log_function
