@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -9,12 +10,23 @@ import customtkinter as ctk
 
 from modules.image_assets import ImageAssetsService
 from modules.image_assets.services.import_service import ImageAssetsImportSummary
+from modules.ui.image_library.dialogs.import_directories import (
+    RecentImportRootsStore,
+    merge_roots,
+    validate_roots,
+)
 
 
 class ImageDirectoryImportDialog(ctk.CTkToplevel):
     """Collect import options and launch image directory import."""
 
-    def __init__(self, master: tk.Misc | None = None, *, service: ImageAssetsService | None = None) -> None:
+    def __init__(
+        self,
+        master: tk.Misc | None = None,
+        *,
+        service: ImageAssetsService | None = None,
+        recent_roots_store: RecentImportRootsStore | None = None,
+    ) -> None:
         super().__init__(master)
         self.title("Import Image Directories")
         self.geometry("680x440")
@@ -22,13 +34,15 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         self.transient(master)
 
         self._service = service or ImageAssetsService()
-        self._roots: list[str] = []
+        self._recent_roots_store = recent_roots_store or RecentImportRootsStore()
+        self._roots: list[str] = self._recent_roots_store.load()
 
         self.recursive_var = ctk.BooleanVar(value=True)
         self.reindex_changed_var = ctk.BooleanVar(value=True)
 
         self._build_ui()
         self._refresh_roots()
+        self._enable_drag_and_drop_if_available()
 
         self.bind("<Escape>", lambda _event: self.destroy())
         self.lift()
@@ -63,6 +77,7 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         side.grid(row=0, column=1, sticky="ns", padx=8, pady=8)
 
         ctk.CTkButton(side, text="Add directory...", command=self._add_directory).pack(fill="x", pady=(0, 6))
+        ctk.CTkButton(side, text="Bulk add...", command=self._bulk_add_directories).pack(fill="x", pady=6)
         ctk.CTkButton(side, text="Remove selected", command=self._remove_selected).pack(fill="x", pady=6)
         ctk.CTkButton(side, text="Clear", command=self._clear).pack(fill="x", pady=6)
 
@@ -87,13 +102,33 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
     def _add_directory(self) -> None:
         """Prompt and append one directory."""
         selected = filedialog.askdirectory(parent=self, title="Select image directory")
-        if not selected:
-            return
-        candidate = str(selected).strip()
-        if not candidate or candidate in self._roots:
-            return
-        self._roots.append(candidate)
-        self._refresh_roots()
+        self._append_roots([selected])
+
+    def _bulk_add_directories(self) -> None:
+        """Repeatedly prompt the user to add multiple directories in one flow."""
+        selected_roots: list[str] = []
+        while True:
+            selected = filedialog.askdirectory(parent=self, title="Select image directory")
+            if not selected:
+                break
+            selected_roots.append(selected)
+            continue_adding = messagebox.askyesno(
+                "Bulk add directories",
+                "Add another directory?",
+                parent=self,
+            )
+            if not continue_adding:
+                break
+
+        self._append_roots(selected_roots)
+
+    def _append_roots(self, candidates: list[str]) -> None:
+        """Append incoming root candidates after normalization and dedupe."""
+        before_count = len(self._roots)
+        merged = merge_roots(self._roots, candidates)
+        self._roots = merged
+        if len(self._roots) != before_count:
+            self._refresh_roots()
 
     def _remove_selected(self) -> None:
         """Remove selected rows from source list."""
@@ -117,16 +152,67 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
 
     def _run_import(self) -> None:
         """Execute import and report concise result."""
-        if not self._roots:
-            messagebox.showwarning("No directory", "Add at least one directory to import.", parent=self)
+        validation = validate_roots(self._roots)
+        existing_roots = validation.existing_roots
+        if not existing_roots:
+            messagebox.showwarning("No directory", "Add at least one valid directory to import.", parent=self)
             return
 
+        if validation.missing_roots:
+            should_continue = messagebox.askyesno(
+                "Missing directories",
+                "Some selected directories no longer exist and will be skipped. Continue import?",
+                parent=self,
+            )
+            if not should_continue:
+                return
+
         summary = self._service.import_directories(
-            paths=list(self._roots),
+            paths=existing_roots,
             recursive=bool(self.recursive_var.get()),
             reindex_changed_only=bool(self.reindex_changed_var.get()),
         )
+        self._recent_roots_store.save(existing_roots)
         messagebox.showinfo("Import complete", self._format_summary(summary), parent=self)
+
+    def _enable_drag_and_drop_if_available(self) -> None:
+        """Enable folder drag-and-drop when supported by the current Tk stack."""
+        target_register = getattr(self.roots_list, "drop_target_register", None)
+        dnd_bind = getattr(self.roots_list, "dnd_bind", None)
+        if not callable(target_register) or not callable(dnd_bind):
+            return
+        try:
+            target_register("DND_Files")
+            dnd_bind("<<Drop>>", self._on_drop_files)
+        except Exception:
+            return
+
+    def _on_drop_files(self, event: object) -> str:
+        """Handle dropped file paths and add only directory roots."""
+        raw_data = str(getattr(event, "data", "") or "")
+        if not raw_data:
+            return "break"
+
+        try:
+            candidates = [str(value).strip("{}") for value in self.tk.splitlist(raw_data)]
+        except tk.TclError:
+            candidates = [raw_data.strip("{}")]
+
+        valid_dirs: list[str] = []
+        for candidate in candidates:
+            if not candidate:
+                continue
+            normalized = candidate.strip()
+            if not normalized:
+                continue
+            try:
+                if os.path.isdir(normalized):
+                    valid_dirs.append(normalized)
+            except Exception:
+                continue
+
+        self._append_roots(valid_dirs)
+        return "break"
 
     @staticmethod
     def _format_summary(summary: ImageAssetsImportSummary) -> str:
