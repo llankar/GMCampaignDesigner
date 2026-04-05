@@ -229,7 +229,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                             display_name = os.path.basename(self.image_path) if self.image_path else "[No Image]"
                             self.image_label.configure(image=None, text=display_name)
                             self.image_image = None
-                        self.field_widgets["Image"] = self.image_path
+                        self.field_widgets["Image"] = self._campaign_relative_path(self.image_path)
                         return
                 except Exception:
                     continue
@@ -275,7 +275,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                     display_name = os.path.basename(self.image_path) if self.image_path else "[No Image]"
                     self.image_label.configure(image=None, text=display_name)
                     self.image_image = None
-                self.field_widgets["Image"] = self.image_path
+                self.field_widgets["Image"] = self._campaign_relative_path(self.image_path)
                 return
             except Exception as e:
                 messagebox.showerror("Paste Image", f"Failed to paste image: {e}")
@@ -511,5 +511,17 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         if file_paths:
             for file_path in file_paths:
+                if not self._validate_asset_source(file_path, asset_label="Portrait"):
+                    continue
                 copied = self.copy_and_resize_portrait(file_path)
-                self._add_portrait_path(copied, make_primary=not self.portrait_paths)
+                normalized = self._campaign_relative_path(copied)
+                self._add_portrait_path(normalized, make_primary=not self.portrait_paths)
+
+    def attach_portrait_from_library(self, image_result):
+        """Attach portrait selected from image library."""
+        source_path = str(getattr(image_result, "path", image_result))
+        if not self._validate_asset_source(source_path, asset_label="Portrait"):
+            return
+        copied = self.copy_and_resize_portrait(source_path)
+        normalized = self._campaign_relative_path(copied)
+        self._add_portrait_path(normalized, make_primary=not self.portrait_paths)

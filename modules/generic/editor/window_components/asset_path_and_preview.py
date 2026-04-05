@@ -4,6 +4,55 @@ from modules.generic.editor.window_context import *
 
 
 class GenericEditorWindowAssetPathAndPreview:
+    def _validate_asset_source(self, src_path: str, *, asset_label: str) -> bool:
+        """Ensure selected source path exists before copying."""
+        if not src_path:
+            return False
+        source = Path(src_path)
+        if source.is_file():
+            return True
+        messagebox.showerror(
+            f"{asset_label} introuvable",
+            f"Le fichier source est introuvable:\n{src_path}",
+        )
+        return False
+
+    def _set_image_preview_from_path(self, image_path: str) -> None:
+        """Refresh image preview label for the provided stored image path."""
+        if image_path:
+            candidate = Path(image_path)
+            abs_path = candidate if candidate.is_absolute() else Path(ConfigHelper.get_campaign_dir()) / candidate
+        else:
+            abs_path = None
+        try:
+            # Keep image resilient if this step fails.
+            if abs_path and abs_path.exists():
+                image = Image.open(abs_path).resize((256, 256))
+                self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
+                self.image_label.configure(image=self.image_image, text="")
+            else:
+                raise FileNotFoundError
+        except Exception:
+            display_name = os.path.basename(image_path) if image_path else "[No Image]"
+            self.image_label.configure(image=None, text=display_name)
+            self.image_image = None
+
+    def _persist_image_path(self, path: str) -> str:
+        """Store image path in campaign-relative format."""
+        normalized = self._campaign_relative_path(path)
+        self.image_path = normalized
+        self.field_widgets["Image"] = normalized
+        return normalized
+
+    def _attach_image_from_source(self, src_path: str) -> bool:
+        """Copy image from source path and persist normalized campaign-relative value."""
+        if not self._validate_asset_source(src_path, asset_label="Image"):
+            return False
+        copied_path = self.copy_and_resize_image(src_path)
+        normalized = self._persist_image_path(copied_path)
+        self._set_image_preview_from_path(normalized)
+        return True
+
     def select_image(self):
         """Select image."""
         file_path = filedialog.askopenfilename(
@@ -22,26 +71,12 @@ class GenericEditorWindowAssetPathAndPreview:
         )
 
         if file_path:
-            # Continue with this path when file path is set.
-            self.image_path = self.copy_and_resize_image(file_path)
-            if self.image_path:
-                candidate = Path(self.image_path)
-                abs_path = candidate if candidate.is_absolute() else Path(ConfigHelper.get_campaign_dir()) / candidate
-            else:
-                abs_path = None
-            try:
-                # Keep image resilient if this step fails.
-                if abs_path and abs_path.exists():
-                    image = Image.open(abs_path).resize((256, 256))
-                    self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
-                    self.image_label.configure(image=self.image_image, text="")
-                else:
-                    raise FileNotFoundError
-            except Exception:
-                display_name = os.path.basename(self.image_path) if self.image_path else "[No Image]"
-                self.image_label.configure(image=None, text=display_name)
-                self.image_image = None
-            self.field_widgets["Image"] = self.image_path
+            self._attach_image_from_source(file_path)
+
+    def attach_image_from_library(self, image_result):
+        """Attach image selected from image library."""
+        source_path = getattr(image_result, "path", image_result)
+        self._attach_image_from_source(str(source_path))
     def _campaign_relative_path(self, path):
         """Internal helper for campaign relative path."""
         if not path or str(path).strip() in ("[No Image]", "[No Portrait]", "[No Attachment]", ""):
