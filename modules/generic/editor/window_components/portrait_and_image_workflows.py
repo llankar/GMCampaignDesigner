@@ -40,6 +40,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         ctk.CTkButton(button_frame, text="Add Portrait(s)", **primary_button_style(), command=self.select_portrait).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Search Images", **primary_button_style(), command=self.open_portrait_image_browser).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Use Image Library", **primary_button_style(), command=self.open_portrait_image_library).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Paste Portrait", **primary_button_style(), command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Create Portrait with description", **primary_button_style(), command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Set Primary", **primary_button_style(), command=self.set_primary_portrait).pack(side="left", padx=5)
@@ -72,6 +73,28 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 "Image Browser",
                 "Impossible d’ouvrir la page d’images. Vérifiez la connexion puis réessayez.",
             )
+    def open_portrait_image_library(self):
+        """Open internal image library to attach a portrait."""
+        host = self.winfo_toplevel()
+        opener = getattr(host, "open_image_library_browser", None)
+        if not callable(opener):
+            messagebox.showerror("Image Library", "Image library is unavailable from this window.")
+            return
+        opener(
+            search_query=self._resolve_portrait_search_query(),
+            on_attach_to_entity=self._attach_portrait_from_image_library,
+        )
+    def _attach_portrait_from_image_library(self, image_result):
+        """Handle portrait attach callback from internal image library."""
+        source_path = str(getattr(image_result, "path", ""))
+        if not self._validate_asset_source(source_path, asset_label="Portrait"):
+            return
+        make_primary = not self.portrait_paths
+        copied = self.copy_and_resize_portrait(source_path)
+        normalized = self._campaign_relative_path(copied)
+        self._add_portrait_path(normalized, make_primary=make_primary)
+        self._refresh_portrait_listbox(select_primary=make_primary)
+        self._update_portrait_preview()
     def _resolve_portrait_search_query(self):
         """Resolve portrait search query."""
         key_field = self.model_wrapper._infer_key_field()
@@ -187,8 +210,30 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         button_frame.pack(pady=5)
 
         ctk.CTkButton(button_frame, text="Select Image", command=self.select_image, **primary_button_style()).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Use Image Library", command=self.open_image_image_library, **primary_button_style()).pack(side="left", padx=5)
         ctk.CTkButton(button_frame, text="Paste Image", command=self.paste_image_from_clipboard, **primary_button_style()).pack(side="left", padx=5)
         self.field_widgets[field["name"]] = self.image_path
+    def open_image_image_library(self):
+        """Open internal image library to attach image field."""
+        host = self.winfo_toplevel()
+        opener = getattr(host, "open_image_library_browser", None)
+        if not callable(opener):
+            messagebox.showerror("Image Library", "Image library is unavailable from this window.")
+            return
+        opener(
+            search_query=self._resolve_portrait_search_query(),
+            on_attach_to_entity=self._attach_image_from_image_library,
+        )
+    def _attach_image_from_image_library(self, image_result):
+        """Handle image attach callback from internal image library."""
+        source_path = str(getattr(image_result, "path", ""))
+        if not self._validate_asset_source(source_path, asset_label="Image"):
+            return
+        copied = self.copy_and_resize_image(source_path)
+        normalized = self._campaign_relative_path(copied)
+        self.image_path = normalized
+        self.field_widgets["Image"] = normalized
+        self._set_image_preview_from_path(normalized)
     def paste_image_from_clipboard(self):
         """Paste image from clipboard and set as entity image (map image).
         Supports images directly or image file paths in clipboard (Windows/macOS).
