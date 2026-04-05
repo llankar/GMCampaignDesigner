@@ -5,6 +5,47 @@ from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, 
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
+    def _resolve_image_library_opener(self):
+        """Resolve a callable image-library opener across likely host containers."""
+
+        def _callable_opener(candidate):
+            opener = getattr(candidate, "open_image_library_browser", None)
+            return opener if callable(opener) else None
+
+        def _walk_parent_chain(start):
+            seen = set()
+            widget = start
+            while widget is not None and id(widget) not in seen:
+                seen.add(id(widget))
+                opener = _callable_opener(widget)
+                if opener:
+                    return opener
+                widget = getattr(widget, "master", None) or getattr(widget, "parent", None)
+            return None
+
+        direct_opener = _callable_opener(self)
+        if direct_opener:
+            return direct_opener
+
+        for owner_attr in ("main_window", "app"):
+            owner = getattr(self, owner_attr, None)
+            opener = _callable_opener(owner)
+            if opener:
+                return opener
+
+        opener = _walk_parent_chain(self)
+        if opener:
+            return opener
+
+        toplevel = self.winfo_toplevel()
+        if toplevel is not None:
+            opener = _callable_opener(toplevel)
+            if opener:
+                return opener
+            return _walk_parent_chain(getattr(toplevel, "master", None) or getattr(toplevel, "parent", None))
+
+        return None
+
     def create_portrait_field(self, field):
         """Create portrait field."""
         frame = ctk.CTkFrame(self._field_parent(), fg_color="transparent")
@@ -75,8 +116,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             )
     def open_portrait_image_library(self):
         """Open internal image library to attach a portrait."""
-        host = self.winfo_toplevel()
-        opener = getattr(host, "open_image_library_browser", None)
+        opener = self._resolve_image_library_opener()
         if not callable(opener):
             messagebox.showerror("Image Library", "Image library is unavailable from this window.")
             return
@@ -215,8 +255,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         self.field_widgets[field["name"]] = self.image_path
     def open_image_image_library(self):
         """Open internal image library to attach image field."""
-        host = self.winfo_toplevel()
-        opener = getattr(host, "open_image_library_browser", None)
+        opener = self._resolve_image_library_opener()
         if not callable(opener):
             messagebox.showerror("Image Library", "Image library is unavailable from this window.")
             return
