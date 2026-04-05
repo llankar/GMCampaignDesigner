@@ -111,10 +111,30 @@ class ImageBrowserPanel(ctk.CTkFrame):
         canvas = getattr(self.scrollable, "_parent_canvas", None)
         if not canvas:
             return
+
+        self._wrap_canvas_yview(canvas)
         canvas.bind("<Configure>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<MouseWheel>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<Button-4>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<Button-5>", lambda _event: self._schedule_virtualized_render(), add="+")
+
+    def _wrap_canvas_yview(self, canvas) -> None:
+        """Wrap canvas yview to rerender after vertical scrollbar movement."""
+        if getattr(canvas, "_image_browser_yview_wrapped", False):
+            return
+
+        original_yview = getattr(canvas, "yview", None)
+        if not callable(original_yview):
+            return
+
+        def _wrapped_yview(*args):
+            result = original_yview(*args)
+            if args:
+                self._schedule_virtualized_render()
+            return result
+
+        setattr(canvas, "yview", _wrapped_yview)
+        setattr(canvas, "_image_browser_yview_wrapped", True)
 
     def _on_toolbar_changed(self, _state: ToolbarState) -> None:
         """Handle toolbar state updates."""
