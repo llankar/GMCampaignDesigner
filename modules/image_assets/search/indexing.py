@@ -72,6 +72,7 @@ def build_searchable_blob(
     tags: Iterable[str],
     name_normalized: str | None,
     search_tokens: Iterable[str],
+    source_folder_name: str | None = None,
 ) -> str:
     """Build a lowercased precomputed blob used by fast in-memory matching."""
     chunks: list[str] = [
@@ -79,6 +80,7 @@ def build_searchable_blob(
         str(path or ""),
         str(relative_path or ""),
         str(source_root or ""),
+        str(source_folder_name or ""),
         str(extension or ""),
         str(name_normalized or ""),
     ]

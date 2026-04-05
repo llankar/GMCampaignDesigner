@@ -49,6 +49,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         thumbnail_cache: ThumbnailCache | None = None,
         toolbar_state: ToolbarState | None = None,
         on_attach_to_entity: Callable[[ImageResult], None] | None = None,
+        on_toolbar_state_changed: Callable[[ToolbarState], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self.grid_rowconfigure(1, weight=1)
@@ -63,6 +64,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._view_callback = on_view or self._default_view
         self._thumbnail_cache = thumbnail_cache or ThumbnailCache(max_items=512)
         self._attach_callback = on_attach_to_entity
+        self._toolbar_state_changed_callback = on_toolbar_state_changed
 
         self.toolbar = ImageLibraryToolbar(
             self,
@@ -246,6 +248,8 @@ class ImageBrowserPanel(ctk.CTkFrame):
 
     def _on_toolbar_changed(self, _state: ToolbarState) -> None:
         """Handle toolbar state updates."""
+        if self._toolbar_state_changed_callback:
+            self._toolbar_state_changed_callback(self.toolbar.state)
         self._apply_filters_and_render(reset_scroll=True)
 
     def _apply_filters_and_render(self, *, reset_scroll: bool = False) -> None:
@@ -253,12 +257,22 @@ class ImageBrowserPanel(ctk.CTkFrame):
         state = self.toolbar.state
         query = state.query.lower().strip()
 
-        if query:
-            self._filtered_records = [
-                item for item in self._records if query in item.name.lower() or query in item.path.lower()
+        folder_name = (state.folder_name or "All").strip().lower()
+        if folder_name and folder_name != "all":
+            folder_filtered = [
+                item
+                for item in self._records
+                if (item.source_folder_name or "").strip().lower() == folder_name
             ]
         else:
-            self._filtered_records = list(self._records)
+            folder_filtered = list(self._records)
+
+        if query:
+            self._filtered_records = [
+                item for item in folder_filtered if query in item.name.lower() or query in item.path.lower()
+            ]
+        else:
+            self._filtered_records = folder_filtered
 
         reverse = False
         if state.sort_by == "Name (A-Z)":

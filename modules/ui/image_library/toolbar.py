@@ -27,6 +27,7 @@ class ToolbarState:
     size_preset: str = "Medium"
     display_mode: str = "Grid"
     sort_by: str = "Name (A-Z)"
+    folder_name: str = "All"
 
 
 class ImageLibraryToolbar(ctk.CTkFrame):
@@ -81,6 +82,16 @@ class ImageLibraryToolbar(ctk.CTkFrame):
         )
         self.sort_selector.grid(row=0, column=4, padx=(6, 8), pady=8, sticky="ew")
 
+        ctk.CTkLabel(self, text="Folder").grid(row=0, column=5, padx=(8, 6), pady=8, sticky="w")
+        self.folder_var = ctk.StringVar(value=self._state.folder_name or "All")
+        self.folder_selector = ctk.CTkOptionMenu(
+            self,
+            values=["All"],
+            variable=self.folder_var,
+            command=lambda _value: self._emit_change(immediate=True),
+        )
+        self.folder_selector.grid(row=0, column=6, padx=(0, 8), pady=8, sticky="ew")
+
     def _on_search_key_release(self, _event=None) -> None:
         """Debounce user typing and emit a single consolidated change."""
         if self._pending_search_job:
@@ -98,8 +109,18 @@ class ImageLibraryToolbar(ctk.CTkFrame):
             size_preset=self.size_var.get(),
             display_mode=self.mode_var.get(),
             sort_by=self.sort_var.get(),
+            folder_name=self.folder_var.get().strip() or "All",
         )
         self._on_change(self._state)
+
+    def set_folder_choices(self, folder_names: list[str]) -> None:
+        """Refresh available source-folder options while preserving selection when possible."""
+        distinct = sorted({str(name).strip() for name in folder_names if str(name).strip()}, key=str.lower)
+        values = ["All", *distinct]
+        self.folder_selector.configure(values=values)
+
+        selected = self.folder_var.get().strip() or "All"
+        self.folder_var.set(selected if selected in values else "All")
 
     @property
     def state(self) -> ToolbarState:

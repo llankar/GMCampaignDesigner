@@ -16,6 +16,7 @@ class ImageResult:
     name: str
     modified_ts: float = 0.0
     subtitle: str = ""
+    source_folder_name: str = ""
 
 
 class ImageResultCard(ctk.CTkFrame):

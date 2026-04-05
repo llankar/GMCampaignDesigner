@@ -15,6 +15,7 @@ class ImageAssetRecord:
     Path: str
     RelativePath: str = ""
     SourceRoot: str = ""
+    SourceFolderName: str = ""
     Extension: str = ""
     Width: int | None = None
     Height: int | None = None
@@ -35,6 +36,7 @@ class ImageAssetRecord:
             "Path": self.Path,
             "RelativePath": self.RelativePath,
             "SourceRoot": self.SourceRoot,
+            "SourceFolderName": self.SourceFolderName,
             "Extension": self.Extension,
             "Width": self.Width,
             "Height": self.Height,
