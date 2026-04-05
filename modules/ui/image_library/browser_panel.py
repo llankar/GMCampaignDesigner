@@ -103,6 +103,10 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._scroll_bind_job: str | None = None
         self._scroll_events_bound = False
         self._bound_canvas = None
+        self._bound_scrollbar = None
+        self._scrollbar_poll_job: str | None = None
+        self._scrollbar_interacting = False
+        self._last_canvas_yview: tuple[float, float] | None = None
 
         self._ensure_scroll_bindings()
         self.bind("<Map>", self._on_widget_map, add="+")
@@ -146,6 +150,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
 
         if self._bound_canvas is canvas:
             self._scroll_events_bound = True
+            self._bind_scrollbar_events()
             return
 
         self._wrap_canvas_yview(canvas)
@@ -153,8 +158,72 @@ class ImageBrowserPanel(ctk.CTkFrame):
         canvas.bind("<MouseWheel>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<Button-4>", lambda _event: self._schedule_virtualized_render(), add="+")
         canvas.bind("<Button-5>", lambda _event: self._schedule_virtualized_render(), add="+")
+        self._last_canvas_yview = canvas.yview()
         self._bound_canvas = canvas
         self._scroll_events_bound = True
+        self._bind_scrollbar_events()
+
+    def _bind_scrollbar_events(self) -> None:
+        """Bind internal scrollbar drag events to keep virtualization in sync."""
+        scrollbar = getattr(self.scrollable, "_scrollbar", None)
+        if not scrollbar:
+            return
+        if self._bound_scrollbar is scrollbar and getattr(scrollbar, "_image_browser_scrollbar_bound", False):
+            return
+
+        if getattr(scrollbar, "_image_browser_scrollbar_bound", False):
+            self._bound_scrollbar = scrollbar
+            return
+
+        scrollbar.bind("<ButtonPress-1>", self._on_scrollbar_button_press, add="+")
+        scrollbar.bind("<B1-Motion>", self._on_scrollbar_drag_motion, add="+")
+        scrollbar.bind("<ButtonRelease-1>", self._on_scrollbar_button_release, add="+")
+        setattr(scrollbar, "_image_browser_scrollbar_bound", True)
+        self._bound_scrollbar = scrollbar
+
+    def _on_scrollbar_button_press(self, _event=None) -> None:
+        """Warm up rerender pipeline and start yview polling while dragging."""
+        self._scrollbar_interacting = True
+        self._schedule_virtualized_render()
+        self._start_scrollbar_position_poll()
+
+    def _on_scrollbar_drag_motion(self, _event=None) -> None:
+        """Force rerender attempts while the scrollbar thumb is dragged."""
+        self._scrollbar_interacting = True
+        self._schedule_virtualized_render()
+        self._start_scrollbar_position_poll()
+
+    def _on_scrollbar_button_release(self, _event=None) -> None:
+        """Stop polling and force a final rerender at drag end."""
+        self._scrollbar_interacting = False
+        if self._scrollbar_poll_job:
+            try:
+                self.after_cancel(self._scrollbar_poll_job)
+            except Exception:
+                pass
+            self._scrollbar_poll_job = None
+        self._schedule_virtualized_render(force=True)
+
+    def _start_scrollbar_position_poll(self) -> None:
+        """Poll canvas yview during scrollbar interaction as a fallback hook."""
+        if self._scrollbar_poll_job:
+            return
+        self._scrollbar_poll_job = self.after(16, self._poll_scrollbar_position_change)
+
+    def _poll_scrollbar_position_change(self) -> None:
+        """Trigger rerender when yview changes while scrollbar is being dragged."""
+        self._scrollbar_poll_job = None
+        canvas = getattr(self.scrollable, "_parent_canvas", None)
+        if not canvas:
+            return
+
+        current_yview = canvas.yview()
+        if self._last_canvas_yview != current_yview:
+            self._last_canvas_yview = current_yview
+            self._schedule_virtualized_render()
+
+        if self._scrollbar_interacting:
+            self._scrollbar_poll_job = self.after(16, self._poll_scrollbar_position_change)
 
     def _wrap_canvas_yview(self, canvas) -> None:
         """Wrap canvas yview to rerender after vertical scrollbar movement."""
@@ -167,6 +236,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
 
         def _wrapped_yview(*args):
             result = original_yview(*args)
+            self._last_canvas_yview = original_yview()
             if args:
                 self._schedule_virtualized_render()
             return result
