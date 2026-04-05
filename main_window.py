@@ -465,7 +465,7 @@ class MainWindow(ctk.CTk):
             if should_reuse:
                 self._image_library_browser_window.lift()
                 self._image_library_browser_window.focus_force()
-                return
+                return self._image_library_browser_window
 
             window = ImageLibraryBrowserDialog(
                 self,
@@ -475,12 +475,14 @@ class MainWindow(ctk.CTk):
             )
             window.bind("<Destroy>", lambda _evt: setattr(self, "_image_library_browser_window", None))
             self._image_library_browser_window = window
+            return window
         except Exception as exc:
             log_exception(
                 f"Failed to open image library browser: {exc}",
                 func_name="main_window.MainWindow.open_image_library_browser",
             )
             messagebox.showerror("Error", f"Failed to open image library browser:\n{exc}")
+            return None
 
     def open_new_entity_type_dialog(self):
         """Open new entity type dialog."""
