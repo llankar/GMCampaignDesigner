@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from modules.image_assets.repository import ImageAssetsRepository
+from modules.image_assets.services.import_service import ImageAssetImportService, ImageAssetsImportSummary
 
 
 class ImageAssetsService:
@@ -13,6 +14,7 @@ class ImageAssetsService:
     def __init__(self, repository: ImageAssetsRepository | None = None) -> None:
         """Initialize service."""
         self.repository = repository or ImageAssetsRepository()
+        self.import_service = ImageAssetImportService(self.repository)
 
     def upsert_asset(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Upsert one image asset by hash/path."""
@@ -31,3 +33,16 @@ class ImageAssetsService:
     ) -> tuple[list[dict[str, Any]], int]:
         """List/search assets with pagination."""
         return self.repository.list_paginated(page=page, page_size=page_size, search=search)
+
+    def import_directories(
+        self,
+        paths: list[str],
+        recursive: bool,
+        reindex_changed_only: bool,
+    ) -> ImageAssetsImportSummary:
+        """Import many directories through the dedicated import workflow."""
+        return self.import_service.import_directories(
+            paths=paths,
+            recursive=recursive,
+            reindex_changed_only=reindex_changed_only,
+        )
