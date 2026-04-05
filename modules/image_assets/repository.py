@@ -115,6 +115,7 @@ class ImageAssetsRepository:
                 str(item.get("Extension") or ""),
                 str(item.get("Hash") or ""),
                 str(item.get("NameNormalized") or ""),
+                str(item.get("SearchableBlob") or ""),
                 " ".join(str(token) for token in tokens),
                 " ".join(str(tag) for tag in tags),
             ]

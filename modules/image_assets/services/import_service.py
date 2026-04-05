@@ -10,6 +10,11 @@ from typing import Iterable
 from PIL import Image, UnidentifiedImageError
 
 from modules.image_assets.repository import ImageAssetsRepository
+from modules.image_assets.search.indexing import (
+    build_search_tokens,
+    build_searchable_blob,
+    normalize_filename,
+)
 
 _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"}
 _BATCH_SIZE = 1024 * 1024
@@ -145,8 +150,19 @@ class ImageAssetImportService:
                     height = self._as_optional_int(existing.get("Height") if existing else None)
 
                 stem = file_path.stem
-                name_normalized = self._normalize_name(stem)
-                search_tokens = self._build_search_tokens(name_normalized)
+                tags: list[str] = []
+                name_normalized = normalize_filename(stem)
+                search_tokens = build_search_tokens(name_normalized=name_normalized, tags=tags)
+                searchable_blob = build_searchable_blob(
+                    name=stem,
+                    path=abs_path,
+                    relative_path=self._compute_relative(file_path=file_path, root_path=root_path),
+                    source_root=str(root_path.resolve()),
+                    extension=file_path.suffix.lower().lstrip("."),
+                    tags=tags,
+                    name_normalized=name_normalized,
+                    search_tokens=search_tokens,
+                )
 
                 payload = {
                     "Name": stem,
@@ -160,6 +176,8 @@ class ImageAssetImportService:
                     "Hash": content_hash,
                     "NameNormalized": name_normalized,
                     "SearchTokens": search_tokens,
+                    "Tags": tags,
+                    "SearchableBlob": searchable_blob,
                 }
 
                 saved = self.repository.upsert_by_hash_or_path(payload)
@@ -228,24 +246,6 @@ class ImageAssetImportService:
         if not digest or not size:
             return ""
         return f"{digest}:{size}"
-
-    @staticmethod
-    def _normalize_name(name: str) -> str:
-        cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in str(name or ""))
-        return " ".join(cleaned.split())
-
-    @classmethod
-    def _build_search_tokens(cls, normalized_name: str) -> list[str]:
-        if not normalized_name:
-            return []
-        parts = normalized_name.split()
-        compact = normalized_name.replace(" ", "")
-        ordered: list[str] = []
-        for token in [*parts, compact]:
-            token = token.strip()
-            if token and token not in ordered:
-                ordered.append(token)
-        return ordered
 
     @staticmethod
     def _compute_relative(file_path: Path, root_path: Path) -> str:

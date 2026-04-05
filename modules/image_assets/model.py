@@ -23,6 +23,7 @@ class ImageAssetRecord:
     NameNormalized: str = ""
     SearchTokens: list[str] = field(default_factory=list)
     Tags: list[str] = field(default_factory=list)
+    SearchableBlob: str = ""
     ImportedAt: str = ""
     UpdatedAt: str = ""
 
@@ -42,6 +43,7 @@ class ImageAssetRecord:
             "NameNormalized": self.NameNormalized,
             "SearchTokens": list(self.SearchTokens),
             "Tags": list(self.Tags),
+            "SearchableBlob": self.SearchableBlob,
             "ImportedAt": self.ImportedAt,
             "UpdatedAt": self.UpdatedAt,
         }
