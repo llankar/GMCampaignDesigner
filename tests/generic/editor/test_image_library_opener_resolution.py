@@ -20,9 +20,23 @@ class _EditorHarness(GenericEditorWindowPortraitAndImageWorkflows):
         self._toplevel = toplevel
         self.main_window = main_window
         self.app = app
+        self._current_grab = None
 
     def winfo_toplevel(self):
         return self._toplevel
+
+    def grab_current(self):
+        return self._current_grab
+
+    def grab_release(self):
+        if self._current_grab is self:
+            self._current_grab = None
+
+    def grab_set(self):
+        self._current_grab = self
+
+    def winfo_exists(self):
+        return True
 
 
 @pytest.mark.parametrize(

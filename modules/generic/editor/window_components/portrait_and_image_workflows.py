@@ -5,6 +5,41 @@ from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, 
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
+    def _open_image_library_dialog_modal(self, opener, *, search_query: str, on_attach_to_entity):
+        """Open the shared image-library dialog and hand off modal focus/grab."""
+        editor_owned_grab = self.grab_current() is self
+        if editor_owned_grab:
+            self.grab_release()
+
+        dialog = opener(
+            search_query=search_query,
+            on_attach_to_entity=on_attach_to_entity,
+        )
+        if dialog is None:
+            if editor_owned_grab and self.winfo_exists():
+                self.grab_set()
+            return
+
+        dialog.transient(self)
+        dialog.lift()
+        dialog.focus_force()
+        dialog.grab_set()
+
+        def _restore_editor_modal(_event):
+            if _event.widget is not dialog:
+                return
+            if not editor_owned_grab:
+                return
+            try:
+                if self.winfo_exists():
+                    self.lift()
+                    self.focus_force()
+                    self.grab_set()
+            except tk.TclError:
+                return
+
+        dialog.bind("<Destroy>", _restore_editor_modal, add="+")
+
     def _resolve_image_library_opener(self):
         """Resolve a callable image-library opener across likely host containers."""
 
@@ -120,7 +155,8 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         if not callable(opener):
             messagebox.showerror("Image Library", "Image library is unavailable from this window.")
             return
-        opener(
+        self._open_image_library_dialog_modal(
+            opener,
             search_query=self._resolve_portrait_search_query(),
             on_attach_to_entity=self._attach_portrait_from_image_library,
         )
@@ -259,7 +295,8 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         if not callable(opener):
             messagebox.showerror("Image Library", "Image library is unavailable from this window.")
             return
-        opener(
+        self._open_image_library_dialog_modal(
+            opener,
             search_query=self._resolve_portrait_search_query(),
             on_attach_to_entity=self._attach_image_from_image_library,
         )
