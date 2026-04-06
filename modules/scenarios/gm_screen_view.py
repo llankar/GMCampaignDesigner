@@ -215,6 +215,7 @@ class GMScreenView(ctk.CTkFrame):
             "World Map",
             "Map Tool",
             "Scene Flow",
+            "Image Library",
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
@@ -2799,6 +2800,14 @@ class GMScreenView(ctk.CTkFrame):
         elif entity_type == "Scene Flow":
             # Handle the branch where entity_type == 'Scene Flow'.
             self.open_scene_flow_tab()
+            return
+        elif entity_type == "Image Library":
+            host = self.winfo_toplevel()
+            opener = getattr(host, "open_image_library_browser", None) if host is not None else None
+            if callable(opener):
+                opener()
+            else:
+                messagebox.showerror("Image Library", "Image library is unavailable from this window.")
             return
         elif entity_type == "Loot Generator":
             # Handle the branch where entity_type == 'Loot Generator'.
