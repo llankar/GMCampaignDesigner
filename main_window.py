@@ -35,6 +35,7 @@ from modules.helpers.template_loader import (
     load_template,
     load_entity_definitions,
     build_entity_wrappers,
+    list_manageable_entities,
 )
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.backup_helper import (
@@ -1040,13 +1041,10 @@ class MainWindow(ctk.CTk):
             ("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
         ]
 
-        # Internal entity types must not be exposed through the generic
-        # "Manage <Entity>" sidebar entries (they have dedicated flows/UI).
-        NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets"}
-
         entity_buttons = []
+        manageable_entities = set(list_manageable_entities())
         for slug, meta in self.entity_definitions.items():
-            if slug in NON_MANAGEABLE_ENTITY_SLUGS:
+            if slug not in manageable_entities:
                 continue
             key = f"entity::{slug}"
             label = meta.get("label") or slug.replace("_", " ").title()

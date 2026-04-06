@@ -6,7 +6,7 @@ from tkinter import messagebox
 from modules.helpers.template_loader import (
     _load_base_template,
     save_custom_fields,
-    list_known_entities,
+    list_manageable_entities,
     list_known_entity_labels,
 )
 from modules.helpers.logging_helper import (
@@ -46,7 +46,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.lift(); self.focus_force(); self.grab_set()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        self.entities = list_known_entities() or [
+        self.entities = list_manageable_entities() or [
             # Fallback ordering if discovery fails
             "scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "maps"
         ]
