@@ -382,6 +382,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
                 on_open=self._open_callback,
                 on_view=self._view_callback,
                 on_context_menu=self._show_context_menu,
+                on_attach=self._attach_callback,
             )
             padx = 8 if display_mode == "Grid" else 4
             pady = 8 if display_mode == "Grid" else 4
