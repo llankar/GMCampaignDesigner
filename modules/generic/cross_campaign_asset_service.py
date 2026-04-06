@@ -37,6 +37,8 @@ ATTACHMENT_FIELDS = {
     "books": "Attachment",
     "puzzles": "Handout",
 }
+IMAGE_LIBRARY_ENTITY_TYPES = {"image_assets"}
+IMAGE_LIBRARY_PATH_FIELDS = ("RelativePath", "Path")
 
 
 @dataclass
@@ -283,6 +285,40 @@ def _collect_attachment_asset(
     )
 
 
+def _collect_image_library_assets(entity_type: str, record: dict, campaign_dir: Path) -> List[AssetReference]:
+    """Collect image-library assets."""
+    collected: List[AssetReference] = []
+    seen_absolute_paths: set[str] = set()
+    key = _determine_record_key(record)
+
+    for field_name in IMAGE_LIBRARY_PATH_FIELDS:
+        # Process each field_name from IMAGE_LIBRARY_PATH_FIELDS.
+        raw_value = record.get(field_name)
+        if raw_value is None:
+            continue
+        normalized = str(raw_value).strip()
+        if not normalized:
+            continue
+        absolute = _campaign_join(campaign_dir, normalized)
+        if not absolute.exists():
+            continue
+        dedupe_key = str(absolute.resolve())
+        if dedupe_key in seen_absolute_paths:
+            continue
+        seen_absolute_paths.add(dedupe_key)
+        collected.append(
+            AssetReference(
+                entity_type=entity_type,
+                record_key=key,
+                asset_type="image_library",
+                original_path=normalized,
+                absolute_path=absolute,
+            )
+        )
+
+    return collected
+
+
 def _campaign_join(campaign_dir: Path, path_value: str) -> Path:
     """Internal helper for campaign join."""
     normalized = str(path_value).strip().replace("\\", "/")
@@ -521,6 +557,11 @@ def collect_assets(entity_type: str, records: Iterable[dict], campaign_dir: Path
         for record in records:
             collected.extend(_collect_map_assets(record, campaign_dir))
             collected.extend(_collect_token_assets(record, campaign_dir))
+        return collected
+    if entity_type in IMAGE_LIBRARY_ENTITY_TYPES:
+        # Handle the branch where entity_type is in IMAGE_LIBRARY_ENTITY_TYPES.
+        for record in records:
+            collected.extend(_collect_image_library_assets(entity_type, record, campaign_dir))
         return collected
 
     attachment_field = ATTACHMENT_FIELDS.get(entity_type)
@@ -861,6 +902,17 @@ def _determine_target_path(asset_type: str, original_path: str, campaign_dir: Pa
         # Handle the branch where asset_type == 'attachment'.
         base = campaign_dir / "assets" / "uploads"
         relative_base = Path("assets/uploads")
+    elif asset_type == "image_library":
+        # Handle the branch where asset_type == 'image_library'.
+        if original and not Path(original).is_absolute():
+            rel = Path(original.lstrip("./"))
+            parent = rel.parent if str(rel.parent) not in ("", ".") else Path()
+            base = campaign_dir / "assets" / "image_library" / parent
+            relative_base = Path("assets/image_library") / parent
+            name = rel.name
+        else:
+            base = campaign_dir / "assets" / "image_library"
+            relative_base = Path("assets/image_library")
     else:  # token assets
         if original and not Path(original).is_absolute():
             rel = Path(original.lstrip("./"))
@@ -971,7 +1023,12 @@ def apply_import(
             for record in records:
                 # Process each record from records.
                 key = _determine_record_key(record)
-                updated_record = _rewrite_record_paths(entity_type, record, replacements)
+                updated_record = _rewrite_record_paths(
+                    entity_type,
+                    record,
+                    replacements,
+                    target_campaign_root=target_campaign.root,
+                )
                 if key in existing_map:
                     # Handle the branch where key is in existing map.
                     if not overwrite:
@@ -1190,7 +1247,12 @@ def apply_direct_copy(
         for record in records:
             # Process each record from records.
             key = _determine_record_key(record)
-            updated_record = _rewrite_record_paths(entity_type, record, replacements)
+            updated_record = _rewrite_record_paths(
+                entity_type,
+                record,
+                replacements,
+                target_campaign_root=target_campaign.root,
+            )
             if key in existing_map:
                 # Handle the branch where key is in existing map.
                 if not overwrite:
@@ -1212,7 +1274,13 @@ def apply_direct_copy(
     return summary
 
 
-def _rewrite_record_paths(entity_type: str, record: dict, replacements: Dict[str, str]) -> dict:
+def _rewrite_record_paths(
+    entity_type: str,
+    record: dict,
+    replacements: Dict[str, str],
+    *,
+    target_campaign_root: Optional[Path] = None,
+) -> dict:
     """Internal helper for rewrite record paths."""
     updated = copy.deepcopy(record)
 
@@ -1262,6 +1330,22 @@ def _rewrite_record_paths(entity_type: str, record: dict, replacements: Dict[str
                 updated["Tokens"] = json.dumps(tokens)
             else:
                 updated["Tokens"] = tokens
+
+    if entity_type in IMAGE_LIBRARY_ENTITY_TYPES:
+        # Handle the branch where entity_type is in IMAGE_LIBRARY_ENTITY_TYPES.
+        replacement = None
+        for field_name in IMAGE_LIBRARY_PATH_FIELDS:
+            # Process each field_name from IMAGE_LIBRARY_PATH_FIELDS.
+            value = updated.get(field_name)
+            if value in replacements:
+                replacement = replacements[value]
+                break
+        if replacement:
+            relative_replacement = str(Path(replacement).as_posix())
+            updated["RelativePath"] = relative_replacement
+            campaign_root = target_campaign_root.resolve() if target_campaign_root else _resolve_campaign_dir(None)
+            updated["Path"] = str((campaign_root / relative_replacement).resolve())
+            updated["SourceRoot"] = str(campaign_root)
 
     return updated
 
