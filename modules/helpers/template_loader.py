@@ -39,6 +39,10 @@ _BUILTIN_ENTITY_METADATA = {
     "image_assets": {"label": "Image Assets", "icon": "assets/import_icon.png"},
 }
 
+# Entity templates that should remain internal and must not appear in
+# generic "Manage <Entity>" or field-customization selectors.
+NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets", "events"}
+
 @log_function
 def _default_template_path(entity_name: str) -> str:
     """Internal helper for default template path."""
@@ -555,6 +559,22 @@ def list_known_entities() -> list:
 
 
 @log_function
+def list_manageable_entities() -> list:
+    """Return known entity slugs that should be user-manageable in generic UIs."""
+
+    entities = [
+        slug
+        for slug in list_known_entities()
+        if slug not in NON_MANAGEABLE_ENTITY_SLUGS
+    ]
+    log_debug(
+        f"Discovered {len(entities)} manageable entity templates",
+        func_name="modules.helpers.template_loader.list_manageable_entities",
+    )
+    return entities
+
+
+@log_function
 def list_known_entity_labels() -> list:
     """Return display labels for every discovered entity template."""
 
@@ -562,6 +582,19 @@ def list_known_entity_labels() -> list:
     labels = []
     for slug in sorted(definitions.keys()):
         # Process each slug from sorted(definitions.keys()).
+        label = str(definitions.get(slug, {}).get("label") or "").strip()
+        if label:
+            labels.append(label)
+    return labels
+
+
+@log_function
+def list_manageable_entity_labels() -> list:
+    """Return display labels for user-manageable entity templates."""
+
+    definitions = load_entity_definitions()
+    labels = []
+    for slug in list_manageable_entities():
         label = str(definitions.get(slug, {}).get("label") or "").strip()
         if label:
             labels.append(label)

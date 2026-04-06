@@ -35,6 +35,7 @@ from modules.helpers.template_loader import (
     load_template,
     load_entity_definitions,
     build_entity_wrappers,
+    NON_MANAGEABLE_ENTITY_SLUGS,
 )
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.backup_helper import (
@@ -1039,10 +1040,6 @@ class MainWindow(ctk.CTk):
             ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
             ("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
         ]
-
-        # Internal entity types must not be exposed through the generic
-        # "Manage <Entity>" sidebar entries (they have dedicated flows/UI).
-        NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets"}
 
         entity_buttons = []
         for slug, meta in self.entity_definitions.items():

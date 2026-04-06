@@ -6,8 +6,8 @@ from tkinter import messagebox
 from modules.helpers.template_loader import (
     _load_base_template,
     save_custom_fields,
-    list_known_entities,
-    list_known_entity_labels,
+    list_manageable_entities,
+    list_manageable_entity_labels,
 )
 from modules.helpers.logging_helper import (
     log_function,
@@ -46,7 +46,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         self.lift(); self.focus_force(); self.grab_set()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        self.entities = list_known_entities() or [
+        self.entities = list_manageable_entities() or [
             # Fallback ordering if discovery fails
             "scenarios", "pcs", "npcs", "creatures", "factions", "places", "objects", "informations", "clues", "maps"
         ]
@@ -92,7 +92,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
         ctk.CTkLabel(form, text="Linked Type (for list)").grid(row=2, column=0, padx=4, pady=4, sticky="w")
         self.linked_var = tk.StringVar(value="")
         # linked types are discovered dynamically from all known entity templates
-        self.known_linked = [""] + list_known_entity_labels()
+        self.known_linked = [""] + list_manageable_entity_labels()
         self.linked_menu = ctk.CTkOptionMenu(form, values=self.known_linked, variable=self.linked_var)
         self.linked_menu.grid(row=2, column=1, padx=4, pady=4, sticky="ew")
 
@@ -144,7 +144,7 @@ class CustomFieldsEditor(ctk.CTkToplevel):
 
     def _refresh_linked_options(self):
         """Refresh linked options."""
-        dynamic_labels = list_known_entity_labels()
+        dynamic_labels = list_manageable_entity_labels()
         values = [""] + dynamic_labels
         existing_linked = {
             str(f.get("linked_type", "")).strip()
