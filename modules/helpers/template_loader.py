@@ -39,7 +39,7 @@ _BUILTIN_ENTITY_METADATA = {
     "image_assets": {"label": "Image Assets", "icon": "assets/import_icon.png"},
 }
 
-NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets"}
+NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets", "events"}
 
 @log_function
 def _default_template_path(entity_name: str) -> str:

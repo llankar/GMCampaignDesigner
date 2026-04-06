@@ -24,7 +24,7 @@ def test_list_manageable_entities_excludes_internal_entity_types(monkeypatch):
     }
     monkeypatch.setattr(template_loader, "load_entity_definitions", lambda: defs)
 
-    assert template_loader.list_manageable_entities() == ["events", "npcs"]
+    assert template_loader.list_manageable_entities() == ["npcs"]
 
 
 def test_list_known_entities_keeps_internal_entity_types(monkeypatch):

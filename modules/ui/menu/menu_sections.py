@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from tkinter import messagebox
 from typing import Callable
 
+from modules.helpers.template_loader import list_manageable_entities
+
 
 @dataclass(slots=True)
 class MenuCommandSpec:
@@ -46,7 +48,10 @@ def format_menu_label(item: MenuCommandSpec) -> str:
 def build_menu_specs(app) -> list[TopLevelMenuSpec]:
     """Build menu specs."""
     entity_items: list[MenuCommandSpec] = []
+    manageable_entities = set(list_manageable_entities())
     for slug, meta in getattr(app, "entity_definitions", {}).items():
+        if slug not in manageable_entities:
+            continue
         label = meta.get("label") or slug.replace("_", " ").title()
         entity_items.append(
             _command(
