@@ -39,6 +39,8 @@ _BUILTIN_ENTITY_METADATA = {
     "image_assets": {"label": "Image Assets", "icon": "assets/import_icon.png"},
 }
 
+NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets"}
+
 @log_function
 def _default_template_path(entity_name: str) -> str:
     """Internal helper for default template path."""
@@ -552,6 +554,12 @@ def list_known_entities() -> list:
         func_name="modules.helpers.template_loader.list_known_entities",
     )
     return entities
+
+
+@log_function
+def list_manageable_entities() -> list:
+    """Return known entities that should be shown in user-manageable UI lists."""
+    return [slug for slug in list_known_entities() if slug not in NON_MANAGEABLE_ENTITY_SLUGS]
 
 
 @log_function
