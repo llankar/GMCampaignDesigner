@@ -112,15 +112,15 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         self.portrait_listbox.bind("<<ListboxSelect>>", self._on_portrait_select)
 
         button_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        button_frame.pack(pady=5)
+        button_frame.pack(pady=2)
 
-        ctk.CTkButton(button_frame, text="Add Portrait(s)", **primary_button_style(), command=self.select_portrait).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Search Images", **primary_button_style(), command=self.open_portrait_image_browser).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Use Image Library", **primary_button_style(), command=self.open_portrait_image_library).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Paste Portrait", **primary_button_style(), command=self.paste_portrait_from_clipboard).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Create Portrait with description", **primary_button_style(), command=self.create_portrait_with_swarmui).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Set Primary", **primary_button_style(), command=self.set_primary_portrait).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Remove Selected", **primary_button_style(), command=self.remove_selected_portrait).pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Add", **primary_button_style(), command=self.select_portrait).pack(side="left", padx=2)
+        ctk.CTkButton(button_frame, text="Search", **primary_button_style(), command=self.open_portrait_image_browser).pack(side="left", padx=2)
+        ctk.CTkButton(button_frame, text="Image Library", **primary_button_style(), command=self.open_portrait_image_library).pack(side="left", padx=2)
+        ctk.CTkButton(button_frame, text="Paste", **primary_button_style(), command=self.paste_portrait_from_clipboard).pack(side="left", padx=2)
+        ctk.CTkButton(button_frame, text="Create Portrait", **primary_button_style(), command=self.create_portrait_with_swarmui).pack(side="left", padx=2)
+        ctk.CTkButton(button_frame, text="Primary", **primary_button_style(), command=self.set_primary_portrait).pack(side="left", padx=2)
+        ctk.CTkButton(button_frame, text="Remove", **primary_button_style(), command=self.remove_selected_portrait).pack(side="left", padx=2)
 
         helper_label = ctk.CTkLabel(
             frame,
