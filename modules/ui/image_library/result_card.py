@@ -32,12 +32,14 @@ class ImageResultCard(ctk.CTkFrame):
         on_open: Callable[[ImageResult], None],
         on_view: Callable[[ImageResult], None],
         on_context_menu: Callable[[ImageResult, int, int], None],
+        on_attach: Callable[[ImageResult], None] | None = None,
     ) -> None:
         super().__init__(parent, corner_radius=8)
         self.item = item
         self._on_open = on_open
         self._on_view = on_view
         self._on_context_menu = on_context_menu
+        self._on_attach = on_attach
 
         self.grid_columnconfigure(1, weight=1)
 
@@ -58,7 +60,8 @@ class ImageResultCard(ctk.CTkFrame):
         subtitle = ctk.CTkLabel(self, text=subtitle_text, anchor="w", justify="left", wraplength=700)
         subtitle.grid(row=1, column=1, padx=(0, 8), pady=(0, 8), sticky="ew")
 
-        open_button = ctk.CTkButton(self, text="Open", width=72, command=self._open)
+        action_label = "Attach" if self._on_attach else "Open"
+        open_button = ctk.CTkButton(self, text=action_label, width=72, command=self._open)
         open_button.grid(row=0, column=2, rowspan=2, padx=(8, 10), pady=8, sticky="e")
 
         self._bind_interactions(thumb, title, subtitle)
@@ -77,10 +80,20 @@ class ImageResultCard(ctk.CTkFrame):
         """Wire all interaction shortcuts consistently."""
         for widget in widgets:
             widget.bind("<Double-Button-1>", lambda _event: self._open())
+            if self._on_attach:
+                widget.bind("<Button-1>", lambda _event: self._attach())
             widget.bind("<Button-3>", self._open_context)
 
     def _open(self) -> None:
+        if self._on_attach:
+            self._attach()
+            return
         self._on_open(self.item)
+
+    def _attach(self) -> None:
+        """Attach the current item when embedded in entity editors."""
+        if self._on_attach:
+            self._on_attach(self.item)
 
     def _open_context(self, event) -> None:
         self._on_context_menu(self.item, event.x_root, event.y_root)
