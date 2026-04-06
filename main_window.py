@@ -1040,8 +1040,14 @@ class MainWindow(ctk.CTk):
             ("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
         ]
 
+        # Internal entity types must not be exposed through the generic
+        # "Manage <Entity>" sidebar entries (they have dedicated flows/UI).
+        NON_MANAGEABLE_ENTITY_SLUGS = {"image_assets"}
+
         entity_buttons = []
         for slug, meta in self.entity_definitions.items():
+            if slug in NON_MANAGEABLE_ENTITY_SLUGS:
+                continue
             key = f"entity::{slug}"
             label = meta.get("label") or slug.replace("_", " ").title()
             tooltip = f"Manage {label}"
