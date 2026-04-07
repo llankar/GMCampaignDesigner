@@ -111,6 +111,9 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.bind("<Control-Shift-z>", lambda _event: self._redo())
         self.bind("<Delete>", lambda _event: self._clear_selection())
         self.bind("<F11>", self._toggle_fullscreen)
+
+        # Keep the editor independent (non-modal) while pinned above other windows.
+        self.attributes("-topmost", True)
         self.lift()
         self.focus_force()
 
