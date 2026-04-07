@@ -15,6 +15,7 @@ import customtkinter as ctk
 from modules.ui.image_library.result_card import ImageResult, ImageResultCard
 from modules.ui.image_library.thumbnail_cache import ThumbnailCache, ThumbnailPlaceholderFactory
 from modules.ui.image_library.toolbar import ImageLibraryToolbar, SORT_OPTIONS, ToolbarState
+from modules.ui.image_library.editor import ImageEditorDialog
 from modules.ui.image_viewer import show_portrait
 
 
@@ -95,6 +96,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         self._context_item: ImageResult | None = None
         self._context_menu.add_command(label="Open", command=self._context_open)
         self._context_menu.add_command(label="View", command=self._context_view)
+        self._context_menu.add_command(label="Edit", command=self._context_edit)
         self._context_menu.add_separator()
         self._context_menu.add_command(label="Attach to entity", command=self._context_attach)
 
@@ -426,6 +428,16 @@ class ImageBrowserPanel(ctk.CTkFrame):
         """Handle context menu view action."""
         if self._context_item:
             self._view_callback(self._context_item)
+
+    def _context_edit(self) -> None:
+        """Open inline image editor for current context item."""
+        if not self._context_item:
+            return
+
+        def _refresh_after_save(_saved_path: str) -> None:
+            self._apply_filters_and_render()
+
+        ImageEditorDialog(self, self._context_item.path, on_saved=_refresh_after_save)
 
     def _context_attach(self) -> None:
         """Handle optional attach action for callers embedding this browser."""
