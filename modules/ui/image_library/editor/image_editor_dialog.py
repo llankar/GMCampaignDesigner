@@ -13,6 +13,19 @@ from modules.ui.image_library.editor.core.document import ImageDocument
 from modules.ui.image_library.editor.core.render.stroke_renderer import StrokeRenderer
 from modules.ui.image_library.editor.core.tools.brush_tool import BrushTool
 from modules.ui.image_library.editor.core.tools.eraser_tool import EraserTool
+from modules.ui.image_library.editor.history.commands import (
+    AddLayerCommand,
+    BrightnessCommand,
+    ContrastCommand,
+    DeleteLayerCommand,
+    EraseCommand,
+    FlipCommand,
+    MoveLayerCommand,
+    RotateCommand,
+    StrokeCommand,
+    ToggleLayerVisibilityCommand,
+)
+from modules.ui.image_library.editor.history.history_stack import HistoryStack
 from modules.ui.image_library.editor.widgets.layers_panel import LayersPanel
 
 
@@ -31,6 +44,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
         self._base_image: Image.Image | None = None
         self._document: ImageDocument | None = None
+        self._history = HistoryStack(max_depth=100)
 
         self._canvas_photo: ImageTk.PhotoImage | None = None
         self._display_scale = 1.0
@@ -39,9 +53,13 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
         self._brightness_var = tk.DoubleVar(value=1.0)
         self._contrast_var = tk.DoubleVar(value=1.0)
+        self._last_brightness = 1.0
+        self._last_contrast = 1.0
         self._brush_size_var = tk.DoubleVar(value=18.0)
         self._brush_opacity_var = tk.DoubleVar(value=1.0)
         self._active_tool_var = tk.StringVar(value="Paint")
+        self._stroke_before: Image.Image | None = None
+        self._stroke_layer_index: int | None = None
 
         self._renderer = StrokeRenderer()
         self._brush_tool: BrushTool | None = None
@@ -57,6 +75,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._load_image()
 
         self.bind("<Escape>", lambda _event: self.destroy())
+        self.bind("<Control-z>", lambda _event: self._undo())
+        self.bind("<Control-y>", lambda _event: self._redo())
+        self.bind("<Control-Shift-Z>", lambda _event: self._redo())
+        self.bind("<Control-Shift-z>", lambda _event: self._redo())
         self.lift()
         self.focus_force()
 
@@ -86,7 +108,14 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._preview_canvas.bind("<B1-Motion>", self._on_canvas_drag, add="+")
         self._preview_canvas.bind("<ButtonRelease-1>", self._on_canvas_release, add="+")
 
-        self._layers_panel = LayersPanel(workspace, on_changed=self._on_layers_changed)
+        self._layers_panel = LayersPanel(
+            workspace,
+            on_changed=self._on_layers_changed,
+            on_add=self._add_layer,
+            on_delete=self._delete_layer,
+            on_move=self._move_layer,
+            on_toggle_visibility=self._toggle_layer_visibility,
+        )
         self._layers_panel.grid(row=0, column=1, sticky="ns", padx=(6, 10), pady=10)
 
     def _build_controls(self) -> None:
@@ -102,6 +131,11 @@ class ImageEditorDialog(ctk.CTkToplevel):
         ctk.CTkButton(controls, text="Mirror", command=self._mirror).grid(row=0, column=2, padx=6, pady=(10, 6))
         ctk.CTkButton(controls, text="Flip", command=self._flip).grid(row=0, column=3, padx=6, pady=(10, 6))
         ctk.CTkButton(controls, text="Reset", command=self._reset).grid(row=0, column=4, padx=6, pady=(10, 6))
+
+        self._undo_button = ctk.CTkButton(controls, text="Undo", command=self._undo)
+        self._undo_button.grid(row=0, column=5, padx=6, pady=(10, 6))
+        self._redo_button = ctk.CTkButton(controls, text="Redo", command=self._redo)
+        self._redo_button.grid(row=0, column=6, padx=6, pady=(10, 6))
 
         ctk.CTkLabel(controls, text="Tool").grid(row=1, column=0, padx=(10, 6), pady=4, sticky="e")
         tool_selector = ctk.CTkSegmentedButton(
@@ -142,7 +176,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             to=2.0,
             number_of_steps=36,
             variable=self._brightness_var,
-            command=lambda _value: self._refresh_preview(),
+            command=self._on_brightness_change,
             width=220,
         ).grid(row=2, column=4, columnspan=2, padx=2, pady=4, sticky="w")
 
@@ -153,7 +187,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             to=2.0,
             number_of_steps=36,
             variable=self._contrast_var,
-            command=lambda _value: self._refresh_preview(),
+            command=self._on_contrast_change,
             width=220,
         ).grid(row=3, column=4, columnspan=2, padx=2, pady=4, sticky="w")
 
@@ -165,6 +199,8 @@ class ImageEditorDialog(ctk.CTkToplevel):
             pady=(10, 10),
             sticky="w",
         )
+
+        self._update_history_buttons()
 
     def _load_image(self) -> None:
         if not self._source_path:
@@ -242,11 +278,39 @@ class ImageEditorDialog(ctk.CTkToplevel):
             return self._eraser_tool
         return self._brush_tool
 
+    def execute_command(self, command) -> None:
+        self._history.execute_command(command)
+        self._layers_panel.refresh()
+        self._refresh_preview()
+        self._update_history_buttons()
+
+    def _update_history_buttons(self) -> None:
+        if hasattr(self, "_undo_button"):
+            self._undo_button.configure(state="normal" if self._history.can_undo else "disabled")
+        if hasattr(self, "_redo_button"):
+            self._redo_button.configure(state="normal" if self._history.can_redo else "disabled")
+
+    def _undo(self) -> str:
+        if self._history.undo():
+            self._layers_panel.refresh()
+            self._refresh_preview()
+            self._update_history_buttons()
+        return "break"
+
+    def _redo(self) -> str:
+        if self._history.redo():
+            self._layers_panel.refresh()
+            self._refresh_preview()
+            self._update_history_buttons()
+        return "break"
+
     def _on_canvas_press(self, event: tk.Event) -> None:
         point = self._canvas_to_document(int(event.x), int(event.y))
         tool = self._get_active_tool()
-        if point is None or tool is None:
+        if point is None or tool is None or self._document is None:
             return
+        self._stroke_layer_index = self._document.active_layer_index
+        self._stroke_before = self._document.active_layer.copy()
         tool.on_press(*point)
         self._refresh_preview()
 
@@ -261,41 +325,102 @@ class ImageEditorDialog(ctk.CTkToplevel):
     def _on_canvas_release(self, event: tk.Event) -> None:
         point = self._canvas_to_document(int(event.x), int(event.y))
         tool = self._get_active_tool()
-        if point is None or tool is None:
+        if point is None or tool is None or self._document is None or self._stroke_before is None:
             return
+        layer_index = self._stroke_layer_index
+        if layer_index is None or layer_index >= len(self._document.layers):
+            return
+
         tool.on_release(*point)
-        self._refresh_preview()
+        after = self._document.layers[layer_index].image.copy()
+        before = self._stroke_before.copy()
+        self._document.layers[layer_index].image = before.copy()
+
+        if self._active_tool_var.get() == "Eraser":
+            command = EraseCommand(self._document, layer_index, before, after)
+        else:
+            command = StrokeCommand(self._document, layer_index, before, after)
+        self.execute_command(command)
+
+        self._stroke_before = None
+        self._stroke_layer_index = None
 
     def _on_layers_changed(self) -> None:
         self._refresh_preview()
+        self._update_history_buttons()
 
     def _rotate(self, degrees: int) -> None:
         if self._document is None:
             return
-        self._document.rotate(degrees)
-        self._layers_panel.refresh()
-        self._refresh_preview()
+        self.execute_command(RotateCommand(self._document, degrees))
 
     def _mirror(self) -> None:
         if self._document is None:
             return
-        self._document.mirror()
-        self._refresh_preview()
+        self.execute_command(FlipCommand(self._document, horizontal=True))
 
     def _flip(self) -> None:
         if self._document is None:
             return
-        self._document.flip()
-        self._refresh_preview()
+        self.execute_command(FlipCommand(self._document, horizontal=False))
+
+    def _on_brightness_change(self, value: float) -> None:
+        current = float(value)
+        if abs(current - self._last_brightness) < 1e-6:
+            return
+        self.execute_command(BrightnessCommand(self._last_brightness, current, setter=self._set_brightness))
+
+    def _on_contrast_change(self, value: float) -> None:
+        current = float(value)
+        if abs(current - self._last_contrast) < 1e-6:
+            return
+        self.execute_command(ContrastCommand(self._last_contrast, current, setter=self._set_contrast))
+
+    def _set_brightness(self, value: float) -> None:
+        self._brightness_var.set(float(value))
+        self._last_brightness = float(value)
+
+    def _set_contrast(self, value: float) -> None:
+        self._contrast_var.set(float(value))
+        self._last_contrast = float(value)
+
+    def _add_layer(self) -> bool:
+        if self._document is None:
+            return False
+        self.execute_command(AddLayerCommand(self._document))
+        return True
+
+    def _delete_layer(self) -> bool:
+        if self._document is None or len(self._document.layers) <= 1:
+            return False
+        self.execute_command(DeleteLayerCommand(self._document))
+        return True
+
+    def _move_layer(self, direction: int) -> bool:
+        if self._document is None:
+            return False
+        target = self._document.active_layer_index + direction
+        if target < 0 or target >= len(self._document.layers):
+            return False
+        self.execute_command(MoveLayerCommand(self._document, direction))
+        return True
+
+    def _toggle_layer_visibility(self) -> bool:
+        if self._document is None:
+            return False
+        self.execute_command(ToggleLayerVisibilityCommand(self._document))
+        return True
 
     def _reset(self) -> None:
         if self._base_image is None or self._document is None:
             return
         self._document.reset_from(self._base_image)
-        self._brightness_var.set(1.0)
-        self._contrast_var.set(1.0)
+        self._history.clear()
+        self._set_brightness(1.0)
+        self._set_contrast(1.0)
         self._layers_panel.refresh()
         self._refresh_preview()
+        self._update_history_buttons()
 
     def _save(self) -> None:
         self._save_to_path(self._source_path)
