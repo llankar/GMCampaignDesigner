@@ -45,8 +45,8 @@ class LayersPanel(ctk.CTkFrame):
 
         ctk.CTkButton(buttons, text="+", width=34, command=self._add).grid(row=0, column=0, padx=3, pady=3)
         ctk.CTkButton(buttons, text="-", width=34, command=self._delete).grid(row=0, column=1, padx=3, pady=3)
-        ctk.CTkButton(buttons, text="↑", width=34, command=lambda: self._move(-1)).grid(row=0, column=2, padx=3, pady=3)
-        ctk.CTkButton(buttons, text="↓", width=34, command=lambda: self._move(1)).grid(row=0, column=3, padx=3, pady=3)
+        ctk.CTkButton(buttons, text="↑", width=34, command=lambda: self._move(1)).grid(row=0, column=2, padx=3, pady=3)
+        ctk.CTkButton(buttons, text="↓", width=34, command=lambda: self._move(-1)).grid(row=0, column=3, padx=3, pady=3)
         ctk.CTkButton(buttons, text="👁", width=40, command=self._toggle_visibility).grid(row=0, column=4, padx=3, pady=3)
 
     def bind_document(self, document: ImageDocument) -> None:
@@ -58,9 +58,10 @@ class LayersPanel(ctk.CTkFrame):
         if self._document is None:
             return
 
-        for index, layer in enumerate(self._document.layers):
+        for display_index, layer_index in enumerate(range(len(self._document.layers) - 1, -1, -1)):
+            layer = self._document.layers[layer_index]
             eye = "👁" if layer.visible else "🚫"
-            active = "●" if index == self._document.active_layer_index else "○"
+            active = "●" if layer_index == self._document.active_layer_index else "○"
             self._listbox.insert(tk.END, f"{active} {eye} {layer.name}")
 
         if self._document.layers:
@@ -70,9 +71,10 @@ class LayersPanel(ctk.CTkFrame):
         if self._document is None or not self._document.layers:
             return
         bounded_index = max(0, min(int(index), len(self._document.layers) - 1))
+        display_index = len(self._document.layers) - 1 - bounded_index
         self._listbox.selection_clear(0, tk.END)
-        self._listbox.selection_set(bounded_index)
-        self._listbox.activate(bounded_index)
+        self._listbox.selection_set(display_index)
+        self._listbox.activate(display_index)
 
     def _emit_changed(self) -> None:
         self.refresh()
@@ -124,5 +126,7 @@ class LayersPanel(ctk.CTkFrame):
         selection = self._listbox.curselection()
         if not selection:
             return
-        if self._document.set_active_layer(int(selection[0])):
+        display_index = int(selection[0])
+        layer_index = len(self._document.layers) - 1 - display_index
+        if self._document.set_active_layer(layer_index):
             self._emit_changed()
