@@ -15,7 +15,7 @@ import customtkinter as ctk
 from modules.ui.image_library.result_card import ImageResult, ImageResultCard
 from modules.ui.image_library.thumbnail_cache import ThumbnailCache, ThumbnailPlaceholderFactory
 from modules.ui.image_library.toolbar import ImageLibraryToolbar, SORT_OPTIONS, ToolbarState
-from modules.ui.image_library.editor import ImageEditorDialog
+from modules.ui.image_library.editor.image_editor_dialog import ImageEditorDialog
 from modules.ui.image_viewer import show_portrait
 
 
