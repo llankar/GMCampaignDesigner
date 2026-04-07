@@ -437,7 +437,13 @@ class ImageBrowserPanel(ctk.CTkFrame):
         def _refresh_after_save(_saved_path: str) -> None:
             self._apply_filters_and_render()
 
-        ImageEditorDialog(self, self._context_item.path, on_saved=_refresh_after_save)
+        ImageEditorDialog(
+            self,
+            self._context_item.path,
+            on_saved=_refresh_after_save,
+            use_transient=False,
+            modal=False,
+        )
 
     def _context_attach(self) -> None:
         """Handle optional attach action for callers embedding this browser."""
