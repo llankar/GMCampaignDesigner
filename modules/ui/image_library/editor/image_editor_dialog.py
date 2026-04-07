@@ -30,7 +30,7 @@ from modules.ui.image_library.editor.history.commands import (
 from modules.ui.image_library.editor.history.history_stack import HistoryStack
 from modules.ui.image_library.editor.io import SUPPORTED_FILETYPES, SaveService
 from modules.ui.image_library.editor.selection import SelectionClipboard, SelectionModel
-from modules.ui.image_library.editor.tools import BrushTool, EraserTool, MagicSelectTool, RectSelectTool
+from modules.ui.image_library.editor.tools import BrushTool, EraserTool, MagicSelectTool, RectSelectTool, ShapeTool
 from modules.ui.image_library.editor.windowing import apply_startup_window_mode
 from modules.ui.image_library.editor.widgets import EditorToolbar, LayersPanel, StatusBar, ToolOptionsBar
 
@@ -83,6 +83,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._last_contrast = 1.0
         self._brush_size_var = tk.DoubleVar(value=18.0)
         self._brush_opacity_var = tk.DoubleVar(value=1.0)
+        self._brush_color_var = tk.StringVar(value="#000000")
         self._active_tool_var = tk.StringVar(value="Paint")
         self._stroke_before: Image.Image | None = None
         self._stroke_layer_index: int | None = None
@@ -94,6 +95,8 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._clipboard = SelectionClipboard()
         self._rect_select_tool: RectSelectTool | None = None
         self._magic_select_tool: MagicSelectTool | None = None
+        self._rectangle_tool: ShapeTool | None = None
+        self._ellipse_tool: ShapeTool | None = None
         self._selection_overlay_item: int | None = None
 
         self.grid_rowconfigure(1, weight=1)
@@ -171,6 +174,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             active_tool_var=self._active_tool_var,
             brush_size_var=self._brush_size_var,
             brush_opacity_var=self._brush_opacity_var,
+            brush_color_var=self._brush_color_var,
             brightness_var=self._brightness_var,
             contrast_var=self._contrast_var,
             on_rotate_left=lambda: self._rotate(-90),
@@ -216,6 +220,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             size_getter=self._brush_size_var.get,
             opacity_getter=self._brush_opacity_var.get,
             hardness_getter=lambda: 0.8,
+            color_getter=self._get_brush_rgba,
         )
         self._eraser_tool = EraserTool(
             self._document,
@@ -226,6 +231,22 @@ class ImageEditorDialog(ctk.CTkToplevel):
         )
         self._rect_select_tool = RectSelectTool(self._selection, canvas_size_getter=lambda: (self._document.width, self._document.height))
         self._magic_select_tool = MagicSelectTool(image_getter=lambda: self._get_flattened_image(), selection=self._selection)
+        self._rectangle_tool = ShapeTool(
+            self._document,
+            self._renderer,
+            color_getter=self._get_brush_rgba,
+            opacity_getter=self._brush_opacity_var.get,
+            stroke_width_getter=self._brush_size_var.get,
+            shape="rectangle",
+        )
+        self._ellipse_tool = ShapeTool(
+            self._document,
+            self._renderer,
+            color_getter=self._get_brush_rgba,
+            opacity_getter=self._brush_opacity_var.get,
+            stroke_width_getter=self._brush_size_var.get,
+            shape="ellipse",
+        )
         self._refresh_preview()
 
     def composite_preview(self) -> Image.Image | None:
@@ -311,6 +332,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
         active_tool = self._active_tool_var.get()
         if active_tool == "Eraser":
             return self._eraser_tool
+        if active_tool == "Rectangle":
+            return self._rectangle_tool
+        if active_tool == "Ellipse":
+            return self._ellipse_tool
         if active_tool == "Select":
             return self._rect_select_tool
         if active_tool == "Magic Select":
@@ -318,7 +343,29 @@ class ImageEditorDialog(ctk.CTkToplevel):
         return self._brush_tool
 
     def _is_paint_tool_active(self) -> bool:
-        return self._active_tool_var.get() in {"Paint", "Eraser"}
+        return self._active_tool_var.get() in {"Paint", "Eraser", "Rectangle", "Ellipse"}
+
+    def _is_constrain_modifier_pressed(self, event: tk.Event) -> bool:
+        return bool(int(getattr(event, "state", 0)) & 0x0001)
+
+    def _apply_shape_constraints(self, event: tk.Event) -> None:
+        constrained = self._is_constrain_modifier_pressed(event)
+        if self._rectangle_tool is not None:
+            self._rectangle_tool.set_constrain_proportions(constrained)
+        if self._ellipse_tool is not None:
+            self._ellipse_tool.set_constrain_proportions(constrained)
+
+    def _get_brush_rgba(self) -> tuple[int, int, int, int]:
+        color = (self._brush_color_var.get() or "#000000").strip()
+        if color.startswith("#") and len(color) == 7:
+            try:
+                red = int(color[1:3], 16)
+                green = int(color[3:5], 16)
+                blue = int(color[5:7], 16)
+                return red, green, blue, 255
+            except ValueError:
+                pass
+        return 0, 0, 0, 255
 
     def execute_command(self, command) -> None:
         self._history.execute_command(command)
@@ -365,6 +412,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         tool = self._get_active_tool()
         if point is None or tool is None or self._document is None:
             return
+        self._apply_shape_constraints(event)
         if not self._is_paint_tool_active():
             tool.on_press(*point)
             self._refresh_preview()
@@ -381,6 +429,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         tool = self._get_active_tool()
         if point is None or tool is None:
             return
+        self._apply_shape_constraints(event)
         tool.on_drag(*point)
         if not self._is_paint_tool_active():
             self._refresh_preview()
@@ -416,6 +465,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             self._drag_render_after_id = None
         if point is None or tool is None or self._document is None or self._stroke_before is None:
             return
+        self._apply_shape_constraints(event)
         layer_index = self._stroke_layer_index
         if layer_index is None or layer_index >= len(self._document.layers):
             return
