@@ -32,43 +32,68 @@ class StrokeRenderer:
         distance = math.dist((sx, sy), (ex, ey))
         steps = max(1, int(distance / spacing))
 
+        alpha_channel = layer.getchannel("A") if erase else None
+
         for idx in range(steps + 1):
             t = idx / steps
             x = sx + (ex - sx) * t
             y = sy + (ey - sy) * t
-            dab = self._build_dab_mask(layer.size, x, y, radius, hardness, opacity)
+            dab, origin = self._build_dab_mask(x, y, radius, hardness, opacity)
             if erase:
-                self._erase(layer, dab)
+                self._erase(alpha_channel, dab, origin)
             else:
-                self._paint(layer, dab, color)
+                self._paint(layer, dab, origin, color)
+        if erase and alpha_channel is not None:
+            layer.putalpha(alpha_channel)
 
-    def _paint(self, layer: Image.Image, dab_mask: Image.Image, color: tuple[int, int, int, int]) -> None:
-        brush = Image.new("RGBA", layer.size, color)
+    def _paint(
+        self,
+        layer: Image.Image,
+        dab_mask: Image.Image,
+        origin: tuple[int, int],
+        color: tuple[int, int, int, int],
+    ) -> None:
+        brush = Image.new("RGBA", dab_mask.size, color)
         brush.putalpha(dab_mask)
-        layer.alpha_composite(brush)
+        layer.alpha_composite(brush, dest=origin)
 
-    def _erase(self, layer: Image.Image, dab_mask: Image.Image) -> None:
-        channels = list(layer.split())
-        channels[3] = ImageChops.subtract(channels[3], dab_mask)
-        layer.putalpha(channels[3])
+    def _erase(self, alpha_channel: Image.Image | None, dab_mask: Image.Image, origin: tuple[int, int]) -> None:
+        if alpha_channel is None:
+            return
+        left, top = origin
+        right = min(alpha_channel.width, left + dab_mask.width)
+        bottom = min(alpha_channel.height, top + dab_mask.height)
+        if right <= left or bottom <= top:
+            return
+        alpha_region = alpha_channel.crop((left, top, right, bottom))
+        mask_region = dab_mask.crop((0, 0, right - left, bottom - top))
+        updated_region = ImageChops.subtract(alpha_region, mask_region)
+        alpha_channel.paste(updated_region, (left, top))
 
     def _build_dab_mask(
         self,
-        size: tuple[int, int],
         cx: float,
         cy: float,
         radius: float,
         hardness: float,
         opacity: float,
-    ) -> Image.Image:
-        mask = Image.new("L", size, 0)
+    ) -> tuple[Image.Image, tuple[int, int]]:
+        left = int(math.floor(cx - radius))
+        top = int(math.floor(cy - radius))
+        right = int(math.ceil(cx + radius))
+        bottom = int(math.ceil(cy + radius))
+        width = max(1, right - left + 1)
+        height = max(1, bottom - top + 1)
+        mask = Image.new("L", (width, height), 0)
         draw = ImageDraw.Draw(mask)
         soft_radius = radius
         inner_radius = radius * hardness
+        local_cx = cx - left
+        local_cy = cy - top
 
         if soft_radius <= 1.0:
-            draw.point((cx, cy), fill=int(255 * opacity))
-            return mask
+            draw.point((local_cx, local_cy), fill=int(255 * opacity))
+            return mask, (left, top)
 
         # Soft falloff built with concentric circles.
         rings = max(4, int(radius))
@@ -83,7 +108,12 @@ class StrokeRenderer:
             if alpha <= 0:
                 continue
             draw.ellipse(
-                (cx - current_radius, cy - current_radius, cx + current_radius, cy + current_radius),
+                (
+                    local_cx - current_radius,
+                    local_cy - current_radius,
+                    local_cx + current_radius,
+                    local_cy + current_radius,
+                ),
                 fill=alpha,
             )
-        return mask
+        return mask, (left, top)
