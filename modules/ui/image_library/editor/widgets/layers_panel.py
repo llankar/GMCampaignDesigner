@@ -64,7 +64,15 @@ class LayersPanel(ctk.CTkFrame):
             self._listbox.insert(tk.END, f"{active} {eye} {layer.name}")
 
         if self._document.layers:
-            self._listbox.selection_set(self._document.active_layer_index)
+            self.sync_active_layer(self._document.active_layer_index)
+
+    def sync_active_layer(self, index: int) -> None:
+        if self._document is None or not self._document.layers:
+            return
+        bounded_index = max(0, min(int(index), len(self._document.layers) - 1))
+        self._listbox.selection_clear(0, tk.END)
+        self._listbox.selection_set(bounded_index)
+        self._listbox.activate(bounded_index)
 
     def _emit_changed(self) -> None:
         self.refresh()
