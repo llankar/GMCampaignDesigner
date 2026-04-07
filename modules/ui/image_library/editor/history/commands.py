@@ -9,6 +9,7 @@ from PIL import Image
 
 from modules.ui.image_library.editor.core.document import ImageDocument
 from modules.ui.image_library.editor.core.layer import Layer
+from modules.ui.image_library.editor.selection.clipboard import SelectionClipboard
 
 
 class HistoryCommand(Protocol):
@@ -120,6 +121,61 @@ class StrokeCommand(LayerPatchCommand):
 
 class EraseCommand(LayerPatchCommand):
     """Reversible erase stroke command."""
+
+
+class ClearSelectionCommand(LayerPatchCommand):
+    """Reversible command that clears pixels inside a selection mask."""
+
+    def __init__(self, document: ImageDocument, layer_index: int, selection_mask: Image.Image) -> None:
+        before = document.layers[layer_index].image.copy()
+        after = before.copy()
+        transparent = Image.new("RGBA", after.size, (0, 0, 0, 0))
+        after.paste(transparent, (0, 0), selection_mask.convert("L"))
+        super().__init__(document, layer_index, before, after)
+
+
+class CutSelectionCommand(LayerPatchCommand):
+    """Clear selected pixels and store copied payload in the in-app clipboard."""
+
+    def __init__(
+        self,
+        document: ImageDocument,
+        layer_index: int,
+        selection_mask: Image.Image,
+        clipboard: SelectionClipboard,
+    ) -> None:
+        before = document.layers[layer_index].image.copy()
+        after = before.copy()
+        mask = selection_mask.convert("L")
+        bounds = mask.getbbox()
+        self._clipboard = clipboard
+        self._payload_image: Image.Image | None = None
+        self._payload_offset = (0, 0)
+        if bounds is not None:
+            selected = Image.new("RGBA", before.size, (0, 0, 0, 0))
+            selected.paste(before, (0, 0), mask)
+            self._payload_image = selected.crop(bounds)
+            self._payload_offset = (bounds[0], bounds[1])
+        transparent = Image.new("RGBA", after.size, (0, 0, 0, 0))
+        after.paste(transparent, (0, 0), mask)
+        super().__init__(document, layer_index, before, after)
+
+    def execute(self) -> None:
+        super().execute()
+        if self._payload_image is not None:
+            self._clipboard.set(self._payload_image, self._payload_offset)
+
+
+class PasteSelectionCommand(LayerPatchCommand):
+    """Paste current clipboard payload on the active layer."""
+
+    def __init__(self, document: ImageDocument, layer_index: int, clipboard: SelectionClipboard) -> None:
+        payload = clipboard.get()
+        before = document.layers[layer_index].image.copy()
+        after = before.copy()
+        if payload is not None:
+            after.alpha_composite(payload.image, payload.offset)
+        super().__init__(document, layer_index, before, after)
 
 
 class RotateCommand(SnapshotCommand):
