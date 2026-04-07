@@ -31,18 +31,33 @@ from modules.ui.image_library.editor.history.history_stack import HistoryStack
 from modules.ui.image_library.editor.io import SUPPORTED_FILETYPES, SaveService
 from modules.ui.image_library.editor.selection import SelectionClipboard, SelectionModel
 from modules.ui.image_library.editor.tools import BrushTool, EraserTool, MagicSelectTool, RectSelectTool
+from modules.ui.image_library.editor.windowing import apply_startup_window_mode
 from modules.ui.image_library.editor.widgets import EditorToolbar, LayersPanel, StatusBar, ToolOptionsBar
 
 
 class ImageEditorDialog(ctk.CTkToplevel):
     """Small non-destructive editor with rotate/flip and basic paint/erase tools."""
 
-    def __init__(self, master: tk.Misc | None, image_path: str, on_saved=None) -> None:
+    def __init__(
+        self,
+        master: tk.Misc | None,
+        image_path: str,
+        on_saved=None,
+        *,
+        use_transient: bool = False,
+        modal: bool = False,
+    ) -> None:
         super().__init__(master)
         self.title("Image Editor")
         self.geometry("1120x760")
         self.minsize(860, 620)
-        self.transient(master)
+        self._windowed_geometry = "1120x760"
+        self._is_fullscreen = False
+
+        if use_transient and master is not None:
+            self.transient(master)
+        if modal:
+            self.grab_set()
 
         self._source_path = str(image_path or "").strip()
         self._on_saved = on_saved
@@ -87,6 +102,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
         self._build_layout()
         self._load_image()
+        apply_startup_window_mode(self)
 
         self.bind("<Escape>", lambda _event: self.destroy())
         self.bind("<Control-z>", lambda _event: self._undo())
@@ -94,8 +110,28 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.bind("<Control-Shift-Z>", lambda _event: self._redo())
         self.bind("<Control-Shift-z>", lambda _event: self._redo())
         self.bind("<Delete>", lambda _event: self._clear_selection())
+        self.bind("<F11>", self._toggle_fullscreen)
         self.lift()
         self.focus_force()
+
+    def _toggle_fullscreen(self, _event=None):
+        """Toggle full-screen mode."""
+        self._is_fullscreen = not self._is_fullscreen
+        if self._is_fullscreen:
+            try:
+                self._windowed_geometry = self.geometry()
+            except Exception:
+                self._windowed_geometry = "1120x760"
+            self.attributes("-fullscreen", True)
+            return "break"
+
+        self.attributes("-fullscreen", False)
+        try:
+            if self._windowed_geometry:
+                self.geometry(self._windowed_geometry)
+        except Exception:
+            pass
+        return "break"
 
     def _build_layout(self) -> None:
         self._toolbar = EditorToolbar(self, source_path=self._source_path)
