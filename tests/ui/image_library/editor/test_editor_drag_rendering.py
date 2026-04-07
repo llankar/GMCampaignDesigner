@@ -12,6 +12,7 @@ except ImportError:  # pragma: no cover - runtime capability guard
     pytest.skip("Pillow ImageEnhance support is required for editor dialog tests", allow_module_level=True)
 
 from modules.ui.image_library.editor.image_editor_dialog import ImageEditorDialog
+from modules.ui.image_library.editor.core.layer import Layer
 
 
 class _DocumentStub:
@@ -84,3 +85,29 @@ def test_flattened_cache_invalidates_on_execute_command() -> None:
     assert dialog._flattened_cache_valid is False
     assert dialog._get_flattened_image() is not None
     assert dialog._document.calls == 2
+
+
+def test_drag_preview_respects_layer_stack_order() -> None:
+    dialog = ImageEditorDialog.__new__(ImageEditorDialog)
+    dialog._apply_preview_adjustments = lambda image: image
+
+    bottom = Layer(
+        name="Bottom ink",
+        visible=True,
+        opacity=1.0,
+        blend_mode="normal",
+        image=Image.new("RGBA", (1, 1), (255, 0, 0, 255)),
+    )
+    top = Layer(
+        name="Top cover",
+        visible=True,
+        opacity=1.0,
+        blend_mode="normal",
+        image=Image.new("RGBA", (1, 1), (0, 0, 255, 255)),
+    )
+    dialog._document = type("Doc", (), {"width": 1, "height": 1, "layers": [bottom, top], "active_layer_index": 0})()
+
+    preview = dialog._build_drag_preview_image()
+
+    assert preview is not None
+    assert preview.getpixel((0, 0)) == (0, 0, 255, 255)

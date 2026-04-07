@@ -76,7 +76,6 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._drag_in_progress = False
         self._drag_needs_render = False
         self._drag_render_after_id: str | None = None
-        self._drag_flattened_without_active: Image.Image | None = None
 
         self._brightness_var = tk.DoubleVar(value=1.0)
         self._contrast_var = tk.DoubleVar(value=1.0)
@@ -252,7 +251,6 @@ class ImageEditorDialog(ctk.CTkToplevel):
     def _invalidate_preview_caches(self) -> None:
         self._flattened_cache_valid = False
         self._flattened_cache = None
-        self._drag_flattened_without_active = None
 
     def _refresh_preview(self) -> None:
         image = self.composite_preview()
@@ -269,24 +267,9 @@ class ImageEditorDialog(ctk.CTkToplevel):
     def _build_drag_preview_image(self) -> Image.Image | None:
         if self._document is None:
             return None
-        active_layer_index = self._document.active_layer_index
-        if self._drag_flattened_without_active is None:
-            self._drag_flattened_without_active = flatten_layers(
-                self._document.width,
-                self._document.height,
-                [layer for idx, layer in enumerate(self._document.layers) if idx != active_layer_index],
-            )
-
-        flattened = self._drag_flattened_without_active.copy()
-        active_layer = self._document.layers[active_layer_index]
-        if active_layer.visible:
-            active_image = active_layer.image.convert("RGBA")
-            opacity = max(0.0, min(1.0, float(active_layer.opacity)))
-            if opacity < 1.0:
-                channels = list(active_image.split())
-                channels[3] = channels[3].point(lambda alpha: int(alpha * opacity))
-                active_image = Image.merge("RGBA", channels)
-            flattened.alpha_composite(active_image)
+        # Keep the drag preview in the exact same compositing order as the final render.
+        # This avoids transient "looks correct while dragging, then disappears" behavior.
+        flattened = flatten_layers(self._document.width, self._document.height, self._document.layers)
         return self._apply_preview_adjustments(flattened)
 
     def _render_preview_image(self, image: Image.Image, resample: int) -> None:
@@ -390,7 +373,6 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._stroke_before = self._document.active_layer.copy()
         self._drag_in_progress = True
         self._drag_needs_render = False
-        self._drag_flattened_without_active = None
         tool.on_press(*point)
         self._refresh_preview_fast()
 
@@ -447,7 +429,6 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.execute_command(command)
 
         self._reset_stroke_context()
-        self._drag_flattened_without_active = None
 
     def _on_layers_changed(self) -> None:
         self._reset_stroke_context()
