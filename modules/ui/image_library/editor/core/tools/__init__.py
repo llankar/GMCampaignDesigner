@@ -1,6 +1,5 @@
-"""Interactive drawing tools."""
+"""Backward-compatible tool imports (moved to editor.tools)."""
 
-from modules.ui.image_library.editor.core.tools.brush_tool import BrushTool
-from modules.ui.image_library.editor.core.tools.eraser_tool import EraserTool
+from modules.ui.image_library.editor.tools import BrushTool, EraserTool
 
 __all__ = ["BrushTool", "EraserTool"]

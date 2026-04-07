@@ -1,15 +1,6 @@
 """Image editor package for image-library workflows."""
 
-from __future__ import annotations
+from modules.ui.image_library.editor.image_editor_dialog import ImageEditorDialog
+from modules.ui.image_library.editor.io import SUPPORTED_FILETYPES, SaveService
 
-from typing import Any
-
-__all__ = ["ImageEditorDialog"]
-
-
-def __getattr__(name: str) -> Any:
-    if name == "ImageEditorDialog":
-        from modules.ui.image_library.editor.image_editor_dialog import ImageEditorDialog
-
-        return ImageEditorDialog
-    raise AttributeError(name)
+__all__ = ["ImageEditorDialog", "SaveService", "SUPPORTED_FILETYPES"]

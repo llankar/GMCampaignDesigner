@@ -11,8 +11,6 @@ from PIL import Image, ImageEnhance, ImageOps, ImageTk
 
 from modules.ui.image_library.editor.core.document import ImageDocument
 from modules.ui.image_library.editor.core.render.stroke_renderer import StrokeRenderer
-from modules.ui.image_library.editor.core.tools.brush_tool import BrushTool
-from modules.ui.image_library.editor.core.tools.eraser_tool import EraserTool
 from modules.ui.image_library.editor.history.commands import (
     AddLayerCommand,
     BrightnessCommand,
@@ -26,7 +24,9 @@ from modules.ui.image_library.editor.history.commands import (
     ToggleLayerVisibilityCommand,
 )
 from modules.ui.image_library.editor.history.history_stack import HistoryStack
-from modules.ui.image_library.editor.widgets.layers_panel import LayersPanel
+from modules.ui.image_library.editor.io import SUPPORTED_FILETYPES, SaveService
+from modules.ui.image_library.editor.tools import BrushTool, EraserTool
+from modules.ui.image_library.editor.widgets import EditorToolbar, LayersPanel, StatusBar, ToolOptionsBar
 
 
 class ImageEditorDialog(ctk.CTkToplevel):
@@ -41,6 +41,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
         self._source_path = str(image_path or "").strip()
         self._on_saved = on_saved
+        self._save_service = SaveService()
 
         self._base_image: Image.Image | None = None
         self._document: ImageDocument | None = None
@@ -49,7 +50,6 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._canvas_photo: ImageTk.PhotoImage | None = None
         self._display_scale = 1.0
         self._display_offset = (0, 0)
-        self._display_size = (0, 0)
 
         self._brightness_var = tk.DoubleVar(value=1.0)
         self._contrast_var = tk.DoubleVar(value=1.0)
@@ -68,10 +68,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self._build_header()
-        self._build_workspace()
-        self._build_controls()
-
+        self._build_layout()
         self._load_image()
 
         self.bind("<Escape>", lambda _event: self.destroy())
@@ -82,15 +79,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.lift()
         self.focus_force()
 
-    def _build_header(self) -> None:
-        bar = ctk.CTkFrame(self)
-        bar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 8))
-        bar.grid_columnconfigure(0, weight=1)
+    def _build_layout(self) -> None:
+        self._toolbar = EditorToolbar(self, source_path=self._source_path)
+        self._toolbar.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 8))
 
-        self._path_label = ctk.CTkLabel(bar, text=self._source_path, anchor="w")
-        self._path_label.grid(row=0, column=0, sticky="ew", padx=10, pady=8)
-
-    def _build_workspace(self) -> None:
         workspace = ctk.CTkFrame(self)
         workspace.grid(row=1, column=0, sticky="nsew", padx=12, pady=8)
         workspace.grid_rowconfigure(0, weight=1)
@@ -118,88 +110,30 @@ class ImageEditorDialog(ctk.CTkToplevel):
         )
         self._layers_panel.grid(row=0, column=1, sticky="ns", padx=(6, 10), pady=10)
 
-    def _build_controls(self) -> None:
-        controls = ctk.CTkFrame(self)
-        controls.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 12))
-
-        ctk.CTkButton(controls, text="Rotate Left", command=lambda: self._rotate(-90)).grid(
-            row=0, column=0, padx=6, pady=(10, 6)
+        self._tool_options = ToolOptionsBar(
+            self,
+            active_tool_var=self._active_tool_var,
+            brush_size_var=self._brush_size_var,
+            brush_opacity_var=self._brush_opacity_var,
+            brightness_var=self._brightness_var,
+            contrast_var=self._contrast_var,
+            on_rotate_left=lambda: self._rotate(-90),
+            on_rotate_right=lambda: self._rotate(90),
+            on_mirror=self._mirror,
+            on_flip=self._flip,
+            on_reset=self._reset,
+            on_undo=self._undo,
+            on_redo=self._redo,
+            on_brightness_change=self._on_brightness_change,
+            on_contrast_change=self._on_contrast_change,
+            on_save=self._save,
+            on_save_as=self._save_as,
+            on_tool_changed=lambda _value: self._refresh_preview(),
         )
-        ctk.CTkButton(controls, text="Rotate Right", command=lambda: self._rotate(90)).grid(
-            row=0, column=1, padx=6, pady=(10, 6)
-        )
-        ctk.CTkButton(controls, text="Mirror", command=self._mirror).grid(row=0, column=2, padx=6, pady=(10, 6))
-        ctk.CTkButton(controls, text="Flip", command=self._flip).grid(row=0, column=3, padx=6, pady=(10, 6))
-        ctk.CTkButton(controls, text="Reset", command=self._reset).grid(row=0, column=4, padx=6, pady=(10, 6))
+        self._tool_options.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 4))
 
-        self._undo_button = ctk.CTkButton(controls, text="Undo", command=self._undo)
-        self._undo_button.grid(row=0, column=5, padx=6, pady=(10, 6))
-        self._redo_button = ctk.CTkButton(controls, text="Redo", command=self._redo)
-        self._redo_button.grid(row=0, column=6, padx=6, pady=(10, 6))
-
-        ctk.CTkLabel(controls, text="Tool").grid(row=1, column=0, padx=(10, 6), pady=4, sticky="e")
-        tool_selector = ctk.CTkSegmentedButton(
-            controls,
-            values=["Paint", "Eraser"],
-            variable=self._active_tool_var,
-            command=lambda _value: self._refresh_preview(),
-            width=220,
-        )
-        tool_selector.grid(row=1, column=1, columnspan=2, padx=4, pady=4, sticky="w")
-
-        ctk.CTkLabel(controls, text="Brush Size").grid(row=1, column=3, padx=(10, 6), pady=4, sticky="e")
-        ctk.CTkSlider(
-            controls,
-            from_=1,
-            to=128,
-            number_of_steps=127,
-            variable=self._brush_size_var,
-            command=lambda _value: None,
-            width=220,
-        ).grid(row=1, column=4, columnspan=2, padx=2, pady=4, sticky="w")
-
-        ctk.CTkLabel(controls, text="Brush Opacity").grid(row=2, column=0, padx=(10, 6), pady=4, sticky="e")
-        ctk.CTkSlider(
-            controls,
-            from_=0.05,
-            to=1.0,
-            number_of_steps=19,
-            variable=self._brush_opacity_var,
-            command=lambda _value: None,
-            width=220,
-        ).grid(row=2, column=1, columnspan=2, padx=2, pady=4, sticky="w")
-
-        ctk.CTkLabel(controls, text="Brightness").grid(row=2, column=3, padx=(10, 6), pady=4, sticky="e")
-        ctk.CTkSlider(
-            controls,
-            from_=0.2,
-            to=2.0,
-            number_of_steps=36,
-            variable=self._brightness_var,
-            command=self._on_brightness_change,
-            width=220,
-        ).grid(row=2, column=4, columnspan=2, padx=2, pady=4, sticky="w")
-
-        ctk.CTkLabel(controls, text="Contrast").grid(row=3, column=3, padx=(10, 6), pady=4, sticky="e")
-        ctk.CTkSlider(
-            controls,
-            from_=0.2,
-            to=2.0,
-            number_of_steps=36,
-            variable=self._contrast_var,
-            command=self._on_contrast_change,
-            width=220,
-        ).grid(row=3, column=4, columnspan=2, padx=2, pady=4, sticky="w")
-
-        ctk.CTkButton(controls, text="Save", command=self._save).grid(row=4, column=4, padx=6, pady=(10, 10), sticky="e")
-        ctk.CTkButton(controls, text="Save As", command=self._save_as).grid(
-            row=4,
-            column=5,
-            padx=(0, 10),
-            pady=(10, 10),
-            sticky="w",
-        )
-
+        self._status_bar = StatusBar(self)
+        self._status_bar.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
         self._update_history_buttons()
 
     def _load_image(self) -> None:
@@ -237,10 +171,8 @@ class ImageEditorDialog(ctk.CTkToplevel):
         if self._document is None:
             return None
         image = self._document.composite()
-        brightness = float(self._brightness_var.get() or 1.0)
-        contrast = float(self._contrast_var.get() or 1.0)
-        image = ImageEnhance.Brightness(image).enhance(brightness)
-        image = ImageEnhance.Contrast(image).enhance(contrast)
+        image = ImageEnhance.Brightness(image).enhance(float(self._brightness_var.get() or 1.0))
+        image = ImageEnhance.Contrast(image).enhance(float(self._contrast_var.get() or 1.0))
         return image
 
     def _refresh_preview(self) -> None:
@@ -254,13 +186,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
         render_w = max(1, int(image.width * scale))
         render_h = max(1, int(image.height * scale))
 
-        rendered = image.resize((render_w, render_h), Image.Resampling.LANCZOS)
-
         self._display_scale = scale
-        self._display_size = (render_w, render_h)
         self._display_offset = ((canvas_w - render_w) // 2, (canvas_h - render_h) // 2)
 
-        self._canvas_photo = ImageTk.PhotoImage(rendered)
+        self._canvas_photo = ImageTk.PhotoImage(image.resize((render_w, render_h), Image.Resampling.LANCZOS))
         self._preview_canvas.delete("all")
         self._preview_canvas.create_image(self._display_offset[0], self._display_offset[1], image=self._canvas_photo, anchor="nw")
 
@@ -274,9 +203,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         return dx, dy
 
     def _get_active_tool(self):
-        if self._active_tool_var.get() == "Eraser":
-            return self._eraser_tool
-        return self._brush_tool
+        return self._eraser_tool if self._active_tool_var.get() == "Eraser" else self._brush_tool
 
     def execute_command(self, command) -> None:
         self._history.execute_command(command)
@@ -285,16 +212,15 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._update_history_buttons()
 
     def _update_history_buttons(self) -> None:
-        if hasattr(self, "_undo_button"):
-            self._undo_button.configure(state="normal" if self._history.can_undo else "disabled")
-        if hasattr(self, "_redo_button"):
-            self._redo_button.configure(state="normal" if self._history.can_redo else "disabled")
+        self._tool_options.undo_button.configure(state="normal" if self._history.can_undo else "disabled")
+        self._tool_options.redo_button.configure(state="normal" if self._history.can_redo else "disabled")
 
     def _undo(self) -> str:
         if self._history.undo():
             self._layers_panel.refresh()
             self._refresh_preview()
             self._update_history_buttons()
+            self._status_bar.set_message("Undid last action")
         return "break"
 
     def _redo(self) -> str:
@@ -302,6 +228,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             self._layers_panel.refresh()
             self._refresh_preview()
             self._update_history_buttons()
+            self._status_bar.set_message("Redid action")
         return "break"
 
     def _on_canvas_press(self, event: tk.Event) -> None:
@@ -336,10 +263,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         before = self._stroke_before.copy()
         self._document.layers[layer_index].image = before.copy()
 
-        if self._active_tool_var.get() == "Eraser":
-            command = EraseCommand(self._document, layer_index, before, after)
-        else:
-            command = StrokeCommand(self._document, layer_index, before, after)
+        command = EraseCommand(self._document, layer_index, before, after) if self._active_tool_var.get() == "Eraser" else StrokeCommand(self._document, layer_index, before, after)
         self.execute_command(command)
 
         self._stroke_before = None
@@ -350,31 +274,26 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._update_history_buttons()
 
     def _rotate(self, degrees: int) -> None:
-        if self._document is None:
-            return
-        self.execute_command(RotateCommand(self._document, degrees))
+        if self._document is not None:
+            self.execute_command(RotateCommand(self._document, degrees))
 
     def _mirror(self) -> None:
-        if self._document is None:
-            return
-        self.execute_command(FlipCommand(self._document, horizontal=True))
+        if self._document is not None:
+            self.execute_command(FlipCommand(self._document, horizontal=True))
 
     def _flip(self) -> None:
-        if self._document is None:
-            return
-        self.execute_command(FlipCommand(self._document, horizontal=False))
+        if self._document is not None:
+            self.execute_command(FlipCommand(self._document, horizontal=False))
 
     def _on_brightness_change(self, value: float) -> None:
         current = float(value)
-        if abs(current - self._last_brightness) < 1e-6:
-            return
-        self.execute_command(BrightnessCommand(self._last_brightness, current, setter=self._set_brightness))
+        if abs(current - self._last_brightness) >= 1e-6:
+            self.execute_command(BrightnessCommand(self._last_brightness, current, setter=self._set_brightness))
 
     def _on_contrast_change(self, value: float) -> None:
         current = float(value)
-        if abs(current - self._last_contrast) < 1e-6:
-            return
-        self.execute_command(ContrastCommand(self._last_contrast, current, setter=self._set_contrast))
+        if abs(current - self._last_contrast) >= 1e-6:
+            self.execute_command(ContrastCommand(self._last_contrast, current, setter=self._set_contrast))
 
     def _set_brightness(self, value: float) -> None:
         self._brightness_var.set(float(value))
@@ -421,6 +340,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._layers_panel.refresh()
         self._refresh_preview()
         self._update_history_buttons()
+        self._status_bar.set_message("Reset editor state")
 
     def _save(self) -> None:
         self._save_to_path(self._source_path)
@@ -433,7 +353,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             initialdir=str(base.parent),
             initialfile=f"{base.stem}_edited{base.suffix}",
             defaultextension=base.suffix or ".png",
-            filetypes=[("Image files", "*.png *.jpg *.jpeg *.webp *.bmp *.gif")],
+            filetypes=SUPPORTED_FILETYPES,
         )
         if target:
             self._save_to_path(target)
@@ -444,20 +364,14 @@ class ImageEditorDialog(ctk.CTkToplevel):
             return
 
         try:
-            destination = Path(target_path).expanduser()
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            extension = destination.suffix.lower()
-            to_save = image
-            # Export to common image formats is flattened by design.
-            if extension in {".jpg", ".jpeg"}:
-                to_save = image.convert("RGB")
-            to_save.save(destination)
+            destination = self._save_service.save_image(image, target_path)
         except Exception as exc:
             messagebox.showerror("Image Editor", f"Unable to save image:\n{exc}")
             return
 
         if callable(self._on_saved):
             self._on_saved(str(destination))
+        self._status_bar.set_message(f"Saved: {destination.name}")
         messagebox.showinfo("Image Editor", "Image saved successfully.")
 
 
