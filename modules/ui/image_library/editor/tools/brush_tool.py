@@ -17,6 +17,7 @@ class BrushTool:
         size_getter,
         opacity_getter,
         hardness_getter,
+        color_getter=None,
         color: tuple[int, int, int, int] = (0, 0, 0, 255),
     ) -> None:
         self._document = document
@@ -24,7 +25,7 @@ class BrushTool:
         self._size_getter = size_getter
         self._opacity_getter = opacity_getter
         self._hardness_getter = hardness_getter
-        self._color = color
+        self._color_getter = color_getter or (lambda: color)
         self._last_point: tuple[float, float] | None = None
 
     def on_press(self, x: float, y: float) -> None:
@@ -52,6 +53,6 @@ class BrushTool:
             size=float(self._size_getter()),
             opacity=float(self._opacity_getter()),
             hardness=float(self._hardness_getter()),
-            color=self._color,
+            color=self._color_getter(),
             erase=False,
         )

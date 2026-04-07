@@ -5,5 +5,6 @@ from modules.ui.image_library.editor.tools.eraser_tool import EraserTool
 from modules.ui.image_library.editor.tools.magic_select_tool import MagicSelectTool
 from modules.ui.image_library.editor.tools.move_selection_tool import MoveSelectionTool
 from modules.ui.image_library.editor.tools.rect_select_tool import RectSelectTool
+from modules.ui.image_library.editor.tools.shape_tool import ShapeTool
 
-__all__ = ["BrushTool", "EraserTool", "RectSelectTool", "MagicSelectTool", "MoveSelectionTool"]
+__all__ = ["BrushTool", "EraserTool", "RectSelectTool", "MagicSelectTool", "MoveSelectionTool", "ShapeTool"]

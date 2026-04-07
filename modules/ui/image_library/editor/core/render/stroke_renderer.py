@@ -117,3 +117,46 @@ class StrokeRenderer:
                 fill=alpha,
             )
         return mask, (left, top)
+
+    def render_shape(
+        self,
+        layer: Image.Image,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        shape: str,
+        color: tuple[int, int, int, int],
+        opacity: float,
+        stroke_width: float,
+        constrain_proportions: bool = False,
+    ) -> None:
+        """Render a rectangle or ellipse outline based on drag bounds."""
+        sx, sy = start
+        ex, ey = end
+        left, top, right, bottom = self._shape_bounds(sx, sy, ex, ey, constrain_proportions=constrain_proportions)
+        alpha = int(max(0.0, min(1.0, float(opacity))) * 255)
+        rgba = (int(color[0]), int(color[1]), int(color[2]), alpha)
+        width = max(1, int(round(float(stroke_width))))
+
+        draw = ImageDraw.Draw(layer, "RGBA")
+        if shape == "ellipse":
+            draw.ellipse((left, top, right, bottom), outline=rgba, width=width)
+            return
+        draw.rectangle((left, top, right, bottom), outline=rgba, width=width)
+
+    @staticmethod
+    def _shape_bounds(
+        sx: float,
+        sy: float,
+        ex: float,
+        ey: float,
+        *,
+        constrain_proportions: bool,
+    ) -> tuple[float, float, float, float]:
+        dx = ex - sx
+        dy = ey - sy
+        if constrain_proportions:
+            side = max(abs(dx), abs(dy))
+            ex = sx + side * (1.0 if dx >= 0 else -1.0)
+            ey = sy + side * (1.0 if dy >= 0 else -1.0)
+        return min(sx, ex), min(sy, ey), max(sx, ex), max(sy, ey)
