@@ -283,6 +283,17 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._tool_options.undo_button.configure(state="normal" if self._history.can_undo else "disabled")
         self._tool_options.redo_button.configure(state="normal" if self._history.can_redo else "disabled")
 
+    def _reset_stroke_context(self) -> None:
+        self._stroke_before = None
+        self._stroke_layer_index = None
+
+    def _sync_active_layer_ui(self, index: int | None = None) -> None:
+        if self._document is None:
+            return
+        target_index = self._document.active_layer_index if index is None else int(index)
+        self._document.set_active_layer(target_index)
+        self._layers_panel.sync_active_layer(self._document.active_layer_index)
+
     def _undo(self) -> str:
         if self._history.undo():
             self._invalidate_preview_caches()
@@ -357,11 +368,12 @@ class ImageEditorDialog(ctk.CTkToplevel):
         command = EraseCommand(self._document, layer_index, before, after) if self._active_tool_var.get() == "Eraser" else StrokeCommand(self._document, layer_index, before, after)
         self.execute_command(command)
 
-        self._stroke_before = None
-        self._stroke_layer_index = None
+        self._reset_stroke_context()
         self._drag_flattened_without_active = None
 
     def _on_layers_changed(self) -> None:
+        self._reset_stroke_context()
+        self._sync_active_layer_ui()
         self._invalidate_preview_caches()
         self._refresh_preview()
         self._update_history_buttons()
@@ -400,12 +412,16 @@ class ImageEditorDialog(ctk.CTkToplevel):
         if self._document is None:
             return False
         self.execute_command(AddLayerCommand(self._document))
+        self._sync_active_layer_ui(len(self._document.layers) - 1)
+        self._reset_stroke_context()
         return True
 
     def _delete_layer(self) -> bool:
         if self._document is None or len(self._document.layers) <= 1:
             return False
         self.execute_command(DeleteLayerCommand(self._document))
+        self._sync_active_layer_ui()
+        self._reset_stroke_context()
         return True
 
     def _move_layer(self, direction: int) -> bool:
@@ -415,12 +431,16 @@ class ImageEditorDialog(ctk.CTkToplevel):
         if target < 0 or target >= len(self._document.layers):
             return False
         self.execute_command(MoveLayerCommand(self._document, direction))
+        self._sync_active_layer_ui()
+        self._reset_stroke_context()
         return True
 
     def _toggle_layer_visibility(self) -> bool:
         if self._document is None:
             return False
         self.execute_command(ToggleLayerVisibilityCommand(self._document))
+        self._sync_active_layer_ui()
+        self._reset_stroke_context()
         return True
 
     def _reset(self) -> None:
