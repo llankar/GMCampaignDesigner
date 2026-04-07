@@ -29,6 +29,9 @@ class ToolOptionsBar(ctk.CTkFrame):
         on_redo: Callable[[], None],
         on_brightness_change: Callable[[float], None],
         on_contrast_change: Callable[[float], None],
+        on_cut: Callable[[], None],
+        on_copy: Callable[[], None],
+        on_paste: Callable[[], None],
         on_save: Callable[[], None],
         on_save_as: Callable[[], None],
         on_tool_changed: Callable[[str], None],
@@ -45,14 +48,17 @@ class ToolOptionsBar(ctk.CTkFrame):
         self.undo_button.grid(row=0, column=5, padx=6, pady=(10, 6))
         self.redo_button = ctk.CTkButton(self, text="Redo", command=on_redo)
         self.redo_button.grid(row=0, column=6, padx=6, pady=(10, 6))
+        ctk.CTkButton(self, text="Cut", command=on_cut).grid(row=0, column=7, padx=6, pady=(10, 6))
+        ctk.CTkButton(self, text="Copy", command=on_copy).grid(row=0, column=8, padx=6, pady=(10, 6))
+        ctk.CTkButton(self, text="Paste", command=on_paste).grid(row=0, column=9, padx=6, pady=(10, 6))
 
         ctk.CTkLabel(self, text="Tool").grid(row=1, column=0, padx=(10, 6), pady=4, sticky="e")
         tool_selector = ctk.CTkSegmentedButton(
             self,
-            values=["Paint", "Eraser"],
+            values=["Paint", "Eraser", "Select", "Magic Select"],
             variable=active_tool_var,
             command=on_tool_changed,
-            width=220,
+            width=360,
         )
         tool_selector.grid(row=1, column=1, columnspan=2, padx=4, pady=4, sticky="w")
 

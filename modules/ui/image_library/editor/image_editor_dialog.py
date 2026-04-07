@@ -16,17 +16,21 @@ from modules.ui.image_library.editor.history.commands import (
     AddLayerCommand,
     BrightnessCommand,
     ContrastCommand,
+    CutSelectionCommand,
     DeleteLayerCommand,
     EraseCommand,
     FlipCommand,
     MoveLayerCommand,
+    PasteSelectionCommand,
     RotateCommand,
+    ClearSelectionCommand,
     StrokeCommand,
     ToggleLayerVisibilityCommand,
 )
 from modules.ui.image_library.editor.history.history_stack import HistoryStack
 from modules.ui.image_library.editor.io import SUPPORTED_FILETYPES, SaveService
-from modules.ui.image_library.editor.tools import BrushTool, EraserTool
+from modules.ui.image_library.editor.selection import SelectionClipboard, SelectionModel
+from modules.ui.image_library.editor.tools import BrushTool, EraserTool, MagicSelectTool, RectSelectTool
 from modules.ui.image_library.editor.widgets import EditorToolbar, LayersPanel, StatusBar, ToolOptionsBar
 
 
@@ -72,6 +76,11 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._renderer = StrokeRenderer()
         self._brush_tool: BrushTool | None = None
         self._eraser_tool: EraserTool | None = None
+        self._selection = SelectionModel()
+        self._clipboard = SelectionClipboard()
+        self._rect_select_tool: RectSelectTool | None = None
+        self._magic_select_tool: MagicSelectTool | None = None
+        self._selection_overlay_item: int | None = None
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -84,6 +93,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.bind("<Control-y>", lambda _event: self._redo())
         self.bind("<Control-Shift-Z>", lambda _event: self._redo())
         self.bind("<Control-Shift-z>", lambda _event: self._redo())
+        self.bind("<Delete>", lambda _event: self._clear_selection())
         self.lift()
         self.focus_force()
 
@@ -134,9 +144,12 @@ class ImageEditorDialog(ctk.CTkToplevel):
             on_redo=self._redo,
             on_brightness_change=self._on_brightness_change,
             on_contrast_change=self._on_contrast_change,
+            on_cut=self._cut_selection,
+            on_copy=self._copy_selection,
+            on_paste=self._paste_selection,
             on_save=self._save,
             on_save_as=self._save_as,
-            on_tool_changed=lambda _value: self._refresh_preview(),
+            on_tool_changed=lambda _value: self._on_tool_changed(),
         )
         self._tool_options.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 4))
 
@@ -173,6 +186,8 @@ class ImageEditorDialog(ctk.CTkToplevel):
             opacity_getter=self._brush_opacity_var.get,
             hardness_getter=lambda: 0.8,
         )
+        self._rect_select_tool = RectSelectTool(self._selection, canvas_size_getter=lambda: (self._document.width, self._document.height))
+        self._magic_select_tool = MagicSelectTool(image_getter=lambda: self._get_flattened_image(), selection=self._selection)
         self._refresh_preview()
 
     def composite_preview(self) -> Image.Image | None:
@@ -259,6 +274,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         else:
             self._preview_canvas.coords(self._canvas_image_item, self._display_offset[0], self._display_offset[1])
             self._preview_canvas.itemconfigure(self._canvas_image_item, image=self._canvas_photo)
+        self._render_selection_overlay()
 
     def _canvas_to_document(self, x: int, y: int) -> tuple[float, float] | None:
         if self._document is None:
@@ -270,7 +286,17 @@ class ImageEditorDialog(ctk.CTkToplevel):
         return dx, dy
 
     def _get_active_tool(self):
-        return self._eraser_tool if self._active_tool_var.get() == "Eraser" else self._brush_tool
+        active_tool = self._active_tool_var.get()
+        if active_tool == "Eraser":
+            return self._eraser_tool
+        if active_tool == "Select":
+            return self._rect_select_tool
+        if active_tool == "Magic Select":
+            return self._magic_select_tool
+        return self._brush_tool
+
+    def _is_paint_tool_active(self) -> bool:
+        return self._active_tool_var.get() in {"Paint", "Eraser"}
 
     def execute_command(self, command) -> None:
         self._history.execute_command(command)
@@ -317,6 +343,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
         tool = self._get_active_tool()
         if point is None or tool is None or self._document is None:
             return
+        if not self._is_paint_tool_active():
+            tool.on_press(*point)
+            self._refresh_preview()
+            return
         self._stroke_layer_index = self._document.active_layer_index
         self._stroke_before = self._document.active_layer.copy()
         self._drag_in_progress = True
@@ -331,6 +361,9 @@ class ImageEditorDialog(ctk.CTkToplevel):
         if point is None or tool is None:
             return
         tool.on_drag(*point)
+        if not self._is_paint_tool_active():
+            self._refresh_preview()
+            return
         self._schedule_drag_refresh()
 
     def _schedule_drag_refresh(self) -> None:
@@ -347,13 +380,19 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._refresh_preview_fast()
 
     def _on_canvas_release(self, event: tk.Event) -> None:
+        point = self._canvas_to_document(int(event.x), int(event.y))
+        tool = self._get_active_tool()
+        if not self._is_paint_tool_active():
+            if point is not None and tool is not None:
+                tool.on_release(*point)
+            self._refresh_preview()
+            return
+
         self._drag_in_progress = False
         self._drag_needs_render = False
         if self._drag_render_after_id is not None:
             self.after_cancel(self._drag_render_after_id)
             self._drag_render_after_id = None
-        point = self._canvas_to_document(int(event.x), int(event.y))
-        tool = self._get_active_tool()
         if point is None or tool is None or self._document is None or self._stroke_before is None:
             return
         layer_index = self._stroke_layer_index
@@ -377,6 +416,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._invalidate_preview_caches()
         self._refresh_preview()
         self._update_history_buttons()
+
+    def _on_tool_changed(self) -> None:
+        self._reset_stroke_context()
+        self._refresh_preview()
 
     def _rotate(self, degrees: int) -> None:
         if self._document is not None:
@@ -451,6 +494,8 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._invalidate_preview_caches()
         self._set_brightness(1.0)
         self._set_contrast(1.0)
+        self._selection.clear()
+        self._clipboard.clear()
         self._layers_panel.refresh()
         self._refresh_preview()
         self._update_history_buttons()
@@ -487,6 +532,65 @@ class ImageEditorDialog(ctk.CTkToplevel):
             self._on_saved(str(destination))
         self._status_bar.set_message(f"Saved: {destination.name}")
         messagebox.showinfo("Image Editor", "Image saved successfully.")
+
+    def _copy_selection(self) -> None:
+        if self._document is None or self._selection.mask is None:
+            return
+        mask = self._selection.mask.convert("L")
+        bounds = mask.getbbox()
+        if bounds is None:
+            return
+        selected = Image.new("RGBA", self._document.active_layer.size, (0, 0, 0, 0))
+        selected.paste(self._document.active_layer, (0, 0), mask)
+        self._clipboard.set(selected.crop(bounds), (bounds[0], bounds[1]))
+        self._status_bar.set_message("Selection copied")
+
+    def _cut_selection(self) -> None:
+        if self._document is None or self._selection.mask is None:
+            return
+        self.execute_command(
+            CutSelectionCommand(
+                self._document,
+                self._document.active_layer_index,
+                self._selection.mask,
+                self._clipboard,
+            )
+        )
+        self._status_bar.set_message("Selection cut")
+
+    def _paste_selection(self) -> None:
+        if self._document is None or not self._clipboard.has_data():
+            return
+        self.execute_command(PasteSelectionCommand(self._document, self._document.active_layer_index, self._clipboard))
+        self._status_bar.set_message("Selection pasted")
+
+    def _clear_selection(self) -> str:
+        if self._document is None or self._selection.mask is None:
+            return "break"
+        self.execute_command(ClearSelectionCommand(self._document, self._document.active_layer_index, self._selection.mask))
+        self._status_bar.set_message("Selection cleared")
+        return "break"
+
+    def _render_selection_overlay(self) -> None:
+        if self._selection_overlay_item is not None:
+            self._preview_canvas.delete(self._selection_overlay_item)
+            self._selection_overlay_item = None
+        if self._selection.mask is None or self._selection.mask.getbbox() is None:
+            return
+        left, top, right, bottom = self._selection.mask.getbbox()
+        sx = self._display_offset[0] + int(left * self._display_scale)
+        sy = self._display_offset[1] + int(top * self._display_scale)
+        ex = self._display_offset[0] + int(right * self._display_scale)
+        ey = self._display_offset[1] + int(bottom * self._display_scale)
+        self._selection_overlay_item = self._preview_canvas.create_rectangle(
+            sx,
+            sy,
+            ex,
+            ey,
+            outline="#4da3ff",
+            width=2,
+            dash=(6, 3),
+        )
 
 
 __all__ = ["ImageEditorDialog"]
