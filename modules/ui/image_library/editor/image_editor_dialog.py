@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image, ImageEnhance, ImageOps, ImageTk
 
+from modules.ui.image_library.editor.core.compositor import flatten_layers
 from modules.ui.image_library.editor.core.document import ImageDocument
 from modules.ui.image_library.editor.core.render.stroke_renderer import StrokeRenderer
 from modules.ui.image_library.editor.history.commands import (
@@ -48,8 +49,15 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._history = HistoryStack(max_depth=100)
 
         self._canvas_photo: ImageTk.PhotoImage | None = None
+        self._canvas_image_item: int | None = None
         self._display_scale = 1.0
         self._display_offset = (0, 0)
+        self._flattened_cache: Image.Image | None = None
+        self._flattened_cache_valid = False
+        self._drag_in_progress = False
+        self._drag_needs_render = False
+        self._drag_render_after_id: str | None = None
+        self._drag_flattened_without_active: Image.Image | None = None
 
         self._brightness_var = tk.DoubleVar(value=1.0)
         self._contrast_var = tk.DoubleVar(value=1.0)
@@ -168,15 +176,66 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._refresh_preview()
 
     def composite_preview(self) -> Image.Image | None:
+        flattened = self._get_flattened_image()
+        if flattened is None:
+            return None
+        return self._apply_preview_adjustments(flattened)
+
+    def _apply_preview_adjustments(self, image: Image.Image) -> Image.Image:
+        adjusted = ImageEnhance.Brightness(image).enhance(float(self._brightness_var.get() or 1.0))
+        adjusted = ImageEnhance.Contrast(adjusted).enhance(float(self._contrast_var.get() or 1.0))
+        return adjusted
+
+    def _get_flattened_image(self) -> Image.Image | None:
         if self._document is None:
             return None
-        image = self._document.composite()
-        image = ImageEnhance.Brightness(image).enhance(float(self._brightness_var.get() or 1.0))
-        image = ImageEnhance.Contrast(image).enhance(float(self._contrast_var.get() or 1.0))
-        return image
+        if self._flattened_cache_valid and self._flattened_cache is not None:
+            return self._flattened_cache
+        self._flattened_cache = self._document.composite()
+        self._flattened_cache_valid = True
+        return self._flattened_cache
+
+    def _invalidate_preview_caches(self) -> None:
+        self._flattened_cache_valid = False
+        self._flattened_cache = None
+        self._drag_flattened_without_active = None
 
     def _refresh_preview(self) -> None:
         image = self.composite_preview()
+        if image is None:
+            return
+        self._render_preview_image(image, resample=Image.Resampling.LANCZOS)
+
+    def _refresh_preview_fast(self) -> None:
+        image = self._build_drag_preview_image()
+        if image is None:
+            return
+        self._render_preview_image(image, resample=Image.Resampling.BILINEAR)
+
+    def _build_drag_preview_image(self) -> Image.Image | None:
+        if self._document is None:
+            return None
+        active_layer_index = self._document.active_layer_index
+        if self._drag_flattened_without_active is None:
+            self._drag_flattened_without_active = flatten_layers(
+                self._document.width,
+                self._document.height,
+                [layer for idx, layer in enumerate(self._document.layers) if idx != active_layer_index],
+            )
+
+        flattened = self._drag_flattened_without_active.copy()
+        active_layer = self._document.layers[active_layer_index]
+        if active_layer.visible:
+            active_image = active_layer.image.convert("RGBA")
+            opacity = max(0.0, min(1.0, float(active_layer.opacity)))
+            if opacity < 1.0:
+                channels = list(active_image.split())
+                channels[3] = channels[3].point(lambda alpha: int(alpha * opacity))
+                active_image = Image.merge("RGBA", channels)
+            flattened.alpha_composite(active_image)
+        return self._apply_preview_adjustments(flattened)
+
+    def _render_preview_image(self, image: Image.Image, resample: int) -> None:
         if image is None:
             return
 
@@ -189,9 +248,17 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._display_scale = scale
         self._display_offset = ((canvas_w - render_w) // 2, (canvas_h - render_h) // 2)
 
-        self._canvas_photo = ImageTk.PhotoImage(image.resize((render_w, render_h), Image.Resampling.LANCZOS))
-        self._preview_canvas.delete("all")
-        self._preview_canvas.create_image(self._display_offset[0], self._display_offset[1], image=self._canvas_photo, anchor="nw")
+        self._canvas_photo = ImageTk.PhotoImage(image.resize((render_w, render_h), resample))
+        if self._canvas_image_item is None:
+            self._canvas_image_item = self._preview_canvas.create_image(
+                self._display_offset[0],
+                self._display_offset[1],
+                image=self._canvas_photo,
+                anchor="nw",
+            )
+        else:
+            self._preview_canvas.coords(self._canvas_image_item, self._display_offset[0], self._display_offset[1])
+            self._preview_canvas.itemconfigure(self._canvas_image_item, image=self._canvas_photo)
 
     def _canvas_to_document(self, x: int, y: int) -> tuple[float, float] | None:
         if self._document is None:
@@ -207,6 +274,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
     def execute_command(self, command) -> None:
         self._history.execute_command(command)
+        self._invalidate_preview_caches()
         self._layers_panel.refresh()
         self._refresh_preview()
         self._update_history_buttons()
@@ -217,6 +285,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
     def _undo(self) -> str:
         if self._history.undo():
+            self._invalidate_preview_caches()
             self._layers_panel.refresh()
             self._refresh_preview()
             self._update_history_buttons()
@@ -225,6 +294,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
     def _redo(self) -> str:
         if self._history.redo():
+            self._invalidate_preview_caches()
             self._layers_panel.refresh()
             self._refresh_preview()
             self._update_history_buttons()
@@ -238,8 +308,11 @@ class ImageEditorDialog(ctk.CTkToplevel):
             return
         self._stroke_layer_index = self._document.active_layer_index
         self._stroke_before = self._document.active_layer.copy()
+        self._drag_in_progress = True
+        self._drag_needs_render = False
+        self._drag_flattened_without_active = None
         tool.on_press(*point)
-        self._refresh_preview()
+        self._refresh_preview_fast()
 
     def _on_canvas_drag(self, event: tk.Event) -> None:
         point = self._canvas_to_document(int(event.x), int(event.y))
@@ -247,9 +320,27 @@ class ImageEditorDialog(ctk.CTkToplevel):
         if point is None or tool is None:
             return
         tool.on_drag(*point)
-        self._refresh_preview()
+        self._schedule_drag_refresh()
+
+    def _schedule_drag_refresh(self) -> None:
+        self._drag_needs_render = True
+        if self._drag_render_after_id is not None:
+            return
+        self._drag_render_after_id = self.after(16, self._flush_drag_refresh)
+
+    def _flush_drag_refresh(self) -> None:
+        self._drag_render_after_id = None
+        if not self._drag_in_progress or not self._drag_needs_render:
+            return
+        self._drag_needs_render = False
+        self._refresh_preview_fast()
 
     def _on_canvas_release(self, event: tk.Event) -> None:
+        self._drag_in_progress = False
+        self._drag_needs_render = False
+        if self._drag_render_after_id is not None:
+            self.after_cancel(self._drag_render_after_id)
+            self._drag_render_after_id = None
         point = self._canvas_to_document(int(event.x), int(event.y))
         tool = self._get_active_tool()
         if point is None or tool is None or self._document is None or self._stroke_before is None:
@@ -268,8 +359,10 @@ class ImageEditorDialog(ctk.CTkToplevel):
 
         self._stroke_before = None
         self._stroke_layer_index = None
+        self._drag_flattened_without_active = None
 
     def _on_layers_changed(self) -> None:
+        self._invalidate_preview_caches()
         self._refresh_preview()
         self._update_history_buttons()
 
@@ -335,6 +428,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             return
         self._document.reset_from(self._base_image)
         self._history.clear()
+        self._invalidate_preview_caches()
         self._set_brightness(1.0)
         self._set_contrast(1.0)
         self._layers_panel.refresh()
