@@ -13,6 +13,7 @@ from modules.ui.image_library.editor.core.document import ImageDocument
 from modules.ui.image_library.editor.core.render.stroke_renderer import StrokeRenderer
 from modules.ui.image_library.editor.core.tools.brush_tool import BrushTool
 from modules.ui.image_library.editor.core.tools.eraser_tool import EraserTool
+from modules.ui.image_library.editor.widgets.layers_panel import LayersPanel
 
 
 class ImageEditorDialog(ctk.CTkToplevel):
@@ -21,8 +22,8 @@ class ImageEditorDialog(ctk.CTkToplevel):
     def __init__(self, master: tk.Misc | None, image_path: str, on_saved=None) -> None:
         super().__init__(master)
         self.title("Image Editor")
-        self.geometry("980x760")
-        self.minsize(760, 620)
+        self.geometry("1120x760")
+        self.minsize(860, 620)
         self.transient(master)
 
         self._source_path = str(image_path or "").strip()
@@ -50,7 +51,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         self._build_header()
-        self._build_preview()
+        self._build_workspace()
         self._build_controls()
 
         self._load_image()
@@ -67,18 +68,26 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._path_label = ctk.CTkLabel(bar, text=self._source_path, anchor="w")
         self._path_label.grid(row=0, column=0, sticky="ew", padx=10, pady=8)
 
-    def _build_preview(self) -> None:
-        container = ctk.CTkFrame(self)
-        container.grid(row=1, column=0, sticky="nsew", padx=12, pady=8)
-        container.grid_rowconfigure(0, weight=1)
-        container.grid_columnconfigure(0, weight=1)
+    def _build_workspace(self) -> None:
+        workspace = ctk.CTkFrame(self)
+        workspace.grid(row=1, column=0, sticky="nsew", padx=12, pady=8)
+        workspace.grid_rowconfigure(0, weight=1)
+        workspace.grid_columnconfigure(0, weight=1)
 
-        self._preview_canvas = tk.Canvas(container, background="#1f1f1f", highlightthickness=0)
+        preview_container = ctk.CTkFrame(workspace)
+        preview_container.grid(row=0, column=0, sticky="nsew", padx=(10, 6), pady=10)
+        preview_container.grid_rowconfigure(0, weight=1)
+        preview_container.grid_columnconfigure(0, weight=1)
+
+        self._preview_canvas = tk.Canvas(preview_container, background="#1f1f1f", highlightthickness=0)
         self._preview_canvas.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
         self._preview_canvas.bind("<Configure>", lambda _event: self._refresh_preview(), add="+")
         self._preview_canvas.bind("<ButtonPress-1>", self._on_canvas_press, add="+")
         self._preview_canvas.bind("<B1-Motion>", self._on_canvas_drag, add="+")
         self._preview_canvas.bind("<ButtonRelease-1>", self._on_canvas_release, add="+")
+
+        self._layers_panel = LayersPanel(workspace, on_changed=self._on_layers_changed)
+        self._layers_panel.grid(row=0, column=1, sticky="ns", padx=(6, 10), pady=10)
 
     def _build_controls(self) -> None:
         controls = ctk.CTkFrame(self)
@@ -171,6 +180,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             return
 
         self._document = ImageDocument.from_image(self._base_image)
+        self._layers_panel.bind_document(self._document)
         self._brush_tool = BrushTool(
             self._document,
             self._renderer,
@@ -256,10 +266,14 @@ class ImageEditorDialog(ctk.CTkToplevel):
         tool.on_release(*point)
         self._refresh_preview()
 
+    def _on_layers_changed(self) -> None:
+        self._refresh_preview()
+
     def _rotate(self, degrees: int) -> None:
         if self._document is None:
             return
         self._document.rotate(degrees)
+        self._layers_panel.refresh()
         self._refresh_preview()
 
     def _mirror(self) -> None:
@@ -280,6 +294,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
         self._document.reset_from(self._base_image)
         self._brightness_var.set(1.0)
         self._contrast_var.set(1.0)
+        self._layers_panel.refresh()
         self._refresh_preview()
 
     def _save(self) -> None:
@@ -308,6 +323,7 @@ class ImageEditorDialog(ctk.CTkToplevel):
             destination.parent.mkdir(parents=True, exist_ok=True)
             extension = destination.suffix.lower()
             to_save = image
+            # Export to common image formats is flattened by design.
             if extension in {".jpg", ".jpeg"}:
                 to_save = image.convert("RGB")
             to_save.save(destination)
