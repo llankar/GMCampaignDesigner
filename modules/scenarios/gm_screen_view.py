@@ -47,6 +47,12 @@ from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
+from modules.scenarios.gm_screen.tab_variants import (
+    TAB_VARIANTS,
+    tab_category_for_name,
+    tab_icon_for_name,
+    tab_short_label,
+)
 from modules.generic.detail_ui import get_detail_palette
 from modules.generic.detail_ui.scroll_host import build_scroll_host
 
@@ -154,10 +160,21 @@ class GMScreenView(ctk.CTkFrame):
         self.tab_order = []                  # ← new: keeps track of left-to-right order
         self.dragging = None                 # ← new: holds (tab_name, start_x)
         self.current_layout_name = None
+        self._default_pinned_tab_names = {self.scenario_name.lower(), "world map", "session timer"}
+        self._command_deck_buttons = {}
 
         # A container to hold both the scrollable tab area and the plus button
         self.tab_bar_container = ctk.CTkFrame(self, height=60, fg_color=self._palette["surface_card"], border_width=1, border_color=self._palette["muted_border"], corner_radius=18)
         self.tab_bar_container.pack(side="top", fill="x")
+
+        self.command_deck = ctk.CTkFrame(self.tab_bar_container, fg_color="transparent")
+        self.command_deck.pack(side="top", anchor="e", padx=8, pady=(4, 0))
+        self.command_deck_label = ctk.CTkLabel(
+            self.command_deck,
+            text="Command Deck",
+            text_color=self._palette["muted_text"],
+        )
+        self.command_deck_label.pack(side="left", padx=(0, 6))
 
         # The scrollable canvas for tabs
         self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=44, highlightthickness=0, bg=self._palette["surface_card"])
@@ -1048,32 +1065,55 @@ class GMScreenView(ctk.CTkFrame):
     def add_tab(self, name, content_frame, content_factory=None, layout_meta=None, activate=True):
         """Handle add tab."""
         log_info(f"Adding GM screen tab: {name}", func_name="GMScreenView.add_tab")
+        meta = dict(layout_meta or {})
+        category = tab_category_for_name(name)
+        variant = TAB_VARIANTS[category]
+        short_label = tab_short_label(name)
+        icon = tab_icon_for_name(name)
+        meta.setdefault("category", category)
+        meta.setdefault("short_label", short_label)
+        meta.setdefault("icon", icon)
+        if "pinned" not in meta:
+            meta["pinned"] = name.strip().lower() in self._default_pinned_tab_names
+
         tab_frame = ctk.CTkFrame(
             self.tab_bar,
-            fg_color=self._palette["surface_elevated"],
+            fg_color=variant["inactive_fg"],
             border_width=1,
-            border_color=self._palette["muted_border"],
-            corner_radius=16,
+            border_color=variant["inactive_border"],
+            corner_radius=12,
         )
         tab_frame.pack(side="left", padx=4, pady=6)
 
         tab_button = ctk.CTkButton(
             tab_frame,
-            text=name,
-            width=150,
-            height=34,
+            text="",
+            width=178,
+            height=30,
             fg_color="transparent",
-            hover_color=self._palette["surface_overlay"],
+            hover_color=variant["inactive_hover"],
             text_color=self._palette["muted_text"],
             command=lambda: self.show_tab(name),
         )
         tab_button.pack(side="left", padx=(4, 0), pady=4)
 
+        pin_button = ctk.CTkButton(
+            tab_frame,
+            text="📌",
+            width=30,
+            height=30,
+            fg_color="transparent",
+            hover_color=variant["inactive_hover"],
+            text_color=self._palette["muted_text"],
+            command=lambda: self.toggle_tab_pin(name),
+        )
+        pin_button.pack(side="left", pady=4)
+
         close_button = ctk.CTkButton(
             tab_frame,
             text="✕",
             width=30,
-            height=34,
+            height=30,
             fg_color="transparent",
             hover_color="#B91C1C",
             text_color=self._palette["muted_text"],
@@ -1086,9 +1126,9 @@ class GMScreenView(ctk.CTkFrame):
             image=self.detach_icon,
             text="",
             width=42,
-            height=34,
+            height=30,
             fg_color="transparent",
-            hover_color=self._palette["surface_overlay"],
+            hover_color=variant["inactive_hover"],
             command=lambda: self.toggle_detach_tab(name),
         )
         detach_button.pack(side="left", padx=(0, 4), pady=4)
@@ -1098,13 +1138,15 @@ class GMScreenView(ctk.CTkFrame):
             "button_frame": tab_frame,
             "content_frame": content_frame,
             "button": tab_button,
+            "pin_button": pin_button,
             "detach_button": detach_button,
             "detached": False,
             "window": None,
             "portrait_label": portrait_label,
             "factory": content_factory,
-            "meta": layout_meta or {},
+            "meta": meta,
         }
+        self._apply_tab_visual_state(name, is_active=False)
 
         content_frame.pack_forget()
         if activate:
@@ -1116,6 +1158,7 @@ class GMScreenView(ctk.CTkFrame):
         draggable_widgets = (
             tab_frame,
             tab_button,
+            pin_button,
             close_button,
             detach_button
         )
@@ -1126,6 +1169,7 @@ class GMScreenView(ctk.CTkFrame):
             w.bind("<ButtonRelease-1>", lambda e=None, n=name: self._on_tab_release(e, n))
 
         self.reposition_add_button()
+        self._refresh_command_deck()
 
     def _teardown_tab_content(self, frame):
         """Tear down tab content."""
@@ -2122,6 +2166,8 @@ class GMScreenView(ctk.CTkFrame):
             self.detach_tab(name)
             # When detached, change to the reattach icon
             self.tabs[name]["detach_button"].configure(image=self.reattach_icon)
+        self._apply_tab_visual_state(name, is_active=(self.current_tab == name))
+        self._refresh_command_deck()
 
     def detach_tab(self, name):
         """Handle detach tab."""
@@ -2551,6 +2597,9 @@ class GMScreenView(ctk.CTkFrame):
         """Close tab."""
         if len(self.tabs) == 1:
             return
+        if name in self._command_deck_buttons:
+            self._command_deck_buttons[name].destroy()
+            self._command_deck_buttons.pop(name, None)
         if name in self.tab_order:
             self.tab_order.remove(name)
         if self.tabs[name].get("detached", False) and self.tabs[name].get("window"):
@@ -2562,6 +2611,7 @@ class GMScreenView(ctk.CTkFrame):
         if self.current_tab == name and self.tabs:
             self.show_tab(next(iter(self.tabs)))
         self.reposition_add_button()
+        self._refresh_command_deck()
 
     def reposition_add_button(self):
         """Handle reposition add button."""
@@ -2709,23 +2759,10 @@ class GMScreenView(ctk.CTkFrame):
             # Handle the branch where current tab is set and current tab is in tabs.
             if not self.tabs[self.current_tab]["detached"]:
                 self.tabs[self.current_tab]["content_frame"].pack_forget()
-            self.tabs[self.current_tab]["button"].configure(
-                fg_color="transparent",
-                text_color=self._palette["muted_text"],
-            )
-            self.tabs[self.current_tab]["button_frame"].configure(
-                fg_color=self._palette["surface_elevated"],
-                border_color=self._palette["muted_border"],
-            )
+            self._apply_tab_visual_state(self.current_tab, is_active=False)
         self.current_tab = name
-        self.tabs[name]["button"].configure(
-            fg_color=self._palette["surface_overlay"],
-            text_color=self._palette["text"],
-        )
-        self.tabs[name]["button_frame"].configure(
-            fg_color=self._palette["hero_gradient"],
-            border_color=self._palette["pill_border"],
-        )
+        self._apply_tab_visual_state(name, is_active=True)
+        self._refresh_command_deck()
         # Only pack the content into the main content area if the tab is not detached.
         if not self.tabs[name]["detached"]:
             # Handle the branch where not tabs[name]['detached'].
@@ -2754,6 +2791,103 @@ class GMScreenView(ctk.CTkFrame):
             frame.pack(fill="both", expand=True)
             self._reset_tab_scroll_state(name)
             self._request_active_tab_layout_settle()
+
+    def _tab_status(self, name, is_active=False):
+        """Return status for a tab."""
+        if is_active:
+            return "active"
+        tab = self.tabs.get(name, {})
+        if tab.get("detached"):
+            return "alert"
+        return "stale"
+
+    def _tab_status_dot(self, status):
+        """Return dot icon from status."""
+        if status == "active":
+            return "🟢"
+        if status == "alert":
+            return "🔴"
+        return "🟡"
+
+    def _build_tab_text(self, name, is_active=False):
+        """Compose tab text with icon, short label and status dot."""
+        tab = self.tabs.get(name, {})
+        meta = tab.get("meta", {})
+        icon = meta.get("icon") or tab_icon_for_name(name)
+        short_label = meta.get("short_label") or tab_short_label(name)
+        status_dot = self._tab_status_dot(self._tab_status(name, is_active=is_active))
+        return f"{icon} {short_label} {status_dot}"
+
+    def _apply_tab_visual_state(self, name, is_active=False):
+        """Apply variant styling to tab widgets."""
+        tab = self.tabs.get(name)
+        if not tab:
+            return
+        meta = tab.get("meta", {})
+        variant = TAB_VARIANTS.get(meta.get("category"), TAB_VARIANTS["default"])
+        status = self._tab_status(name, is_active=is_active)
+        border = variant["active_border"] if is_active else variant["inactive_border"]
+        frame_fg = variant["active_fg"] if is_active else variant["inactive_fg"]
+        text_color = self._palette["text"] if is_active else self._palette["muted_text"]
+        tab["button_frame"].configure(
+            fg_color=frame_fg,
+            border_color=border,
+            border_width=2 if is_active else 1,
+            corner_radius=16 if is_active else 10,
+        )
+        tab["button"].configure(
+            text=self._build_tab_text(name, is_active=is_active),
+            height=38 if is_active else 28,
+            hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
+            text_color=text_color,
+            font=ctk.CTkFont(size=14 if is_active else 12, weight="bold" if is_active else "normal"),
+        )
+        tab["pin_button"].configure(
+            text="📌" if meta.get("pinned") else "📍",
+            hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
+            text_color=text_color,
+        )
+        tab["detach_button"].configure(
+            hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
+        )
+        if status == "alert":
+            tab["button_frame"].configure(border_color="#EF4444")
+
+    def toggle_tab_pin(self, name):
+        """Pin or unpin a tab to the command deck."""
+        if name not in self.tabs:
+            return
+        meta = self.tabs[name].setdefault("meta", {})
+        meta["pinned"] = not bool(meta.get("pinned"))
+        self._apply_tab_visual_state(name, is_active=(self.current_tab == name))
+        self._refresh_command_deck()
+
+    def _refresh_command_deck(self):
+        """Refresh command deck buttons for pinned tabs."""
+        for button in self._command_deck_buttons.values():
+            button.destroy()
+        self._command_deck_buttons = {}
+        pinned_names = [tab_name for tab_name in self.tab_order if self.tabs.get(tab_name, {}).get("meta", {}).get("pinned")]
+        if not pinned_names:
+            self.command_deck_label.configure(text="Command Deck (none)")
+            return
+        self.command_deck_label.configure(text="Command Deck")
+        for tab_name in pinned_names[:6]:
+            tab = self.tabs.get(tab_name, {})
+            meta = tab.get("meta", {})
+            label = f"{meta.get('icon', '◻')} {meta.get('short_label', tab_name)}"
+            button = ctk.CTkButton(
+                self.command_deck,
+                text=label,
+                height=26,
+                width=108,
+                fg_color=self._palette["surface_overlay"],
+                hover_color=self._palette["accent_hover"],
+                text_color=self._palette["text"],
+                command=lambda n=tab_name: self.show_tab(n),
+            )
+            button.pack(side="left", padx=2)
+            self._command_deck_buttons[tab_name] = button
 
     def add_new_tab(self):
         """Handle add new tab."""
