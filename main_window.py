@@ -195,6 +195,8 @@ class MainWindow(ctk.CTk):
         self.whiteboard_controller = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
+        root.bind_all("<Control-i>", self._on_ctrl_i)
+        root.bind_all("<Control-I>", self._on_ctrl_i)
         self._bind_global_shortcuts()
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
@@ -4300,6 +4302,11 @@ class MainWindow(ctk.CTk):
         if self.current_gm_view:
             self.current_gm_view.open_global_search()
          # otherwise ignore silently
+
+    def _on_ctrl_i(self, event=None):
+        """Global Ctrl+I binding: open shared image library browser."""
+        self.open_image_library_browser()
+        return "break"
 
 
     def open_audio_bar(self):
