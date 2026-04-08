@@ -67,6 +67,7 @@ from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
+from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
 from modules.events.ui.dock import CalendarDock
 from modules.events.models.event_types import get_event_type
@@ -952,95 +953,19 @@ class MainWindow(ctk.CTk):
         container = getattr(self, "sidebar_sections_container", None)
         if container is None:
             return
-        for child in container.winfo_children():
-            child.destroy()
-        sections = []  # track all sections to enforce single-open behavior
         default_title = "Campaign Workshop"
-        default_meta = {"sec": None}
-        active_section = {"sec": None}
-
-        def make_section(parent, title, buttons):
-            """Handle make section."""
-            sec = ctk.CTkFrame(parent)
-            sec.pack(fill="x", pady=(4, 6))
-
-            header_color = theme_manager.get_tokens().get("sidebar_header_bg")
-            header = ctk.CTkFrame(sec, fg_color=header_color)
-            header.pack(fill="x")
-            title_lbl = ctk.CTkLabel(header, text=title, anchor="center")
-            title_lbl.pack(fill="x", pady=6)
-            state = {"open": False}
-
-            body = ctk.CTkFrame(sec, fg_color="transparent")
-            cols = 2
-            for c in range(cols):
-                body.grid_columnconfigure(c, weight=1)
-            for idx, (icon_key, tooltip, cmd) in enumerate(buttons):
-                r, c = divmod(idx, cols)
-                icon = self.icons.get(icon_key)
-                btn = create_icon_button(body, icon, tooltip, cmd)
-                btn.grid(row=r, column=c, padx=2, pady=2, sticky="ew")
-
-            def expand():
-                """Handle expand."""
-                if state["open"]:
-                    return
-                state["open"] = True
-                try:
-                    body.pack(fill="x", padx=2, pady=(2, 2))
-                except Exception:
-                    pass
-
-            def collapse():
-                """Collapse the operation."""
-                if not state["open"]:
-                    return
-                state["open"] = False
-                try:
-                    body.pack_forget()
-                except Exception:
-                    pass
-
-            def toggle(_event=None):
-                """Toggle the operation."""
-                if state["open"]:
-                    # Handle the branch where state['open'].
-                    collapse()
-                    if active_section["sec"] is sec:
-                        active_section["sec"] = None
-                else:
-                    for meta in sections:
-                        # Process each meta from sections.
-                        if meta["sec"] is sec:
-                            continue
-                        meta["collapse"]()
-                    expand()
-                    active_section["sec"] = sec
-
-            header.bind("<Button-1>", toggle)
-            title_lbl.bind("<Button-1>", toggle)
-
-            sections.append({
-                "sec": sec,
-                "state": state,
-                "collapse": collapse,
-                "expand": expand,
-                "toggle": toggle,
-                "title": title,
-            })
-            return sec
 
         # Group buttons
         data_system = [
-            ("change_db", "Change Data Storage", self.change_database_storage),
-            ("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
-            ("customize_fields", "Customize Fields", self.open_custom_fields_editor),
-            ("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
-            ("auto_improve", "Auto-improvement (Codex CLI)", self.open_auto_improve_panel),
-            ("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
-            ("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
-            ("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
-            ("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
+            SidebarItemSpec("change_db", "Change Data Storage", self.change_database_storage),
+            SidebarItemSpec("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
+            SidebarItemSpec("customize_fields", "Customize Fields", self.open_custom_fields_editor),
+            SidebarItemSpec("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
+            SidebarItemSpec("auto_improve", "Auto-improvement (Codex CLI)", self.open_auto_improve_panel),
+            SidebarItemSpec("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
+            SidebarItemSpec("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
+            SidebarItemSpec("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
+            SidebarItemSpec("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
         ]
 
         entity_buttons = []
@@ -1051,54 +976,76 @@ class MainWindow(ctk.CTk):
             key = f"entity::{slug}"
             label = meta.get("label") or slug.replace("_", " ").title()
             tooltip = f"Manage {label}"
-            entity_buttons.append((key, tooltip, lambda s=slug: self.open_entity(s)))
+            group = self._entity_sidebar_group(label)
+            entity_buttons.append(SidebarItemSpec(key, tooltip, lambda s=slug: self.open_entity(s), group=group))
 
         relations = [
-            ("character_graph", "Open Character Graph Editor", self.open_character_graph_editor),
-            ("villain_graph", "Open Villain Graph Editor", self.open_villain_graph_editor),
-            ("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
-            ("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
-            ("create_random_table", "Create Random Table", self.open_random_table_editor),
-            ("scene_flow_viewer", "Open Scene Flow Viewer", self.open_scene_flow_viewer),
-            ("world_map", "Open World Map", self.open_world_map),
+            SidebarItemSpec("character_graph", "Open Character Graph Editor", self.open_character_graph_editor),
+            SidebarItemSpec("villain_graph", "Open Villain Graph Editor", self.open_villain_graph_editor),
+            SidebarItemSpec("faction_graph", "Open Factions Graph Editor", self.open_faction_graph_editor),
+            SidebarItemSpec("scenario_graph", "Open Scenario Graph Editor", self.open_scenario_graph_editor),
+            SidebarItemSpec("create_random_table", "Create Random Table", self.open_random_table_editor),
+            SidebarItemSpec("scene_flow_viewer", "Open Scene Flow Viewer", self.open_scene_flow_viewer),
+            SidebarItemSpec("world_map", "Open World Map", self.open_world_map),
         ]
         utilities = [
-            ("generate_scenario", "Generate Scenario", self.open_scenario_generator),
-            ("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
-            ("campaign_builder", "Campaign Builder Wizard", self.open_campaign_builder),
-            ("timeline_simulator", "Advance Timeline", self.open_timeline_simulator_dialog),
-            ("import_scenario", "Import Scenario", self.open_scenario_importer),
-            ("import_creatures_pdf", "Import NPCs/Creatures from PDF", self.open_creature_importer),
-            ("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
-            ("gm_screen", "Open GM Screen", self.open_gm_screen),
-            ("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
-            ("export_campaign_dossier", "Export Entire Campaign (Dossier Binder)", self.open_campaign_dossier_exporter),
-            ("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
-            ("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
-            ("map_tool", "Map Tool", self.map_tool),
-            ("whiteboard", "Whiteboard", self.open_whiteboard),
-            ("audio_controls", "Sound & Music Manager", self.open_sound_manager),
-            ("dice_roller", "Open Dice Roller", self.open_dice_roller),
-            ("session_timers", "Open Session Timers", self.open_timer_window),
-            ("character_creation", "Character Creation", self.open_character_creation),
+            SidebarItemSpec("generate_scenario", "Generate Scenario", self.open_scenario_generator),
+            SidebarItemSpec("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
+            SidebarItemSpec("campaign_builder", "Campaign Builder Wizard", self.open_campaign_builder),
+            SidebarItemSpec("timeline_simulator", "Advance Timeline", self.open_timeline_simulator_dialog),
+            SidebarItemSpec("import_scenario", "Import Scenario", self.open_scenario_importer),
+            SidebarItemSpec("import_creatures_pdf", "Import NPCs/Creatures from PDF", self.open_creature_importer),
+            SidebarItemSpec("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
+            SidebarItemSpec("gm_screen", "Open GM Screen", self.open_gm_screen),
+            SidebarItemSpec("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
+            SidebarItemSpec("export_campaign_dossier", "Export Entire Campaign (Dossier Binder)", self.open_campaign_dossier_exporter),
+            SidebarItemSpec("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
+            SidebarItemSpec("import_portraits", "Import Portraits from Folder", self.import_portraits_from_directory),
+            SidebarItemSpec("map_tool", "Map Tool", self.map_tool),
+            SidebarItemSpec("whiteboard", "Whiteboard", self.open_whiteboard),
+            SidebarItemSpec("audio_controls", "Sound & Music Manager", self.open_sound_manager),
+            SidebarItemSpec("dice_roller", "Open Dice Roller", self.open_dice_roller),
+            SidebarItemSpec("session_timers", "Open Session Timers", self.open_timer_window),
+            SidebarItemSpec("character_creation", "Character Creation", self.open_character_creation),
         ]
+        db_mtime = self._campaign_db_mtime()
+        recent_update = bool(db_mtime and (time.time() - db_mtime) < 86400)
+        has_campaign_data = len(entity_buttons) > 0
 
-        make_section(container, "Data & System", data_system)
-        make_section(container, "Campaign Workshop", entity_buttons)
-        make_section(container, "Relations & Graphs", relations)
-        make_section(container, "Utilities", utilities)
+        specs = [
+            SidebarSectionSpec("Data & System", data_system, item_count=len(data_system), has_unresolved=not has_campaign_data),
+            SidebarSectionSpec("Campaign Workshop", entity_buttons, item_count=len(entity_buttons), updated_recently=recent_update),
+            SidebarSectionSpec("Relations & Graphs", relations, item_count=len(relations)),
+            SidebarSectionSpec("Utilities", utilities, item_count=len(utilities), has_critical=not has_campaign_data),
+        ]
+        self._sidebar_accordion = SidebarAccordion(
+            container,
+            icons=self.icons,
+            create_icon_button=create_icon_button,
+            tokens=theme_manager.get_tokens(),
+        )
+        self._sidebar_accordion.build(specs, default_title=default_title)
 
-        # Open the default section by default
-        for meta in sections:
-            if meta.get("title") == default_title:
-                # Handle the branch where meta.get('title') == default_title.
-                default_meta = meta
-                try:
-                    meta["expand"]()
-                    active_section["sec"] = meta["sec"]
-                except Exception:
-                    pass
-                break
+    def _campaign_db_mtime(self) -> float | None:
+        """Return campaign database modification time when available."""
+        db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
+        if not db_path:
+            return None
+        try:
+            return os.path.getmtime(db_path)
+        except OSError:
+            return None
+
+    def _entity_sidebar_group(self, label: str) -> str:
+        """Infer compact group title for sidebar entities."""
+        text = (label or "").strip().lower()
+        if any(token in text for token in ("npc", "character", "creature", "villain", "faction", "people", "person")):
+            return "People"
+        if any(token in text for token in ("place", "location", "city", "region", "map", "world")):
+            return "Places"
+        if any(token in text for token in ("plot", "clue", "scenario", "event", "quest", "scene")):
+            return "Plot"
+        return "Other"
 
     def _ensure_sidebar_hotspot(self):
         """Ensure sidebar hotspot."""
