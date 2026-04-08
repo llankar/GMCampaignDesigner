@@ -1955,6 +1955,11 @@ class GMScreenView(ctk.CTkFrame):
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
+    def _is_note_tab(self, tab_name):
+        """Return whether the provided tab is a note tab."""
+        meta = (self.tabs.get(tab_name) or {}).get("meta") or {}
+        return meta.get("kind") == "note"
+
     def load_layout(self, layout_name, set_default=False, silent=False):
         """Load layout."""
         layout = self.layout_manager.get_layout(layout_name)
@@ -2008,13 +2013,12 @@ class GMScreenView(ctk.CTkFrame):
 
             # On startup (silent restore), avoid auto-opening a note tab as the first visible tab.
             if silent and target_active:
-                active_meta = (self.tabs.get(target_active) or {}).get("meta") or {}
-                if active_meta.get("kind") == "note":
+                if self._is_note_tab(target_active):
                     target_active = next(
                         (
                             tab_name
                             for tab_name in self.tab_order
-                            if ((self.tabs.get(tab_name) or {}).get("meta") or {}).get("kind") != "note"
+                            if not self._is_note_tab(tab_name)
                         ),
                         target_active,
                     )
@@ -2022,7 +2026,13 @@ class GMScreenView(ctk.CTkFrame):
             if target_active:
                 self.show_tab(target_active)
             elif self.tab_order:
-                self.show_tab(self.tab_order[0])
+                fallback_tab = None
+                if silent:
+                    fallback_tab = next(
+                        (tab_name for tab_name in self.tab_order if not self._is_note_tab(tab_name)),
+                        None,
+                    )
+                self.show_tab(fallback_tab or self.tab_order[0])
 
             for tab_name in list(self.tabs.keys()):
                 self._reset_tab_scroll_state(tab_name)
