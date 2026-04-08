@@ -21,6 +21,7 @@ class GMScreenLayoutManager:
             "scenario_defaults": {},
             "scenario_state": {},
             "session_settings": {},
+            "global_settings": {},
         }
         self._load()
 
@@ -40,17 +41,20 @@ class GMScreenLayoutManager:
             scenario_defaults = raw.get("scenario_defaults") or {}
             scenario_state = raw.get("scenario_state") or {}
             session_settings = raw.get("session_settings") or {}
+            global_settings = raw.get("global_settings") or {}
             if (
                 not isinstance(layouts, dict)
                 or not isinstance(scenario_defaults, dict)
                 or not isinstance(scenario_state, dict)
                 or not isinstance(session_settings, dict)
+                or not isinstance(global_settings, dict)
             ):
                 raise ValueError("Layout file malformed")
             self.data["layouts"] = layouts
             self.data["scenario_defaults"] = scenario_defaults
             self.data["scenario_state"] = scenario_state
             self.data["session_settings"] = session_settings
+            self.data["global_settings"] = global_settings
         except Exception as exc:
             log_exception(exc, func_name="GMScreenLayoutManager._load")
             log_warning(
@@ -62,6 +66,7 @@ class GMScreenLayoutManager:
                 "scenario_defaults": {},
                 "scenario_state": {},
                 "session_settings": {},
+                "global_settings": {},
             }
 
     def _write(self) -> None:
@@ -217,6 +222,27 @@ class GMScreenLayoutManager:
                 "mid_hours": mid_hours,
                 "end_hours": end_hours,
             }
+        self._write()
+
+    # ------------------------------------------------------------------
+    # Global settings
+    # ------------------------------------------------------------------
+    def get_global_setting(self, key: str, default: Any = None) -> Any:
+        """Return a global setting value."""
+        if not key:
+            return default
+        store = self.data.get("global_settings") or {}
+        return store.get(key, default)
+
+    def set_global_setting(self, key: str, value: Any) -> None:
+        """Persist a global setting value."""
+        if not key:
+            return
+        store = self.data.setdefault("global_settings", {})
+        if value is None:
+            store.pop(key, None)
+        else:
+            store[key] = value
         self._write()
 
 

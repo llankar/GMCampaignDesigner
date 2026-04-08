@@ -53,6 +53,7 @@ from modules.scenarios.gm_screen.tab_variants import (
     tab_icon_for_name,
     tab_short_label,
 )
+from modules.scenarios.gm_screen.dashboard.animations import MotionController
 from modules.generic.detail_ui import get_detail_palette
 from modules.generic.detail_ui.scroll_host import build_scroll_host
 
@@ -91,8 +92,11 @@ class GMScreenView(ctk.CTkFrame):
         self._plot_twist_scheduler = PlotTwistScheduler(self)
         self._session_mid_var = tk.StringVar()
         self._session_end_var = tk.StringVar()
+        self._reduced_motion_var = tk.BooleanVar(value=False)
 
         self._load_persisted_state()
+        self._load_motion_settings()
+        self._motion = MotionController(self.after, reduced_motion=self._reduced_motion_var.get())
 
         # Track transient key bindings when this view owns its toplevel window
         self._bound_shortcut_owner = None
@@ -760,6 +764,13 @@ class GMScreenView(ctk.CTkFrame):
             command=self._append_session_debrief,
         )
         debrief_btn.pack(side="left")
+        settings_btn = ctk.CTkButton(
+            self._session_controls,
+            text="Settings",
+            width=84,
+            command=self._open_settings_dialog,
+        )
+        settings_btn.pack(side="left", padx=(4, 0))
 
         mid_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
         end_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
@@ -772,7 +783,53 @@ class GMScreenView(ctk.CTkFrame):
         self._session_end_button = end_btn
         self._session_capture_button = capture_btn
         self._session_debrief_button = debrief_btn
+        self._session_settings_button = settings_btn
         self._update_session_controls_state()
+
+    def _load_motion_settings(self):
+        """Load reduced motion setting from persisted global preferences."""
+        manager = getattr(self, "layout_manager", None)
+        reduced_motion = False
+        if manager is not None:
+            reduced_motion = bool(manager.get_global_setting("reduced_motion", False))
+        self._reduced_motion_var.set(reduced_motion)
+
+    def _persist_motion_settings(self):
+        """Persist reduced motion setting."""
+        manager = getattr(self, "layout_manager", None)
+        if manager is None:
+            return
+        manager.set_global_setting("reduced_motion", bool(self._reduced_motion_var.get()))
+
+    def _on_reduced_motion_toggled(self):
+        """Handle reduced motion toggle."""
+        enabled = bool(self._reduced_motion_var.get())
+        self._motion.set_reduced_motion(enabled)
+        self._persist_motion_settings()
+
+    def _open_settings_dialog(self):
+        """Open compact settings dialog for global accessibility options."""
+        popup = ctk.CTkToplevel(self)
+        popup.title("GM Screen Settings")
+        popup.geometry("360x160")
+        popup.transient(self.winfo_toplevel())
+        popup.grab_set()
+        popup.focus_force()
+
+        body = ctk.CTkFrame(popup, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=16, pady=16)
+        ctk.CTkLabel(
+            body,
+            text="Accessibility",
+            anchor="w",
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).pack(fill="x", pady=(0, 8))
+        ctk.CTkSwitch(
+            body,
+            text="Reduced motion",
+            variable=self._reduced_motion_var,
+            command=self._on_reduced_motion_toggled,
+        ).pack(anchor="w")
 
     def _load_session_hours(self):
         """Load session hours."""
@@ -2158,6 +2215,7 @@ class GMScreenView(ctk.CTkFrame):
     def toggle_detach_tab(self, name):
         """Toggle detach tab."""
         log_info(f"Toggling detach for tab: {name}", func_name="GMScreenView.toggle_detach_tab")
+        self._motion.pulse_widget(self.tabs.get(name, {}).get("detach_button"), duration_ms=140)
         if self.tabs[name]["detached"]:
             self.reattach_tab(name)
             # After reattaching, show the detach icon
@@ -2226,6 +2284,7 @@ class GMScreenView(ctk.CTkFrame):
         GMScreenView.detached_count = getattr(GMScreenView, "detached_count", 0) + 1
 
         detached_window.deiconify()
+        self._motion.fade_in_window(detached_window, duration_ms=180)
         print(f"[DETACH] Detached window shown at {GRAPH_W}×{GRAPH_H}")
 
         # Portrait & scenario-graph restoration (unchanged)…
@@ -2762,6 +2821,7 @@ class GMScreenView(ctk.CTkFrame):
             self._apply_tab_visual_state(self.current_tab, is_active=False)
         self.current_tab = name
         self._apply_tab_visual_state(name, is_active=True)
+        self._motion.pulse_widget(self.tabs.get(name, {}).get("button_frame"), duration_ms=160)
         self._refresh_command_deck()
         # Only pack the content into the main content area if the tab is not detached.
         if not self.tabs[name]["detached"]:
@@ -2898,6 +2958,7 @@ class GMScreenView(ctk.CTkFrame):
     def _show_add_menu(self):
         """Show add menu."""
         button = self.add_button
+        self._motion.pulse_widget(button, duration_ms=120)
         x = button.winfo_rootx()
         y = button.winfo_rooty() + button.winfo_height()
         try:
