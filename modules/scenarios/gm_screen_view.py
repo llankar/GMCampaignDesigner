@@ -1081,12 +1081,23 @@ class GMScreenView(ctk.CTkFrame):
             fg_color=variant["inactive_fg"],
             border_width=1,
             border_color=variant["inactive_border"],
-            corner_radius=12,
+            corner_radius=14,
         )
         tab_frame.pack(side="left", padx=4, pady=6)
 
-        tab_button = ctk.CTkButton(
+        accent_bar = ctk.CTkFrame(
             tab_frame,
+            height=3,
+            fg_color=variant.get("inactive_accent", variant["inactive_border"]),
+            corner_radius=8,
+        )
+        accent_bar.pack(side="top", fill="x", padx=8, pady=(6, 2))
+
+        tab_controls = ctk.CTkFrame(tab_frame, fg_color="transparent")
+        tab_controls.pack(side="top", fill="x", padx=2, pady=(0, 3))
+
+        tab_button = ctk.CTkButton(
+            tab_controls,
             text="",
             width=178,
             height=30,
@@ -1098,8 +1109,8 @@ class GMScreenView(ctk.CTkFrame):
         tab_button.pack(side="left", padx=(4, 0), pady=4)
 
         pin_button = ctk.CTkButton(
-            tab_frame,
-            text="📌",
+            tab_controls,
+            text="★",
             width=30,
             height=30,
             fg_color="transparent",
@@ -1110,7 +1121,7 @@ class GMScreenView(ctk.CTkFrame):
         pin_button.pack(side="left", pady=4)
 
         close_button = ctk.CTkButton(
-            tab_frame,
+            tab_controls,
             text="✕",
             width=30,
             height=30,
@@ -1122,7 +1133,7 @@ class GMScreenView(ctk.CTkFrame):
         close_button.pack(side="left", pady=4)
 
         detach_button = ctk.CTkButton(
-            tab_frame,
+            tab_controls,
             image=self.detach_icon,
             text="",
             width=42,
@@ -1140,6 +1151,7 @@ class GMScreenView(ctk.CTkFrame):
             "button": tab_button,
             "pin_button": pin_button,
             "detach_button": detach_button,
+            "accent_bar": accent_bar,
             "detached": False,
             "window": None,
             "portrait_label": portrait_label,
@@ -1157,6 +1169,7 @@ class GMScreenView(ctk.CTkFrame):
         # collect ALL the widgets you need to drag
         draggable_widgets = (
             tab_frame,
+            tab_controls,
             tab_button,
             pin_button,
             close_button,
@@ -2815,8 +2828,9 @@ class GMScreenView(ctk.CTkFrame):
         meta = tab.get("meta", {})
         icon = meta.get("icon") or tab_icon_for_name(name)
         short_label = meta.get("short_label") or tab_short_label(name)
-        status_dot = self._tab_status_dot(self._tab_status(name, is_active=is_active))
-        return f"{icon} {short_label} {status_dot}"
+        status = self._tab_status(name, is_active=is_active)
+        badge = "◆" if status == "active" else ("✦" if status == "alert" else "·")
+        return f"{icon}  {short_label} {badge}"
 
     def _apply_tab_visual_state(self, name, is_active=False):
         """Apply variant styling to tab widgets."""
@@ -2835,6 +2849,13 @@ class GMScreenView(ctk.CTkFrame):
             border_width=2 if is_active else 1,
             corner_radius=16 if is_active else 10,
         )
+        if tab.get("accent_bar") is not None:
+            tab["accent_bar"].configure(
+                fg_color=variant.get(
+                    "active_accent" if is_active else "inactive_accent",
+                    border,
+                )
+            )
         tab["button"].configure(
             text=self._build_tab_text(name, is_active=is_active),
             height=38 if is_active else 28,
@@ -2843,7 +2864,7 @@ class GMScreenView(ctk.CTkFrame):
             font=ctk.CTkFont(size=14 if is_active else 12, weight="bold" if is_active else "normal"),
         )
         tab["pin_button"].configure(
-            text="📌" if meta.get("pinned") else "📍",
+            text="★" if meta.get("pinned") else "☆",
             hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
             text_color=text_color,
         )
