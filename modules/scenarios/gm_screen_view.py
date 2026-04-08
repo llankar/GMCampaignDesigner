@@ -54,8 +54,16 @@ from modules.scenarios.gm_screen.tab_variants import (
     tab_short_label,
 )
 from modules.scenarios.gm_screen.dashboard.animations import MotionController
+from modules.scenarios.gm_screen.docking_feedback import (
+    DOCK_BADGE_COPY,
+    apply_origin_highlight,
+    dock_toggle_text,
+    dock_toggle_tooltip,
+    pulse_slot,
+)
 from modules.generic.detail_ui import get_detail_palette
 from modules.generic.detail_ui.scroll_host import build_scroll_host
+from modules.ui.tooltip import ToolTip
 
 log_module_import(__name__)
 
@@ -109,16 +117,9 @@ class GMScreenView(ctk.CTkFrame):
         self._layout_settle_scheduler = LayoutSettleScheduler(self)
         self._layout_probe_signature = None
         self._bound_layout_hosts = set()
+        self._skip_dock_toggle_name = None
         self.bind("<Destroy>", self._on_destroy, add="+")
         self._setup_toplevel_shortcuts()
-
-        # Load your detach and reattach icon files (adjust file paths and sizes as needed)
-        self.detach_icon = CTkImage(light_image=Image.open("assets/detach_icon.png"),
-                                    dark_image=Image.open("assets/detach_icon.png"),
-                                    size=(20, 20))
-        self.reattach_icon = CTkImage(light_image=Image.open("assets/reattach_icon.png"),
-                                    dark_image=Image.open("assets/reattach_icon.png"),
-                                    size=(20, 20))
 
         self.wrappers = {
             "Campaigns": GenericModelWrapper("campaigns"),
@@ -1178,17 +1179,32 @@ class GMScreenView(ctk.CTkFrame):
         )
         close_button.pack(side="left", pady=4)
 
-        detach_button = ctk.CTkButton(
+        dock_badge = ctk.CTkLabel(
             tab_frame,
-            image=self.detach_icon,
-            text="",
-            width=42,
+            text="Docked",
+            width=70,
+            height=22,
+            corner_radius=11,
+            fg_color="#DCFCE7",
+            text_color="#14532D",
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
+        dock_badge.pack(side="left", padx=(2, 4), pady=4)
+
+        dock_toggle_button = ctk.CTkButton(
+            tab_frame,
+            text="Float",
+            width=56,
             height=30,
-            fg_color="transparent",
-            hover_color=variant["inactive_hover"],
+            fg_color=variant["active_border"],
+            hover_color=variant["active_hover"],
+            text_color=self._palette["text"],
+            font=ctk.CTkFont(size=12, weight="bold"),
             command=lambda: self.toggle_detach_tab(name),
         )
-        detach_button.pack(side="left", padx=(0, 4), pady=4)
+        dock_toggle_button.pack(side="left", padx=(0, 4), pady=4)
+        dock_toggle_button.bind("<Button-1>", lambda e=None, n=name: self._on_dock_toggle_click(e, n), add="+")
+        dock_tooltip = ToolTip(dock_toggle_button, dock_toggle_tooltip(False))
 
         portrait_label = getattr(content_frame, "portrait_label", None)
         self.tabs[name] = {
@@ -1196,7 +1212,9 @@ class GMScreenView(ctk.CTkFrame):
             "content_frame": content_frame,
             "button": tab_button,
             "pin_button": pin_button,
-            "detach_button": detach_button,
+            "dock_badge": dock_badge,
+            "detach_button": dock_toggle_button,
+            "dock_button_tooltip": dock_tooltip,
             "detached": False,
             "window": None,
             "portrait_label": portrait_label,
@@ -1217,13 +1235,16 @@ class GMScreenView(ctk.CTkFrame):
             tab_button,
             pin_button,
             close_button,
-            detach_button
+            dock_badge,
+            dock_toggle_button
         )
 
         for w in draggable_widgets:
             w.bind("<Button-1>",        lambda e=None, n=name: self._on_tab_press(e, n))
             w.bind("<B1-Motion>",       lambda e=None, n=name: self._on_tab_motion(e, n))
             w.bind("<ButtonRelease-1>", lambda e=None, n=name: self._on_tab_release(e, n))
+        tab_frame.bind("<Double-Button-1>", lambda _e=None, n=name: self._on_header_double_click(n), add="+")
+        tab_button.bind("<Double-Button-1>", lambda _e=None, n=name: self._on_header_double_click(n), add="+")
 
         self.reposition_add_button()
         self._refresh_command_deck()
@@ -2214,18 +2235,47 @@ class GMScreenView(ctk.CTkFrame):
 
     def toggle_detach_tab(self, name):
         """Toggle detach tab."""
+        if self._skip_dock_toggle_name == name:
+            self._skip_dock_toggle_name = None
+            return
         log_info(f"Toggling detach for tab: {name}", func_name="GMScreenView.toggle_detach_tab")
         self._motion.pulse_widget(self.tabs.get(name, {}).get("detach_button"), duration_ms=140)
         if self.tabs[name]["detached"]:
             self.reattach_tab(name)
-            # After reattaching, show the detach icon
-            self.tabs[name]["detach_button"].configure(image=self.detach_icon)
         else:
             self.detach_tab(name)
-            # When detached, change to the reattach icon
-            self.tabs[name]["detach_button"].configure(image=self.reattach_icon)
         self._apply_tab_visual_state(name, is_active=(self.current_tab == name))
         self._refresh_command_deck()
+
+    def _on_header_double_click(self, name):
+        """Float a docked panel from a header double-click shortcut."""
+        tab = self.tabs.get(name)
+        if not tab or tab.get("detached"):
+            return
+        self.toggle_detach_tab(name)
+
+    def _on_dock_toggle_click(self, event, name):
+        """Handle modifier shortcuts on dock toggle control."""
+        if event is not None and self._has_ctrl_shift_modifier(event):
+            self._skip_dock_toggle_name = name
+            self.dock_all_tabs()
+            return "break"
+        return None
+
+    def _has_ctrl_shift_modifier(self, event):
+        """Return True when Ctrl+Shift modifiers are pressed for mouse events."""
+        state = getattr(event, "state", 0) or 0
+        return bool(state & 0x0004) and bool(state & 0x0001)
+
+    def dock_all_tabs(self):
+        """Reattach every floating tab with a single shortcut."""
+        floating = [tab_name for tab_name, tab in self.tabs.items() if tab.get("detached")]
+        for tab_name in floating:
+            self.reattach_tab(tab_name)
+        if floating:
+            active = self.current_tab
+            if active in self.tabs:
+                self._apply_tab_visual_state(active, is_active=True)
 
     def detach_tab(self, name):
         """Handle detach tab."""
@@ -2285,6 +2335,7 @@ class GMScreenView(ctk.CTkFrame):
 
         detached_window.deiconify()
         self._motion.fade_in_window(detached_window, duration_ms=180)
+        apply_origin_highlight(self.tabs[name].get("button_frame"), self.after, hold_ms=1400)
         print(f"[DETACH] Detached window shown at {GRAPH_W}×{GRAPH_H}")
 
         # Portrait & scenario-graph restoration (unchanged)…
@@ -2645,6 +2696,7 @@ class GMScreenView(ctk.CTkFrame):
         self.tabs[name]["detached"] = False
         self.tabs[name]["window"] = None
         self.show_tab(name)
+        pulse_slot(self.tabs[name].get("button_frame"), self.after)
         # Reorder any remaining detached windows
         if hasattr(self, "reorder_detached_windows"):
             self.reorder_detached_windows()
@@ -2909,8 +2961,16 @@ class GMScreenView(ctk.CTkFrame):
             text_color=text_color,
         )
         tab["detach_button"].configure(
+            text=dock_toggle_text(tab.get("detached", False)),
+            fg_color=variant["active_border"] if is_active else variant["inactive_border"],
             hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
+            text_color=text_color,
         )
+        badge_text, badge_fg, badge_text_color = DOCK_BADGE_COPY[bool(tab.get("detached"))]
+        tab["dock_badge"].configure(text=badge_text, fg_color=badge_fg, text_color=badge_text_color)
+        tooltip = tab.get("dock_button_tooltip")
+        if tooltip is not None:
+            tooltip.text = dock_toggle_tooltip(tab.get("detached", False))
         if status == "alert":
             tab["button_frame"].configure(border_color="#EF4444")
 
