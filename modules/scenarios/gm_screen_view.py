@@ -2838,7 +2838,7 @@ class GMScreenView(ctk.CTkFrame):
         )
         tab["button"].configure(
             text=self._build_tab_text(name, is_active=is_active),
-            height=38 if is_active else 28,
+            height=20 if is_active else 15,
             hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
             text_color=text_color,
             font=ctk.CTkFont(size=14 if is_active else 12, weight="bold" if is_active else "normal"),
