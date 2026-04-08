@@ -73,6 +73,7 @@ from modules.events.models.event_types import get_event_type
 from modules.events.services.timeline_simulator import CampaignTimelineSimulator
 from modules.events.services.entity_link_service import EntityLinkService
 from modules.events.services.calendar_state_store import CalendarStateStore
+from modules.navigation import ViewHistoryManager, ViewSnapshot
 
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -193,6 +194,8 @@ class MainWindow(ctk.CTk):
         self._database_manager_dialog = None
         self._update_thread = None
         self.whiteboard_controller = None
+        self.view_history_manager = ViewHistoryManager()
+        self._history_navigation_in_progress = False
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
         root.bind_all("<Control-i>", self._on_ctrl_i)
@@ -2509,6 +2512,7 @@ class MainWindow(ctk.CTk):
 
     def open_faction_graph_editor(self):
         """Open faction graph editor."""
+        self._push_current_view_to_history()
         self._graph_type = 'faction'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2527,6 +2531,13 @@ class MainWindow(ctk.CTk):
         container.graph_editor = editor
         self.current_open_view   = container
         self.current_open_entity = None
+        self._set_current_history_snapshot(
+            ViewSnapshot(
+                kind="graph_editor",
+                restore_callable=self.open_faction_graph_editor,
+                state={"graph_type": "faction"},
+            )
+        )
         
 
     # =============================================================
@@ -2572,6 +2583,99 @@ class MainWindow(ctk.CTk):
         self._gm_mode = False
         self.current_gm_view = None
 
+    def _build_current_view_snapshot(self):
+        """Build a snapshot describing the currently displayed main-surface view."""
+        if getattr(self, "_gm_mode", False):
+            gm_view = getattr(self, "current_gm_view", None)
+            scenario_name = None
+            if gm_view is not None and getattr(gm_view, "winfo_exists", lambda: 0)():
+                scenario_name = getattr(gm_view, "scenario_name", None)
+            return ViewSnapshot(
+                kind="gm_screen",
+                restore_callable=lambda: self.open_gm_screen(
+                    show_empty_message=False,
+                    scenario_name=scenario_name,
+                ),
+                state={"scenario_name": scenario_name},
+            )
+
+        if self.current_open_entity:
+            entity_name = self.current_open_entity
+            return ViewSnapshot(
+                kind="generic_entity_list",
+                restore_callable=lambda: self.open_entity(entity_name),
+                state={"entity": entity_name},
+            )
+
+        current_view = getattr(self, "current_open_view", None)
+        if current_view is not None and getattr(current_view, "winfo_exists", lambda: 0)():
+            if getattr(self, "whiteboard_controller", None) is not None:
+                return ViewSnapshot(
+                    kind="whiteboard",
+                    restore_callable=self.open_whiteboard,
+                    state={},
+                )
+
+            graph_editor = getattr(current_view, "graph_editor", None)
+            if graph_editor is not None:
+                graph_type = getattr(self, "_graph_type", None)
+                graph_restore_map = {
+                    "character": self.open_character_graph_editor,
+                    "villain": self.open_villain_graph_editor,
+                    "faction": self.open_faction_graph_editor,
+                    "scenario": self.open_scenario_graph_editor,
+                }
+                restore_callable = graph_restore_map.get(graph_type)
+                if restore_callable is not None:
+                    return ViewSnapshot(
+                        kind="graph_editor",
+                        restore_callable=restore_callable,
+                        state={"graph_type": graph_type},
+                    )
+
+            if getattr(current_view, "content_inner", None) is not None:
+                return ViewSnapshot(
+                    kind="campaign_graph",
+                    restore_callable=self.open_campaign_graph_view,
+                    state={},
+                )
+
+        return None
+
+    def _push_current_view_to_history(self):
+        """Record current view before opening a different one."""
+        if self._history_navigation_in_progress:
+            return
+        snapshot = self._build_current_view_snapshot()
+        if snapshot is not None:
+            self.view_history_manager.push_current_and_set(snapshot)
+
+    def _set_current_history_snapshot(self, snapshot):
+        """Set active snapshot once a navigation action succeeds."""
+        if self._history_navigation_in_progress:
+            return
+        self.view_history_manager.set_current(snapshot)
+
+    def navigate_back(self):
+        """Navigate to previous view snapshot if available."""
+        snapshot = self.view_history_manager.navigate_back()
+        self._restore_view_snapshot(snapshot)
+
+    def navigate_forward(self):
+        """Navigate to next view snapshot if available."""
+        snapshot = self.view_history_manager.navigate_forward()
+        self._restore_view_snapshot(snapshot)
+
+    def _restore_view_snapshot(self, snapshot):
+        """Restore the given snapshot."""
+        if snapshot is None:
+            return
+        self._history_navigation_in_progress = True
+        try:
+            snapshot.restore()
+        finally:
+            self._history_navigation_in_progress = False
+
     def _teardown_whiteboard_controller(self):
         """Tear down whiteboard controller."""
         controller = getattr(self, "whiteboard_controller", None)
@@ -2602,6 +2706,7 @@ class MainWindow(ctk.CTk):
 
     def open_entity(self, entity):
         """Open entity."""
+        self._push_current_view_to_history()
         self.clear_current_content()
         target_parent = self.get_content_container()
         self.banner_toggle_btn._state="normal"
@@ -2635,6 +2740,13 @@ class MainWindow(ctk.CTk):
             command=lambda: self.save_items_to_json(view, entity)
         )
         save_btn.pack(side="right", padx=(5,5))
+        self._set_current_history_snapshot(
+            ViewSnapshot(
+                kind="generic_entity_list",
+                restore_callable=lambda: self.open_entity(entity),
+                state={"entity": entity},
+            )
+        )
 
     def save_items_to_json(self, view, entity_name):
         """Save items to JSON."""
@@ -2718,6 +2830,7 @@ class MainWindow(ctk.CTk):
 
     def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
         """Open GM screen."""
+        self._push_current_view_to_history()
         # 1) Clear any existing content
         self.clear_current_content()
         self._gm_mode = True
@@ -2868,6 +2981,17 @@ class MainWindow(ctk.CTk):
                 return
             _show_selected_scenario(selected)
             _finalize_gm_shell()
+            self._set_current_history_snapshot(
+                ViewSnapshot(
+                    kind="gm_screen",
+                    restore_callable=lambda: self.open_gm_screen(
+                        show_empty_message=False,
+                        scenario_name=scenario_name,
+                        initial_layout=initial_layout,
+                    ),
+                    state={"scenario_name": scenario_name, "initial_layout": initial_layout},
+                )
+            )
             return
 
         # 6) Insert the generic list‐selection view
@@ -2881,11 +3005,19 @@ class MainWindow(ctk.CTk):
         list_selection.pack(fill="both", expand=True)
         self.current_gm_view = None
         _finalize_gm_shell()
+        self._set_current_history_snapshot(
+            ViewSnapshot(
+                kind="gm_screen",
+                restore_callable=lambda: self.open_gm_screen(show_empty_message=False),
+                state={"scenario_name": None, "initial_layout": None},
+            )
+        )
 
     def open_character_graph_editor(self):
         """Open character graph editor."""
         from modules.characters.character_graph_editor import CharacterGraphEditor
 
+        self._push_current_view_to_history()
         self._graph_type = 'character'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2909,11 +3041,19 @@ class MainWindow(ctk.CTk):
         container.graph_editor = editor
         self.current_open_view = container
         self.current_open_entity = None
+        self._set_current_history_snapshot(
+            ViewSnapshot(
+                kind="graph_editor",
+                restore_callable=self.open_character_graph_editor,
+                state={"graph_type": "character"},
+            )
+        )
 
     def open_villain_graph_editor(self):
         """Open villain graph editor."""
         from modules.characters.character_graph_editor import CharacterGraphEditor
 
+        self._push_current_view_to_history()
         self._graph_type = 'villain'
         self.current_gm_view = None
         self.clear_current_content()
@@ -2941,6 +3081,13 @@ class MainWindow(ctk.CTk):
         container.graph_editor = editor
         self.current_open_view = container
         self.current_open_entity = None
+        self._set_current_history_snapshot(
+            ViewSnapshot(
+                kind="graph_editor",
+                restore_callable=self.open_villain_graph_editor,
+                state={"graph_type": "villain"},
+            )
+        )
 
 
     def open_world_map(self):
@@ -2964,6 +3111,7 @@ class MainWindow(ctk.CTk):
 
         try:
             # Keep world map resilient if this step fails.
+            self._push_current_view_to_history()
             from modules.maps.world_map_view import WorldMapWindow
 
             window = WorldMapWindow(self)
@@ -2972,6 +3120,13 @@ class MainWindow(ctk.CTk):
             window.attributes("-topmost", True)
             window.after_idle(lambda: window.attributes("-topmost", False))
             self._world_map_window = window
+            self._set_current_history_snapshot(
+                ViewSnapshot(
+                    kind="world_map",
+                    restore_callable=self.open_world_map,
+                    state={},
+                )
+            )
         except Exception as exc:
             log_exception(
                 f"Failed to open World Map window: {exc}",
@@ -2983,6 +3138,7 @@ class MainWindow(ctk.CTk):
         """Open scenario graph editor."""
         from modules.scenarios.scenario_graph_editor import ScenarioGraphEditor
 
+        self._push_current_view_to_history()
         self._graph_type = 'scenario'
         self.current_gm_view = None
         self.clear_current_content()
@@ -3006,6 +3162,13 @@ class MainWindow(ctk.CTk):
         container.graph_editor = editor
         self.current_open_view   = container
         self.current_open_entity = None
+        self._set_current_history_snapshot(
+            ViewSnapshot(
+                kind="graph_editor",
+                restore_callable=self.open_scenario_graph_editor,
+                state={"graph_type": "scenario"},
+            )
+        )
 
     def open_scene_flow_viewer(self):
         """Open scene flow viewer."""
@@ -3557,6 +3720,7 @@ class MainWindow(ctk.CTk):
         """Open campaign graph view."""
         try:
             # Keep campaign graph view resilient if this step fails.
+            self._push_current_view_to_history()
             campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
             self.entity_wrappers.setdefault("campaigns", campaign_wrapper)
 
@@ -3584,6 +3748,13 @@ class MainWindow(ctk.CTk):
             container.grid(row=0, column=0, sticky="nsew")
             self.current_open_view = container
             self.current_open_entity = None
+            self._set_current_history_snapshot(
+                ViewSnapshot(
+                    kind="campaign_graph",
+                    restore_callable=self.open_campaign_graph_view,
+                    state={},
+                )
+            )
         except Exception as exc:
             log_exception(
                 f"Failed to open Campaign Graph view: {exc}",
@@ -4514,6 +4685,7 @@ class MainWindow(ctk.CTk):
         log_info("Opening Whiteboard", func_name="main_window.MainWindow.open_whiteboard")
         try:
             # Keep whiteboard resilient if this step fails.
+            self._push_current_view_to_history()
             self.clear_current_content()
             parent = self.get_content_container()
 
@@ -4536,6 +4708,13 @@ class MainWindow(ctk.CTk):
             container.bind("<Destroy>", _on_destroy)
             self.current_open_view = container
             self.current_open_entity = None
+            self._set_current_history_snapshot(
+                ViewSnapshot(
+                    kind="whiteboard",
+                    restore_callable=self.open_whiteboard,
+                    state={},
+                )
+            )
         except Exception as exc:
             log_exception(
                 f"Failed to open Whiteboard: {exc}",
