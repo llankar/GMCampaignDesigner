@@ -53,6 +53,10 @@ from modules.scenarios.gm_screen.tab_variants import (
     tab_icon_for_name,
     tab_short_label,
 )
+from modules.scenarios.gm_screen.command_context import (
+    has_horizontal_overflow,
+    resolve_now_playing_label,
+)
 from modules.scenarios.gm_screen.dashboard.animations import MotionController
 from modules.generic.detail_ui import get_detail_palette
 from modules.generic.detail_ui.scroll_host import build_scroll_host
@@ -165,71 +169,84 @@ class GMScreenView(ctk.CTkFrame):
         self.dragging = None                 # ← new: holds (tab_name, start_x)
         self.current_layout_name = None
         self._default_pinned_tab_names = {self.scenario_name.lower(), "world map", "session timer"}
-        self._command_deck_buttons = {}
-
-        # A container to hold both the scrollable tab area and the plus button
-        self.tab_bar_container = ctk.CTkFrame(self, height=60, fg_color=self._palette["surface_card"], border_width=1, border_color=self._palette["muted_border"], corner_radius=18)
+        # A container to hold command deck + utility strip
+        self.tab_bar_container = ctk.CTkFrame(
+            self,
+            height=88,
+            fg_color=self._palette["surface_card"],
+            border_width=1,
+            border_color=self._palette["muted_border"],
+            corner_radius=18,
+        )
         self.tab_bar_container.pack(side="top", fill="x")
 
         self.command_deck = ctk.CTkFrame(self.tab_bar_container, fg_color="transparent")
-        self.command_deck.pack(side="top", anchor="e", padx=8, pady=(4, 0))
+        self.command_deck.pack(side="top", fill="x", padx=10, pady=(8, 0))
         self.command_deck_label = ctk.CTkLabel(
             self.command_deck,
             text="Command Deck",
+            font=ctk.CTkFont(size=15, weight="bold"),
             text_color=self._palette["muted_text"],
         )
-        self.command_deck_label.pack(side="left", padx=(0, 6))
+        self.command_deck_label.pack(side="left", padx=(0, 8))
+        self.now_playing_chip = ctk.CTkLabel(
+            self.command_deck,
+            text="Now Playing: —",
+            fg_color=self._palette["surface_overlay"],
+            text_color=self._palette["text"],
+            corner_radius=12,
+            padx=12,
+            pady=4,
+            font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        self.now_playing_chip.pack(side="right")
 
         # The scrollable canvas for tabs
-        self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=44, highlightthickness=0, bg=self._palette["surface_card"])
-        self.tab_bar_canvas.pack(side="top", fill="x", expand=True)
+        self.tab_bar_canvas = ctk.CTkCanvas(
+            self.tab_bar_container,
+            height=56,
+            highlightthickness=0,
+            bg=self._palette["surface_card"],
+        )
+        self.tab_bar_canvas.pack(side="top", fill="x", expand=True, padx=8, pady=(4, 2))
 
         # Horizontal scrollbar at the bottom alongside layout status
         self.tab_bar_bottom = ctk.CTkFrame(self.tab_bar_container, fg_color="transparent")
-        self.tab_bar_bottom.pack(side="bottom", fill="x")
+        self.tab_bar_bottom.pack(side="bottom", fill="x", padx=8, pady=(0, 6))
 
         self.h_scrollbar = ctk.CTkScrollbar(
             self.tab_bar_bottom,
             orientation="horizontal",
             command=self.tab_bar_canvas.xview
         )
-        self.h_scrollbar.pack(side="left", fill="x", expand=True)
+        self.h_scrollbar.pack_forget()
 
         # The actual frame that holds the tab buttons
-        self.tab_bar = ctk.CTkFrame(self.tab_bar_canvas, height=44, fg_color="transparent")
+        self.tab_bar = ctk.CTkFrame(self.tab_bar_canvas, height=54, fg_color="transparent")
         self.tab_bar_id = self.tab_bar_canvas.create_window((0, 0), window=self.tab_bar, anchor="nw")
 
         # Connect the scrollbar to the canvas
-        self.tab_bar_canvas.configure(xscrollcommand=self.h_scrollbar.set)
+        self.tab_bar_canvas.configure(xscrollcommand=self._on_tab_canvas_xscroll)
+        self.tab_bar_canvas.bind("<Configure>", self._on_tab_canvas_configure, add="+")
 
         # Update the scroll region when the tab bar resizes
-        self.tab_bar.bind("<Configure>", lambda e: self.tab_bar_canvas.configure(
-            scrollregion=self.tab_bar_canvas.bbox("all")))
+        self.tab_bar.bind("<Configure>", self._on_tab_bar_configure, add="+")
 
-        # The plus button stays on the right side of the container and hosts the add menu
-        self.add_button = ctk.CTkButton(
-            self.tab_bar,
-            text="+",
-            width=42,
+        self._tab_edge_gradient_ids = []
+
+        # Floating command launcher for quick actions (+ random)
+        self.command_launcher_button = ctk.CTkButton(
+            self.tab_bar_container,
+            text="✦ Command Launcher",
+            width=172,
+            height=36,
             fg_color=self._palette["surface_overlay"],
             hover_color=self._palette["accent_hover"],
             text_color=self._palette["text"],
-            corner_radius=14,
-            command=self.add_new_tab
+            corner_radius=18,
+            command=self._show_command_launcher_menu,
         )
-        
-        self.random_button = ctk.CTkButton(
-            self.tab_bar,
-            text="?",
-            width=42,
-            fg_color=self._palette["surface_overlay"],
-            hover_color=self._palette["accent_hover"],
-            text_color=self._palette["text"],
-            corner_radius=14,
-            command=self._add_random_entity
-        )
-        self.random_button.pack(side="left", padx=2, pady=5)
-        self.add_button.pack(side="left", padx=2, pady=5)
+        self.command_launcher_button.place(relx=1.0, rely=1.0, anchor="se", x=-12, y=-12)
 
         self._add_menu_options = [
             "Campaign Dashboard",
@@ -262,11 +279,12 @@ class GMScreenView(ctk.CTkFrame):
             ("Open Chatbot", self.open_chatbot),
         ]
         self._add_menu = self._build_add_menu()
+        self._command_launcher_menu = self._build_command_launcher_menu()
         self._session_controls = ctk.CTkFrame(self.tab_bar_bottom)
-        self._session_controls.pack(side="right", padx=8, pady=4)
+        self._session_controls.pack(side="left", padx=(0, 8), pady=4)
         self._build_session_controls()
         self.layout_status_label = ctk.CTkLabel(self.tab_bar_bottom, text="", text_color=self._palette["muted_text"])
-        self.layout_status_label.pack(side="right", padx=8, pady=5)
+        self.layout_status_label.pack(side="left", padx=6, pady=5)
 
         # Main content area for scenario details
         self.content_area = ctk.CTkFrame(self)
@@ -515,6 +533,95 @@ class GMScreenView(ctk.CTkFrame):
                 continue
             menu.add_command(label=option, command=lambda o=option: self.open_selection_window(o))
         return menu
+
+    def _build_command_launcher_menu(self):
+        """Build consolidated command launcher menu."""
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="➕ Add Tab…", command=self.add_new_tab)
+        menu.add_command(label="🎲 Random Pick", command=self._add_random_entity)
+        menu.add_separator()
+        menu.add_command(label="📌 Save Layout", command=self._prompt_save_layout)
+        menu.add_command(label="🗂 Load Layout", command=self._open_load_layout_dialog)
+        return menu
+
+    def _show_command_launcher_menu(self):
+        """Show command launcher popover near the floating button."""
+        button = self.command_launcher_button
+        self._motion.pulse_widget(button, duration_ms=120)
+        x = button.winfo_rootx()
+        y = button.winfo_rooty() - 6
+        try:
+            self._command_launcher_menu.tk_popup(x, y)
+        finally:
+            self._command_launcher_menu.grab_release()
+
+    def _on_tab_canvas_configure(self, _event=None):
+        """Refresh deck overflow visuals after viewport changes."""
+        self._update_tab_strip_overflow_visuals()
+
+    def _on_tab_canvas_xscroll(self, first, last):
+        """Proxy xscroll command to scrollbar while updating visual overflow cues."""
+        self.h_scrollbar.set(first, last)
+        self.after_idle(self._update_tab_strip_overflow_visuals)
+
+    def _on_tab_bar_configure(self, _event=None):
+        """Sync scrollregion and overflow cues when tab content width changes."""
+        self.tab_bar_canvas.configure(scrollregion=self.tab_bar_canvas.bbox("all"))
+        self._update_tab_strip_overflow_visuals()
+
+    def _update_tab_strip_overflow_visuals(self):
+        """Show scrollbar only on overflow and draw subtle edge gradient cues."""
+        bbox = self.tab_bar_canvas.bbox("all")
+        if not bbox:
+            return
+
+        content_width = bbox[2] - bbox[0]
+        viewport_width = self.tab_bar_canvas.winfo_width()
+        has_overflow = has_horizontal_overflow(content_width, viewport_width)
+
+        if has_overflow and not self.h_scrollbar.winfo_ismapped():
+            self.h_scrollbar.pack(side="right", fill="x", expand=False, padx=(8, 0))
+        elif not has_overflow and self.h_scrollbar.winfo_ismapped():
+            self.h_scrollbar.pack_forget()
+
+        for item_id in self._tab_edge_gradient_ids:
+            self.tab_bar_canvas.delete(item_id)
+        self._tab_edge_gradient_ids = []
+        if not has_overflow:
+            return
+
+        left, right = self.tab_bar_canvas.xview()
+        if left > 0.001:
+            self._tab_edge_gradient_ids.extend(self._draw_edge_gradient(left_side=True))
+        if right < 0.999:
+            self._tab_edge_gradient_ids.extend(self._draw_edge_gradient(left_side=False))
+
+    def _draw_edge_gradient(self, *, left_side=True):
+        """Draw subtle edge gradient hint for hidden horizontal content."""
+        width = max(0, self.tab_bar_canvas.winfo_width())
+        height = max(0, self.tab_bar_canvas.winfo_height())
+        if width <= 0 or height <= 0:
+            return []
+        ramp = ("#1E293B", "#263244", "#2E3B4F", self._palette["surface_card"])
+        ids = []
+        step = 8
+        for idx, color in enumerate(ramp):
+            if left_side:
+                x0 = idx * step
+            else:
+                x0 = width - ((idx + 1) * step)
+            x1 = x0 + step
+            ids.append(
+                self.tab_bar_canvas.create_rectangle(
+                    x0,
+                    0,
+                    x1,
+                    height,
+                    outline="",
+                    fill=color,
+                )
+            )
+        return ids
 
 
     def _load_map_records(self):
@@ -1138,15 +1245,15 @@ class GMScreenView(ctk.CTkFrame):
             fg_color=variant["inactive_fg"],
             border_width=1,
             border_color=variant["inactive_border"],
-            corner_radius=12,
+            corner_radius=16,
         )
-        tab_frame.pack(side="left", padx=4, pady=6)
+        tab_frame.pack(side="left", padx=5, pady=8)
 
         tab_button = ctk.CTkButton(
             tab_frame,
             text="",
-            width=178,
-            height=30,
+            width=214,
+            height=36,
             fg_color="transparent",
             hover_color=variant["inactive_hover"],
             text_color=self._palette["muted_text"],
@@ -1273,6 +1380,8 @@ class GMScreenView(ctk.CTkFrame):
         self._scene_vars = {}
         self._scene_order = []
         self._scene_metadata = {}
+        self._active_scene_key = None
+        self._update_now_playing_chip()
 
     def register_scene_widget(self, scene_key, var, checkbox, display_label=None, description=None, note_title=None):
         """Register scene widget."""
@@ -1337,6 +1446,7 @@ class GMScreenView(ctk.CTkFrame):
     def set_active_scene(self, scene_key):
         """Set active scene."""
         self._active_scene_key = scene_key
+        self._update_now_playing_chip()
 
     def mark_active_scene_complete(self):
         """Handle mark active scene complete."""
@@ -2140,10 +2250,6 @@ class GMScreenView(ctk.CTkFrame):
             f.pack_forget()
             f.place(in_=self.tab_bar, x=fx, y=fy)
 
-        # 4) Hide the “+” and "?" so it doesn’t get in the way
-        self.add_button.pack_forget()
-        self.random_button.pack_forget()
-        
         # 5) Lift the one we’re dragging above the others
         self.tabs[name]["button_frame"].lift()
 
@@ -2205,11 +2311,10 @@ class GMScreenView(ctk.CTkFrame):
             f.place_forget()
             f.pack(side="left", padx=2, pady=5)
 
-        # **use your helper** to put “+” back in line
-        self.reposition_add_button()
         self.tab_bar_canvas.configure(
             scrollregion=self.tab_bar_canvas.bbox("all")
         )
+        self._update_tab_strip_overflow_visuals()
         self.dragging = None
 
     def toggle_detach_tab(self, name):
@@ -2656,9 +2761,6 @@ class GMScreenView(ctk.CTkFrame):
         """Close tab."""
         if len(self.tabs) == 1:
             return
-        if name in self._command_deck_buttons:
-            self._command_deck_buttons[name].destroy()
-            self._command_deck_buttons.pop(name, None)
         if name in self.tab_order:
             self.tab_order.remove(name)
         if self.tabs[name].get("detached", False) and self.tabs[name].get("window"):
@@ -2669,21 +2771,12 @@ class GMScreenView(ctk.CTkFrame):
         del self.tabs[name]
         if self.current_tab == name and self.tabs:
             self.show_tab(next(iter(self.tabs)))
-        self.reposition_add_button()
         self._refresh_command_deck()
 
     def reposition_add_button(self):
-        """Handle reposition add button."""
-        self.add_button.pack_forget()
-        self.random_button.pack_forget()
-        if self.tab_order:
-            last = self.tabs[self.tab_order[-1]]["button_frame"]
-            self.add_button.pack(side="left", padx=2, pady=5, after=last)
-            self.random_button.pack(side="left", padx=2, pady=5, after=self.add_button)
-        else:
-            self.add_button.pack(side="left", padx=2, pady=5)
-            self.random_button.pack(side="left", padx=2, pady=5)
-    
+        """Compatibility shim for legacy callers."""
+        self._update_tab_strip_overflow_visuals()
+
     def _add_random_entity(self):
         """Internal helper for add random entity."""
         log_info("Adding random entity to GM screen", func_name="GMScreenView._add_random_entity")
@@ -2898,10 +2991,10 @@ class GMScreenView(ctk.CTkFrame):
         )
         tab["button"].configure(
             text=self._build_tab_text(name, is_active=is_active),
-            height=20 if is_active else 15,
+            height=28 if is_active else 24,
             hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
             text_color=text_color,
-            font=ctk.CTkFont(size=14 if is_active else 12, weight="bold" if is_active else "normal"),
+            font=ctk.CTkFont(size=15 if is_active else 13, weight="bold" if is_active else "normal"),
         )
         tab["pin_button"].configure(
             text="📌" if meta.get("pinned") else "📍",
@@ -2924,31 +3017,19 @@ class GMScreenView(ctk.CTkFrame):
         self._refresh_command_deck()
 
     def _refresh_command_deck(self):
-        """Refresh command deck buttons for pinned tabs."""
-        for button in self._command_deck_buttons.values():
-            button.destroy()
-        self._command_deck_buttons = {}
-        pinned_names = [tab_name for tab_name in self.tab_order if self.tabs.get(tab_name, {}).get("meta", {}).get("pinned")]
-        if not pinned_names:
-            self.command_deck_label.configure(text="Command Deck (none)")
-            return
-        self.command_deck_label.configure(text="Command Deck")
-        for tab_name in pinned_names[:6]:
-            tab = self.tabs.get(tab_name, {})
-            meta = tab.get("meta", {})
-            label = f"{meta.get('icon', '◻')} {meta.get('short_label', tab_name)}"
-            button = ctk.CTkButton(
-                self.command_deck,
-                text=label,
-                height=26,
-                width=108,
-                fg_color=self._palette["surface_overlay"],
-                hover_color=self._palette["accent_hover"],
-                text_color=self._palette["text"],
-                command=lambda n=tab_name: self.show_tab(n),
-            )
-            button.pack(side="left", padx=2)
-            self._command_deck_buttons[tab_name] = button
+        """Refresh deck metadata + now-playing context."""
+        self.command_deck_label.configure(text=f"Command Deck ({len(self.tab_order)} tabs)")
+        self._update_now_playing_chip()
+        self._update_tab_strip_overflow_visuals()
+
+    def _update_now_playing_chip(self):
+        """Update right-side context chip for the active scene/arc."""
+        label = resolve_now_playing_label(
+            self._active_scene_key,
+            self._scene_metadata,
+            self.current_tab,
+        )
+        self.now_playing_chip.configure(text=label)
 
     def add_new_tab(self):
         """Handle add new tab."""
@@ -2957,10 +3038,10 @@ class GMScreenView(ctk.CTkFrame):
 
     def _show_add_menu(self):
         """Show add menu."""
-        button = self.add_button
+        button = self.command_launcher_button
         self._motion.pulse_widget(button, duration_ms=120)
         x = button.winfo_rootx()
-        y = button.winfo_rooty() + button.winfo_height()
+        y = button.winfo_rooty() - 6
         try:
             # Keep add menu resilient if this step fails.
             self._add_menu.tk_popup(x, y)
