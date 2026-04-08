@@ -401,14 +401,16 @@ def insert_links(parent, header, items, linked_type, open_entity_callback):
     """Handle insert links."""
     card, body = create_section_card(parent, header, compact=True)
     card.pack(fill="x", padx=10, pady=(0, 12))
-    links_row = ctk.CTkFrame(body, fg_color="transparent")
-    links_row.pack(fill="x")
+    links_row = None
     has_items = False
     for item in items:
         # Process each item from items.
         display_text = str(item).strip()
         if not display_text:
             continue
+        if links_row is None:
+            links_row = ctk.CTkFrame(body, fg_color="transparent")
+            links_row.pack(fill="x")
         has_items = True
         chip = create_chip(links_row, display_text)
         chip.pack(side="left", padx=(0, 8), pady=(0, 8))
