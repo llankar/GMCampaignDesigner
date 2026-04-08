@@ -2004,8 +2004,23 @@ class GMScreenView(ctk.CTkFrame):
                 )
 
             active_name = layout.get("active")
-            if active_name and active_name in self.tabs:
-                self.show_tab(active_name)
+            target_active = active_name if active_name in self.tabs else None
+
+            # On startup (silent restore), avoid auto-opening a note tab as the first visible tab.
+            if silent and target_active:
+                active_meta = (self.tabs.get(target_active) or {}).get("meta") or {}
+                if active_meta.get("kind") == "note":
+                    target_active = next(
+                        (
+                            tab_name
+                            for tab_name in self.tab_order
+                            if ((self.tabs.get(tab_name) or {}).get("meta") or {}).get("kind") != "note"
+                        ),
+                        target_active,
+                    )
+
+            if target_active:
+                self.show_tab(target_active)
             elif self.tab_order:
                 self.show_tab(self.tab_order[0])
 
