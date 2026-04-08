@@ -19,8 +19,6 @@ TAB_VARIANTS: Dict[str, Dict[str, str]] = {
         "inactive_border": "#4B2A43",
         "active_hover": "#4C2746",
         "inactive_hover": "#2D2230",
-        "active_accent": "#F472B6",
-        "inactive_accent": "#5B344F",
     },
     TAB_CATEGORY_WORLD: {
         "active_fg": "#1E3A34",
@@ -29,8 +27,6 @@ TAB_VARIANTS: Dict[str, Dict[str, str]] = {
         "inactive_border": "#2C4B45",
         "active_hover": "#254841",
         "inactive_hover": "#20302D",
-        "active_accent": "#6EE7B7",
-        "inactive_accent": "#355A52",
     },
     TAB_CATEGORY_OPS: {
         "active_fg": "#1E2F46",
@@ -39,8 +35,6 @@ TAB_VARIANTS: Dict[str, Dict[str, str]] = {
         "inactive_border": "#2D3F57",
         "active_hover": "#283B57",
         "inactive_hover": "#202B3A",
-        "active_accent": "#93C5FD",
-        "inactive_accent": "#375071",
     },
     TAB_CATEGORY_DEFAULT: {
         "active_fg": "#2A2A33",
@@ -49,8 +43,6 @@ TAB_VARIANTS: Dict[str, Dict[str, str]] = {
         "inactive_border": "#3B4250",
         "active_hover": "#343846",
         "inactive_hover": "#262B36",
-        "active_accent": "#B6C2D9",
-        "inactive_accent": "#4D5666",
     },
 }
 
