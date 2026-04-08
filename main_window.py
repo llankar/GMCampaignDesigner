@@ -177,6 +177,7 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         self._normalize_entity_media_paths()
         self.current_gm_view = None
+        self.current_gm_container = None
         self._gm_mode = False
         self.dice_roller_window = None
         self.dice_bar_window = None
@@ -2514,8 +2515,11 @@ class MainWindow(ctk.CTk):
         """Open faction graph editor."""
         self._push_current_view_to_history()
         self._graph_type = 'faction'
-        self.current_gm_view = None
-        self.clear_current_content()
+        self.clear_current_content(
+            navigation_transition=True,
+            preserve_gm_state=True,
+            teardown_non_resumable=False,
+        )
         self.banner_toggle_btn.configure(state="normal")
         parent = self.get_content_container()
 
@@ -2543,14 +2547,43 @@ class MainWindow(ctk.CTk):
     # =============================================================
     # Methods Called by Icon Buttons (Event Handlers)
     # =============================================================
-    def clear_current_content(self):
-        """Clear current content."""
-        self._teardown_whiteboard_controller()
+    def _hide_widget(self, widget):
+        """Hide a widget while preserving its runtime state."""
+        if widget is None:
+            return
+        try:
+            manager = widget.winfo_manager()
+        except Exception:
+            return
+        if manager == "grid":
+            try:
+                widget.grid_forget()
+            except Exception:
+                pass
+        elif manager == "pack":
+            try:
+                widget.pack_forget()
+            except Exception:
+                pass
+
+    def clear_current_content(
+        self,
+        *,
+        navigation_transition=False,
+        preserve_gm_state=False,
+        teardown_non_resumable=True,
+    ):
+        """Clear or hide current content depending on lifecycle intent."""
+        if teardown_non_resumable:
+            self._teardown_whiteboard_controller()
         # Always clear children of the inner content container
         try:
             # Keep current content resilient if this step fails.
             for widget in self.inner_content_frame.winfo_children():
-                widget.destroy()
+                if navigation_transition:
+                    self._hide_widget(widget)
+                else:
+                    widget.destroy()
         except Exception:
             pass
 
@@ -2569,7 +2602,10 @@ class MainWindow(ctk.CTk):
             for widget in self.content_frame.winfo_children():
                 if widget not in static_widgets:
                     try:
-                        widget.destroy()
+                        if navigation_transition:
+                            self._hide_widget(widget)
+                        else:
+                            widget.destroy()
                     except Exception:
                         pass
         else:
@@ -2581,21 +2617,60 @@ class MainWindow(ctk.CTk):
 
         # Leaving GM screen mode when clearing
         self._gm_mode = False
-        self.current_gm_view = None
+        if not preserve_gm_state:
+            self.current_gm_view = None
+            self.current_gm_container = None
+
+    def _restore_gm_screen_snapshot(self, snapshot_state):
+        """Restore an existing GM screen widget tree when available."""
+        state = snapshot_state or {}
+        gm_container = state.get("container")
+        gm_view = state.get("view")
+        if gm_container is not None and gm_view is not None:
+            try:
+                if gm_container.winfo_exists() and gm_view.winfo_exists():
+                    self.clear_current_content(
+                        navigation_transition=True,
+                        preserve_gm_state=True,
+                        teardown_non_resumable=False,
+                    )
+                    self._gm_mode = True
+                    self.current_open_view = None
+                    self.current_open_entity = None
+                    self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+                    gm_container.grid(in_=self.inner_content_frame, row=0, column=0, sticky="nsew")
+                    self.inner_content_frame.grid_rowconfigure(0, weight=1)
+                    self.inner_content_frame.grid_columnconfigure(0, weight=1)
+                    self.content_frame.grid_rowconfigure(0, weight=0)
+                    self.content_frame.grid_rowconfigure(1, weight=1)
+                    self.content_frame.grid_columnconfigure(0, weight=1)
+                    self.current_gm_container = gm_container
+                    self.current_gm_view = gm_view
+                    return
+            except Exception:
+                pass
+        self.open_gm_screen(
+            show_empty_message=False,
+            scenario_name=state.get("scenario_name"),
+            initial_layout=state.get("initial_layout"),
+        )
 
     def _build_current_view_snapshot(self):
         """Build a snapshot describing the currently displayed main-surface view."""
         if getattr(self, "_gm_mode", False):
             gm_view = getattr(self, "current_gm_view", None)
+            gm_container = getattr(self, "current_gm_container", None)
             scenario_name = None
             if gm_view is not None and getattr(gm_view, "winfo_exists", lambda: 0)():
                 scenario_name = getattr(gm_view, "scenario_name", None)
             return ViewSnapshot(
                 kind="gm_screen",
-                restore_callable=lambda: self.open_gm_screen(
-                    show_empty_message=False,
-                    scenario_name=scenario_name,
-                ),
+                restore_callable=lambda gm_state={
+                    "scenario_name": scenario_name,
+                    "initial_layout": None,
+                    "container": gm_container,
+                    "view": gm_view,
+                }: self._restore_gm_screen_snapshot(gm_state),
                 state={"scenario_name": scenario_name},
             )
 
@@ -2707,7 +2782,11 @@ class MainWindow(ctk.CTk):
     def open_entity(self, entity):
         """Open entity."""
         self._push_current_view_to_history()
-        self.clear_current_content()
+        self.clear_current_content(
+            navigation_transition=True,
+            preserve_gm_state=True,
+            teardown_non_resumable=False,
+        )
         target_parent = self.get_content_container()
         self.banner_toggle_btn._state="normal"
         container = ctk.CTkFrame(target_parent)
@@ -2832,7 +2911,11 @@ class MainWindow(ctk.CTk):
         """Open GM screen."""
         self._push_current_view_to_history()
         # 1) Clear any existing content
-        self.clear_current_content()
+        self.clear_current_content(
+            navigation_transition=True,
+            preserve_gm_state=True,
+            teardown_non_resumable=False,
+        )
         self._gm_mode = True
         # 2) Load all scenarios
         scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
@@ -2871,9 +2954,10 @@ class MainWindow(ctk.CTk):
 
         # 4) Prepare inner content area
         self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
-        for w in self.inner_content_frame.winfo_children():
-            w.destroy()
-        parent = self.inner_content_frame
+        gm_shell_container = ctk.CTkFrame(self.inner_content_frame, fg_color="transparent")
+        gm_shell_container.grid(row=0, column=0, sticky="nsew")
+        self.current_gm_container = gm_shell_container
+        parent = gm_shell_container
 
         layout_bar = ctk.CTkFrame(parent)
         layout_bar.pack(fill="x", padx=10, pady=(5, 0))
@@ -3019,8 +3103,11 @@ class MainWindow(ctk.CTk):
 
         self._push_current_view_to_history()
         self._graph_type = 'character'
-        self.current_gm_view = None
-        self.clear_current_content()
+        self.clear_current_content(
+            navigation_transition=True,
+            preserve_gm_state=True,
+            teardown_non_resumable=False,
+        )
         self.banner_toggle_btn.configure(state="normal")
         parent = self.get_content_container()
 
@@ -3055,8 +3142,11 @@ class MainWindow(ctk.CTk):
 
         self._push_current_view_to_history()
         self._graph_type = 'villain'
-        self.current_gm_view = None
-        self.clear_current_content()
+        self.clear_current_content(
+            navigation_transition=True,
+            preserve_gm_state=True,
+            teardown_non_resumable=False,
+        )
         self.banner_toggle_btn.configure(state="normal")
         parent = self.get_content_container()
 
@@ -3140,8 +3230,11 @@ class MainWindow(ctk.CTk):
 
         self._push_current_view_to_history()
         self._graph_type = 'scenario'
-        self.current_gm_view = None
-        self.clear_current_content()
+        self.clear_current_content(
+            navigation_transition=True,
+            preserve_gm_state=True,
+            teardown_non_resumable=False,
+        )
         self.banner_toggle_btn.configure(state="normal")
         parent = self.get_content_container()
 
@@ -3727,7 +3820,11 @@ class MainWindow(ctk.CTk):
             scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
             self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
 
-            self.clear_current_content()
+            self.clear_current_content(
+                navigation_transition=True,
+                preserve_gm_state=True,
+                teardown_non_resumable=False,
+            )
             self._prepare_campaign_overview_layout()
             parent = self.get_content_container()
             parent.grid_rowconfigure(0, weight=1)
