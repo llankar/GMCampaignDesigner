@@ -168,6 +168,8 @@ class MainWindow(ctk.CTk):
         self.create_layout()
         self.entity_definitions = load_entity_definitions()
         self.load_icons()
+        self.view_history_manager = ViewHistoryManager()
+        self._history_navigation_in_progress = False
         self.create_menu_bar()
         self.entity_wrappers = {}
         self.create_content_area()
@@ -195,8 +197,6 @@ class MainWindow(ctk.CTk):
         self._database_manager_dialog = None
         self._update_thread = None
         self.whiteboard_controller = None
-        self.view_history_manager = ViewHistoryManager()
-        self._history_navigation_in_progress = False
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
         root.bind_all("<Control-i>", self._on_ctrl_i)
@@ -225,6 +225,18 @@ class MainWindow(ctk.CTk):
         root.bind_all("<F8>", lambda _event: self.open_dice_roller())
         root.bind_all("<F9>", lambda _event: self.open_campaign_builder())
         root.bind_all("<F12>", lambda _event: self.destroy())
+        root.bind_all("<Alt-Left>", self._on_navigate_back_shortcut)
+        root.bind_all("<Alt-Right>", self._on_navigate_forward_shortcut)
+
+    def _on_navigate_back_shortcut(self, _event):
+        """Navigate backward using keyboard shortcut."""
+        self.navigate_back()
+        return "break"
+
+    def _on_navigate_forward_shortcut(self, _event):
+        """Navigate forward using keyboard shortcut."""
+        self.navigate_forward()
+        return "break"
 
     def open_ai_settings(self):
         """Open AI settings."""
@@ -325,6 +337,7 @@ class MainWindow(ctk.CTk):
         """Create menu bar."""
         self.menu_bar = AppMenuBar(self)
         self.menu_bar.attach()
+        self._refresh_navigation_controls()
 
     def load_icons(self):
         """Load icons."""
@@ -2724,21 +2737,25 @@ class MainWindow(ctk.CTk):
         snapshot = self._build_current_view_snapshot()
         if snapshot is not None:
             self.view_history_manager.push_current_and_set(snapshot)
+            self._refresh_navigation_controls()
 
     def _set_current_history_snapshot(self, snapshot):
         """Set active snapshot once a navigation action succeeds."""
         if self._history_navigation_in_progress:
             return
         self.view_history_manager.set_current(snapshot)
+        self._refresh_navigation_controls()
 
     def navigate_back(self):
         """Navigate to previous view snapshot if available."""
         snapshot = self.view_history_manager.navigate_back()
+        self._refresh_navigation_controls()
         self._restore_view_snapshot(snapshot)
 
     def navigate_forward(self):
         """Navigate to next view snapshot if available."""
         snapshot = self.view_history_manager.navigate_forward()
+        self._refresh_navigation_controls()
         self._restore_view_snapshot(snapshot)
 
     def _restore_view_snapshot(self, snapshot):
@@ -2750,6 +2767,16 @@ class MainWindow(ctk.CTk):
             snapshot.restore()
         finally:
             self._history_navigation_in_progress = False
+
+    def _refresh_navigation_controls(self):
+        """Refresh back/forward controls from current history state."""
+        menu_bar = getattr(self, "menu_bar", None)
+        if menu_bar is None:
+            return
+        menu_bar.set_navigation_state(
+            can_go_back=self.view_history_manager.can_go_back(),
+            can_go_forward=self.view_history_manager.can_go_forward(),
+        )
 
     def _teardown_whiteboard_controller(self):
         """Tear down whiteboard controller."""

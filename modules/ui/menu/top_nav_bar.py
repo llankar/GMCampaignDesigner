@@ -9,7 +9,11 @@ import customtkinter as ctk
 from modules.helpers import theme_manager
 from modules.ui.menu.menu_image_adapter import prepare_menu_image, resize_ctk_icon
 from modules.ui.menu.menu_sections import build_menu_specs, format_menu_label
-from modules.ui.menu.quick_actions import build_primary_quick_actions, build_system_quick_actions
+from modules.ui.menu.quick_actions import (
+    build_navigation_quick_actions,
+    build_primary_quick_actions,
+    build_system_quick_actions,
+)
 
 
 class AppMenuBar:
@@ -63,6 +67,7 @@ class AppMenuBar:
         self._open_menu: tk.Menu | None = None
         self._menu_images: list[tk.PhotoImage] = []
         self._action_buttons: list[ctk.CTkButton] = []
+        self._navigation_quick_buttons: dict[str, ctk.CTkButton] = {}
         self._primary_quick_buttons: list[ctk.CTkButton] = []
         self._system_quick_buttons: list[ctk.CTkButton] = []
 
@@ -117,7 +122,13 @@ class AppMenuBar:
 
     def _clear_widgets(self):
         """Clear widgets."""
-        for button in [*self._menu_buttons, *self._action_buttons, *self._primary_quick_buttons, *self._system_quick_buttons]:
+        for button in [
+            *self._menu_buttons,
+            *self._action_buttons,
+            *self._navigation_quick_buttons.values(),
+            *self._primary_quick_buttons,
+            *self._system_quick_buttons,
+        ]:
             try:
                 button.destroy()
             except Exception:
@@ -127,6 +138,7 @@ class AppMenuBar:
         self._button_menus.clear()
         self._menu_images.clear()
         self._action_buttons.clear()
+        self._navigation_quick_buttons.clear()
         self._primary_quick_buttons.clear()
         self._system_quick_buttons.clear()
 
@@ -221,6 +233,10 @@ class AppMenuBar:
 
     def _build_quick_actions(self):
         """Build quick actions."""
+        for action in build_navigation_quick_actions(self.app):
+            button = self._create_quick_action_button(self.system_quick_frame, action)
+            button.pack(side="left", padx=4)
+            self._navigation_quick_buttons[action.text.lower()] = button
         for action in build_primary_quick_actions(self.app):
             button = self._create_quick_action_button(self.quick_actions_inner, action)
             button.pack(side="left", padx=4)
@@ -229,6 +245,18 @@ class AppMenuBar:
             button = self._create_quick_action_button(self.system_quick_frame, action)
             button.pack(side="left", padx=4)
             self._system_quick_buttons.append(button)
+        self.set_navigation_state(can_go_back=False, can_go_forward=False)
+
+    def set_navigation_state(self, *, can_go_back: bool, can_go_forward: bool):
+        """Update quick navigation button states."""
+        nav_state = {
+            "back": "normal" if can_go_back else "disabled",
+            "forward": "normal" if can_go_forward else "disabled",
+        }
+        for key, state in nav_state.items():
+            button = self._navigation_quick_buttons.get(key)
+            if button is not None:
+                button.configure(state=state)
 
     def _create_quick_action_button(self, parent, action_spec):
         """Create quick action button."""
@@ -305,6 +333,8 @@ class AppMenuBar:
         for button in self._primary_quick_buttons:
             self._style_quick_button(button, menu_bg=menu_bg, button_fg=button_fg, panel_bg=panel_bg, muted_fg=muted_fg)
         for button in self._system_quick_buttons:
+            self._style_quick_button(button, menu_bg=menu_bg, button_fg=button_fg, panel_bg=panel_bg, muted_fg=muted_fg)
+        for button in self._navigation_quick_buttons.values():
             self._style_quick_button(button, menu_bg=menu_bg, button_fg=button_fg, panel_bg=panel_bg, muted_fg=muted_fg)
 
         for button in self._action_buttons:

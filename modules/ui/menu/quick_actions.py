@@ -31,6 +31,11 @@ SYSTEM_ACTIONS = (
     QuickActionSpec("DB", lambda app: app.change_database_storage(), "change_db", "Switch the active database", "system"),
 )
 
+NAVIGATION_ACTIONS = (
+    QuickActionSpec("Back", lambda app: app.navigate_back(), None, "Go to previous view", "system"),
+    QuickActionSpec("Forward", lambda app: app.navigate_forward(), None, "Go to next view", "system"),
+)
+
 
 def _bind_actions(app, items: tuple[QuickActionSpec, ...]) -> list[QuickActionSpec]:
     """Bind actions."""
@@ -56,3 +61,8 @@ def build_primary_quick_actions(app) -> list[QuickActionSpec]:
 def build_system_quick_actions(app) -> list[QuickActionSpec]:
     """Build system quick actions."""
     return _bind_actions(app, SYSTEM_ACTIONS)
+
+
+def build_navigation_quick_actions(app) -> list[QuickActionSpec]:
+    """Build navigation quick actions."""
+    return _bind_actions(app, NAVIGATION_ACTIONS)
