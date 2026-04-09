@@ -2887,29 +2887,37 @@ class MainWindow(ctk.CTk):
                 chosen_layout = selected_layout_var.get()
                 resolved_layout = None if chosen_layout == default_label else chosen_layout
 
-            from modules.scenarios.gm_screen2 import GMScreen2View
-
-            view = GMScreen2View(
-                detail_container,
-                scenario_item=selected,
-                initial_layout=resolved_layout,
-                layout_manager=layout_manager,
+            from modules.scenarios.gm_screen2.app import GMScreen2Controller
+            from modules.scenarios.gm_screen2.services import (
+                GenericModelScenarioRepository,
+                ScenarioPanelPayloadProvider,
             )
-            view.pack(fill="both", expand=True)
-            self.current_gm_view = view
+            from modules.scenarios.gm_screen2.ui import GMScreen2RootView
 
-            default_layout = layout_manager.get_scenario_default(view.scenario_name)
-            has_saved_layout = bool(resolved_layout or default_layout)
-            if not has_saved_layout:
-                def _open_default_tabs():
-                    """Open default desktop tabs."""
-                    scenario_tab = view.tabs.get(view.scenario_name)
-                    if not scenario_tab:
-                        view.after(50, _open_default_tabs)
-                        return
-                    view.open_whiteboard_tab(activate=False)
+            repository = GenericModelScenarioRepository(scenario_wrapper)
+            payload_provider = ScenarioPanelPayloadProvider(repository)
+            controller = GMScreen2Controller(repository, payload_provider)
+            root_view = GMScreen2RootView(detail_container, controller=controller)
+            root_view.pack(fill="both", expand=True)
 
-                view.after_idle(_open_default_tabs)
+            scenarios_for_view = controller.initialize()
+            selected_summary = next(
+                (
+                    scenario
+                    for scenario in scenarios_for_view
+                    if scenario.title == _resolve_scenario_title(selected)
+                ),
+                None,
+            )
+            if selected_summary:
+                controller.load_scenario(selected_summary.scenario_id)
+
+            if isinstance(resolved_layout, dict):
+                split_ratios = resolved_layout.get("split_ratios")
+                if isinstance(split_ratios, (list, tuple)):
+                    controller.update_state(split_ratios=list(split_ratios))
+
+            self.current_gm_view = root_view
 
         def on_scenario_select(entity_type, entity_name):
             """Handle scenario selection."""
