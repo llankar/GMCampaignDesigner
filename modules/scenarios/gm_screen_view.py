@@ -2394,7 +2394,10 @@ class GMScreenView(ctk.CTkFrame):
 
         detached_window.deiconify()
         self._motion.fade_in_window(detached_window, duration_ms=180)
-        print(f"[DETACH] Detached window shown at {GRAPH_W}×{GRAPH_H}")
+        detached_window.update_idletasks()
+        shown_w = detached_window.winfo_width()
+        shown_h = detached_window.winfo_height()
+        print(f"[DETACH] Detached window shown at {shown_w}×{shown_h}")
 
         # Portrait & scenario-graph restoration (unchanged)…
         if hasattr(old_frame, "scenario_graph_editor") and hasattr(old_frame.scenario_graph_editor, "get_state"):
