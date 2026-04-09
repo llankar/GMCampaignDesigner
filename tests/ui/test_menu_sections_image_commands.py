@@ -24,6 +24,7 @@ def test_menu_sections_expose_image_library_commands() -> None:
         destroy=lambda: None,
         refresh_entities=lambda: None,
         open_gm_screen=lambda: None,
+        open_gm_screen2=lambda: None,
         open_campaign_graph_view=lambda: None,
         open_world_map=lambda: None,
         open_character_graph_editor=lambda: None,
