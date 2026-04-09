@@ -118,6 +118,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                     helper="live reference views during play",
                     items=[
                         _command("GM Screen", app.open_gm_screen, shortcut="F1", icon_key="gm_screen"),
+                        _command("GM Screen 2", app.open_gm_screen2, shortcut="F10", icon_key="gm_screen"),
                         _command("Campaign Overview", app.open_campaign_graph_view, icon_key="campaign_graph"),
                         _command("World Map", app.open_world_map, shortcut="F5", icon_key="world_map"),
                     ],
@@ -202,6 +203,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                             lambda: messagebox.showinfo(
                                 "Keyboard Shortcuts",
                                 "F1: GM Screen\n"
+                                "F10: GM Screen 2\n"
                                 "F2: Map Tool\n"
                                 "F3: Whiteboard\n"
                                 "F4: Scenario Builder\n"
