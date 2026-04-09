@@ -221,6 +221,7 @@ class MainWindow(ctk.CTk):
         root.bind_all("<F7>", lambda _event: self.open_sound_manager())
         root.bind_all("<F8>", lambda _event: self.open_dice_roller())
         root.bind_all("<F9>", lambda _event: self.open_campaign_builder())
+        root.bind_all("<F10>", lambda _event: self.open_gm_screen2())
         root.bind_all("<F12>", lambda _event: self.destroy())
 
     def open_ai_settings(self):
@@ -997,6 +998,7 @@ class MainWindow(ctk.CTk):
             SidebarItemSpec("import_creatures_pdf", "Import NPCs/Creatures from PDF", self.open_creature_importer),
             SidebarItemSpec("import_objects_pdf", "Import Equipment from PDF", self.open_object_importer),
             SidebarItemSpec("gm_screen", "Open GM Screen", self.open_gm_screen),
+            SidebarItemSpec("gm_screen2", "Open GM Screen 2 (Desktop Panels)", self.open_gm_screen2),
             SidebarItemSpec("export_scenarios", "Export Scenarios", self.preview_and_export_scenarios),
             SidebarItemSpec("export_campaign_dossier", "Export Entire Campaign (Dossier Binder)", self.open_campaign_dossier_exporter),
             SidebarItemSpec("generate_portraits", "Generate Portraits", self.generate_missing_portraits),
@@ -2816,6 +2818,150 @@ class MainWindow(ctk.CTk):
             scenario_wrapper,
             load_template("scenarios"),
             on_select_callback=on_scenario_select
+        )
+        list_selection.pack(fill="both", expand=True)
+        self.current_gm_view = None
+        _finalize_gm_shell()
+
+    def open_gm_screen2(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
+        """Open desktop-panel variant of the GM screen (GM Screen 2)."""
+        self.clear_current_content()
+        self._gm_mode = True
+
+        scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
+        self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
+        scenarios = scenario_wrapper.load_items()
+        if not scenarios:
+            if show_empty_message:
+                messagebox.showwarning("No Scenarios", "No scenarios available.")
+            else:
+                log_info(
+                    "Skipped opening GM Screen 2 because no scenarios are available",
+                    func_name="main_window.MainWindow.open_gm_screen2",
+                )
+            return
+
+        layout_manager = GMScreenLayoutManager()
+        layout_map = layout_manager.list_layouts()
+        default_label = "Use Scenario Default"
+        layout_options = [default_label]
+        layout_options.extend(sorted(layout_map.keys()))
+        selected_layout_var = tk.StringVar(value=default_label)
+
+        if getattr(self, "banner_frame", None) and self.banner_frame.winfo_exists():
+            if not self.banner_frame.winfo_ismapped():
+                self.banner_frame.pack(fill="x")
+        else:
+            self.banner_frame = self._create_banner_frame()
+            self.banner_frame.pack(fill="x")
+        pcs_items = {pc["Name"]: pc for pc in self.pc_wrapper.load_items()}
+        if pcs_items:
+            display_pcs_in_banner(self.banner_frame, pcs_items)
+
+        self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+        for w in self.inner_content_frame.winfo_children():
+            w.destroy()
+        parent = self.inner_content_frame
+
+        layout_bar = ctk.CTkFrame(parent)
+        layout_bar.pack(fill="x", padx=10, pady=(5, 0))
+        ctk.CTkLabel(layout_bar, text="GM Screen 2 layout:").pack(side="left", padx=(0, 10), pady=5)
+        ctk.CTkOptionMenu(layout_bar, variable=selected_layout_var, values=layout_options).pack(side="left", pady=5)
+        ctk.CTkLabel(
+            layout_bar,
+            text="Ctrl+1..9: afficher/masquer panneau • Ctrl+0: restaurer tous",
+        ).pack(side="right", padx=6, pady=5)
+
+        def _resolve_scenario_title(scenario):
+            """Resolve scenario title."""
+            return str((scenario or {}).get("Title") or (scenario or {}).get("Name") or "").strip()
+
+        def _show_selected_scenario(selected):
+            """Show selected scenario in GM Screen 2."""
+            for w in parent.winfo_children():
+                w.destroy()
+            detail_container = ctk.CTkFrame(parent)
+            detail_container.grid(row=0, column=0, sticky="nsew")
+            resolved_layout = initial_layout
+            if resolved_layout is None:
+                chosen_layout = selected_layout_var.get()
+                resolved_layout = None if chosen_layout == default_label else chosen_layout
+
+            from modules.scenarios.gm_screen2 import GMScreen2View
+
+            view = GMScreen2View(
+                detail_container,
+                scenario_item=selected,
+                initial_layout=resolved_layout,
+                layout_manager=layout_manager,
+            )
+            view.pack(fill="both", expand=True)
+            self.current_gm_view = view
+
+            default_layout = layout_manager.get_scenario_default(view.scenario_name)
+            has_saved_layout = bool(resolved_layout or default_layout)
+            if not has_saved_layout:
+                def _open_default_tabs():
+                    """Open default desktop tabs."""
+                    scenario_tab = view.tabs.get(view.scenario_name)
+                    if not scenario_tab:
+                        view.after(50, _open_default_tabs)
+                        return
+                    view.open_whiteboard_tab(activate=False)
+
+                view.after_idle(_open_default_tabs)
+
+        def on_scenario_select(entity_type, entity_name):
+            """Handle scenario selection."""
+            selected = next((s for s in scenarios if _resolve_scenario_title(s) == entity_name), None)
+            if not selected:
+                messagebox.showwarning("Not Found", f"Scenario '{entity_name}' not found.")
+                return
+            _show_selected_scenario(selected)
+
+        def _finalize_gm_shell():
+            """Finalize shell layout and banner controls."""
+            def _safe_update_banner_toggle(**kwargs):
+                """Safely update banner toggle button."""
+                button = getattr(self, "banner_toggle_btn", None)
+                if button is None:
+                    return
+                if not getattr(button, "winfo_exists", lambda: 0)():
+                    return
+                try:
+                    button.configure(**kwargs)
+                except Exception:
+                    return
+                if "state" in kwargs:
+                    try:
+                        button._state = kwargs["state"]
+                    except Exception:
+                        pass
+
+            self.banner_visible = True
+            _safe_update_banner_toggle(text="▲", state="disabled")
+            self.content_frame.grid_rowconfigure(0, weight=0)
+            self.content_frame.grid_rowconfigure(1, weight=1)
+            self.content_frame.grid_columnconfigure(0, weight=1)
+            self.inner_content_frame.grid_rowconfigure(0, weight=1)
+            self.inner_content_frame.grid_columnconfigure(0, weight=1)
+            _safe_update_banner_toggle(text="▲", state="normal")
+
+        if scenario_name:
+            selected = next((s for s in scenarios if _resolve_scenario_title(s) == str(scenario_name).strip()), None)
+            if not selected:
+                messagebox.showwarning("Not Found", f"Scenario '{scenario_name}' not found.")
+                return
+            _show_selected_scenario(selected)
+            _finalize_gm_shell()
+            return
+
+        list_selection = GenericListSelectionView(
+            parent,
+            "scenarios",
+            scenario_wrapper,
+            load_template("scenarios"),
+            on_select_callback=on_scenario_select,
         )
         list_selection.pack(fill="both", expand=True)
         self.current_gm_view = None
