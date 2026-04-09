@@ -53,6 +53,7 @@ from modules.scenarios.gm_screen.tab_variants import (
     tab_icon_for_name,
     tab_short_label,
 )
+from modules.scenarios.gm_screen.tab_positioning import apply_tab_zone_metadata, sanitize_tab_zone
 from modules.scenarios.gm_screen.dashboard.animations import MotionController
 from modules.generic.detail_ui import get_detail_palette
 from modules.generic.detail_ui.scroll_host import build_scroll_host
@@ -336,10 +337,11 @@ class GMScreenView(ctk.CTkFrame):
         """Return the configured UI zone for a tab."""
         tab = self.tabs.get(tab_name) or {}
         meta = tab.get("meta") or {}
-        ui_zone = str(meta.get("ui_zone") or "center").strip().lower()
-        if ui_zone not in self._desk_zones:
+        fallback_zone = "center" if getattr(self, "_desk_zones", {}).get("center") else "center"
+        ui_zone = sanitize_tab_zone(meta.get("ui_zone"), fallback=fallback_zone)
+        if ui_zone not in getattr(self, "_desk_zones", {}):
             ui_zone = "center"
-            meta["ui_zone"] = ui_zone
+        apply_tab_zone_metadata(meta, ui_zone, fallback="center")
         return ui_zone
 
     def _apply_virtual_desk_layout_for_tab(self, name: str) -> None:
@@ -348,7 +350,12 @@ class GMScreenView(ctk.CTkFrame):
         if not tab or tab.get("detached"):
             return
 
-        target_zone = self._desk_zones.get(self._resolve_ui_zone(name), self.desk_center)
+        resolved_zone = self._resolve_ui_zone(name)
+        target_zone = self._desk_zones.get(resolved_zone)
+        if target_zone is None:
+            resolved_zone = "center"
+            target_zone = self._desk_zones.get("center", self.desk_center)
+            apply_tab_zone_metadata((tab.get("meta") or {}), resolved_zone, fallback="center")
         target_host = (tab.get("meta") or {}).get("host") or "scroll"
 
         try:
@@ -367,6 +374,31 @@ class GMScreenView(ctk.CTkFrame):
             host.pack(in_=target_zone, fill="both", expand=True)
         else:
             self.content_area.pack(in_=target_zone, fill="both", expand=True)
+
+    def _set_tab_ui_zone(self, name: str, ui_zone: str) -> None:
+        """Update a tab UI zone and re-render virtual desk layout."""
+        tab = self.tabs.get(name)
+        if not tab:
+            return
+        meta = tab.setdefault("meta", {})
+        requested_zone = sanitize_tab_zone(ui_zone, fallback="center")
+        fallback_zone = requested_zone if requested_zone in getattr(self, "_desk_zones", {}) else "center"
+        apply_tab_zone_metadata(meta, fallback_zone, fallback="center")
+        if name == self.current_tab and not tab.get("detached"):
+            self._apply_virtual_desk_layout_for_tab(name)
+            self._request_active_tab_layout_settle()
+
+    def pin_tab_to_right(self, name: str) -> None:
+        """Dock the given tab to the right rail when available."""
+        self._set_tab_ui_zone(name, "right")
+
+    def minimize_tab_to_bottom(self, name: str) -> None:
+        """Dock the given tab to the bottom rail when available."""
+        self._set_tab_ui_zone(name, "bottom")
+
+    def restore_tab_to_center(self, name: str) -> None:
+        """Restore the given tab to center area."""
+        self._set_tab_ui_zone(name, "center")
 
     def _get_active_attached_frame(self):
         """Return active attached frame."""
@@ -1189,8 +1221,7 @@ class GMScreenView(ctk.CTkFrame):
         meta.setdefault("category", category)
         meta.setdefault("short_label", short_label)
         meta.setdefault("icon", icon)
-        meta.setdefault("ui_zone", "center")
-        meta.setdefault("ui_state", "normal")
+        apply_tab_zone_metadata(meta, meta.get("ui_zone", "center"), fallback="center")
         if "pinned" not in meta:
             meta["pinned"] = name.strip().lower() in self._default_pinned_tab_names
 
@@ -1227,6 +1258,42 @@ class GMScreenView(ctk.CTkFrame):
         )
         pin_button.pack(side="left", pady=4)
 
+        move_right_button = ctk.CTkButton(
+            tab_frame,
+            text="⇢",
+            width=26,
+            height=30,
+            fg_color="transparent",
+            hover_color=variant["inactive_hover"],
+            text_color=self._palette["muted_text"],
+            command=lambda: self.pin_tab_to_right(name),
+        )
+        move_right_button.pack(side="left", pady=4)
+
+        move_bottom_button = ctk.CTkButton(
+            tab_frame,
+            text="⇣",
+            width=26,
+            height=30,
+            fg_color="transparent",
+            hover_color=variant["inactive_hover"],
+            text_color=self._palette["muted_text"],
+            command=lambda: self.minimize_tab_to_bottom(name),
+        )
+        move_bottom_button.pack(side="left", pady=4)
+
+        restore_center_button = ctk.CTkButton(
+            tab_frame,
+            text="◎",
+            width=26,
+            height=30,
+            fg_color="transparent",
+            hover_color=variant["inactive_hover"],
+            text_color=self._palette["muted_text"],
+            command=lambda: self.restore_tab_to_center(name),
+        )
+        restore_center_button.pack(side="left", pady=4)
+
         close_button = ctk.CTkButton(
             tab_frame,
             text="✕",
@@ -1257,6 +1324,9 @@ class GMScreenView(ctk.CTkFrame):
             "content_frame": content_frame,
             "button": tab_button,
             "pin_button": pin_button,
+            "move_right_button": move_right_button,
+            "move_bottom_button": move_bottom_button,
+            "restore_center_button": restore_center_button,
             "detach_button": detach_button,
             "detached": False,
             "window": None,
@@ -1277,6 +1347,9 @@ class GMScreenView(ctk.CTkFrame):
             tab_frame,
             tab_button,
             pin_button,
+            move_right_button,
+            move_bottom_button,
+            restore_center_button,
             close_button,
             detach_button
         )
@@ -2950,6 +3023,13 @@ class GMScreenView(ctk.CTkFrame):
             hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
             text_color=text_color,
         )
+        for action_button_key in ("move_right_button", "move_bottom_button", "restore_center_button"):
+            action_button = tab.get(action_button_key)
+            if action_button is not None:
+                action_button.configure(
+                    hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
+                    text_color=text_color,
+                )
         tab["detach_button"].configure(
             hover_color=variant["active_hover"] if is_active else variant["inactive_hover"],
         )
