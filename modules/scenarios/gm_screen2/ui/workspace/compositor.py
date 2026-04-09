@@ -17,13 +17,16 @@ class WorkspaceCompositor:
         self._on_resize_split = on_resize_split
         self._on_activate_panel = on_activate_panel
         self.zone_hosts: dict[str, PanelHostFrame] = {}
+        self._layout_root: ctk.CTkFrame | None = None
 
     def rebuild(self, root_node: LayoutNode, panel_widgets: dict[str, ctk.CTkFrame], visibility: dict[str, bool]) -> None:
-        for child in self._root.winfo_children():
-            child.destroy()
+        if self._layout_root is not None and self._layout_root.winfo_exists():
+            self._layout_root.destroy()
+        self._layout_root = ctk.CTkFrame(self._root, fg_color="transparent")
         self.zone_hosts.clear()
-        built = self._build_node(self._root, root_node, panel_widgets, visibility)
+        built = self._build_node(self._layout_root, root_node, panel_widgets, visibility)
         built.pack(fill="both", expand=True)
+        self._layout_root.pack(fill="both", expand=True)
 
     def _build_node(self, parent, node: LayoutNode, panel_widgets: dict[str, ctk.CTkFrame], visibility: dict[str, bool]):
         if isinstance(node, ZoneNode):

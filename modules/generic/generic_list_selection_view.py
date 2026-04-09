@@ -6,6 +6,7 @@ import customtkinter as ctk
 import time
 import re
 import os
+import inspect
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -266,10 +267,24 @@ class GenericListSelectionView(ctk.CTkFrame):
         if not self.on_select_callback:
             return
         entity_name = self._resolve_entity_name(item)
-        try:
-            self.on_select_callback(self.entity_type, entity_name, item)
-        except TypeError:
-            self.on_select_callback(self.entity_type, entity_name)
+        callback = self.on_select_callback
+        signature = inspect.signature(callback)
+        positional_args = [
+            parameter
+            for parameter in signature.parameters.values()
+            if parameter.kind in (
+                inspect.Parameter.POSITIONAL_ONLY,
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            )
+        ]
+        has_varargs = any(
+            parameter.kind == inspect.Parameter.VAR_POSITIONAL
+            for parameter in signature.parameters.values()
+        )
+        if has_varargs or len(positional_args) >= 3:
+            callback(self.entity_type, entity_name, item)
+            return
+        callback(self.entity_type, entity_name)
 
     def _resolve_entity_name(self, item):
         """Resolve entity name."""

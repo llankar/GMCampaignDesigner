@@ -2758,7 +2758,7 @@ class MainWindow(ctk.CTk):
 
                 view.after_idle(_open_default_tabs)
 
-        def on_scenario_select(entity_type, entity_name):
+        def on_scenario_select(entity_type, entity_name, _item=None):
             """Handle scenario select."""
             selected = next(
                 (s for s in scenarios if _resolve_scenario_title(s) == entity_name),
@@ -2943,7 +2943,7 @@ class MainWindow(ctk.CTk):
 
             self.current_gm_view = root_view
 
-        def on_scenario_select(entity_type, entity_name):
+        def on_scenario_select(entity_type, entity_name, _item=None):
             """Handle scenario selection."""
             selected = next((s for s in scenarios if _resolve_scenario_title(s) == entity_name), None)
             if not selected:
