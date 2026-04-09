@@ -2867,10 +2867,8 @@ class MainWindow(ctk.CTk):
         layout_bar.pack(fill="x", padx=10, pady=(5, 0))
         ctk.CTkLabel(layout_bar, text="GM Screen 2 layout:").pack(side="left", padx=(0, 10), pady=5)
         ctk.CTkOptionMenu(layout_bar, variable=selected_layout_var, values=layout_options).pack(side="left", pady=5)
-        ctk.CTkLabel(
-            layout_bar,
-            text="Ctrl+1..9: afficher/masquer panneau • Ctrl+0: restaurer tous",
-        ).pack(side="right", padx=6, pady=5)
+        toolbar_actions = ctk.CTkFrame(layout_bar, fg_color="transparent")
+        toolbar_actions.pack(side="right", padx=6, pady=5)
 
         def _resolve_scenario_title(scenario):
             """Resolve scenario title."""
@@ -2912,10 +2910,36 @@ class MainWindow(ctk.CTk):
             if selected_summary:
                 controller.load_scenario(selected_summary.scenario_id)
 
+            saved_presets = getattr(self, "_gm_screen2_layout_presets", {})
+            scenario_layout = saved_presets.get(selected_summary.scenario_id if selected_summary else "")
             if isinstance(resolved_layout, dict):
-                split_ratios = resolved_layout.get("split_ratios")
-                if isinstance(split_ratios, (list, tuple)):
-                    controller.update_state(split_ratios=list(split_ratios))
+                controller.docking.import_layout(resolved_layout)
+            elif isinstance(scenario_layout, dict):
+                controller.docking.import_layout(scenario_layout)
+
+            def _reset_layout():
+                controller.docking.reset_layout()
+
+            def _save_preset():
+                if not selected_summary:
+                    return
+                layout_store = dict(getattr(self, "_gm_screen2_layout_presets", {}))
+                layout_store[selected_summary.scenario_id] = controller.docking.export_layout()
+                self._gm_screen2_layout_presets = layout_store
+
+            def _load_preset():
+                if not selected_summary:
+                    return
+                layout_store = dict(getattr(self, "_gm_screen2_layout_presets", {}))
+                preset = layout_store.get(selected_summary.scenario_id)
+                if isinstance(preset, dict):
+                    controller.docking.import_layout(preset)
+
+            for child in toolbar_actions.winfo_children():
+                child.destroy()
+            ctk.CTkButton(toolbar_actions, text="Reset Layout", width=110, command=_reset_layout).pack(side="left", padx=2)
+            ctk.CTkButton(toolbar_actions, text="Save Preset", width=110, command=_save_preset).pack(side="left", padx=2)
+            ctk.CTkButton(toolbar_actions, text="Load Preset", width=110, command=_load_preset).pack(side="left", padx=2)
 
             self.current_gm_view = root_view
 

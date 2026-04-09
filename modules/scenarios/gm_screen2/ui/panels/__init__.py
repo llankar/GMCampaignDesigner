@@ -6,7 +6,16 @@ from modules.scenarios.gm_screen2.ui.panels.overview_panel import OverviewPanelV
 from modules.scenarios.gm_screen2.ui.panels.quick_reference_panel import QuickReferencePanelView
 from modules.scenarios.gm_screen2.ui.panels.timeline_panel import TimelinePanelView
 
+PANEL_TYPES = {
+    "overview": OverviewPanelView,
+    "entities": EntitiesPanelView,
+    "notes": NotesPanelView,
+    "timeline": TimelinePanelView,
+    "quick_reference": QuickReferencePanelView,
+}
+
 __all__ = [
+    "PANEL_TYPES",
     "OverviewPanelView",
     "EntitiesPanelView",
     "NotesPanelView",

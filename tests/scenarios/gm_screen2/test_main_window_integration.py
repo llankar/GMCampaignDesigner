@@ -34,10 +34,13 @@ def test_open_gm_screen2_signature_is_stable():
     assert kwonly_names == ["show_empty_message", "scenario_name", "initial_layout"]
 
 
-def test_open_gm_screen2_uses_new_controller_and_root_view():
+def test_open_gm_screen2_wires_toolbar_layout_actions_and_workspace_view():
     method = _get_method("open_gm_screen2")
     source = ast.get_source_segment(SOURCE_PATH.read_text(encoding="utf-8-sig"), method) or ""
 
     assert "GMScreen2Controller" in source
     assert "GMScreen2RootView" in source
-    assert "GenericModelScenarioRepository" in source
+    assert "ScenarioPanelPayloadProvider" in source
+    assert "Save Preset" in source
+    assert "Load Preset" in source
+    assert "Reset Layout" in source

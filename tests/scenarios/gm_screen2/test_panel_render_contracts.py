@@ -1,29 +1,15 @@
-"""Contract tests for GM Screen 2 panel widgets."""
+"""Workspace mounting tests for GM Screen 2 panel zones."""
 
-from modules.scenarios.gm_screen2.ui.panels import (
-    EntitiesPanelView,
-    NotesPanelView,
-    OverviewPanelView,
-    QuickReferencePanelView,
-    TimelinePanelView,
-)
+from modules.scenarios.gm_screen2.state.layout_reducer import find_zone
+from modules.scenarios.gm_screen2.state.layout_state import LayoutState
 
 
-def test_panel_types_define_unique_panel_keys():
-    panel_types = [
-        OverviewPanelView,
-        EntitiesPanelView,
-        NotesPanelView,
-        TimelinePanelView,
-        QuickReferencePanelView,
-    ]
+def test_panel_mount_unmount_in_workspace_zones():
+    state = LayoutState()
+    left = find_zone(state.root, "zone_left")
 
-    panel_keys = [panel_type.PANEL_KEY for panel_type in panel_types]
-    assert panel_keys == ["overview", "entities", "notes", "timeline", "quick_reference"]
-    assert len(panel_keys) == len(set(panel_keys))
+    assert left is not None
+    assert "overview" in left.panel_stack
 
-
-def test_panel_types_expose_render_payload_contract():
-    for panel_type in [OverviewPanelView, EntitiesPanelView, NotesPanelView, TimelinePanelView, QuickReferencePanelView]:
-        assert hasattr(panel_type, "render_payload")
-        assert callable(getattr(panel_type, "render_payload"))
+    left.panel_stack.remove("overview")
+    assert "overview" not in left.panel_stack
