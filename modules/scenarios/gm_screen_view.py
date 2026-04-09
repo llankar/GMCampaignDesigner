@@ -53,6 +53,11 @@ from modules.scenarios.gm_screen.tab_variants import (
     tab_icon_for_name,
     tab_short_label,
 )
+from modules.scenarios.gm_screen.layout_presets import (
+    DEFAULT_LAYOUT_PRESETS,
+    build_snapshot_preset,
+    resolve_zone_for_tab,
+)
 from modules.scenarios.gm_screen.tab_positioning import apply_tab_zone_metadata, sanitize_tab_zone
 from modules.scenarios.gm_screen.dashboard.animations import MotionController
 from modules.generic.detail_ui import get_detail_palette
@@ -167,6 +172,8 @@ class GMScreenView(ctk.CTkFrame):
         self.current_layout_name = None
         self._default_pinned_tab_names = {self.scenario_name.lower(), "world map", "session timer"}
         self._command_deck_buttons = {}
+        self._active_layout_preset_name = None
+        self._previous_layout_preset_name = self.layout_manager.get_last_layout_preset(self.scenario_name)
 
         # A container to hold both the scrollable tab area and the plus button
         self.tab_bar_container = ctk.CTkFrame(self, height=60, fg_color=self._palette["surface_card"], border_width=1, border_color=self._palette["muted_border"], corner_radius=18)
@@ -180,6 +187,39 @@ class GMScreenView(ctk.CTkFrame):
             text_color=self._palette["muted_text"],
         )
         self.command_deck_label.pack(side="left", padx=(0, 6))
+        self.preset_apply_button = ctk.CTkButton(
+            self.command_deck,
+            text="Apply Preset",
+            height=26,
+            width=110,
+            fg_color=self._palette["surface_overlay"],
+            hover_color=self._palette["accent_hover"],
+            text_color=self._palette["text"],
+            command=self._open_apply_preset_menu,
+        )
+        self.preset_apply_button.pack(side="left", padx=2)
+        self.preset_save_button = ctk.CTkButton(
+            self.command_deck,
+            text="Save Preset",
+            height=26,
+            width=108,
+            fg_color=self._palette["surface_overlay"],
+            hover_color=self._palette["accent_hover"],
+            text_color=self._palette["text"],
+            command=self._save_current_preset,
+        )
+        self.preset_save_button.pack(side="left", padx=2)
+        self.preset_restore_button = ctk.CTkButton(
+            self.command_deck,
+            text="Restore Prev",
+            height=26,
+            width=108,
+            fg_color=self._palette["surface_overlay"],
+            hover_color=self._palette["accent_hover"],
+            text_color=self._palette["text"],
+            command=self._restore_previous_preset,
+        )
+        self.preset_restore_button.pack(side="left", padx=(2, 6))
 
         # The scrollable canvas for tabs
         self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=44, highlightthickness=0, bg=self._palette["surface_card"])
@@ -1911,6 +1951,91 @@ class GMScreenView(ctk.CTkFrame):
             "active": self.current_tab,
         }
 
+    def _merged_layout_presets(self):
+        """Return default presets merged with user-defined presets."""
+        presets = {name: dict(data) for name, data in DEFAULT_LAYOUT_PRESETS.items()}
+        for name, data in self.layout_manager.list_layout_presets().items():
+            if isinstance(data, dict):
+                presets[name] = data
+        return presets
+
+    def _apply_layout_preset(self, preset_name: str, *, persist_previous: bool = True) -> bool:
+        """Apply a virtual-desk preset to all opened tabs."""
+        presets = self._merged_layout_presets()
+        preset = presets.get(preset_name)
+        if not preset:
+            messagebox.showwarning("Preset Missing", f"Preset '{preset_name}' was not found.")
+            return False
+
+        changed = 0
+        for tab_name in list(self.tab_order):
+            tab = self.tabs.get(tab_name) or {}
+            if tab.get("detached"):
+                continue
+            meta = tab.setdefault("meta", {})
+            target_zone = resolve_zone_for_tab(tab_name, meta, preset)
+            if not target_zone:
+                continue
+            current_zone = sanitize_tab_zone(meta.get("ui_zone"), fallback="center")
+            safe_zone = sanitize_tab_zone(target_zone, fallback=current_zone)
+            if safe_zone == current_zone:
+                continue
+            self._set_tab_ui_zone(tab_name, safe_zone)
+            changed += 1
+
+        if persist_previous:
+            self._previous_layout_preset_name = self._active_layout_preset_name
+        self._active_layout_preset_name = preset_name
+        self.layout_manager.set_last_layout_preset(self.scenario_name, self._previous_layout_preset_name)
+        if self.current_tab in self.tabs and not self.tabs[self.current_tab].get("detached"):
+            self._apply_virtual_desk_layout_for_tab(self.current_tab)
+        self._request_active_tab_layout_settle()
+        self._update_layout_status(self.current_layout_name)
+        if changed == 0:
+            messagebox.showinfo("Preset Applied", f"Preset '{preset_name}' applied (no tab moved).")
+        return True
+
+    def _open_apply_preset_menu(self):
+        """Show the preset menu anchored to the apply button."""
+        menu = tk.Menu(self, tearoff=0)
+        presets = self._merged_layout_presets()
+        for name in sorted(presets.keys()):
+            menu.add_command(label=name, command=lambda n=name: self._apply_layout_preset(n))
+        x = self.preset_apply_button.winfo_rootx()
+        y = self.preset_apply_button.winfo_rooty() + self.preset_apply_button.winfo_height()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def _save_current_preset(self):
+        """Persist a preset snapshot from currently opened tabs."""
+        data = self._serialize_current_layout()
+        if not data.get("tabs"):
+            messagebox.showwarning("Preset", "There are no tabs to capture.")
+            return
+
+        dialog = ctk.CTkInputDialog(text="Preset name:", title="Save Current Preset")
+        name = (dialog.get_input() or "").strip() if dialog else ""
+        if not name:
+            return
+
+        presets = self.layout_manager.list_layout_presets()
+        if name in presets and not messagebox.askyesno("Overwrite Preset?", f"Preset '{name}' already exists. Overwrite it?"):
+            return
+
+        preset_payload = build_snapshot_preset(data["tabs"])
+        self.layout_manager.save_layout_preset(name, preset_payload)
+        messagebox.showinfo("Preset Saved", f"Preset '{name}' saved.")
+
+    def _restore_previous_preset(self):
+        """Re-apply the previous preset if available."""
+        previous_name = self._previous_layout_preset_name
+        if not previous_name:
+            messagebox.showinfo("Preset", "No previous preset available yet.")
+            return
+        self._apply_layout_preset(previous_name, persist_previous=False)
+
     def _prompt_save_layout(self):
         """Internal helper for prompt save layout."""
         data = self._serialize_current_layout()
@@ -2146,6 +2271,28 @@ class GMScreenView(ctk.CTkFrame):
         else:
             raise ValueError(f"Unsupported tab kind '{kind}'")
 
+    def _apply_virtual_desk_overlay_from_layout(self, tabs_config):
+        """Apply saved virtual desk metadata after base tab restoration."""
+        if not isinstance(tabs_config, list):
+            return
+        for tab_def in tabs_config:
+            if not isinstance(tab_def, dict):
+                continue
+            title = tab_def.get("title")
+            if not title:
+                continue
+            tab = self.tabs.get(title)
+            if not tab:
+                continue
+            meta = tab.setdefault("meta", {})
+            saved_zone = tab_def.get("ui_zone")
+            if saved_zone:
+                apply_tab_zone_metadata(meta, saved_zone, fallback="center")
+                continue
+            saved_state = str(tab_def.get("ui_state") or "").strip().lower()
+            if saved_state == "normal":
+                apply_tab_zone_metadata(meta, "center", fallback="center")
+
     def load_layout(self, layout_name, set_default=False, silent=False):
         """Load layout."""
         layout = self.layout_manager.get_layout(layout_name)
@@ -2169,6 +2316,7 @@ class GMScreenView(ctk.CTkFrame):
 
         def _finalize_restore():
             """Internal helper for finalize restore."""
+            self._apply_virtual_desk_overlay_from_layout(tabs)
             if not self.tabs:
                 # Handle the branch where tabs is unavailable.
                 scenario_name = self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
