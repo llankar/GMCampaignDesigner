@@ -268,8 +268,31 @@ class GMScreenView(ctk.CTkFrame):
         self.layout_status_label = ctk.CTkLabel(self.tab_bar_bottom, text="", text_color=self._palette["muted_text"])
         self.layout_status_label.pack(side="right", padx=8, pady=5)
 
+        # Main content desk with three visual zones
+        self.virtual_desk_layout = ctk.CTkFrame(self, fg_color="transparent")
+        self.virtual_desk_layout.pack(fill="both", expand=True)
+        self.virtual_desk_layout.grid_rowconfigure(0, weight=1)
+        self.virtual_desk_layout.grid_rowconfigure(1, weight=0)
+        self.virtual_desk_layout.grid_columnconfigure(0, weight=1)
+        self.virtual_desk_layout.grid_columnconfigure(1, weight=0)
+
+        self.desk_center = ctk.CTkFrame(self.virtual_desk_layout, fg_color="transparent")
+        self.desk_center.grid(row=0, column=0, sticky="nsew", padx=(0, 6), pady=(0, 6))
+        self.desk_right_rail = ctk.CTkFrame(self.virtual_desk_layout, fg_color="transparent", width=320)
+        self.desk_right_rail.grid(row=0, column=1, sticky="nsew", pady=(0, 6))
+        self.desk_bottom_rail = ctk.CTkFrame(self.virtual_desk_layout, fg_color="transparent", height=220)
+        self.desk_bottom_rail.grid(row=1, column=0, columnspan=2, sticky="nsew")
+        self.desk_right_rail.grid_propagate(False)
+        self.desk_bottom_rail.grid_propagate(False)
+
+        self._desk_zones = {
+            "center": self.desk_center,
+            "right": self.desk_right_rail,
+            "bottom": self.desk_bottom_rail,
+        }
+
         # Main content area for scenario details
-        self.content_area = ctk.CTkFrame(self)
+        self.content_area = ctk.CTkFrame(self.desk_center)
         self.content_area.pack(fill="both", expand=True)
         self.content_area._scrollable_frame = self.content_area
         self._bind_layout_host(self.content_area)
@@ -304,10 +327,46 @@ class GMScreenView(ctk.CTkFrame):
         """Ensure rich host."""
         host = self._rich_host
         if host is None or not host.winfo_exists():
-            host = ctk.CTkFrame(self)
+            host = ctk.CTkFrame(self.desk_center)
             self._rich_host = host
             self._bind_layout_host(host)
         return host
+
+    def _resolve_ui_zone(self, tab_name: str) -> str:
+        """Return the configured UI zone for a tab."""
+        tab = self.tabs.get(tab_name) or {}
+        meta = tab.get("meta") or {}
+        ui_zone = str(meta.get("ui_zone") or "center").strip().lower()
+        if ui_zone not in self._desk_zones:
+            ui_zone = "center"
+            meta["ui_zone"] = ui_zone
+        return ui_zone
+
+    def _apply_virtual_desk_layout_for_tab(self, name: str) -> None:
+        """Reposition only the active tab display host to its virtual desk zone."""
+        tab = self.tabs.get(name)
+        if not tab or tab.get("detached"):
+            return
+
+        target_zone = self._desk_zones.get(self._resolve_ui_zone(name), self.desk_center)
+        target_host = (tab.get("meta") or {}).get("host") or "scroll"
+
+        try:
+            self.content_area.pack_forget()
+        except Exception:
+            pass
+        try:
+            rich_host = getattr(self, "_rich_host", None)
+            if rich_host is not None and rich_host.winfo_exists():
+                rich_host.pack_forget()
+        except Exception:
+            pass
+
+        if target_host == "rich":
+            host = self._ensure_rich_host()
+            host.pack(in_=target_zone, fill="both", expand=True)
+        else:
+            self.content_area.pack(in_=target_zone, fill="both", expand=True)
 
     def _get_active_attached_frame(self):
         """Return active attached frame."""
@@ -1130,6 +1189,8 @@ class GMScreenView(ctk.CTkFrame):
         meta.setdefault("category", category)
         meta.setdefault("short_label", short_label)
         meta.setdefault("icon", icon)
+        meta.setdefault("ui_zone", "center")
+        meta.setdefault("ui_state", "normal")
         if "pinned" not in meta:
             meta["pinned"] = name.strip().lower() in self._default_pinned_tab_names
 
@@ -2827,26 +2888,7 @@ class GMScreenView(ctk.CTkFrame):
         if not self.tabs[name]["detached"]:
             # Handle the branch where not tabs[name]['detached'].
             tab = self.tabs[name]
-            target_host = (tab.get("meta") or {}).get("host") or "scroll"
-            # Toggle which host is visible
-            if target_host == "rich":
-                # Hide scroll area and show rich host
-                try:
-                    self.content_area.pack_forget()
-                except Exception:
-                    pass
-                host = self._ensure_rich_host()
-                host.pack(fill="both", expand=True)
-            else:
-                # Show scroll area and hide rich host
-                try:
-                    # Keep tab resilient if this step fails.
-                    if getattr(self, "_rich_host", None) and self._rich_host.winfo_exists():
-                        self._rich_host.pack_forget()
-                except Exception:
-                    pass
-                self.content_area.pack(fill="both", expand=True)
-
+            self._apply_virtual_desk_layout_for_tab(name)
             frame = tab["content_frame"]
             frame.pack(fill="both", expand=True)
             self._reset_tab_scroll_state(name)
