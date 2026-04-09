@@ -65,7 +65,7 @@ DEFAULT_MAP_THUMBNAIL_SIZE = (200, 140)
 
 @log_methods
 class GMScreenView(ctk.CTkFrame):
-    def __init__(self, master, scenario_item, *args, initial_layout=None, layout_manager=None, **kwargs):
+    def __init__(self, master, scenario_item, *args, initial_layout=None, layout_manager=None, desktop_mode=False, **kwargs):
         """Initialize the GMScreenView instance."""
         super().__init__(master, *args, **kwargs)
         # Persistent cache for portrait images
@@ -93,6 +93,7 @@ class GMScreenView(ctk.CTkFrame):
         self._session_mid_var = tk.StringVar()
         self._session_end_var = tk.StringVar()
         self._reduced_motion_var = tk.BooleanVar(value=False)
+        self.desktop_mode = bool(desktop_mode)
 
         self._load_persisted_state()
         self._load_motion_settings()
@@ -106,6 +107,7 @@ class GMScreenView(ctk.CTkFrame):
         self._ctrl_shift_C_binding = None
         self._ctrl_shift_c_release_binding = None
         self._ctrl_shift_C_release_binding = None
+        self._panel_shortcut_bindings = []
         self._layout_settle_scheduler = LayoutSettleScheduler(self)
         self._layout_probe_signature = None
         self._bound_layout_hosts = set()
@@ -685,6 +687,13 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_release_binding = top.bind(
                 "<Control-Shift-KeyRelease-C>", self.open_chatbot, add="+"
             )
+            if self.desktop_mode:
+                for idx in range(1, 10):
+                    sequence = f"<Control-Key-{idx}>"
+                    binding = top.bind(sequence, lambda _event=None, panel_index=idx - 1: self._toggle_panel_shortcut(panel_index), add="+")
+                    self._panel_shortcut_bindings.append((sequence, binding))
+                zero_binding = top.bind("<Control-Key-0>", lambda _event=None: self.restore_all_panels(), add="+")
+                self._panel_shortcut_bindings.append(("<Control-Key-0>", zero_binding))
         except Exception:
             self._bound_shortcut_owner = None
             self._ctrl_f_binding = None
@@ -693,6 +702,7 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_shift_C_binding = None
             self._ctrl_shift_c_release_binding = None
             self._ctrl_shift_C_release_binding = None
+            self._panel_shortcut_bindings = []
 
     def _teardown_toplevel_shortcuts(self):
         """Tear down toplevel shortcuts."""
@@ -713,6 +723,9 @@ class GMScreenView(ctk.CTkFrame):
                 top.unbind("<Control-Shift-KeyRelease-c>", self._ctrl_shift_c_release_binding)
             if self._ctrl_shift_C_release_binding:
                 top.unbind("<Control-Shift-KeyRelease-C>", self._ctrl_shift_C_release_binding)
+            for sequence, binding in list(self._panel_shortcut_bindings):
+                if binding:
+                    top.unbind(sequence, binding)
         except Exception:
             pass
         finally:
@@ -723,6 +736,50 @@ class GMScreenView(ctk.CTkFrame):
             self._ctrl_F_binding = None
             self._ctrl_shift_c_release_binding = None
             self._ctrl_shift_C_release_binding = None
+
+    def _toggle_panel_shortcut(self, panel_index: int):
+        """Toggle a detached panel visibility from keyboard shortcuts."""
+        if panel_index < 0 or panel_index >= len(self.tab_order):
+            return
+        tab_name = self.tab_order[panel_index]
+        self.toggle_panel_visibility(tab_name)
+
+    def toggle_panel_visibility(self, tab_name: str):
+        """Minimize/restore a detached panel, or detach an attached one."""
+        tab = self.tabs.get(tab_name)
+        if not tab:
+            return
+        if not tab.get("detached"):
+            self.detach_tab(tab_name)
+            return
+        window = tab.get("window")
+        if window is None or not window.winfo_exists():
+            tab["detached"] = False
+            tab["window"] = None
+            return
+        try:
+            if window.state() == "withdrawn":
+                window.deiconify()
+                window.lift()
+            else:
+                window.withdraw()
+        except Exception:
+            pass
+
+    def restore_all_panels(self):
+        """Restore all detached panels in desktop mode."""
+        for tab_name in self.tab_order:
+            tab = self.tabs.get(tab_name)
+            if not tab or not tab.get("detached"):
+                continue
+            window = tab.get("window")
+            if window is None or not window.winfo_exists():
+                continue
+            try:
+                window.deiconify()
+                window.lift()
+            except Exception:
+                continue
 
     def _on_destroy(self, event=None):
         """Handle destroy."""
@@ -1227,6 +1284,9 @@ class GMScreenView(ctk.CTkFrame):
 
         self.reposition_add_button()
         self._refresh_command_deck()
+
+        if self.desktop_mode:
+            self.after_idle(lambda n=name: self.toggle_panel_visibility(n) if n in self.tabs and not self.tabs[n].get("detached") else None)
 
     def _teardown_tab_content(self, frame):
         """Tear down tab content."""
@@ -1770,6 +1830,15 @@ class GMScreenView(ctk.CTkFrame):
                 meta.pop("controller", None)
             elif meta.get("kind") == "campaign_dashboard":
                 meta.pop("cache", None)
+            tab_state = {"detached": bool(tab_info.get("detached"))}
+            window = tab_info.get("window")
+            if window is not None and getattr(window, "winfo_exists", lambda: False)():
+                try:
+                    tab_state["geometry"] = window.geometry()
+                    tab_state["minimized"] = (window.state() == "withdrawn")
+                except Exception:
+                    pass
+            meta["desktop"] = tab_state
             layout_tabs.append(meta)
         return {
             "scenario": self.scenario_name,
@@ -2069,6 +2138,18 @@ class GMScreenView(ctk.CTkFrame):
             for tab_name in list(self.tabs.keys()):
                 self._reset_tab_scroll_state(tab_name)
 
+            desktop_states = {}
+            for tab_def in tabs:
+                tab_title = str(tab_def.get("title") or "").strip()
+                if not tab_title:
+                    continue
+                desktop_state = tab_def.get("desktop")
+                if isinstance(desktop_state, dict):
+                    desktop_states[tab_title] = desktop_state
+
+            if self.desktop_mode and desktop_states:
+                self.after_idle(lambda states=desktop_states: self._apply_desktop_layout_states(states))
+
             if set_default:
                 self.layout_manager.set_scenario_default(self.scenario_name, layout_name)
             elif layout.get("scenario") == self.scenario_name and layout_name == self.layout_manager.get_scenario_default(self.scenario_name):
@@ -2098,6 +2179,36 @@ class GMScreenView(ctk.CTkFrame):
             self.after_idle(_restore_next)
 
         self.after_idle(_restore_next)
+
+    def _apply_desktop_layout_states(self, states):
+        """Apply detached/minimized/geometry state from a saved layout."""
+        for tab_name, desktop_state in (states or {}).items():
+            tab = self.tabs.get(tab_name)
+            if not tab:
+                continue
+            should_detach = bool(desktop_state.get("detached"))
+            if should_detach and not tab.get("detached"):
+                self.detach_tab(tab_name)
+            elif not should_detach and tab.get("detached"):
+                self.reattach_tab(tab_name)
+
+            tab = self.tabs.get(tab_name)
+            window = tab.get("window") if tab else None
+            if window is None or not getattr(window, "winfo_exists", lambda: False)():
+                continue
+            geometry = desktop_state.get("geometry")
+            if geometry:
+                try:
+                    window.geometry(str(geometry))
+                except Exception:
+                    pass
+            try:
+                if desktop_state.get("minimized"):
+                    window.withdraw()
+                else:
+                    window.deiconify()
+            except Exception:
+                pass
 
     def _open_entity_from_layout(self, entity_type, entity_name):
         """Open entity from layout."""
@@ -2276,12 +2387,10 @@ class GMScreenView(ctk.CTkFrame):
                 ge._on_canvas_configure(cfg)
                 ge.set_state(state)
 
-        # Hard-code size for all graph windows
-        GRAPH_W, GRAPH_H = 1600, 800
-        x_off = getattr(GMScreenView, "detached_count", 0) * (GRAPH_W + 10)
-        y_off = 0
-        detached_window.geometry(f"{GRAPH_W}x{GRAPH_H}")
-        GMScreenView.detached_count = getattr(GMScreenView, "detached_count", 0) + 1
+        # Default geometry for detached panels (can be overridden by saved layouts).
+        default_geometry = "1600x800"
+        saved_geometry = ((self.tabs.get(name, {}).get("meta") or {}).get("desktop") or {}).get("geometry")
+        detached_window.geometry(str(saved_geometry or default_geometry))
 
         detached_window.deiconify()
         self._motion.fade_in_window(detached_window, duration_ms=180)
