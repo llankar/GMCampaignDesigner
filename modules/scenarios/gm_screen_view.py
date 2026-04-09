@@ -58,7 +58,11 @@ from modules.scenarios.gm_screen.layout_presets import (
     build_snapshot_preset,
     resolve_zone_for_tab,
 )
-from modules.scenarios.gm_screen.tab_positioning import apply_tab_zone_metadata, sanitize_tab_zone
+from modules.scenarios.gm_screen.virtual_desk import (
+    VirtualDeskHostManager,
+    apply_tab_zone_metadata,
+    sanitize_tab_zone,
+)
 from modules.scenarios.gm_screen.dashboard.animations import MotionController
 from modules.generic.detail_ui import get_detail_palette
 from modules.generic.detail_ui.scroll_host import build_scroll_host
@@ -337,6 +341,17 @@ class GMScreenView(ctk.CTkFrame):
         self.content_area.pack(fill="both", expand=True)
         self.content_area._scrollable_frame = self.content_area
         self._bind_layout_host(self.content_area)
+
+        self._virtual_desk_hosts = {
+            "center": self.content_area,
+            "right": ctk.CTkFrame(self.desk_right_rail, fg_color="transparent"),
+            "bottom": ctk.CTkFrame(self.desk_bottom_rail, fg_color="transparent"),
+        }
+        self._virtual_desk_hosts["right"].pack(fill="both", expand=True)
+        self._virtual_desk_hosts["bottom"].pack(fill="both", expand=True)
+        self._bind_layout_host(self._virtual_desk_hosts["right"])
+        self._bind_layout_host(self._virtual_desk_hosts["bottom"])
+        self._virtual_desk_host_manager = VirtualDeskHostManager(self._virtual_desk_hosts)
         self._initialize_context_menu()
 
         # Example usage: create the first tab from the scenario_item
@@ -377,43 +392,27 @@ class GMScreenView(ctk.CTkFrame):
         """Return the configured UI zone for a tab."""
         tab = self.tabs.get(tab_name) or {}
         meta = tab.get("meta") or {}
-        fallback_zone = "center" if getattr(self, "_desk_zones", {}).get("center") else "center"
+        manager = getattr(self, "_virtual_desk_host_manager", None)
+        fallback_zone = "center"
         ui_zone = sanitize_tab_zone(meta.get("ui_zone"), fallback=fallback_zone)
-        if ui_zone not in getattr(self, "_desk_zones", {}):
-            ui_zone = "center"
+        if manager is not None:
+            ui_zone = manager.resolve_zone(ui_zone, fallback="center")
         apply_tab_zone_metadata(meta, ui_zone, fallback="center")
         return ui_zone
 
     def _apply_virtual_desk_layout_for_tab(self, name: str) -> None:
-        """Reposition only the active tab display host to its virtual desk zone."""
+        """Reposition only the active tab content frame to its virtual desk host."""
         tab = self.tabs.get(name)
         if not tab or tab.get("detached"):
             return
 
         resolved_zone = self._resolve_ui_zone(name)
-        target_zone = self._desk_zones.get(resolved_zone)
-        if target_zone is None:
-            resolved_zone = "center"
-            target_zone = self._desk_zones.get("center", self.desk_center)
-            apply_tab_zone_metadata((tab.get("meta") or {}), resolved_zone, fallback="center")
-        target_host = (tab.get("meta") or {}).get("host") or "scroll"
-
-        try:
-            self.content_area.pack_forget()
-        except Exception:
-            pass
-        try:
-            rich_host = getattr(self, "_rich_host", None)
-            if rich_host is not None and rich_host.winfo_exists():
-                rich_host.pack_forget()
-        except Exception:
-            pass
-
-        if target_host == "rich":
-            host = self._ensure_rich_host()
-            host.pack(in_=target_zone, fill="both", expand=True)
-        else:
-            self.content_area.pack(in_=target_zone, fill="both", expand=True)
+        frame = tab.get("content_frame")
+        manager = getattr(self, "_virtual_desk_host_manager", None)
+        if frame is None or manager is None:
+            return
+        settled_zone = manager.move_content_frame(frame, resolved_zone, fallback="center")
+        apply_tab_zone_metadata((tab.get("meta") or {}), settled_zone, fallback="center")
 
     def _set_tab_ui_zone(self, name: str, ui_zone: str) -> None:
         """Update a tab UI zone and re-render virtual desk layout."""
@@ -421,8 +420,9 @@ class GMScreenView(ctk.CTkFrame):
         if not tab:
             return
         meta = tab.setdefault("meta", {})
+        manager = getattr(self, "_virtual_desk_host_manager", None)
         requested_zone = sanitize_tab_zone(ui_zone, fallback="center")
-        fallback_zone = requested_zone if requested_zone in getattr(self, "_desk_zones", {}) else "center"
+        fallback_zone = manager.resolve_zone(requested_zone, fallback="center") if manager else "center"
         apply_tab_zone_metadata(meta, fallback_zone, fallback="center")
         if name == self.current_tab and not tab.get("detached"):
             self._apply_virtual_desk_layout_for_tab(name)
@@ -462,11 +462,7 @@ class GMScreenView(ctk.CTkFrame):
             return False
         try:
             # Keep active tab layout ready resilient if this step fails.
-            rich_host = getattr(self, "_rich_host", None)
-            if rich_host is not None and rich_host.winfo_exists() and frame.master == rich_host:
-                viewport = rich_host
-            else:
-                viewport = self.content_area if hasattr(self, "content_area") else self
+            viewport = frame.master if hasattr(frame, "master") and frame.master is not None else self.content_area
             viewport.update_idletasks()
             width = int(viewport.winfo_width())
             height = int(viewport.winfo_height())
@@ -542,11 +538,7 @@ class GMScreenView(ctk.CTkFrame):
             return
         try:
             # Keep fullbleed now resilient if this step fails.
-            rich_host = getattr(self, "_rich_host", None)
-            if rich_host is not None and rich_host.winfo_exists() and container.master == rich_host:
-                viewport = rich_host
-            else:
-                viewport = self.content_area if hasattr(self, "content_area") else self
+            viewport = container.master if hasattr(container, "master") and container.master is not None else self.content_area
             viewport.update_idletasks()
             w = int(viewport.winfo_width())
             h = int(viewport.winfo_height())
@@ -1944,6 +1936,7 @@ class GMScreenView(ctk.CTkFrame):
                 meta.pop("controller", None)
             elif meta.get("kind") == "campaign_dashboard":
                 meta.pop("cache", None)
+            apply_tab_zone_metadata(meta, meta.get("ui_zone"), fallback="center")
             layout_tabs.append(meta)
         return {
             "scenario": self.scenario_name,
@@ -2292,6 +2285,8 @@ class GMScreenView(ctk.CTkFrame):
             saved_state = str(tab_def.get("ui_state") or "").strip().lower()
             if saved_state == "normal":
                 apply_tab_zone_metadata(meta, "center", fallback="center")
+                continue
+            apply_tab_zone_metadata(meta, "center", fallback="center")
 
     def load_layout(self, layout_name, set_default=False, silent=False):
         """Load layout."""
@@ -2921,8 +2916,11 @@ class GMScreenView(ctk.CTkFrame):
             if saved_state and hasattr(new_frame, "scenario_graph_editor") and hasattr(new_frame.scenario_graph_editor, "set_state"):
                 new_frame.scenario_graph_editor.set_state(saved_state)
 
-        # Pack and finalize
-        new_frame.pack(fill="both", expand=True)
+        # Finalize and let show_tab reinsert frame into the resolved virtual desk host.
+        try:
+            new_frame.pack_forget()
+        except Exception:
+            pass
         self.tabs[name]["content_frame"] = new_frame
         self.tabs[name]["detached"] = False
         self.tabs[name]["window"] = None
@@ -3108,10 +3106,7 @@ class GMScreenView(ctk.CTkFrame):
         # Only pack the content into the main content area if the tab is not detached.
         if not self.tabs[name]["detached"]:
             # Handle the branch where not tabs[name]['detached'].
-            tab = self.tabs[name]
             self._apply_virtual_desk_layout_for_tab(name)
-            frame = tab["content_frame"]
-            frame.pack(fill="both", expand=True)
             self._reset_tab_scroll_state(name)
             self._request_active_tab_layout_settle()
 
