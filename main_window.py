@@ -2869,6 +2869,8 @@ class MainWindow(ctk.CTk):
         ctk.CTkOptionMenu(layout_bar, variable=selected_layout_var, values=layout_options).pack(side="left", pady=5)
         toolbar_actions = ctk.CTkFrame(layout_bar, fg_color="transparent")
         toolbar_actions.pack(side="right", padx=6, pady=5)
+        scenario_content_host = ctk.CTkFrame(parent, fg_color="transparent")
+        scenario_content_host.pack(fill="both", expand=True, padx=10, pady=(6, 10))
 
         def _resolve_scenario_title(scenario):
             """Resolve scenario title."""
@@ -2876,10 +2878,12 @@ class MainWindow(ctk.CTk):
 
         def _show_selected_scenario(selected):
             """Show selected scenario in GM Screen 2."""
-            for w in parent.winfo_children():
+            for w in scenario_content_host.winfo_children():
                 w.destroy()
-            detail_container = ctk.CTkFrame(parent)
+            detail_container = ctk.CTkFrame(scenario_content_host)
             detail_container.grid(row=0, column=0, sticky="nsew")
+            scenario_content_host.grid_rowconfigure(0, weight=1)
+            scenario_content_host.grid_columnconfigure(0, weight=1)
             resolved_layout = initial_layout
             if resolved_layout is None:
                 chosen_layout = selected_layout_var.get()
