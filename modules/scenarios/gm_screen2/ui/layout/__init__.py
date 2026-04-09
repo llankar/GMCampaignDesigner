@@ -1,5 +1,5 @@
-"""Layout tools for GM Screen 2 UI."""
+"""Layout helpers for GM Screen 2."""
 
-from .desktop_layout_engine import DesktopLayoutEngine, PanelGeometry
+from .desktop_layout_engine import DesktopLayoutEngine
 
-__all__ = ["DesktopLayoutEngine", "PanelGeometry"]
+__all__ = ["DesktopLayoutEngine"]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import Literal, Mapping, Sequence
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,12 +17,29 @@ class ScenarioSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class PanelItem:
+    """Typed item used by structured panel sections."""
+
+    kind: Literal["text", "chip", "card"] = "text"
+    title: str = ""
+    text: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class PanelSection:
+    """One structured section in a panel payload."""
+
+    heading: str
+    items: tuple[PanelItem, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class PanelPayload:
     """Normalized payload rendered by a specific panel."""
 
     panel_id: str
     title: str
-    content_blocks: tuple[str, ...] = ()
+    sections: tuple[PanelSection, ...] = ()
     metadata: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -40,8 +57,7 @@ class LayoutPreset:
     """Persisted layout metadata for desktop arrangements."""
 
     name: str
-    split_ratios: tuple[float, ...]
-    visible_panels: tuple[str, ...]
+    schema: Mapping[str, object]
     pinned_blocks: tuple[str, ...] = ()
 
 

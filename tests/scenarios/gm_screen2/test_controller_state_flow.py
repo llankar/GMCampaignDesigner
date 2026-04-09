@@ -1,7 +1,8 @@
-"""State flow tests for GM Screen 2 controller."""
+"""Reducer behavior tests for GM Screen 2 docking actions."""
 
 from modules.scenarios.gm_screen2.app.gm_screen2_controller import GMScreen2Controller
-from modules.scenarios.gm_screen2.domain.models import PanelPayload, ScenarioSummary
+from modules.scenarios.gm_screen2.domain.models import PanelPayload, PanelSection, PanelItem, ScenarioSummary
+from modules.scenarios.gm_screen2.state.layout_reducer import find_split, find_zone
 
 
 class _RepoDouble:
@@ -18,27 +19,19 @@ class _RepoDouble:
 class _ProviderDouble:
     def load_panel_payloads(self, scenario: ScenarioSummary):
         return {
-            "overview": PanelPayload(panel_id="overview", title=scenario.title, content_blocks=("A",)),
-            "notes": PanelPayload(panel_id="notes", title="Notes", content_blocks=("B",)),
+            "overview": PanelPayload(panel_id="overview", title=scenario.title, sections=(PanelSection("A", (PanelItem(text="A"),)),)),
+            "notes": PanelPayload(panel_id="notes", title="Notes", sections=(PanelSection("B", (PanelItem(text="B"),)),)),
         }
 
 
-def test_controller_initialize_and_load_updates_state():
+def test_docking_split_resize_and_move_actions_mutate_layout_tree():
     controller = GMScreen2Controller(_RepoDouble(), _ProviderDouble())
 
-    scenarios = controller.initialize()
-    assert [scenario.scenario_id for scenario in scenarios] == ["S1"]
+    controller.docking.split_zone("zone_mid", "vertical", "zone_extra", moved_panel_id="notes")
+    assert find_zone(controller.state.layout.root, "zone_extra") is not None
 
-    controller.load_scenario("S1")
-    assert controller.state.active_scenario is not None
-    assert controller.state.active_scenario.title == "Arrival"
-    assert set(controller.state.panel_payloads) == {"overview", "notes"}
+    controller.docking.resize_split("split_zone_mid_zone_extra", 0.7)
+    assert round(find_split(controller.state.layout.root, "split_zone_mid_zone_extra").ratio, 2) == 0.7
 
-
-def test_controller_update_state_applies_mutable_fields():
-    controller = GMScreen2Controller(_RepoDouble(), _ProviderDouble())
-    controller.update_state(selected_panel_id="notes", split_ratios=[0.5, 0.3, 0.2], pinned_blocks=["hook"]) 
-
-    assert controller.state.selected_panel_id == "notes"
-    assert controller.state.layout.split_ratios == [0.5, 0.3, 0.2]
-    assert controller.state.pinned_blocks == ["hook"]
+    controller.docking.move_panel("overview", "zone_extra")
+    assert "overview" in find_zone(controller.state.layout.root, "zone_extra").panel_stack

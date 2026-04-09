@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable
+from typing import Any, Callable
 
-StateListener = Callable[[], None]
+StateListener = Callable[[dict[str, Any]], None]
 
 
 class EventBus:
@@ -18,10 +18,11 @@ class EventBus:
         """Register a callback for an event."""
         self._listeners[event_name].append(callback)
 
-    def publish(self, event_name: str) -> None:
+    def publish(self, event_name: str, payload: dict[str, Any] | None = None) -> None:
         """Trigger callbacks for an event."""
+        event_payload = payload or {}
         for callback in list(self._listeners.get(event_name, [])):
-            callback()
+            callback(event_payload)
 
     def clear(self) -> None:
         """Remove all listeners."""

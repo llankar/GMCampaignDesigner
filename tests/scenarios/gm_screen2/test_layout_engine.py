@@ -1,30 +1,14 @@
-"""Tests for GM Screen 2 desktop layout engine."""
+"""Tests for GM Screen 2 workspace layout serialization."""
 
-from modules.scenarios.gm_screen2.ui.layout.desktop_layout_engine import DesktopLayoutEngine
-
-
-def test_layout_engine_distributes_visible_panels_with_normalized_ratios():
-    engine = DesktopLayoutEngine()
-
-    geometry = engine.compute(
-        panel_ids=["overview", "entities", "notes"],
-        split_ratios=[2.0, 1.0, 1.0],
-        hidden_panels=set(),
-    )
-
-    assert len(geometry) == 3
-    assert geometry[0].panel_id == "overview"
-    assert round(geometry[0].relwidth, 2) == 0.5
-    assert round(geometry[1].relx, 2) == 0.5
+from modules.scenarios.gm_screen2.state.layout_serializer import deserialize_layout, serialize_layout
+from modules.scenarios.gm_screen2.state.layout_state import LayoutState, SplitNode
 
 
-def test_layout_engine_skips_hidden_panels():
-    engine = DesktopLayoutEngine()
+def test_layout_tree_serialization_round_trip_preserves_nested_splits():
+    state = LayoutState()
 
-    geometry = engine.compute(
-        panel_ids=["overview", "entities", "notes"],
-        split_ratios=[1.0, 1.0, 1.0],
-        hidden_panels={"entities"},
-    )
+    serialized = serialize_layout(state)
+    loaded = deserialize_layout(serialized)
 
-    assert [item.panel_id for item in geometry] == ["overview", "notes"]
+    assert isinstance(loaded.root, SplitNode)
+    assert serialize_layout(loaded) == serialized
