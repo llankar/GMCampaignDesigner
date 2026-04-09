@@ -22,6 +22,7 @@ class GMScreenLayoutManager:
             "scenario_state": {},
             "session_settings": {},
             "global_settings": {},
+            "layout_presets": {},
         }
         self._load()
 
@@ -42,12 +43,14 @@ class GMScreenLayoutManager:
             scenario_state = raw.get("scenario_state") or {}
             session_settings = raw.get("session_settings") or {}
             global_settings = raw.get("global_settings") or {}
+            layout_presets = raw.get("layout_presets") or {}
             if (
                 not isinstance(layouts, dict)
                 or not isinstance(scenario_defaults, dict)
                 or not isinstance(scenario_state, dict)
                 or not isinstance(session_settings, dict)
                 or not isinstance(global_settings, dict)
+                or not isinstance(layout_presets, dict)
             ):
                 raise ValueError("Layout file malformed")
             self.data["layouts"] = layouts
@@ -55,6 +58,7 @@ class GMScreenLayoutManager:
             self.data["scenario_state"] = scenario_state
             self.data["session_settings"] = session_settings
             self.data["global_settings"] = global_settings
+            self.data["layout_presets"] = layout_presets
         except Exception as exc:
             log_exception(exc, func_name="GMScreenLayoutManager._load")
             log_warning(
@@ -67,6 +71,7 @@ class GMScreenLayoutManager:
                 "scenario_state": {},
                 "session_settings": {},
                 "global_settings": {},
+                "layout_presets": {},
             }
 
     def _write(self) -> None:
@@ -223,6 +228,56 @@ class GMScreenLayoutManager:
                 "end_hours": end_hours,
             }
         self._write()
+
+
+
+    # ------------------------------------------------------------------
+    # Virtual desk layout presets
+    # ------------------------------------------------------------------
+    def list_layout_presets(self) -> Dict[str, Any]:
+        """Return saved virtual desk presets."""
+        return dict(self.data.get("layout_presets", {}))
+
+    def get_layout_preset(self, name: str) -> Optional[Dict[str, Any]]:
+        """Return a deep-copied layout preset by name."""
+        if not name:
+            return None
+        presets = self.data.get("layout_presets", {})
+        preset = presets.get(name)
+        if preset is None:
+            return None
+        return json.loads(json.dumps(preset))
+
+    def save_layout_preset(self, name: str, preset: Dict[str, Any]) -> None:
+        """Persist a virtual desk preset."""
+        if not name:
+            return
+        self.data.setdefault("layout_presets", {})[name] = preset
+        self._write()
+
+    def set_last_layout_preset(self, scenario_title: str, preset_name: Optional[str]) -> None:
+        """Track the previously-applied preset per scenario."""
+        if not scenario_title:
+            return
+        store = self.data.setdefault("scenario_state", {})
+        entry: Dict[str, Any] = store.setdefault(scenario_title, {})
+        if preset_name:
+            entry["last_layout_preset"] = preset_name
+        else:
+            entry.pop("last_layout_preset", None)
+        if not entry:
+            store.pop(scenario_title, None)
+        self._write()
+
+    def get_last_layout_preset(self, scenario_title: str) -> Optional[str]:
+        """Return the previous preset name stored for a scenario."""
+        if not scenario_title:
+            return None
+        entry = self.data.get("scenario_state", {}).get(scenario_title) or {}
+        value = entry.get("last_layout_preset")
+        if isinstance(value, str) and value:
+            return value
+        return None
 
     # ------------------------------------------------------------------
     # Global settings
