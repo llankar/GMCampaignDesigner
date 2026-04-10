@@ -59,7 +59,14 @@ def get_textbox_style() -> dict:
     }
 
 
-def create_section_card(parent, title: str, subtitle: str | None = None, *, compact: bool = False):
+def create_section_card(
+    parent,
+    title: str,
+    subtitle: str | None = None,
+    *,
+    compact: bool = False,
+    show_header: bool = True,
+):
     """Create section card."""
     palette = get_detail_palette()
     outer = ctk.CTkFrame(
@@ -69,25 +76,27 @@ def create_section_card(parent, title: str, subtitle: str | None = None, *, comp
         border_color=palette["muted_border"],
         corner_radius=18,
     )
-    header = ctk.CTkFrame(outer, fg_color="transparent")
-    header.pack(fill="x", padx=16, pady=(14, 6 if compact else 8))
-    ctk.CTkLabel(
-        header,
-        text=title,
-        font=ctk.CTkFont(size=16 if compact else 17, weight="bold"),
-        text_color=palette["text"],
-    ).pack(anchor="w")
-    if subtitle:
+    if show_header:
+        header = ctk.CTkFrame(outer, fg_color="transparent")
+        header.pack(fill="x", padx=16, pady=(14, 6 if compact else 8))
         ctk.CTkLabel(
             header,
-            text=subtitle,
-            font=ctk.CTkFont(size=12),
-            text_color=palette["muted_text"],
-            wraplength=640,
-            justify="left",
-        ).pack(anchor="w", pady=(4, 0))
+            text=title,
+            font=ctk.CTkFont(size=16 if compact else 17, weight="bold"),
+            text_color=palette["text"],
+        ).pack(anchor="w")
+        if subtitle:
+            ctk.CTkLabel(
+                header,
+                text=subtitle,
+                font=ctk.CTkFont(size=12),
+                text_color=palette["muted_text"],
+                wraplength=640,
+                justify="left",
+            ).pack(anchor="w", pady=(4, 0))
     body = ctk.CTkFrame(outer, fg_color="transparent")
-    body.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+    top_padding = 0 if show_header else 16
+    body.pack(fill="both", expand=True, padx=16, pady=(top_padding, 16))
     return outer, body
 
 

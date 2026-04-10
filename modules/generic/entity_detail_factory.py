@@ -391,9 +391,9 @@ def _populate_generic_columns(columns, fields, entity, open_entity_callback):
 
 
 @log_function
-def insert_text(parent, header, content):
+def insert_text(parent, header, content, show_header=True):
     """Handle insert text."""
-    card, body = create_section_card(parent, header, compact=True)
+    card, body = create_section_card(parent, header, compact=True, show_header=show_header)
     card.pack(fill="x", padx=10, pady=(0, 12))
     box = ctk.CTkTextbox(body, wrap="word", height=58, **get_textbox_style())
     render_rtf_to_text_widget(box, content)
@@ -402,9 +402,9 @@ def insert_text(parent, header, content):
 
 
 @log_function
-def insert_longtext(parent, header, content):
+def insert_longtext(parent, header, content, show_header=True):
     """Handle insert longtext."""
-    card, body = create_section_card(parent, header)
+    card, body = create_section_card(parent, header, show_header=show_header)
     card.pack(fill="x", padx=10, pady=(0, 12))
     box = CTkTextbox(body, wrap="word", **get_textbox_style())
     render_rtf_to_text_widget(box, content)
@@ -422,9 +422,9 @@ def insert_longtext(parent, header, content):
 
 
 @log_function
-def insert_links(parent, header, items, linked_type, open_entity_callback):
+def insert_links(parent, header, items, linked_type, open_entity_callback, show_header=True):
     """Handle insert links."""
-    card, body = create_section_card(parent, header, compact=True)
+    card, body = create_section_card(parent, header, compact=True, show_header=show_header)
     card.pack(fill="x", padx=10, pady=(0, 12))
     links_row = None
     has_items = False
@@ -692,9 +692,9 @@ def _create_entity_dashboard_card(list_wrap, *, title, portrait_builder=None, po
     return row_card
 
 @log_function
-def insert_npc_table(parent, header, npc_names, open_entity_callback):
+def insert_npc_table(parent, header, npc_names, open_entity_callback, show_header=True):
     """Handle insert NPC table."""
-    card, body = create_section_card(parent, header, compact=True)
+    card, body = create_section_card(parent, header, compact=True, show_header=show_header)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
     palette = get_detail_palette()
@@ -743,9 +743,9 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback):
         row_card.grid(row=r, column=0, sticky="ew", pady=(0, 10))
 
 @log_function
-def insert_creature_table(parent, header, creature_names, open_entity_callback):
+def insert_creature_table(parent, header, creature_names, open_entity_callback, show_header=True):
     """Handle insert creature table."""
-    card, body = create_section_card(parent, header, compact=True)
+    card, body = create_section_card(parent, header, compact=True, show_header=show_header)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
     palette = get_detail_palette()
@@ -795,9 +795,9 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback):
         row_card.grid(row=r, column=0, sticky="ew", pady=(0, 10))
 
 @log_function
-def insert_villain_table(parent, header, villain_names, open_entity_callback):
+def insert_villain_table(parent, header, villain_names, open_entity_callback, show_header=True):
     """Handle insert villain table."""
-    card, body = create_section_card(parent, header, compact=True)
+    card, body = create_section_card(parent, header, compact=True, show_header=show_header)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
     palette = get_detail_palette()
@@ -854,11 +854,11 @@ def insert_villain_table(parent, header, villain_names, open_entity_callback):
         row_card.grid(row=r, column=0, sticky="ew", pady=(0, 10))
 
 @log_function
-def insert_places_table(parent, header, place_names, open_entity_callback):
+def insert_places_table(parent, header, place_names, open_entity_callback, show_header=True):
     """
     Render places as dashboard cards instead of a raw grid.
     """
-    card, body = create_section_card(parent, header, compact=True)
+    card, body = create_section_card(parent, header, compact=True, show_header=show_header)
     card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
     palette = get_detail_palette()
@@ -1792,7 +1792,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         section_frame = _get_section_frame(section_name)
 
         if ftype == "text":
-            insert_text(section_frame, name, value)
+            insert_text(section_frame, name, value, show_header=name != section_name)
         elif ftype == "list_longtext":
             if name == "Scenes" and gm_view_instance is not None:
                 # Handle the branch where name == 'Scenes' and GM view instance is available.
@@ -1802,6 +1802,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     section_frame,
                     "Scenes",
                     "Run the scenario as a scene list or switch to scene flow.",
+                    show_header=False,
                 )
                 scenes_card.pack(fill="both", expand=True, padx=10, pady=(0, 12))
 
@@ -2042,17 +2043,18 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                     open_entity_callback,
                     entity_collector=scene_entity_tracker,
                     gm_view=gm_view_instance,
+                    show_header=name != section_name,
                 )
         elif ftype == "longtext":
-            insert_longtext(section_frame, name, value)
+            insert_longtext(section_frame, name, value, show_header=name != section_name)
         elif ftype == "list":
             # Handle the branch where ftype == 'list'.
             linked = field.get("linked_type")
             items  = value if isinstance(value, list) else []
             if linked == "NPCs":
-                insert_npc_table(section_frame, "NPCs", items, open_entity_callback)
+                insert_npc_table(section_frame, "NPCs", items, open_entity_callback, show_header=False)
             elif linked == "Villains":
-                insert_villain_table(section_frame, "Villains", items, open_entity_callback)
+                insert_villain_table(section_frame, "Villains", items, open_entity_callback, show_header=False)
             elif linked == "Creatures":
                 # Handle the branch where linked == 'Creatures'.
                 filtered_creatures = [
@@ -2061,11 +2063,11 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 ]
                 if not filtered_creatures:
                     continue
-                insert_creature_table(section_frame, "Creatures", filtered_creatures, open_entity_callback)
+                insert_creature_table(section_frame, "Creatures", filtered_creatures, open_entity_callback, show_header=False)
             elif linked == "Places":
-                insert_places_table(section_frame, "Places", items, open_entity_callback)
+                insert_places_table(section_frame, "Places", items, open_entity_callback, show_header=False)
             else:
-                insert_links(section_frame, name, items, linked, open_entity_callback)
+                insert_links(section_frame, name, items, linked, open_entity_callback, show_header=name != section_name)
 
     insert_relationship_table(
         _get_section_frame("NPCs"),
@@ -2079,6 +2081,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         secrets_section,
         "Secrets",
         "Hidden truths, leverage, and reveals to hold in reserve.",
+        show_header=False,
     )
     secrets_card.pack(fill="x", padx=10, pady=(0, 12))
     secrets_text_label = CTkLabel(
