@@ -23,6 +23,7 @@ def test_menu_sections_expose_image_library_commands() -> None:
         open_auto_improve_panel=lambda: None,
         destroy=lambda: None,
         refresh_entities=lambda: None,
+        open_gm_table=lambda: None,
         open_gm_screen=lambda: None,
         open_campaign_graph_view=lambda: None,
         open_world_map=lambda: None,
@@ -55,9 +56,13 @@ def test_menu_sections_expose_image_library_commands() -> None:
     )
 
     specs = build_menu_specs(app)
+    campaign_menu = next(menu for menu in specs if menu.label == "Campaign")
+    table_surfaces = next(group for group in campaign_menu.groups if group.title == "Table Surfaces")
+    table_labels = [item.label for item in table_surfaces.items]
     gm_tools = next(menu for menu in specs if menu.label == "GM Tools")
     imports_group = next(group for group in gm_tools.groups if group.title == "Imports & Media")
     labels = [item.label for item in imports_group.items]
 
+    assert "GM Table" in table_labels
     assert "Import Image Directories…" in labels
     assert "Open Image Library" in labels

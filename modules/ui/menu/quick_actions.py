@@ -16,6 +16,7 @@ class QuickActionSpec:
 
 
 PRIMARY_ACTIONS = (
+    QuickActionSpec("GM Table", lambda app: app.open_gm_table(), "gm_table", "Open the freeform GM tabletop"),
     QuickActionSpec("GM Screen", lambda app: app.open_gm_screen(), "gm_screen", "Open the GM reference screen"),
     QuickActionSpec("Scenario", lambda app: app.open_scenario_builder(), "scenario_builder", "Launch the scenario builder"),
     QuickActionSpec("Campaign", lambda app: app.open_campaign_builder(), "campaign_builder", "Launch the campaign builder"),

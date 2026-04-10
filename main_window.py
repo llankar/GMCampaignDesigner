@@ -337,6 +337,7 @@ class MainWindow(ctk.CTk):
             "export_campaign_dossier": "export_icon.png",
             "asset_library": "icons/save.png",
             "gm_screen": "gm_screen_icon.png",
+            "gm_table": "gm_screen_icon.png",
             "character_graph": "npc_graph_icon.png",
             "villain_graph": "npc_graph_icon.png",
             "faction_graph": "faction_graph_icon.png",
@@ -2662,6 +2663,87 @@ class MainWindow(ctk.CTk):
     def _auto_open_gm_screen_if_available(self):
         """Backward-compatible alias that now launches the campaign overview."""
         self._auto_open_campaign_overview()
+
+    def open_gm_table(self, *, show_empty_message=True, scenario_name=None):
+        """Open the virtual tabletop style GM Table."""
+        self.clear_current_content()
+        self._gm_mode = True
+
+        scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
+        self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
+        scenarios = scenario_wrapper.load_items()
+        if not scenarios:
+            if show_empty_message:
+                messagebox.showwarning("No Scenarios", "No scenarios available.")
+            else:
+                log_info(
+                    "Skipped opening GM Table because no scenarios are available",
+                    func_name="main_window.MainWindow.open_gm_table",
+                )
+            return
+
+        def _resolve_scenario_title(item):
+            """Resolve scenario title."""
+            return str((item or {}).get("Title") or (item or {}).get("Name") or "").strip()
+
+        selected = None
+        if scenario_name:
+            selected = next(
+                (item for item in scenarios if _resolve_scenario_title(item) == scenario_name),
+                None,
+            )
+            if selected is None:
+                messagebox.showwarning("GM Table", f"Scenario '{scenario_name}' not found.")
+                return
+        elif len(scenarios) == 1:
+            selected = scenarios[0]
+
+        if selected is None:
+            selection_popup = ctk.CTkToplevel(self)
+            selection_popup.title("Open GM Table")
+            selection_popup.geometry("1200x800")
+            selection_popup.transient(self.winfo_toplevel())
+            selection_popup.grab_set()
+            selection_popup.focus_force()
+
+            def _open_selected(_entity_type, name):
+                """Open the chosen scenario in the GM Table."""
+                selection_popup.destroy()
+                self.open_gm_table(show_empty_message=show_empty_message, scenario_name=name)
+
+            picker = GenericListSelectionView(
+                selection_popup,
+                "Scenarios",
+                scenario_wrapper,
+                load_template("scenarios"),
+                _open_selected,
+            )
+            picker.pack(fill="both", expand=True)
+            return
+
+        if getattr(self, "banner_frame", None) and self.banner_frame.winfo_exists():
+            try:
+                self.banner_frame.grid_remove()
+            except Exception:
+                pass
+
+        self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
+        for widget in self.inner_content_frame.winfo_children():
+            widget.destroy()
+
+        detail_container = ctk.CTkFrame(self.inner_content_frame, fg_color="transparent")
+        detail_container.grid(row=0, column=0, sticky="nsew")
+
+        from modules.scenarios.gm_table_view import GMTableView
+
+        view = GMTableView(
+            detail_container,
+            scenario_item=selected,
+            root_app=self,
+        )
+        view.pack(fill="both", expand=True)
+        self.current_gm_table = view
+        view.after_idle(view.log_workspace_opened)
 
     def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
         """Open GM screen."""
