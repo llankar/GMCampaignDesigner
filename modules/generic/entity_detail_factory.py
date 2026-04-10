@@ -107,6 +107,31 @@ def _bring_window_to_front(window, parent=None):
         pass
 
 
+def _resolve_context_menu_handler(host):
+    """Return the host context-menu handler when it is available."""
+    handler = getattr(host, "_show_context_menu", None)
+    return handler if callable(handler) else None
+
+
+def _bind_host_context_menu(widget, host):
+    """Bind the host context menu when the current host exposes one."""
+    menu_handler = _resolve_context_menu_handler(host)
+    if menu_handler is None:
+        return None
+    widget.bind("<Button-3>", menu_handler)
+    widget.bind("<Control-Button-1>", menu_handler)
+    return menu_handler
+
+
+def _bind_host_context_menu_recursively(widget, host):
+    """Recursively bind the host context menu when available."""
+    menu_handler = _resolve_context_menu_handler(host)
+    if menu_handler is None:
+        return None
+    bind_context_menu_recursively(widget, menu_handler)
+    return menu_handler
+
+
 def _compute_wraplength_from_widths(*candidate_widths, minimum=200, safety_margin=32):
     """Return a conservative wrap length from the narrowest usable container width."""
 
@@ -1582,6 +1607,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
     palette = get_detail_palette()
     frame = ctk.CTkFrame(master, fg_color="transparent")
     gm_view_instance = getattr(open_entity_callback, "__self__", None)
+    menu_handler = _resolve_context_menu_handler(gm_view_instance)
     sections = {}
     pinned_sections = set()
     active_section = None
@@ -1618,9 +1644,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         )
 
     frame.edit_entity = _edit_entity
-    if gm_view_instance is not None:
-        frame.bind("<Button-3>", gm_view_instance._show_context_menu)
-        frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
+    _bind_host_context_menu(frame, gm_view_instance)
 
     layout = ctk.CTkFrame(frame, fg_color="transparent")
     layout.pack(fill="both", expand=True)
@@ -2071,7 +2095,6 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         """Update text wraplength."""
         try:
             available_width = max(260, scrollable_frame.winfo_width() - 80)
-            summary_text_label.configure(wraplength=available_width)
             secrets_text_label.configure(wraplength=available_width)
         except Exception:
             pass
@@ -2139,8 +2162,8 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         tabs.set_active(section_names[0])
         show_section(section_names[0])
 
-    if gm_view_instance is not None:
-        bind_context_menu_recursively(frame, gm_view_instance._show_context_menu)
+    if menu_handler is not None:
+        bind_context_menu_recursively(frame, menu_handler)
     return frame
 
 @log_function
@@ -2219,9 +2242,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         )
 
     content_frame.edit_entity = _edit_entity
-    if gm_view_instance is not None:
-        content_frame.bind("<Button-3>", gm_view_instance._show_context_menu)
-        content_frame.bind("<Control-Button-1>", gm_view_instance._show_context_menu)
+    _bind_host_context_menu(content_frame, gm_view_instance)
 
     entity_label = entity.get("Name") or entity.get("Title") or entity_type[:-1]
     audio_value = get_entity_audio_value(entity)
@@ -2436,8 +2457,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         )
         related_events_panel.pack(fill="x")
 
-    if gm_view_instance is not None:
-        bind_context_menu_recursively(content_frame, gm_view_instance._show_context_menu)
+    _bind_host_context_menu_recursively(content_frame, gm_view_instance)
     return content_frame
 
 @log_function
