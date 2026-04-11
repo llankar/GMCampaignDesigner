@@ -68,6 +68,13 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
         self._scenario_focus_container = None
+        self._scenario_section = None
+        self._scenario_selector_strip = None
+        self._scenario_left_column = None
+        self._scenario_sidebar_container = None
+        self._scenario_right_stack = None
+        self._pending_sidebar_job = None
+        self._pending_sidebar_target: tuple[str, str] | None = None
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -115,6 +122,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _on_campaign_selected(self, selected_name: str) -> None:
         """Handle campaign selected."""
+        self._cancel_pending_sidebar_render()
         campaign = self._campaign_index.get(selected_name)
         self._selected_campaign = build_campaign_graph_payload(campaign, self._scenario_items)
         self._selected_arc_index = 0
@@ -176,11 +184,17 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _refresh_campaign_content(self) -> None:
         """Refresh campaign content."""
+        self._cancel_pending_sidebar_render()
         payload = self._selected_campaign
         if payload is None:
             self._clear_container(self._hero_container)
             self._clear_container(self._arc_focus_container)
             self._scenario_focus_container = None
+            self._scenario_section = None
+            self._scenario_selector_strip = None
+            self._scenario_left_column = None
+            self._scenario_sidebar_container = None
+            self._scenario_right_stack = None
             self._render_empty_state("Select a campaign to visualize its structure.")
             return
 
@@ -189,6 +203,11 @@ class CampaignGraphPanel(ctk.CTkFrame):
         if not payload.arcs:
             self._clear_container(self._arc_focus_container)
             self._scenario_focus_container = None
+            self._scenario_section = None
+            self._scenario_selector_strip = None
+            self._scenario_left_column = None
+            self._scenario_sidebar_container = None
+            self._scenario_right_stack = None
             self._render_empty_state("This campaign does not contain any arc data yet.")
             return
 
@@ -204,11 +223,17 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _refresh_arc_focus(self) -> None:
         """Refresh arc focus."""
+        self._cancel_pending_sidebar_render()
         def _refresh() -> None:
             """Refresh the operation."""
             payload = self._selected_campaign
             self._clear_container(self._arc_focus_container)
             self._scenario_focus_container = None
+            self._scenario_section = None
+            self._scenario_selector_strip = None
+            self._scenario_left_column = None
+            self._scenario_sidebar_container = None
+            self._scenario_right_stack = None
             if payload is None or not payload.arcs:
                 return
 
@@ -233,7 +258,6 @@ class CampaignGraphPanel(ctk.CTkFrame):
             if scenario_container is None:
                 return
 
-            self._clear_container(scenario_container)
             if selected_arc is None:
                 return
 
@@ -393,7 +417,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         ).grid(row=row + 1, column=0, columnspan=2, sticky="w", padx=(0, 18))
 
         status_stack = ctk.CTkFrame(parent, fg_color="transparent")
-        status_stack.grid(row=row, column=2, rowspan=2, sticky="e", padx=(22, 0))
+        status_stack.grid(row=row, column=2, rowspan=2, sticky="ne", padx=(22, 0))
 
         ctk.CTkLabel(
             status_stack,
@@ -404,13 +428,13 @@ class CampaignGraphPanel(ctk.CTkFrame):
             pady=4,
             text_color=self._status_text_color(status_label),
             font=ctk.CTkFont(size=10, weight="bold"),
-        ).grid(row=0, column=0, sticky="e")
+        ).pack(anchor="e", pady=(0, 8))
 
         controls = ctk.CTkFrame(status_stack, fg_color="transparent")
-        controls.grid(row=1, column=0, sticky="e", pady=(8, 0))
+        controls.pack(anchor="e")
         ctk.CTkButton(
             controls,
-            text="← Previous",
+            text="\u2190 Previous",
             width=96,
             height=30,
             command=prev_command,
@@ -422,7 +446,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         ).grid(row=0, column=0, padx=(0, 8))
         ctk.CTkButton(
             controls,
-            text="Next →",
+            text="Next \u2192",
             width=96,
             height=30,
             command=next_command,
@@ -457,6 +481,8 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
     def _render_scenario_focus(self, arc: CampaignGraphArc) -> None:
         """Render scenario focus."""
+        self._render_or_update_scenario_focus(arc)
+        return
         section = ctk.CTkFrame(self._scenario_focus_container, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=20)
         section.grid(row=0, column=0, sticky="nsew", padx=14, pady=(0, 14))
         section.grid_columnconfigure(0, weight=1)
@@ -564,6 +590,327 @@ class CampaignGraphPanel(ctk.CTkFrame):
             links=scenario.entity_links,
             on_open_entity=self._open_entity,
         ).grid(row=0, column=1, rowspan=2, sticky="nsew")
+
+    def _render_or_update_scenario_focus(self, arc: CampaignGraphArc) -> None:
+        """Render the scenario shell once, then update the active scenario in place."""
+        container = getattr(self, "_scenario_focus_container", None)
+        if container is None:
+            return
+
+        section = getattr(self, "_scenario_section", None)
+        if section is None or not hasattr(section, "winfo_exists") or not section.winfo_exists():
+            self._build_scenario_focus_shell(arc)
+            return
+
+        self._update_selected_scenario_focus(arc)
+
+    def _build_scenario_focus_shell(self, arc: CampaignGraphArc) -> None:
+        """Build the scenario shell for the active arc."""
+        container = getattr(self, "_scenario_focus_container", None)
+        if container is None:
+            return
+
+        self._cancel_pending_sidebar_render()
+        self._clear_container(container)
+
+        self._scenario_section = ctk.CTkFrame(container, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=20)
+        self._scenario_section.grid(row=0, column=0, sticky="nsew", padx=14, pady=(0, 14))
+        self._scenario_section.grid_columnconfigure(0, weight=1)
+        self._scenario_section.grid_rowconfigure(2, weight=1)
+        self._scenario_right_stack = None
+
+        if not arc.scenarios:
+            self._scenario_selector_strip = None
+            self._scenario_left_column = None
+            self._scenario_sidebar_container = None
+            ctk.CTkLabel(
+                self._scenario_section,
+                text="No scenarios are currently attached to this arc.",
+                text_color=DASHBOARD_THEME.text_secondary,
+                font=ctk.CTkFont(size=14),
+            ).grid(row=0, column=0, sticky="ew", padx=14, pady=18)
+            return
+
+        header = ctk.CTkFrame(self._scenario_section, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 4))
+        header.grid_columnconfigure(1, weight=1)
+        self._scenario_subtitle_label = ctk.CTkLabel(
+            header,
+            text="",
+            text_color=DASHBOARD_THEME.text_secondary,
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+        )
+        self._scenario_subtitle_label.grid(row=0, column=0, sticky="w")
+        self._scenario_title_label = ctk.CTkLabel(
+            header,
+            text="",
+            font=ctk.CTkFont(size=16, weight="bold"),
+            text_color=DASHBOARD_THEME.text_primary,
+            anchor="w",
+            wraplength=760,
+            justify="left",
+        )
+        self._scenario_title_label.grid(row=1, column=0, columnspan=2, sticky="w", padx=(0, 18))
+        right_stack = ctk.CTkFrame(header, fg_color="transparent")
+        right_stack.grid(row=0, column=2, rowspan=2, sticky="ne", padx=(22, 0))
+        self._scenario_right_stack = right_stack
+        self._scenario_status_label = ctk.CTkLabel(
+            right_stack,
+            text="",
+            fg_color=DASHBOARD_THEME.arc_planned,
+            corner_radius=999,
+            padx=12,
+            pady=4,
+            text_color="#f8fbff",
+            font=ctk.CTkFont(size=10, weight="bold"),
+        )
+        self._scenario_status_label.pack(anchor="e", pady=(0, 8))
+
+        controls = ctk.CTkFrame(right_stack, fg_color="transparent")
+        controls.pack(anchor="e")
+        self._scenario_prev_button = ctk.CTkButton(
+            controls,
+            text="\u2190 Previous",
+            width=96,
+            height=30,
+            command=lambda: self._shift_scenario(-1),
+            fg_color=DASHBOARD_THEME.button_fg,
+            hover_color=DASHBOARD_THEME.button_hover,
+            text_color=DASHBOARD_THEME.text_primary,
+            font=ctk.CTkFont(size=11),
+        )
+        self._scenario_prev_button.grid(row=0, column=0, padx=(0, 8))
+        self._scenario_next_button = ctk.CTkButton(
+            controls,
+            text="Next \u2192",
+            width=96,
+            height=30,
+            command=lambda: self._shift_scenario(1),
+            fg_color=DASHBOARD_THEME.accent,
+            hover_color=DASHBOARD_THEME.accent_hover,
+            text_color="#f8fbff",
+            font=ctk.CTkFont(size=11),
+        )
+        self._scenario_next_button.grid(row=0, column=1)
+
+        self._scenario_selector_strip = ScenarioSelectorStrip(
+            self._scenario_section,
+            scenarios=arc.scenarios,
+            selected_index=self._selected_scenario_index,
+            on_select=self._select_scenario,
+        )
+        self._scenario_selector_strip.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 12))
+        if hasattr(self._scenario_selector_strip, "set_scenarios"):
+            self._scenario_selector_strip.set_scenarios(arc.scenarios, self._selected_scenario_index)
+
+        self._scenario_card = ctk.CTkFrame(self._scenario_section, fg_color=DASHBOARD_THEME.panel_alt_bg, corner_radius=22, border_width=1, border_color=DASHBOARD_THEME.card_border)
+        self._scenario_card.grid(row=2, column=0, sticky="nsew", padx=14, pady=(0, 14))
+        self._scenario_card.grid_columnconfigure(0, weight=1)
+        self._scenario_card.grid_rowconfigure(1, weight=1)
+
+        self._scenario_primary = ctk.CTkFrame(self._scenario_card, fg_color="transparent")
+        self._scenario_primary.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 10))
+        self._scenario_primary.grid_columnconfigure(0, weight=1)
+
+        self._scenario_content = ctk.CTkFrame(self._scenario_card, fg_color="transparent")
+        self._scenario_content.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 14))
+        self._scenario_content.grid_columnconfigure(0, weight=3)
+        self._scenario_content.grid_columnconfigure(1, weight=3)
+        self._scenario_content.grid_rowconfigure(0, weight=1)
+
+        self._scenario_left_column = ctk.CTkFrame(self._scenario_content, fg_color="transparent")
+        self._scenario_left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
+        self._scenario_left_column.grid_columnconfigure(0, weight=1)
+
+        self._scenario_sidebar_container = ctk.CTkFrame(self._scenario_content, fg_color="transparent")
+        self._scenario_sidebar_container.grid(row=0, column=1, sticky="nsew")
+        self._scenario_sidebar_container.grid_columnconfigure(0, weight=1)
+
+        self._update_selected_scenario_focus(arc)
+
+    def _update_selected_scenario_focus(self, arc: CampaignGraphArc) -> None:
+        """Refresh the selected scenario without rebuilding the shell."""
+        if not arc.scenarios:
+            return
+
+        selected_index = self._clamp_index(self._selected_scenario_index, len(arc.scenarios))
+        self._selected_scenario_index = selected_index
+        selected_scenario = arc.scenarios[selected_index]
+
+        selector = getattr(self, "_scenario_selector_strip", None)
+        if selector is not None:
+            if hasattr(selector, "set_selected_index"):
+                selector.set_selected_index(selected_index)
+            elif hasattr(selector, "set_scenarios"):
+                selector.set_scenarios(arc.scenarios, selected_index)
+
+        prev_button = getattr(self, "_scenario_prev_button", None)
+        next_button = getattr(self, "_scenario_next_button", None)
+        if prev_button is not None:
+            prev_button.configure(state="normal" if selected_index > 0 else "disabled")
+        if next_button is not None:
+            next_button.configure(state="normal" if selected_index < len(arc.scenarios) - 1 else "disabled")
+
+        subtitle_label = getattr(self, "_scenario_subtitle_label", None)
+        title_label = getattr(self, "_scenario_title_label", None)
+        status_label = getattr(self, "_scenario_status_label", None)
+        if subtitle_label is not None:
+            subtitle_label.configure(text=f"Scenario {selected_index + 1} of {len(arc.scenarios)}")
+        if title_label is not None:
+            title_label.configure(text=selected_scenario.title)
+        if status_label is not None:
+            status_label.configure(
+                text=f"{len(selected_scenario.entity_links)} links",
+                fg_color=self._status_color(f"{len(selected_scenario.entity_links)} links"),
+            )
+
+        self._render_selected_scenario_primary(arc, selected_scenario)
+        self._render_scenario_sidebar_placeholder(selected_scenario, arc)
+        self._schedule_scenario_sidebar_render(arc, selected_scenario)
+
+    def _render_selected_scenario_primary(self, arc: CampaignGraphArc, scenario: CampaignGraphScenario) -> None:
+        """Render the primary selected scenario content immediately."""
+        primary = getattr(self, "_scenario_primary", None)
+        left_column = getattr(self, "_scenario_left_column", None)
+        if primary is None or left_column is None:
+            return
+
+        self._clear_container(primary)
+        self._clear_container(left_column)
+
+        gm_callback = (lambda n=scenario.title: self._open_scenario_gm_screen(n)) if scenario.record_exists else None
+        ScenarioHeroStrip(
+            primary,
+            title=scenario.title,
+            subtitle=f"{arc.name} • Scenario {self._selected_scenario_index + 1} of {len(arc.scenarios)}",
+            count_chips=[
+                ("linked entities", str(scenario.linked_entity_count)),
+                ("places", str(scenario.linked_places_count)),
+                ("factions", str(scenario.linked_factions_count)),
+                ("villains", str(scenario.linked_villains_count)),
+            ],
+            on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_screen=gm_callback,
+        ).grid(row=0, column=0, sticky="ew")
+
+        identity_summary = scenario.hook or scenario.summary or "No synopsis written yet for this scenario."
+        ScenarioIdentityPanel(
+            left_column,
+            eyebrow="Mission profile",
+            title=scenario.title,
+            summary=identity_summary,
+            tags=scenario.tags,
+            progress_items=[
+                ("linked entities", str(scenario.linked_entity_count)),
+                ("primary cluster", scenario.primary_link_type or "Unassigned"),
+                ("scenes", str(scenario.scene_count or 0)),
+                ("status", "Secrets ready" if scenario.has_secrets else "Open notes"),
+            ],
+            on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_screen=gm_callback,
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
+
+        ScenarioBriefingPanel(
+            left_column,
+            summary=scenario.briefing or scenario.summary,
+            objective=scenario.objective,
+            hook=scenario.hook,
+            stakes=scenario.stakes,
+        ).grid(row=1, column=0, sticky="nsew")
+
+    def _render_scenario_sidebar_placeholder(self, scenario: CampaignGraphScenario, arc: CampaignGraphArc) -> None:
+        """Render the sidebar placeholder before the entity browser is ready."""
+        container = getattr(self, "_scenario_sidebar_container", None)
+        if container is None:
+            return
+
+        self._clear_container(container)
+        placeholder = ctk.CTkFrame(container, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=20, border_width=1, border_color=DASHBOARD_THEME.card_border)
+        placeholder.grid(row=0, column=0, sticky="nsew")
+        placeholder.grid_columnconfigure(0, weight=1)
+        placeholder.grid_rowconfigure(1, weight=1)
+        ctk.CTkLabel(
+            placeholder,
+            text="Scenario entities",
+            text_color=DASHBOARD_THEME.text_primary,
+            font=ctk.CTkFont(size=18, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=16, pady=(14, 6))
+        ctk.CTkLabel(
+            placeholder,
+            text=f"Preparing the entity roster for {scenario.title} in {arc.name}.",
+            text_color=DASHBOARD_THEME.text_secondary,
+            font=ctk.CTkFont(size=12),
+            anchor="w",
+            justify="left",
+            wraplength=420,
+        ).grid(row=1, column=0, sticky="nw", padx=16, pady=(0, 16))
+
+    def _schedule_scenario_sidebar_render(self, arc: CampaignGraphArc, scenario: CampaignGraphScenario) -> None:
+        """Schedule the sidebar browser render after first paint."""
+        self._cancel_pending_sidebar_render()
+        container = getattr(self, "_scenario_sidebar_container", None)
+        if container is None:
+            return
+
+        target = (arc.name, scenario.title)
+        self._pending_sidebar_target = target
+
+        def _render() -> None:
+            """Render the operation."""
+            self._pending_sidebar_job = None
+            self._pending_sidebar_target = None
+            self._render_scenario_sidebar_if_current(target[0], target[1])
+
+        self._pending_sidebar_job = self.after(25, _render)
+
+    def _render_scenario_sidebar_if_current(self, arc_name: str, scenario_title: str) -> None:
+        """Render the entity browser only if the selection is still current."""
+        payload = self._selected_campaign
+        if payload is None:
+            return
+
+        selected_arc = self._get_selected_arc(payload)
+        if selected_arc is None or selected_arc.name != arc_name:
+            return
+        if self._selected_scenario_index >= len(selected_arc.scenarios):
+            return
+
+        selected_scenario = selected_arc.scenarios[self._selected_scenario_index]
+        if selected_scenario.title != scenario_title:
+            return
+
+        container = getattr(self, "_scenario_sidebar_container", None)
+        if container is None or not hasattr(container, "winfo_exists") or not container.winfo_exists():
+            return
+
+        self._clear_container(container)
+        ScenarioEntityBrowser(
+            container,
+            scenario_title=selected_scenario.title,
+            links=selected_scenario.entity_links,
+            on_open_entity=self._open_entity,
+        ).grid(row=0, column=0, sticky="nsew")
+
+    def _cancel_pending_sidebar_render(self) -> None:
+        """Cancel any scheduled sidebar render."""
+        job = getattr(self, "_pending_sidebar_job", None)
+        if job is not None and hasattr(self, "after_cancel"):
+            try:
+                self.after_cancel(job)
+            except Exception:
+                pass
+        self._pending_sidebar_job = None
+        self._pending_sidebar_target = None
+
+    def destroy(self) -> None:
+        """Destroy the panel and cancel deferred work first."""
+        self._cancel_pending_sidebar_render()
+        try:
+            super().destroy()
+        except Exception:
+            pass
 
     def _get_selected_arc(self, payload: CampaignGraphPayload) -> CampaignGraphArc | None:
         """Return selected arc."""

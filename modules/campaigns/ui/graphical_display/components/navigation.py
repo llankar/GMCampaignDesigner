@@ -67,7 +67,6 @@ class ArcSelectorStrip(_CanvasSelector):
         start_x = max((width - total_width) / 2, margin)
 
         for index, arc in enumerate(self._arcs):
-            # Process each (index, arc) from enumerate(_arcs).
             x1 = start_x + index * (card_width + gap)
             x2 = x1 + card_width
             y1 = 18
@@ -102,7 +101,7 @@ class ArcSelectorStrip(_CanvasSelector):
             canvas.create_text(
                 x1 + 14,
                 y2 - 18,
-                text=f"{arc.status} • {len(arc.scenarios)} scenarios",
+                text=f"{arc.status} \u2022 {len(arc.scenarios)} scenarios",
                 fill=meta_color,
                 anchor="sw",
                 font=("Segoe UI", 9, "bold"),
@@ -129,6 +128,9 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self._scenarios = list(scenarios)
         self._selected_index = selected_index
         self._on_select = on_select
+        self._scenario_signature: tuple[str, ...] = tuple(_scenario_signature(scenario) for scenario in self._scenarios)
+        self._card_frames: list[ctk.CTkFrame] = []
+        self._title_labels: list[ctk.CTkLabel] = []
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -145,15 +147,46 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self.canvas.bind("<Configure>", self._resize_window)
         self.after_idle(self._render)
 
+    def set_selected_index(self, index: int) -> None:
+        """Update the selected card without rebuilding the strip."""
+        if not self._scenarios:
+            self._selected_index = 0
+            return
+
+        new_index = max(0, min(index, len(self._scenarios) - 1))
+        if new_index == self._selected_index and self._card_frames:
+            return
+        self._selected_index = new_index
+        self._sync_selection_state()
+
+    def set_scenarios(self, scenarios: Sequence[CampaignGraphScenario], selected_index: int) -> None:
+        """Replace the scenario list when the arc changes."""
+        scenario_list = list(scenarios)
+        signature = tuple(_scenario_signature(scenario) for scenario in scenario_list)
+        self._selected_index = max(0, min(selected_index, len(scenario_list) - 1)) if scenario_list else 0
+        if signature == self._scenario_signature and len(scenario_list) == len(self._scenarios):
+            self._scenarios = scenario_list
+            self._sync_selection_state()
+            return
+
+        self._scenarios = scenario_list
+        self._scenario_signature = signature
+        self._render()
+
     def _render(self) -> None:
         """Render the operation."""
+        canvas = getattr(self, "canvas", None)
+        if canvas is None or not canvas.winfo_exists():
+            return
+
+        self._card_frames = []
+        self._title_labels = []
         for child in self.inner.winfo_children():
             child.destroy()
 
         many_scenarios = len(self._scenarios) >= 7
         card_width = 196 if many_scenarios else 224
         for index, scenario in enumerate(self._scenarios):
-            # Process each (index, scenario) from enumerate(_scenarios).
             selected = index == self._selected_index
             card = ctk.CTkFrame(
                 self.inner,
@@ -185,17 +218,35 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 wraplength=card_width - 24,
             )
             title_label.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))
-           
+
             for clickable in (card, title_label):
                 clickable.bind("<Button-1>", lambda _event, idx=index: self._on_select(idx))
                 clickable.bind("<Enter>", lambda _event, target=card: target.configure(cursor="hand2"))
                 clickable.bind("<Leave>", lambda _event, target=card: target.configure(cursor=""))
 
+            self._card_frames.append(card)
+            self._title_labels.append(title_label)
+
         self.after_idle(self._sync_scrollregion)
+        self._sync_selection_state()
 
     def _sync_scrollregion(self, _event=None) -> None:
         """Synchronize scrollregion."""
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _sync_selection_state(self) -> None:
+        """Restyle existing cards to match the selected scenario."""
+        for index, card in enumerate(self._card_frames):
+            selected = index == self._selected_index
+            card.configure(
+                fg_color=DASHBOARD_THEME.button_fg if selected else DASHBOARD_THEME.panel_bg,
+                border_width=2 if selected else 1,
+                border_color=DASHBOARD_THEME.accent_soft if selected else DASHBOARD_THEME.card_border,
+            )
+            if index < len(self._title_labels):
+                self._title_labels[index].configure(
+                    text_color="#f8fbff" if selected else DASHBOARD_THEME.text_primary,
+                )
 
     def _resize_window(self, event) -> None:
         """Internal helper for resize window."""
@@ -207,7 +258,8 @@ def _truncate(value: str, limit: int) -> str:
     text = str(value or "").strip()
     if len(text) <= limit:
         return text
-    return text[: max(limit - 1, 0)].rstrip() + "…"
+    ellipsis = "..."
+    return text[: max(limit - len(ellipsis), 0)].rstrip() + ellipsis
 
 
 def _truncate_middle(value: str, limit: int) -> str:
@@ -215,8 +267,15 @@ def _truncate_middle(value: str, limit: int) -> str:
     text = str(value or "").strip()
     if len(text) <= limit:
         return text
-    if limit <= 1:
-        return "…"
-    head = max((limit - 1) // 2, 1)
-    tail = max(limit - head - 1, 1)
-    return f"{text[:head].rstrip()}…{text[-tail:].lstrip()}"
+    ellipsis = "..."
+    if limit <= len(ellipsis):
+        return ellipsis[:limit]
+    remaining = limit - len(ellipsis)
+    head = max(remaining // 2, 1)
+    tail = max(remaining - head, 1)
+    return f"{text[:head].rstrip()}{ellipsis}{text[-tail:].lstrip()}"
+
+
+def _scenario_signature(scenario: CampaignGraphScenario) -> str:
+    """Build a stable signature for selector rebuild detection."""
+    return str(getattr(scenario, "title", "") or "").strip()

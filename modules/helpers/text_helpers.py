@@ -8,6 +8,58 @@ from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
 
+_MOJIBAKE_MARKERS = ("Ã", "Â", "â€", "â€¢", "â€¦", "â€”", "ðŸ", "ï¿½")
+
+
+def _mojibake_score(text: str) -> int:
+    """Count obvious mojibake markers in a string."""
+
+    return sum(text.count(marker) for marker in _MOJIBAKE_MARKERS)
+
+
+def _repair_mojibake_text(text: str) -> str:
+    """Repair common UTF-8-vs-cp1252 mojibake without touching clean text."""
+
+    if not text or not any(marker in text for marker in _MOJIBAKE_MARKERS):
+        return text
+
+    best = text
+    best_score = _mojibake_score(text)
+    frontier = {text}
+    seen = {text}
+
+    for _ in range(3):
+        next_frontier: set[str] = set()
+
+        for current in frontier:
+            for encoding in ("cp1252", "latin-1"):
+                try:
+                    candidate = current.encode(encoding).decode("utf-8")
+                except (UnicodeEncodeError, UnicodeDecodeError):
+                    continue
+
+                if candidate == current or candidate in seen:
+                    continue
+
+                seen.add(candidate)
+                next_frontier.add(candidate)
+
+                score = _mojibake_score(candidate)
+                if score < best_score:
+                    best = candidate
+                    best_score = score
+
+        if not next_frontier:
+            break
+
+        frontier = next_frontier
+
+        if best_score == 0:
+            break
+
+    return best
+
+
 def deserialize_possible_json(value):
     """Attempt to deserialize a JSON or Python literal string.
 
@@ -405,8 +457,8 @@ def _coerce_text(val):
         v = val.get("text", "")
         if isinstance(v, (list, dict)):
             return _coerce_text(v)
-        return str(v)
-    return str(val)
+        return _repair_mojibake_text(str(v))
+    return _repair_mojibake_text(str(val))
 
 
 def coerce_text(val):

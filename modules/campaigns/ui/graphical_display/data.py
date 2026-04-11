@@ -83,6 +83,7 @@ def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_
         return None
 
     scenario_index = _build_scenario_index(scenario_items)
+    link_fields = iter_scenario_link_fields()
     arcs = coerce_arc_list(campaign_item.get("Arcs"))
     linked_scenarios = _coerce_string_list(campaign_item.get("LinkedScenarios"))
     used_scenarios: set[str] = set()
@@ -91,7 +92,7 @@ def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_
     for index, arc in enumerate(arcs, start=1):
         arc_name = coerce_text(arc.get("name")).strip() or f"Arc {index}"
         scenario_names = _coerce_string_list(arc.get("scenarios"))
-        rendered_scenarios = [_build_scenario_payload(name, scenario_index) for name in scenario_names]
+        rendered_scenarios = [_build_scenario_payload(name, scenario_index, link_fields) for name in scenario_names]
         used_scenarios.update(scenario_names)
         rendered_arcs.append(
             CampaignGraphArc(
@@ -111,7 +112,7 @@ def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_
                 status="In Progress" if rendered_arcs else "Planned",
                 summary="Linked scenarios that are not yet anchored to a named campaign arc.",
                 objective="Assign these scenarios to a narrative arc when the story sharpens.",
-                scenarios=[_build_scenario_payload(name, scenario_index) for name in loose_threads],
+                scenarios=[_build_scenario_payload(name, scenario_index, link_fields) for name in loose_threads],
             )
         )
 
@@ -144,7 +145,11 @@ def _build_scenario_index(scenario_items: Iterable[dict[str, Any]]) -> dict[str,
     return index
 
 
-def _build_scenario_payload(title: str, scenario_index: dict[str, dict[str, Any]]) -> CampaignGraphScenario:
+def _build_scenario_payload(
+    title: str,
+    scenario_index: dict[str, dict[str, Any]],
+    link_fields: list[tuple[str, str]],
+) -> CampaignGraphScenario:
     """Build scenario payload."""
     title = coerce_text(title).strip()
     scenario = scenario_index.get(title, {})
@@ -159,7 +164,7 @@ def _build_scenario_payload(title: str, scenario_index: dict[str, dict[str, Any]
     )
     entity_links: list[ScenarioEntityLink] = []
 
-    for entity_type, field_name in iter_scenario_link_fields():
+    for entity_type, field_name in link_fields:
         for name in _coerce_string_list(scenario.get(field_name)):
             entity_links.append(ScenarioEntityLink(entity_type=entity_type, name=name))
 
