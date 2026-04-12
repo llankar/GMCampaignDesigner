@@ -1,4 +1,4 @@
-# version.txt
+﻿# version.txt
 # UTF-8 encoded
 
 VSVersionInfo(
