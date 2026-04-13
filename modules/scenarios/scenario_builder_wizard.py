@@ -43,11 +43,9 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
 from modules.scenarios.wizard_steps.scenes.scene_entity_aggregator import (
     collect_scene_entity_names,
 )
-from modules.scenarios.wizard_steps.scenes.entity_resolution.db_indexes import (
-    build_campaign_db_indexes,
-)
-from modules.scenarios.wizard_steps.scenes.entity_resolution.structured_entity_matcher import (
-    resolve_scene_entities_from_structured,
+from modules.scenarios.wizard_steps.scenes.entity_resolution.structured_to_entities import (
+    build_campaign_entity_indexes,
+    resolve_entities_from_structured,
 )
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
     SCENE_STRUCTURED_FIELDS,
@@ -241,6 +239,7 @@ class ScenesPlanningStep(WizardStep):
         "_SceneLayout",
         "NPCs",
         "Creatures",
+        "Clues",
         "Bases",
         "Places",
         "Maps",
@@ -560,7 +559,7 @@ class ScenesPlanningStep(WizardStep):
     def save_state(self, state):
         """Save state."""
         self.scenes = self._collect_active_scenes()
-        db_indexes = build_campaign_db_indexes(getattr(self, "entity_wrappers", {}) or {})
+        db_indexes = build_campaign_entity_indexes(getattr(self, "entity_wrappers", {}) or {})
         state["Title"] = self.scenario_title_var.get().strip()
         state["Summary"] = (self._scenario_summary or "").strip()
         secrets = (self._scenario_secrets or "").strip()
@@ -587,7 +586,7 @@ class ScenesPlanningStep(WizardStep):
                 record[field_name] = normalise_entity_list(scene.get(field_name))
             for field_name in SCENE_STRUCTURED_FIELDS:
                 record[field_name] = normalise_structured_scene_items(scene.get(field_name))
-            resolved_entities = resolve_scene_entities_from_structured(record, db_indexes)
+            resolved_entities = resolve_entities_from_structured(record, db_indexes)
             for field_name in ("NPCs", "Creatures", "Places", "Clues"):
                 existing = normalise_entity_list(record.get(field_name))
                 resolved = normalise_entity_list(resolved_entities.get(field_name))
