@@ -19,6 +19,18 @@ log_module_import(__name__)
 # max size fallback for the popup (same as in generic_list_view)
 MAX_PORTRAIT_SIZE = (1024, 1024)
 
+
+@log_function
+def _configure_single_monitor_overlay(win, monitors):
+    """Keep portrait window visible on single-screen setups without blocking interaction."""
+    if len(monitors) != 1:
+        return
+    try:
+        win.attributes("-topmost", True)
+    except Exception:
+        # Ignore unsupported/failed topmost attribute on some environments.
+        return
+
 @log_function
 def _get_monitors():
     """Return list of (x, y, width, height)."""
@@ -83,6 +95,7 @@ def show_portrait(path, title=None):
     win.title(title or os.path.basename(resolved))
     win.geometry(f"{sw}x{sh}+{sx}+{sy}")
     win.update_idletasks()
+    _configure_single_monitor_overlay(win, monitors)
 
     # white background frame
     content = tk.Frame(win, bg="white")
