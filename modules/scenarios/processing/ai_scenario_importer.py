@@ -3,6 +3,22 @@
 import json
 import re
 
+from modules.scenarios.scene_structured_fields import (
+    SCENE_STRUCTURED_SECTION_FIELDS,
+    get_structured_field_name_for_section_key,
+    normalise_structured_scene_items,
+)
+from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sections
+
+_SCENE_FIELD_MAP = {
+    "beats": "SceneBeats",
+    "obstacles": "SceneObstacles",
+    "clues": "SceneClues",
+    "transitions": "SceneTransitions",
+    "locations": "SceneLocations",
+    "npcs": "SceneNPCs",
+}
+
 
 def parse_json_relaxed(s: str):
     """Try to parse JSON from a possibly noisy AI response (module-level helper)."""
@@ -133,11 +149,25 @@ def expand_summary(client, title: str, summary_draft: str, compressed_context: s
 
 def expand_scenes(client, title: str, outline_scenes, compressed_context: str, chunk_range_hint: str):
     """Handle expand scenes."""
-    scenes_schema = {"Scenes": [{"Title": "text", "Text": "multi-paragraph detailed scene"}]}
+    scenes_schema = {
+        "Scenes": [
+            {
+                "Title": "text",
+                "Summary": "optional 1-2 paragraph prose summary",
+                "beats": ["key beat"],
+                "obstacles": ["conflict or obstacle"],
+                "clues": ["clue or hook"],
+                "transitions": ["transition to another scene"],
+                "locations": ["important location"],
+                "NPCs": ["involved NPC name"],
+            }
+        ]
+    }
     prompt_scenes = (
         "Using the outline below and the source text, produce detailed scene writeups.\n"
         "Keep the original language.\n\n"
-        "For each scene, include a 1–2 paragraph overview plus bullet points for: key beats, conflicts/obstacles, clues/hooks, transitions, important locations, and involved NPCs.\n"
+        "For each scene, return structured keys for beats, obstacles, clues, transitions, locations, and NPCs.\n"
+        "Include an optional prose Summary when it helps readability.\n"
         "Return STRICT JSON only with this schema:\n" + json.dumps(scenes_schema, ensure_ascii=False, indent=2) + "\n\n"
         f"Title: {title}\n"
         "Outline scenes:\n" + json.dumps(outline_scenes, ensure_ascii=False, indent=2) + "\n\n"
@@ -155,13 +185,38 @@ def expand_scenes(client, title: str, outline_scenes, compressed_context: str, c
         raise RuntimeError("AI did not return a JSON object with Scenes")
     scenes_expanded_list = []
     for sc in scenes_obj.get("Scenes", []) or []:
-        if isinstance(sc, dict):
-            # Handle the branch where isinstance(sc, dict).
-            txt = sc.get("Text") or ""
-            if isinstance(txt, dict) and "text" in txt:
-                txt = txt.get("text", "")
-            scenes_expanded_list.append(str(txt).strip())
+        if not isinstance(sc, dict):
+            continue
+        scenes_expanded_list.append(_normalise_scene_payload(sc))
     return scenes_expanded_list
+
+
+def _normalise_scene_payload(scene_payload: dict) -> dict:
+    """Normalize AI scene payload into canonical structured scene fields."""
+    normalized = {
+        "Title": str(scene_payload.get("Title") or scene_payload.get("Name") or "").strip(),
+        "Summary": str(scene_payload.get("Summary") or scene_payload.get("Prose") or scene_payload.get("ProseSummary") or "").strip(),
+    }
+
+    for source_key, target_key in _SCENE_FIELD_MAP.items():
+        value = scene_payload.get(source_key)
+        if value is None:
+            value = scene_payload.get(source_key.capitalize())
+        normalized[target_key] = normalise_structured_scene_items(value)
+
+    has_structured_items = any(normalized.get(item["field"]) for item in SCENE_STRUCTURED_SECTION_FIELDS)
+    raw_text = scene_payload.get("Text")
+    if not has_structured_items and raw_text:
+        text = raw_text.get("text", "") if isinstance(raw_text, dict) else str(raw_text)
+        parsed = parse_scene_body_sections(text)
+        if not normalized.get("Summary"):
+            normalized["Summary"] = str(parsed.get("intro_text") or "").strip()
+        for section in parsed.get("sections") or []:
+            target_key = get_structured_field_name_for_section_key(section.get("key"))
+            if target_key and not normalized.get(target_key):
+                normalized[target_key] = normalise_structured_scene_items(section.get("items") or [])
+
+    return normalized
 
 
 def extract_entities(client, compressed_context: str, chunk_range_hint: str, stats_examples: list):
