@@ -25,6 +25,7 @@ from modules.scenarios.processing.ai_scenario_importer import (
     expand_summary,
     request_outline,
 )
+from modules.scenarios.scene_structured_fields import compose_scene_text_from_fields
 
 log_module_import(__name__)
 
@@ -534,14 +535,29 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             )
 
             self._set_status(f"Analyzing text with AI (phase 3/4, scenario {idx}/{total_scenarios})...")
-            scenes_expanded_text = expand_scenes(
+            scenes_expanded_payload = expand_scenes(
                 client,
                 title,
                 outline_scenes,
                 compressed_context,
                 chunk_range_hint,
             )
-            scenes_expanded_list = [ai_text_to_rtf_json(text) for text in scenes_expanded_text]
+            scenes_expanded_list = []
+            for scene_index, scene_payload in enumerate(scenes_expanded_payload, start=1):
+                if not isinstance(scene_payload, dict):
+                    continue
+                scene_record = {
+                    "Title": scene_payload.get("Title") or f"Scene {scene_index}",
+                    "Summary": scene_payload.get("Summary") or "",
+                    "SceneBeats": scene_payload.get("SceneBeats") or [],
+                    "SceneObstacles": scene_payload.get("SceneObstacles") or [],
+                    "SceneClues": scene_payload.get("SceneClues") or [],
+                    "SceneTransitions": scene_payload.get("SceneTransitions") or [],
+                    "SceneLocations": scene_payload.get("SceneLocations") or [],
+                    "SceneNPCs": scene_payload.get("SceneNPCs") or [],
+                }
+                scene_record["Text"] = compose_scene_text_from_fields(scene_record)
+                scenes_expanded_list.append(scene_record)
 
             self._set_status(f"Analyzing text with AI (phase 4/4, scenario {idx}/{total_scenarios})...")
             entities = extract_entities(
