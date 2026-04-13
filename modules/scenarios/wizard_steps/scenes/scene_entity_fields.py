@@ -1,6 +1,6 @@
 """Field helpers for scenes scene entity."""
 
-SCENE_ENTITY_FIELDS = ("NPCs", "Creatures", "Bases", "Places", "Maps")
+SCENE_ENTITY_FIELDS = ("NPCs", "Creatures", "Clues", "Bases", "Places", "Maps")
 
 
 def normalise_entity_list(value):
