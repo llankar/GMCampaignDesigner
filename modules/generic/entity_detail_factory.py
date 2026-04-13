@@ -1139,6 +1139,8 @@ def insert_list_longtext(
             scene_dict["Title"] = title_clean
 
         indicator_payload = build_scene_indicator_payload(scene_dict, body_text)
+        for field_name, values in (indicator_payload.get("structured_sections") or {}).items():
+            scene_dict[field_name] = list(values or [])
 
         return {
             "scene_dict": scene_dict,
@@ -1250,6 +1252,7 @@ def insert_list_longtext(
         scene_sections = build_scene_body_sections(
             body,
             body_text=body_text,
+            scene_dict=scene_dict,
             npc_names=npc_names,
             villain_names=villain_names,
             creature_names=creature_names,
