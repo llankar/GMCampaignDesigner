@@ -12,6 +12,7 @@ from modules.scenarios.scene_structured_fields import (
     migrate_scene_to_structured_fields,
     normalise_structured_scene_items,
 )
+from modules.scenarios.wizard_steps.scenes.text_payloads import extract_plain_scene_text
 
 GUIDED_BOUNDARY_FLOW = (
     ("Hook", "Setup"),
@@ -77,7 +78,7 @@ def canonicalise_scene(scene, *, index=0):
         migrated["Text"] = compose_scene_text_from_fields(migrated)
         return migrated
     data = copy.deepcopy(scene)
-    summary = str(data.get("Summary") or data.get("Text") or "").strip()
+    summary = extract_plain_scene_text(data.get("Summary") or data.get("Text"))
     links = normalise_scene_links(data)
     canonical_scene = {
         "Title": str(data.get("Title") or data.get("Name") or f"Scene {index + 1}").strip(),

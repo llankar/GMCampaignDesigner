@@ -55,6 +55,7 @@ from modules.scenarios.wizard_steps.scenes.scene_structured_editor_fields import
     convert_structured_fields_from_text,
     parse_multiline_items,
 )
+from modules.scenarios.wizard_steps.scenes.text_payloads import extract_plain_scene_text
 
 try:
     _IMAGE_RESAMPLE = Image.Resampling.LANCZOS
@@ -681,7 +682,7 @@ class InlineSceneEditor(ctk.CTkFrame):
 
         self.summary_text = ctk.CTkTextbox(self, wrap="word")
         self.summary_text.grid(row=3, column=0, sticky="nsew", padx=12)
-        self.summary_text.insert("1.0", scene.get("Summary") or scene.get("Text") or "")
+        self.summary_text.insert("1.0", extract_plain_scene_text(scene.get("Summary") or scene.get("Text")))
 
         structure_section = ctk.CTkFrame(self, fg_color="#111827", corner_radius=10)
         structure_section.grid(row=4, column=0, sticky="ew", padx=12, pady=(8, 0))
