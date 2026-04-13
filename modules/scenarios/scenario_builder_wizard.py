@@ -43,6 +43,12 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
 from modules.scenarios.wizard_steps.scenes.scene_entity_aggregator import (
     collect_scene_entity_names,
 )
+from modules.scenarios.wizard_steps.scenes.entity_resolution.db_indexes import (
+    build_campaign_db_indexes,
+)
+from modules.scenarios.wizard_steps.scenes.entity_resolution.structured_entity_matcher import (
+    resolve_scene_entities_from_structured,
+)
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
     SCENE_STRUCTURED_FIELDS,
     canonicalise_scene,
@@ -506,6 +512,35 @@ class ScenesPlanningStep(WizardStep):
         self._set_mode("guided", remap=False)
         self.guided_planner.load_cards(scenes_to_guided_cards(self.scenes))
 
+    def _normalise_scene(self, scene, index):
+        """Normalize a raw scene payload into canonical wizard scene data."""
+        if isinstance(scene, dict) and not scene.get("Summary"):
+            description = str(scene.get("Description") or "").strip()
+            if description:
+                scene = {**scene, "Summary": description}
+            else:
+                fragments = []
+
+                def _collect_text(value):
+                    if isinstance(value, str):
+                        text = value.strip()
+                        if text:
+                            fragments.append(text)
+                        return
+                    if isinstance(value, dict):
+                        for nested in value.values():
+                            _collect_text(nested)
+                        return
+                    if isinstance(value, (list, tuple, set)):
+                        for nested in value:
+                            _collect_text(nested)
+
+                for candidate_key in ("SceneText", "Notes"):
+                    _collect_text(scene.get(candidate_key))
+                if fragments:
+                    scene = {**scene, "Summary": "\n\n".join(fragments)}
+        return canonicalise_scene(scene, index=index)
+
     def load_state(self, state):
         """Load state."""
         self.scenario_title_var.set(state.get("Title", ""))
@@ -525,6 +560,7 @@ class ScenesPlanningStep(WizardStep):
     def save_state(self, state):
         """Save state."""
         self.scenes = self._collect_active_scenes()
+        db_indexes = build_campaign_db_indexes(getattr(self, "entity_wrappers", {}) or {})
         state["Title"] = self.scenario_title_var.get().strip()
         state["Summary"] = (self._scenario_summary or "").strip()
         secrets = (self._scenario_secrets or "").strip()
@@ -551,6 +587,11 @@ class ScenesPlanningStep(WizardStep):
                 record[field_name] = normalise_entity_list(scene.get(field_name))
             for field_name in SCENE_STRUCTURED_FIELDS:
                 record[field_name] = normalise_structured_scene_items(scene.get(field_name))
+            resolved_entities = resolve_scene_entities_from_structured(record, db_indexes)
+            for field_name in ("NPCs", "Creatures", "Places", "Clues"):
+                existing = normalise_entity_list(record.get(field_name))
+                resolved = normalise_entity_list(resolved_entities.get(field_name))
+                record[field_name] = list(dict.fromkeys(existing + resolved))
             record["Text"] = compose_scene_text_from_fields(record)
             extras = scene.get("_extra_fields")
             if isinstance(extras, dict):

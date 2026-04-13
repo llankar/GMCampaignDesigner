@@ -161,7 +161,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
             on_add_entity=self._on_add_entity_to_scene,
             on_link=self._link_scenes_via_drag,
             on_link_text_edit=lambda *_: None,
-            available_entity_types=["NPCs", "Creatures", "Places", "Bases", "Maps"],
+            available_entity_types=["NPCs", "Creatures", "Clues", "Places", "Bases", "Maps"],
         )
         self.canvas.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self._update_buttons()
