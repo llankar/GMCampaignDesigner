@@ -2,6 +2,8 @@
 
 import re
 
+from modules.scenarios.widgets.scene_section_aliases import SECTION_KEY_ALIASES
+
 _SECTION_DEFINITIONS = (
     ("key beats", "Key beats", "🎯"),
     ("conflicts/obstacles", "Conflicts/obstacles", "⚔️"),
@@ -11,8 +13,9 @@ _SECTION_DEFINITIONS = (
     ("involved npcs", "Involved NPCs", "🧑‍🤝‍🧑"),
 )
 
+_ALIAS_PATTERN = "|".join(sorted((re.escape(alias) for alias in SECTION_KEY_ALIASES), key=len, reverse=True))
 _HEADER_PATTERN = re.compile(
-    r"^\s*[-*>#•·●▪]*\s*\**\s*(key beats|conflicts/obstacles|clues/hooks|transitions|important locations|involved npcs)\s*\**\s*:?\s*$",
+    rf"^\s*[-*>#•·●▪]*\s*\**\s*(?P<header>{_ALIAS_PATTERN})\s*\**\s*:?\s*(?P<inline_content>.*)$",
     re.IGNORECASE,
 )
 
@@ -51,6 +54,9 @@ def _extract_items(section_text):
     candidates = [part.strip(" -•\t") for part in re.split(r"(?:\s*;\s+|\s{2,}|\n+)", merged) if part.strip()]
     if len(candidates) == 1:
         # Handle the branch where len(candidates) == 1.
+        comma_candidates = [part.strip() for part in candidates[0].split(",") if part.strip()]
+        if len(comma_candidates) > 1:
+            candidates = comma_candidates
         sentence_candidates = [part.strip() for part in re.split(r"(?<=[.!?])\s+", candidates[0]) if part.strip()]
         if len(sentence_candidates) > 1:
             candidates = sentence_candidates
@@ -70,8 +76,17 @@ def parse_scene_body_sections(body_text):
         line_without_bullet = _HEADER_BULLET_PREFIX.sub("", line, count=1)
         header_match = _HEADER_PATTERN.match(line_without_bullet)
         if header_match:
-            current_key = header_match.group(1).strip().lower()
+            normalized_header = re.sub(r"\s+", " ", header_match.group("header").strip().lower())
+            current_key = SECTION_KEY_ALIASES.get(normalized_header)
+            if not current_key:
+                current_key = None
+                if line.strip():
+                    intro_lines.append(line)
+                continue
             sections_buffer.setdefault(current_key, [])
+            inline_content = header_match.group("inline_content").strip()
+            if inline_content:
+                sections_buffer[current_key].append(inline_content)
             continue
 
         if current_key is None:
