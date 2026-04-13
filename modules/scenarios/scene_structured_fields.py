@@ -19,6 +19,7 @@ SCENE_STRUCTURED_SECTION_FIELDS: tuple[dict[str, str], ...] = (
 )
 
 _SECTION_FIELD_BY_KEY = {item["key"]: item["field"] for item in SCENE_STRUCTURED_SECTION_FIELDS}
+_RUNTIME_SCENE_KEYS = {"title_var", "summary_widget", "structured_widgets", "entity_vars"}
 
 
 def _coerce_string_list(value: Any) -> list[str]:
@@ -60,6 +61,19 @@ def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
 def normalise_structured_scene_items(value: Any) -> list[str]:
     """Normalise structured scene field values without comma splitting."""
     return _dedupe_preserve_order(_coerce_string_list(value))
+
+
+def _clone_scene_payload(scene_dict: dict[str, Any]) -> dict[str, Any]:
+    """Clone a scene payload while skipping transient Tk widget/runtime references."""
+    cloned: dict[str, Any] = {}
+    for key, value in scene_dict.items():
+        if key in _RUNTIME_SCENE_KEYS:
+            continue
+        try:
+            cloned[key] = copy.deepcopy(value)
+        except (TypeError, ValueError):
+            cloned[key] = value
+    return cloned
 
 
 def extract_structured_scene_sections(scene_dict: dict[str, Any]) -> list[dict[str, Any]]:
@@ -104,7 +118,7 @@ def migrate_scene_to_structured_fields(scene_dict: dict[str, Any], body_text: st
     if not isinstance(scene_dict, dict):
         scene_dict = {"Text": str(scene_dict or "")}
 
-    migrated = copy.deepcopy(scene_dict)
+    migrated = _clone_scene_payload(scene_dict)
     parser_payload = parse_scene_body_sections(body_text)
     parsed_items_by_key = {
         str(section.get("key") or "").lower(): _dedupe_preserve_order(section.get("items") or [])
