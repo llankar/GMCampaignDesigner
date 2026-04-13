@@ -7,6 +7,12 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS,
     normalise_entity_list,
 )
+from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import SCENE_STRUCTURED_FIELDS
+from modules.scenarios.wizard_steps.scenes.scene_structured_editor_fields import (
+    SCENE_STRUCTURED_FIELD_LABELS,
+    convert_structured_fields_from_text,
+    parse_multiline_items,
+)
 
 
 class GuidedScenePlanner(ctk.CTkFrame):
@@ -31,7 +37,19 @@ class GuidedScenePlanner(ctk.CTkFrame):
         self._container.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
         self._container.grid_columnconfigure(0, weight=1)
 
-    def _new_card_data(self, *, title="", summary="", scene_type="Choice", stage="", canvas=None, extra_fields=None, entities=None):
+    def _new_card_data(
+        self,
+        *,
+        title="",
+        summary="",
+        scene_type="Choice",
+        stage="",
+        canvas=None,
+        extra_fields=None,
+        entities=None,
+        structured=None,
+        structured_prefilled=False,
+    ):
         """Internal helper for new card data."""
         card = {
             "stage": stage or "Scene",
@@ -46,6 +64,12 @@ class GuidedScenePlanner(ctk.CTkFrame):
             card[field_name] = normalise_entity_list(
                 incoming_entities.get(field_name) if isinstance(incoming_entities, dict) else None
             )
+        incoming_structured = structured or {}
+        for field_name in SCENE_STRUCTURED_FIELDS:
+            card[field_name] = parse_multiline_items(
+                incoming_structured.get(field_name) if isinstance(incoming_structured, dict) else None
+            )
+        card["_structured_prefilled"] = bool(structured_prefilled)
         return card
 
     def _card_heading(self, index):
@@ -75,6 +99,8 @@ class GuidedScenePlanner(ctk.CTkFrame):
             canvas=payload.get("_canvas"),
             extra_fields=payload.get("_extra_fields"),
             entities={field_name: payload.get(field_name) for field_name in SCENE_ENTITY_FIELDS},
+            structured={field_name: payload.get(field_name) for field_name in SCENE_STRUCTURED_FIELDS},
+            structured_prefilled=payload.get("_structured_prefilled"),
         )
 
     def _render_cards(self):
@@ -126,8 +152,45 @@ class GuidedScenePlanner(ctk.CTkFrame):
             summary.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 12))
             summary.insert("1.0", payload["Summary"])
 
+            structured_section = ctk.CTkFrame(card, fg_color="#111827", corner_radius=10)
+            structured_section.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
+            structured_section.grid_columnconfigure((0, 1), weight=1)
+            ctk.CTkLabel(
+                structured_section,
+                text="Scene Structure",
+                font=ctk.CTkFont(size=12, weight="bold"),
+                text_color="#b8c7e2",
+                anchor="w",
+            ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
+            convert_state = "disabled" if payload.get("_structured_prefilled") else "normal"
+            ctk.CTkButton(
+                structured_section,
+                text="Convert from existing text",
+                width=180,
+                state=convert_state,
+                command=lambda i=idx: self._prefill_structured_fields(i),
+            ).grid(row=0, column=1, sticky="e", padx=10, pady=(8, 4))
+
+            structured_widgets = {}
+            for section_idx, field_name in enumerate(SCENE_STRUCTURED_FIELDS):
+                row = 1 + (section_idx // 2)
+                col = section_idx % 2
+                field_frame = ctk.CTkFrame(structured_section, fg_color="transparent")
+                field_frame.grid(row=row, column=col, sticky="nsew", padx=10, pady=(0, 8))
+                field_frame.grid_columnconfigure(0, weight=1)
+                ctk.CTkLabel(
+                    field_frame,
+                    text=SCENE_STRUCTURED_FIELD_LABELS.get(field_name, field_name),
+                    anchor="w",
+                    text_color="#8fa6cc",
+                ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+                widget = ctk.CTkTextbox(field_frame, height=74, wrap="word")
+                widget.grid(row=1, column=0, sticky="ew")
+                widget.insert("1.0", "\n".join(payload.get(field_name) or []))
+                structured_widgets[field_name] = widget
+
             entities_section = ctk.CTkFrame(card, fg_color="#111827", corner_radius=10)
-            entities_section.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
+            entities_section.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 12))
             entities_section.grid_columnconfigure(0, weight=1)
             ctk.CTkLabel(
                 entities_section,
@@ -159,7 +222,27 @@ class GuidedScenePlanner(ctk.CTkFrame):
 
             payload["title_var"] = title_var
             payload["summary_widget"] = summary
+            payload["structured_widgets"] = structured_widgets
             payload["entity_vars"] = entity_vars
+
+    def _prefill_structured_fields(self, index):
+        """Run legacy parser once to prefill structured scene fields."""
+        if index < 0 or index >= len(self._cards):
+            return
+        payload = self._cards[index]
+        if payload.get("_structured_prefilled"):
+            return
+        summary_widget = payload.get("summary_widget")
+        summary = summary_widget.get("1.0", "end").strip() if summary_widget is not None else str(payload.get("Summary") or "")
+        converted = convert_structured_fields_from_text(payload, summary)
+        for field_name, values in converted.items():
+            payload[field_name] = values
+            widget = (payload.get("structured_widgets") or {}).get(field_name)
+            if widget is not None:
+                widget.delete("1.0", "end")
+                widget.insert("1.0", "\n".join(values))
+        payload["_structured_prefilled"] = True
+        self._render_cards()
 
     def _open_entity_selector(self, field_name, entity_var):
         """Open entity selector."""
@@ -185,12 +268,18 @@ class GuidedScenePlanner(ctk.CTkFrame):
             base = self._normalise_card_data(payload, idx, total)
             base["Title"] = title or base["stage"]
             base["Summary"] = summary
+            structured_widgets = payload.get("structured_widgets") or {}
+            for field_name in SCENE_STRUCTURED_FIELDS:
+                field_widget = structured_widgets.get(field_name)
+                if field_widget is not None:
+                    base[field_name] = parse_multiline_items(field_widget.get("1.0", "end"))
             entity_vars = payload.get("entity_vars") or {}
             for field_name in SCENE_ENTITY_FIELDS:
                 # Process each field_name from SCENE_ENTITY_FIELDS.
                 field_var = entity_vars.get(field_name)
                 if field_var is not None:
                     base[field_name] = normalise_entity_list(field_var.get())
+            base["_structured_prefilled"] = bool(payload.get("_structured_prefilled"))
             snapshot.append(base)
         self._cards = snapshot
 

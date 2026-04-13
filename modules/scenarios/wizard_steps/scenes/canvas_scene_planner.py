@@ -10,7 +10,15 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS,
     normalise_entity_list,
 )
-from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import normalise_scene_links
+from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
+    SCENE_STRUCTURED_FIELDS,
+    normalise_scene_links,
+)
+from modules.scenarios.wizard_steps.scenes.scene_structured_editor_fields import (
+    SCENE_STRUCTURED_FIELD_LABELS,
+    convert_structured_fields_from_text,
+    parse_multiline_items,
+)
 
 
 class InlineSceneEditor(ctk.CTkFrame):
@@ -21,7 +29,7 @@ class InlineSceneEditor(ctk.CTkFrame):
         self.on_cancel = on_cancel
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(5, weight=1)
 
         ctk.CTkLabel(self, text="Scene Details", font=ctk.CTkFont(size=14, weight="bold"), anchor="w").grid(
             row=0, column=0, sticky="ew", padx=12, pady=(12, 6)
@@ -42,19 +50,77 @@ class InlineSceneEditor(ctk.CTkFrame):
         self.summary_text.grid(row=3, column=0, sticky="nsew", padx=12)
         self.summary_text.insert("1.0", scene.get("Summary") or scene.get("Text") or "")
 
+        structure_section = ctk.CTkFrame(self, fg_color="#111827", corner_radius=10)
+        structure_section.grid(row=4, column=0, sticky="ew", padx=12, pady=(8, 0))
+        structure_section.grid_columnconfigure((0, 1), weight=1)
+        ctk.CTkLabel(
+            structure_section,
+            text="Scene Structure",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color="#b8c7e2",
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 4))
+        self._structured_prefilled = bool(scene.get("_structured_prefilled"))
+        self.convert_btn = ctk.CTkButton(
+            structure_section,
+            text="Convert from existing text",
+            width=180,
+            state="disabled" if self._structured_prefilled else "normal",
+            command=self._convert_from_summary,
+        )
+        self.convert_btn.grid(row=0, column=1, sticky="e", padx=10, pady=(8, 4))
+        self.structured_widgets = {}
+        for section_idx, field_name in enumerate(SCENE_STRUCTURED_FIELDS):
+            row = 1 + (section_idx // 2)
+            col = section_idx % 2
+            field_frame = ctk.CTkFrame(structure_section, fg_color="transparent")
+            field_frame.grid(row=row, column=col, sticky="nsew", padx=10, pady=(0, 8))
+            field_frame.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(
+                field_frame,
+                text=SCENE_STRUCTURED_FIELD_LABELS.get(field_name, field_name),
+                text_color="#8fa6cc",
+                anchor="w",
+            ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+            widget = ctk.CTkTextbox(field_frame, height=70, wrap="word")
+            widget.grid(row=1, column=0, sticky="ew")
+            widget.insert("1.0", "\n".join(parse_multiline_items(scene.get(field_name))))
+            self.structured_widgets[field_name] = widget
+
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.grid(row=4, column=0, sticky="ew", padx=12, pady=(8, 10))
+        row.grid(row=6, column=0, sticky="ew", padx=12, pady=(8, 10))
         row.grid_columnconfigure((0, 1), weight=1)
         ctk.CTkButton(row, text="Cancel", command=self._on_cancel).grid(row=0, column=0, sticky="ew", padx=(0, 6))
         ctk.CTkButton(row, text="Save", command=self._on_save).grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
+    def _convert_from_summary(self):
+        """Run legacy parser once to prefill structured fields."""
+        if self._structured_prefilled:
+            return
+        summary = self.summary_text.get("1.0", "end").strip()
+        converted = convert_structured_fields_from_text({}, summary)
+        for field_name, values in converted.items():
+            widget = self.structured_widgets.get(field_name)
+            if widget is None:
+                continue
+            widget.delete("1.0", "end")
+            widget.insert("1.0", "\n".join(values))
+        self._structured_prefilled = True
+        self.convert_btn.configure(state="disabled")
+
     def _on_save(self):
         """Handle save."""
+        structured_data = {
+            field_name: parse_multiline_items(widget.get("1.0", "end"))
+            for field_name, widget in self.structured_widgets.items()
+        }
         self.on_save(
             {
                 "Title": self.title_var.get().strip(),
                 "SceneType": self.type_var.get().strip(),
                 "Summary": self.summary_text.get("1.0", "end").strip(),
+                "_structured_prefilled": self._structured_prefilled,
+                **structured_data,
             }
         )
 
@@ -121,6 +187,8 @@ class CanvasScenePlanner(ctk.CTkFrame):
     def add_scene(self):
         """Handle add scene."""
         scene = {"Title": f"Scene {len(self.scenes) + 1}", "Summary": "", "SceneType": "", "LinkData": [], "NextScenes": [], "_canvas": {}}
+        for field_name in SCENE_STRUCTURED_FIELDS:
+            scene[field_name] = []
         self._assign_default_position(scene)
         self.scenes.append(scene)
         self.selected_index = len(self.scenes) - 1
@@ -194,6 +262,9 @@ class CanvasScenePlanner(ctk.CTkFrame):
         scene["Title"] = data.get("Title") or scene.get("Title") or f"Scene {index + 1}"
         scene["Summary"] = data.get("Summary", "")
         scene["SceneType"] = data.get("SceneType", "")
+        for field_name in SCENE_STRUCTURED_FIELDS:
+            scene[field_name] = parse_multiline_items(data.get(field_name))
+        scene["_structured_prefilled"] = bool(data.get("_structured_prefilled"))
         self._close_inline_scene_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
