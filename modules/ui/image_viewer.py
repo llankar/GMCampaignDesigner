@@ -1,11 +1,12 @@
 """Viewer for image."""
 # modules/ui/image_viewer.py
-import os, ctypes
-from modules.helpers.config_helper import ConfigHelper
+import os
+import ctypes
 from ctypes import wintypes
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import resolve_portrait_path
 from modules.helpers.logging_helper import (
     log_function,
@@ -22,19 +23,40 @@ MAX_PORTRAIT_SIZE = (1024, 1024)
 
 @log_function
 def _configure_single_monitor_overlay(win, monitors):
-    """Keep portrait window visible on single-screen setups without blocking interaction."""
+    """Keep portrait window visible on single-screen setups."""
     if len(monitors) != 1:
         return
     try:
+        win.lift()
+        win.focus_force()
         win.attributes("-topmost", True)
     except Exception:
         # Ignore unsupported/failed topmost attribute on some environments.
         return
 
+
+@log_function
+def _fallback_primary_monitor():
+    """Build a safe single-monitor fallback from Tk screen metrics."""
+    probe = tk.Tk()
+    probe.withdraw()
+    try:
+        width = int(probe.winfo_screenwidth())
+        height = int(probe.winfo_screenheight())
+    finally:
+        probe.destroy()
+    if width <= 0 or height <= 0:
+        return []
+    return [(0, 0, width, height)]
+
+
 @log_function
 def _get_monitors():
     """Return list of (x, y, width, height)."""
     monitors = []
+    if os.name != "nt":
+        return _fallback_primary_monitor()
+
     def _enum(hMonitor, hdcMonitor, lprcMonitor, dwData):
         """Internal helper for enum."""
         rect = lprcMonitor.contents
@@ -42,12 +64,16 @@ def _get_monitors():
                         rect.right - rect.left,
                         rect.bottom - rect.top))
         return True
-    MonitorEnumProc = ctypes.WINFUNCTYPE(
-        wintypes.BOOL, wintypes.HMONITOR, wintypes.HDC,
-        ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
-    ctypes.windll.user32.EnumDisplayMonitors(
-        0, 0, MonitorEnumProc(_enum), 0)
-    return monitors
+    try:
+        monitor_enum_proc = ctypes.WINFUNCTYPE(
+            wintypes.BOOL, wintypes.HMONITOR, wintypes.HDC,
+            ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+        ctypes.windll.user32.EnumDisplayMonitors(
+            0, 0, monitor_enum_proc(_enum), 0)
+    except Exception:
+        return _fallback_primary_monitor()
+
+    return monitors or _fallback_primary_monitor()
 
 @log_function
 def show_portrait(path, title=None):
@@ -73,6 +99,11 @@ def show_portrait(path, title=None):
 
     # pick a monitor (second if available)
     monitors = _get_monitors()
+    if not monitors:
+        log_warning("No monitors detected for portrait viewer", func_name="show_portrait")
+        tk.messagebox.showerror("Error", "Unable to detect any display.")
+        return
+
     target = monitors[1] if len(monitors) > 1 else monitors[0]
     sx, sy, sw, sh = target
 
