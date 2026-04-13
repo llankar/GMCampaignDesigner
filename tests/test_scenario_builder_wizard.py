@@ -440,6 +440,63 @@ def test_normalise_scene_collects_nested_text_fragments():
     assert scene["Summary"] == "First part.\n\nSecond part.\n\nThird part."
 
 
+def test_save_state_persists_structured_fields_and_composed_text():
+    """Verify save_state stores structured scene fields + legacy composed text."""
+    step = _build_scenes_step()
+    step._collect_active_scenes = lambda: [
+        {
+            "Title": "Dockside Meeting",
+            "Summary": "The broker arrives late.",
+            "SceneType": "Social",
+            "SceneBeats": ["Negotiate terms, keep cover intact"],
+            "SceneClues": ["Ledger page with coded initials"],
+            "LinkData": [{"target": "Ambush", "text": "Follow the courier"}],
+            "_canvas": {"x": 120, "y": 90},
+        }
+    ]
+    step.scenario_title_var = _StubVariable("Harbor Intrigue")
+    step._scenario_summary = "Scenario summary"
+    step._scenario_secrets = "Secret note"
+    step._root_extra_fields = {}
+    step.scenes = []
+
+    state = {}
+    assert step.save_state(state) is True
+
+    persisted = state["Scenes"][0]
+    assert persisted["Summary"] == "The broker arrives late."
+    assert persisted["SceneBeats"] == ["Negotiate terms, keep cover intact"]
+    assert persisted["SceneClues"] == ["Ledger page with coded initials"]
+    assert "Key beats:" in persisted["Text"]
+    assert "- Negotiate terms, keep cover intact" in persisted["Text"]
+
+
+def test_scene_mode_adapters_round_trip_structured_fields():
+    """Verify structured fields round-trip across guided/canvas adapters."""
+    cards = [
+        {
+            "Title": "Hook",
+            "Summary": "Start at the docks.",
+            "SceneType": "Setup",
+            "SceneBeats": ["Talk to Captain Rhel, avoid suspicion"],
+        },
+        {
+            "Title": "Fallout",
+            "Summary": "Deal with consequences.",
+            "SceneType": "Outcome",
+            "SceneClues": ["Stamped crate marked OR-17"],
+        },
+    ]
+
+    scenes = scenario_builder_wizard.guided_cards_to_scenes(cards)
+    assert scenes[0]["SceneBeats"] == ["Talk to Captain Rhel, avoid suspicion"]
+    assert "Key beats:" in scenes[0]["Text"]
+
+    round_tripped = scenario_builder_wizard.scenes_to_guided_cards(scenes)
+    assert round_tripped[0]["SceneBeats"] == ["Talk to Captain Rhel, avoid suspicion"]
+    assert round_tripped[1]["SceneClues"] == ["Stamped crate marked OR-17"]
+
+
 def test_finish_embedded_can_persist_before_callback(monkeypatch):
     """Verify that finish embedded can persist before callback."""
     wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(

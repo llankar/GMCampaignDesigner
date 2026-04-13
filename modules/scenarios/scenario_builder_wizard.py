@@ -25,6 +25,10 @@ from modules.helpers.text_helpers import coerce_text
 from modules.scenarios.scene_flow_components import (
     SceneFlowPreview,
 )
+from modules.scenarios.scene_structured_fields import (
+    compose_scene_text_from_fields,
+    normalise_structured_scene_items,
+)
 from modules.scenarios.scenario_character_graph import (
     ScenarioCharacterGraphEditor,
     build_scenario_graph_with_links,
@@ -533,7 +537,6 @@ class ScenesPlanningStep(WizardStep):
             record = {
                 "Title": scene.get("Title", "Scene"),
                 "Summary": scene.get("Summary", ""),
-                "Text": scene.get("Summary", ""),
             }
             scene_type = scene.get("SceneType", "")
             if scene_type:
@@ -546,7 +549,8 @@ class ScenesPlanningStep(WizardStep):
             for field_name in SCENE_CARD_ENTITY_FIELDS:
                 record[field_name] = normalise_entity_list(scene.get(field_name))
             for field_name in SCENE_STRUCTURED_FIELDS:
-                record[field_name] = normalise_entity_list(scene.get(field_name))
+                record[field_name] = normalise_structured_scene_items(scene.get(field_name))
+            record["Text"] = compose_scene_text_from_fields(record)
             extras = scene.get("_extra_fields")
             if isinstance(extras, dict):
                 for key, value in extras.items():
