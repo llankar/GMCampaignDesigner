@@ -57,6 +57,11 @@ def _dedupe_preserve_order(values: Iterable[str]) -> list[str]:
     return deduped
 
 
+def normalise_structured_scene_items(value: Any) -> list[str]:
+    """Normalise structured scene field values without comma splitting."""
+    return _dedupe_preserve_order(_coerce_string_list(value))
+
+
 def extract_structured_scene_sections(scene_dict: dict[str, Any]) -> list[dict[str, Any]]:
     """Extract display sections from structured scene fields."""
     if not isinstance(scene_dict, dict):
@@ -120,3 +125,25 @@ def migrate_scene_to_structured_fields(scene_dict: dict[str, Any], body_text: st
 def get_structured_field_name_for_section_key(section_key: str) -> str | None:
     """Return canonical field name for a parser section key."""
     return _SECTION_FIELD_BY_KEY.get(str(section_key or "").strip().lower())
+
+
+def compose_scene_text_from_fields(scene_dict: dict[str, Any]) -> str:
+    """Compose a legacy text blob from summary + structured fields."""
+    if not isinstance(scene_dict, dict):
+        return str(scene_dict or "").strip()
+
+    lines: list[str] = []
+    summary = str(scene_dict.get("Summary") or "").strip()
+    if summary:
+        lines.append(summary)
+
+    for definition in SCENE_STRUCTURED_SECTION_FIELDS:
+        items = _dedupe_preserve_order(_coerce_string_list(scene_dict.get(definition["field"])))
+        if not items:
+            continue
+        if lines:
+            lines.append("")
+        lines.append(f"{definition['title']}:")
+        lines.extend(f"- {item}" for item in items)
+
+    return "\n".join(lines).strip()

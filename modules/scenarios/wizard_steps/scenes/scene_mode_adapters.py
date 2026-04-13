@@ -6,7 +6,12 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS,
     normalise_entity_list,
 )
-from modules.scenarios.scene_structured_fields import SCENE_STRUCTURED_SECTION_FIELDS, migrate_scene_to_structured_fields
+from modules.scenarios.scene_structured_fields import (
+    SCENE_STRUCTURED_SECTION_FIELDS,
+    compose_scene_text_from_fields,
+    migrate_scene_to_structured_fields,
+    normalise_structured_scene_items,
+)
 
 GUIDED_BOUNDARY_FLOW = (
     ("Hook", "Setup"),
@@ -61,7 +66,7 @@ def normalise_scene_links(scene):
 def canonicalise_scene(scene, *, index=0):
     """Handle canonicalise scene."""
     if not isinstance(scene, dict):
-        return migrate_scene_to_structured_fields({
+        migrated = migrate_scene_to_structured_fields({
             "Title": f"Scene {index + 1}",
             "Summary": str(scene or ""),
             "SceneType": "",
@@ -69,6 +74,8 @@ def canonicalise_scene(scene, *, index=0):
             "NextScenes": [],
             "_canvas": {},
         }, str(scene or ""))
+        migrated["Text"] = compose_scene_text_from_fields(migrated)
+        return migrated
     data = copy.deepcopy(scene)
     summary = str(data.get("Summary") or data.get("Text") or "").strip()
     links = normalise_scene_links(data)
@@ -84,7 +91,7 @@ def canonicalise_scene(scene, *, index=0):
             for field_name in SCENE_ENTITY_FIELDS
         },
         **{
-            field_name: normalise_entity_list(data.get(field_name))
+            field_name: normalise_structured_scene_items(data.get(field_name))
             for field_name in SCENE_STRUCTURED_FIELDS
         },
         "_extra_fields": {
@@ -95,7 +102,9 @@ def canonicalise_scene(scene, *, index=0):
             }
         },
     }
-    return migrate_scene_to_structured_fields(canonical_scene, summary)
+    migrated = migrate_scene_to_structured_fields(canonical_scene, summary)
+    migrated["Text"] = compose_scene_text_from_fields(migrated)
+    return migrated
 
 
 def scenes_to_guided_cards(scenes):
@@ -143,7 +152,7 @@ def scenes_to_guided_cards(scenes):
                     for field_name in SCENE_ENTITY_FIELDS
                 },
                 **{
-                    field_name: normalise_entity_list(scene.get(field_name))
+                    field_name: normalise_structured_scene_items(scene.get(field_name))
                     for field_name in SCENE_STRUCTURED_FIELDS
                 },
                 "_extra_fields": copy.deepcopy(scene.get("_extra_fields") or {}),
@@ -190,10 +199,11 @@ def guided_cards_to_scenes(cards):
                 for field_name in SCENE_ENTITY_FIELDS
             },
             **{
-                field_name: normalise_entity_list(card.get(field_name))
+                field_name: normalise_structured_scene_items(card.get(field_name))
                 for field_name in SCENE_STRUCTURED_FIELDS
             },
         }
+        scene["Text"] = compose_scene_text_from_fields(scene)
         extras = card.get("_extra_fields")
         if isinstance(extras, dict):
             scene["_extra_fields"] = copy.deepcopy(extras)
