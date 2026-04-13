@@ -5,7 +5,11 @@ from collections.abc import Iterable
 from typing import Any
 
 from modules.helpers.text_helpers import deserialize_possible_json
-from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sections
+from modules.scenarios.scene_structured_fields import (
+    get_structured_field_name_for_section_key,
+    migrate_scene_to_structured_fields,
+    parse_scene_sections_with_structured_fallback,
+)
 
 
 _NAME_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
@@ -156,7 +160,7 @@ def _merge_links(scene_dict: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _collect_names_from_sections(body_text: str, section_key: str) -> list[str]:
     """Collect names from sections."""
-    parsed = parse_scene_body_sections(body_text)
+    parsed = parse_scene_sections_with_structured_fallback({}, body_text)
     sections = parsed.get("sections") or []
     collected: list[str] = []
     for section in sections:
@@ -168,8 +172,14 @@ def _collect_names_from_sections(body_text: str, section_key: str) -> list[str]:
     return collected
 
 
+def migrate_scene_indicator_scene(scene_dict: dict[str, Any], body_text: str) -> dict[str, Any]:
+    """Populate scene payload with canonical structured section fields."""
+    return migrate_scene_to_structured_fields(scene_dict, body_text)
+
+
 def build_scene_indicator_payload(scene_dict: dict[str, Any], body_text: str) -> dict[str, Any]:
     """Build scene indicator payload."""
+    scene_dict = migrate_scene_indicator_scene(scene_dict, body_text)
     npcs = _collect_names(scene_dict, "NPCs")
     places = _collect_names(scene_dict, "Places")
     maps = _collect_names(scene_dict, "Maps")
@@ -177,9 +187,22 @@ def build_scene_indicator_payload(scene_dict: dict[str, Any], body_text: str) ->
     creatures = _collect_names(scene_dict, "Creatures")
 
     if not npcs:
+        npcs = _normalize_names(scene_dict.get("SceneNPCs") or [])
+    if not places:
+        places = _normalize_names(scene_dict.get("SceneLocations") or [])
+    if not npcs:
         npcs = _collect_names_from_sections(body_text, "involved npcs")
     if not places:
         places = _collect_names_from_sections(body_text, "important locations")
+
+    sections_payload = parse_scene_sections_with_structured_fallback(scene_dict, body_text)
+    section_field_values: dict[str, list[str]] = {}
+    for section in sections_payload.get("sections") or []:
+        section_key = str(section.get("key") or "").lower()
+        field_name = get_structured_field_name_for_section_key(section_key)
+        if not field_name:
+            continue
+        section_field_values[field_name] = _normalize_names(section.get("items") or [])
 
     links = _merge_links(scene_dict)
 
@@ -190,4 +213,15 @@ def build_scene_indicator_payload(scene_dict: dict[str, Any], body_text: str) ->
         "villain_names": villains,
         "creature_names": creatures,
         "links": links,
+        "structured_sections": {
+            field_name: section_field_values.get(field_name, _normalize_names(scene_dict.get(field_name) or []))
+            for field_name in (
+                "SceneBeats",
+                "SceneObstacles",
+                "SceneClues",
+                "SceneTransitions",
+                "SceneLocations",
+                "SceneNPCs",
+            )
+        },
     }

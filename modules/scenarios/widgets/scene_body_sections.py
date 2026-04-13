@@ -3,9 +3,9 @@ import customtkinter as ctk
 from customtkinter import CTkLabel
 
 from modules.generic.detail_ui import get_detail_palette
+from modules.scenarios.scene_structured_fields import parse_scene_sections_with_structured_fallback
 from modules.scenarios.widgets.scene_body import create_entities_groups_grid, prepare_entities_for_group
 from modules.scenarios.widgets.scene_density import get_scene_density_style
-from modules.scenarios.widgets.scene_sections_parser import parse_scene_body_sections
 
 
 def _compute_wraplength(container_width, *, horizontal_padding, min_wrap, safety_margin=10):
@@ -154,10 +154,10 @@ def _render_card_bullets(container, items, *, expanded, font_size):
     _refresh_wrap()
 
 
-def _create_description_block(parent, body_text, *, description_font_size=13):
+def _create_description_block(parent, body_text, *, scene_dict=None, description_font_size=13):
     """Create description block."""
     palette = get_detail_palette()
-    parsed = parse_scene_body_sections(body_text)
+    parsed = parse_scene_sections_with_structured_fallback(scene_dict or {}, body_text)
     if not parsed.get("has_sections"):
         return _create_description_block_fallback(parent, body_text, description_font_size=description_font_size)
 
@@ -443,6 +443,7 @@ def _create_links_block(parent, links, open_scene_callback=None):
 def build_scene_body_sections(
     parent,
     body_text,
+    scene_dict,
     npc_names,
     villain_names,
     creature_names,
@@ -465,6 +466,7 @@ def build_scene_body_sections(
     description_block, description_label = _create_description_block(
         shell,
         body_text,
+        scene_dict=scene_dict,
         description_font_size=density_style["description_font_size"],
     )
     if has_entities or has_maps or has_links:

@@ -40,6 +40,7 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_aggregator import (
     collect_scene_entity_names,
 )
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import (
+    SCENE_STRUCTURED_FIELDS,
     canonicalise_scene,
     guided_cards_to_scenes,
     normalise_scene_links,
@@ -538,6 +539,8 @@ class ScenesPlanningStep(WizardStep):
                 record["NextScenes"] = [link["target"] for link in links]
                 record["Links"] = [{"target": link["target"], "text": link.get("text") or link["target"]} for link in links]
             for field_name in SCENE_CARD_ENTITY_FIELDS:
+                record[field_name] = normalise_entity_list(scene.get(field_name))
+            for field_name in SCENE_STRUCTURED_FIELDS:
                 record[field_name] = normalise_entity_list(scene.get(field_name))
             extras = scene.get("_extra_fields")
             if isinstance(extras, dict):

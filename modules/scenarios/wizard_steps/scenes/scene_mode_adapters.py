@@ -6,6 +6,7 @@ from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS,
     normalise_entity_list,
 )
+from modules.scenarios.scene_structured_fields import SCENE_STRUCTURED_SECTION_FIELDS, migrate_scene_to_structured_fields
 
 GUIDED_BOUNDARY_FLOW = (
     ("Hook", "Setup"),
@@ -18,6 +19,8 @@ LEGACY_GUIDED_FLOW = (
     ("Climax", "Combat"),
     ("Fallout", "Outcome"),
 )
+
+SCENE_STRUCTURED_FIELDS = tuple(item["field"] for item in SCENE_STRUCTURED_SECTION_FIELDS)
 
 
 def _split_to_list(value):
@@ -58,18 +61,18 @@ def normalise_scene_links(scene):
 def canonicalise_scene(scene, *, index=0):
     """Handle canonicalise scene."""
     if not isinstance(scene, dict):
-        return {
+        return migrate_scene_to_structured_fields({
             "Title": f"Scene {index + 1}",
             "Summary": str(scene or ""),
             "SceneType": "",
             "LinkData": [],
             "NextScenes": [],
             "_canvas": {},
-        }
+        }, str(scene or ""))
     data = copy.deepcopy(scene)
     summary = str(data.get("Summary") or data.get("Text") or "").strip()
     links = normalise_scene_links(data)
-    return {
+    canonical_scene = {
         "Title": str(data.get("Title") or data.get("Name") or f"Scene {index + 1}").strip(),
         "Summary": summary,
         "SceneType": str(data.get("SceneType") or data.get("Type") or "").strip(),
@@ -80,14 +83,19 @@ def canonicalise_scene(scene, *, index=0):
             field_name: normalise_entity_list(data.get(field_name))
             for field_name in SCENE_ENTITY_FIELDS
         },
+        **{
+            field_name: normalise_entity_list(data.get(field_name))
+            for field_name in SCENE_STRUCTURED_FIELDS
+        },
         "_extra_fields": {
             k: copy.deepcopy(v)
             for k, v in data.items()
             if k not in {
-                "Title", "Name", "Summary", "Text", "SceneType", "Type", "LinkData", "Links", "NextScenes", "_canvas", *SCENE_ENTITY_FIELDS
+                "Title", "Name", "Summary", "Text", "SceneType", "Type", "LinkData", "Links", "NextScenes", "_canvas", *SCENE_ENTITY_FIELDS, *SCENE_STRUCTURED_FIELDS
             }
         },
     }
+    return migrate_scene_to_structured_fields(canonical_scene, summary)
 
 
 def scenes_to_guided_cards(scenes):
@@ -134,6 +142,10 @@ def scenes_to_guided_cards(scenes):
                     field_name: normalise_entity_list(scene.get(field_name))
                     for field_name in SCENE_ENTITY_FIELDS
                 },
+                **{
+                    field_name: normalise_entity_list(scene.get(field_name))
+                    for field_name in SCENE_STRUCTURED_FIELDS
+                },
                 "_extra_fields": copy.deepcopy(scene.get("_extra_fields") or {}),
             }
         )
@@ -176,6 +188,10 @@ def guided_cards_to_scenes(cards):
             **{
                 field_name: normalise_entity_list(card.get(field_name))
                 for field_name in SCENE_ENTITY_FIELDS
+            },
+            **{
+                field_name: normalise_entity_list(card.get(field_name))
+                for field_name in SCENE_STRUCTURED_FIELDS
             },
         }
         extras = card.get("_extra_fields")
