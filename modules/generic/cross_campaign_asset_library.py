@@ -20,6 +20,7 @@ from modules.generic.cross_campaign_asset_service import (
     analyze_bundle,
     apply_direct_copy,
     apply_import,
+    apply_import_for_entity_types,
     cleanup_analysis,
     detect_duplicates,
     discover_databases_in_directory,
@@ -145,7 +146,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         button_row = ctk.CTkFrame(self)
         button_row.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        for column_index in range(8):
+        for column_index in range(9):
             button_row.grid_columnconfigure(column_index, weight=1)
 
         self.export_btn = ctk.CTkButton(button_row, text="Export Selected…", command=self.export_selected)
@@ -158,33 +159,39 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.copy_btn.grid(row=0, column=1, padx=6, pady=6, sticky="ew")
         self.import_btn = ctk.CTkButton(button_row, text="Import Bundle…", command=self.import_bundle)
         self.import_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
+        self.import_image_library_btn = ctk.CTkButton(
+            button_row,
+            text="Import Image Library…",
+            command=self.import_image_library_bundle,
+        )
+        self.import_image_library_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
         self.reload_btn = ctk.CTkButton(button_row, text="Refresh Source", command=self.reload_source)
-        self.reload_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
+        self.reload_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
         self.publish_btn = ctk.CTkButton(
             button_row,
             text="Publish to GitHub…",
             command=self.publish_selected_to_github,
         )
-        self.publish_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
+        self.publish_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
         self.publish_image_library_btn = ctk.CTkButton(
             button_row,
             text="Publish Image Library…",
             command=self.publish_image_library_to_github,
         )
-        self.publish_image_library_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
+        self.publish_image_library_btn.grid(row=0, column=6, padx=6, pady=6, sticky="ew")
         self.gallery_btn = ctk.CTkButton(
             button_row,
             text="Browse Online Gallery…",
             command=self.open_online_gallery,
         )
-        self.gallery_btn.grid(row=0, column=6, padx=6, pady=6, sticky="ew")
+        self.gallery_btn.grid(row=0, column=7, padx=6, pady=6, sticky="ew")
 
         self.github_token_btn = ctk.CTkButton(
             button_row,
             text=self._github_token_button_label(),
             command=self.configure_github_token,
         )
-        self.github_token_btn.grid(row=0, column=7, padx=6, pady=6, sticky="ew")
+        self.github_token_btn.grid(row=0, column=8, padx=6, pady=6, sticky="ew")
 
         self._update_publish_button_state()
 
@@ -714,6 +721,16 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
         self._start_import_from_bundle(Path(bundle_path))
 
+    def import_image_library_bundle(self):
+        """Import only image library records from a bundle."""
+        bundle_path = filedialog.askopenfilename(
+            title="Import Image Library Bundle",
+            filetypes=[("Zip Files", "*.zip"), ("All Files", "*.*")],
+        )
+        if not bundle_path:
+            return
+        self._start_image_library_import_from_bundle(Path(bundle_path))
+
     def _post_import(self, summary: dict, overwrite: bool):
         """Internal helper for post import."""
         if hasattr(self.master, "refresh_entities"):
@@ -812,6 +829,114 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         self._run_progress_task("Analyzing Bundle", analyze_worker, None, None, on_success=after_analysis)
 
+    def _post_image_library_import(self, summary: dict, overwrite: bool):
+        """Internal helper for image-library-only import completion."""
+        if hasattr(self.master, "refresh_entities"):
+            try:
+                self.master.refresh_entities()
+            except Exception:
+                pass
+        messagebox.showinfo(
+            "Image Library Import Complete",
+            (
+                "Image Library only import completed.\n\n"
+                f"Image assets imported: {summary.get('imported', 0)}\n"
+                f"Image assets updated: {summary.get('updated', 0)}\n"
+                f"Image assets skipped: {summary.get('skipped', 0)}"
+            ),
+        )
+
+    def _start_image_library_import_from_bundle(
+        self,
+        bundle_path: Path,
+        *,
+        cleanup: Optional[Callable[[], None]] = None,
+    ):
+        """Import only image library entities from a bundle archive."""
+        target_campaign = self.active_campaign
+        allowed_entity_types = {"image_assets"}
+
+        def analyze_worker(_callback):
+            """Handle analyze worker."""
+            try:
+                return analyze_bundle(bundle_path, target_campaign.db_path)
+            except Exception:
+                if cleanup:
+                    cleanup()
+                raise
+
+        def after_analysis(analysis):
+            """Handle analysis for image-library-only import."""
+            image_records = analysis.data_by_type.get("image_assets", [])
+            if not image_records:
+                cleanup_analysis(analysis)
+                if cleanup:
+                    cleanup()
+                messagebox.showinfo(
+                    "No Image Library Assets",
+                    "This bundle does not contain any image library assets to import.",
+                )
+                return
+
+            duplicate_names = analysis.duplicates.get("image_assets", [])
+            if duplicate_names:
+                response = messagebox.askyesnocancel(
+                    "Overwrite Existing Image Library Entries?",
+                    "Some image library assets already exist in the active campaign:\n"
+                    f"Image Assets: {len(duplicate_names)}\n\n"
+                    "Select Yes to overwrite them, No to skip duplicates, or Cancel to abort.",
+                )
+                if response is None:
+                    cleanup_analysis(analysis)
+                    if cleanup:
+                        cleanup()
+                    return
+                overwrite = bool(response)
+            else:
+                overwrite = True
+
+            def import_worker(callback):
+                """Import worker for image-library-only flow."""
+                try:
+                    return apply_import_for_entity_types(
+                        analysis,
+                        target_campaign,
+                        entity_types=allowed_entity_types,
+                        overwrite=overwrite,
+                        progress_callback=callback,
+                    )
+                except Exception:
+                    if cleanup:
+                        cleanup()
+                    raise
+
+            def detail(summary: dict) -> str:
+                """Handle detail."""
+                return (
+                    "Image Library only\n"
+                    f"Image assets imported: {summary.get('imported', 0)}\n"
+                    f"Image assets updated: {summary.get('updated', 0)}\n"
+                    f"Image assets skipped: {summary.get('skipped', 0)}"
+                )
+
+            def finalize(result):
+                """Handle finalize."""
+                try:
+                    self._post_image_library_import(result, overwrite)
+                finally:
+                    if cleanup:
+                        cleanup()
+
+            self._run_progress_task(
+                "Importing Image Library",
+                import_worker,
+                "Image Library only bundle imported into the active campaign.",
+                detail,
+                on_success=finalize,
+            )
+
+        self._run_progress_task("Analyzing Bundle", analyze_worker, None, None, on_success=after_analysis)
+
     def open_online_gallery(self):
         """Open online gallery."""
         if self._online_dialog and self._online_dialog.winfo_exists():
@@ -903,7 +1028,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             except Exception:
                 pass
 
-    def _download_gallery_bundle(self, bundle: GalleryBundleSummary, *, install_full_campaign: bool = False):
+    def _download_gallery_bundle(
+        self,
+        bundle: GalleryBundleSummary,
+        *,
+        install_full_campaign: bool = False,
+        image_library_only: bool = False,
+    ):
         """Internal helper for download gallery bundle."""
         temp_dir = Path(tempfile.mkdtemp(prefix="gallery_download_"))
         asset_name = bundle.asset_name or (bundle.tag or "bundle")
@@ -926,9 +1057,16 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             if install_full_campaign:
                 self._install_full_campaign_from_archive(bundle, path, cleanup=cleanup)
                 return
+            if image_library_only:
+                self._start_image_library_import_from_bundle(path, cleanup=cleanup)
+                return
             self._start_import_from_bundle(path, cleanup=cleanup)
 
         self._run_progress_task("Downloading Bundle", worker, None, None, on_success=handle_success)
+
+    def _download_and_import_image_library_bundle(self, bundle: GalleryBundleSummary):
+        """Download a gallery bundle and import only image library entities."""
+        self._download_gallery_bundle(bundle, image_library_only=True)
 
     def _install_full_campaign_from_archive(
         self,
@@ -1238,16 +1376,22 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
 
         button_bar = ctk.CTkFrame(self)
         button_bar.grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=(10, 10))
-        button_bar.grid_columnconfigure((0, 1, 2, 3), weight=1)
+        button_bar.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         self.refresh_btn = ctk.CTkButton(button_bar, text="Refresh", command=self.refresh)
         self.refresh_btn.grid(row=0, column=0, padx=6, pady=6, sticky="ew")
         self.download_btn = ctk.CTkButton(button_bar, text="Download & Import…", command=self._download_selected)
         self.download_btn.grid(row=0, column=1, padx=6, pady=6, sticky="ew")
+        self.download_image_library_btn = ctk.CTkButton(
+            button_bar,
+            text="Import Image Library…",
+            command=self._download_image_library_selected,
+        )
+        self.download_image_library_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
         self.install_btn = ctk.CTkButton(button_bar, text="Download & Install Campaign…", command=self._install_selected)
-        self.install_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
+        self.install_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
         self.delete_btn = ctk.CTkButton(button_bar, text="Delete from GitHub…", command=self._delete_selected)
-        self.delete_btn.grid(row=0, column=3, padx=6, pady=6, sticky="ew")
+        self.delete_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
         if not self.client.can_publish:
             self.delete_btn.configure(state="disabled")
 
@@ -1359,6 +1503,14 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
             messagebox.showinfo("No Selection", "Select a bundle to download.")
             return
         self.parent_window._download_gallery_bundle(bundle)
+
+    def _download_image_library_selected(self):
+        """Download selected bundle and import only image library assets."""
+        bundle = self._current_selection()
+        if not bundle:
+            messagebox.showinfo("No Selection", "Select a bundle to import.")
+            return
+        self.parent_window._download_and_import_image_library_bundle(bundle)
 
     def _install_selected(self):
         """Internal helper for install selected."""
