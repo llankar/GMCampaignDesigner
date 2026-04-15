@@ -966,6 +966,59 @@ def detect_duplicates(
     return duplicates
 
 
+def apply_import_for_entity_types(
+    analysis: BundleAnalysis,
+    target_campaign: CampaignDatabase,
+    *,
+    entity_types: set[str],
+    overwrite: bool,
+    progress_callback=None,
+) -> Dict[str, int]:
+    """Apply import restricted to specific entity types."""
+    selected_types = {entity_type for entity_type in entity_types if entity_type}
+    if not selected_types:
+        return {
+            "imported": 0,
+            "skipped": 0,
+            "updated": 0,
+            "systems_imported": 0,
+            "systems_skipped": 0,
+            "systems_updated": 0,
+        }
+
+    filtered_data = {
+        entity_type: records
+        for entity_type, records in analysis.data_by_type.items()
+        if entity_type in selected_types
+    }
+    filtered_duplicates = {
+        entity_type: names
+        for entity_type, names in analysis.duplicates.items()
+        if entity_type in selected_types
+    }
+    filtered_assets = [
+        asset for asset in analysis.assets if str(asset.get("entity_type") or "") in selected_types
+    ]
+    filtered_world_maps = analysis.world_maps if "maps" in selected_types else None
+
+    filtered_analysis = BundleAnalysis(
+        manifest=analysis.manifest,
+        data_by_type=filtered_data,
+        assets=filtered_assets,
+        temp_dir=analysis.temp_dir,
+        duplicates=filtered_duplicates,
+        database=analysis.database,
+        world_maps=filtered_world_maps,
+        systems=None,
+    )
+    return apply_import(
+        filtered_analysis,
+        target_campaign,
+        overwrite=overwrite,
+        progress_callback=progress_callback,
+    )
+
+
 def apply_import(
     analysis: BundleAnalysis,
     target_campaign: CampaignDatabase,
