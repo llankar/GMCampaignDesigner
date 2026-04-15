@@ -145,7 +145,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         button_row = ctk.CTkFrame(self)
         button_row.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        for column_index in range(7):
+        for column_index in range(8):
             button_row.grid_columnconfigure(column_index, weight=1)
 
         self.export_btn = ctk.CTkButton(button_row, text="Export Selected…", command=self.export_selected)
@@ -166,19 +166,25 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             command=self.publish_selected_to_github,
         )
         self.publish_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
+        self.publish_image_library_btn = ctk.CTkButton(
+            button_row,
+            text="Publish Image Library…",
+            command=self.publish_image_library_to_github,
+        )
+        self.publish_image_library_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
         self.gallery_btn = ctk.CTkButton(
             button_row,
             text="Browse Online Gallery…",
             command=self.open_online_gallery,
         )
-        self.gallery_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
+        self.gallery_btn.grid(row=0, column=6, padx=6, pady=6, sticky="ew")
 
         self.github_token_btn = ctk.CTkButton(
             button_row,
             text=self._github_token_button_label(),
             command=self.configure_github_token,
         )
-        self.github_token_btn.grid(row=0, column=6, padx=6, pady=6, sticky="ew")
+        self.github_token_btn.grid(row=0, column=7, padx=6, pady=6, sticky="ew")
 
         self._update_publish_button_state()
 
@@ -520,6 +526,77 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         if description is None:
             return
         description = description.strip()
+        self._publish_bundle_to_github(
+            selections=selections,
+            title=title,
+            description=description,
+            include_database=publishing_full_campaign,
+        )
+
+    def publish_image_library_to_github(self):
+        """Publish image library records from the selected campaign to GitHub."""
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+        if not self.gallery_client.can_publish:
+            messagebox.showerror(
+                "GitHub Token Required",
+                "Configure a GitHub personal access token with repo scope before publishing.",
+            )
+            return
+
+        selections = self._gather_image_library_records()
+        if not selections:
+            messagebox.showinfo(
+                "No Image Library Assets",
+                "The selected campaign does not contain any image library assets to publish.",
+            )
+            return
+
+        base_name = self.selected_campaign.name or "Campaign"
+        default_title = f"{base_name} Image Library"
+        title = simpledialog.askstring(
+            "Bundle Title",
+            "Enter a title for the GitHub release:",
+            initialvalue=default_title,
+            parent=self,
+        )
+        if title is None:
+            return
+        title = title.strip()
+        if not title:
+            messagebox.showwarning("Invalid Title", "Enter a non-empty title for the bundle.")
+            return
+
+        description = simpledialog.askstring(
+            "Bundle Description",
+            "Optional description for the bundle:",
+            parent=self,
+        )
+        if description is None:
+            return
+        description = description.strip()
+
+        self._publish_bundle_to_github(
+            selections=selections,
+            title=title,
+            description=description,
+            include_database=False,
+            progress_title="Publishing Image Library",
+        )
+
+    def _publish_bundle_to_github(
+        self,
+        *,
+        selections: Dict[str, List[dict]],
+        title: str,
+        description: str,
+        include_database: bool = False,
+        progress_title: str = "Publishing Bundle",
+    ) -> None:
+        """Internal helper for publishing a bundle to GitHub."""
+        if not self.selected_campaign:
+            raise ValueError("A source campaign must be selected before publishing.")
 
         temp_dir = Path(tempfile.mkdtemp(prefix="gallery_publish_"))
         slug = re.sub(r"[^A-Za-z0-9]+", "_", title).strip("_") or "bundle"
@@ -535,7 +612,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     archive_path,
                     self.selected_campaign,
                     selections,
-                    include_database=publishing_full_campaign,
+                    include_database=include_database,
                     include_systems=True,
                     progress_callback=callback,
                 )
@@ -569,7 +646,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             messagebox.showinfo("Bundle Published", message)
             self._refresh_online_dialog()
 
-        self._run_progress_task("Publishing Bundle", worker, None, None, on_success=on_success)
+        self._run_progress_task(progress_title, worker, None, None, on_success=on_success)
 
     def copy_selected_to_current_campaign(self):
         """Copy selected to current campaign."""
@@ -808,6 +885,10 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         except Exception:
             pass
         try:
+            self.publish_image_library_btn.configure(state=state)
+        except Exception:
+            pass
+        try:
             self.github_token_btn.configure(text=self._github_token_button_label())
         except Exception:
             pass
@@ -1004,6 +1085,15 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             for entity_type, records in self.entity_records.items()
             if records
         }
+
+    def _gather_image_library_records(self) -> Dict[str, List[dict]]:
+        """Internal helper for gather image library records."""
+        if not self.selected_campaign:
+            return {}
+        records = load_entities("image_assets", self.selected_campaign.db_path)
+        if not records:
+            return {}
+        return {"image_assets": [copy.deepcopy(record) for record in records]}
 
     # ------------------------------------------------------- Busy handling
     def _run_progress_task(self, title, worker, success_message, detail_builder, on_success=None):
