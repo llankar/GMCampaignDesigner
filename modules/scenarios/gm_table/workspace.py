@@ -32,6 +32,7 @@ DEFAULT_PANEL_SIZES = {
     "map_tool": (900, 640),
     "scene_flow": (860, 600),
     "image_library": (860, 580),
+    "handouts": (760, 560),
     "loot_generator": (620, 520),
     "whiteboard": (900, 640),
     "random_tables": (680, 560),

@@ -21,6 +21,7 @@ from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
+from modules.scenarios.gm_table.handouts_page import GMTableHandoutsPage
 from modules.scenarios.gm_table.pages import (
     GMTableHostedPage,
     GMTableImageLibraryPage,
@@ -123,6 +124,7 @@ class GMTableView(ctk.CTkFrame):
             "Map Tool",
             "Scene Flow",
             "Image Library",
+            "Handouts",
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
@@ -260,6 +262,7 @@ class GMTableView(ctk.CTkFrame):
         self._create_panel("campaign_dashboard", "Campaign Dashboard", {})
         self._create_panel("random_tables", "Random Tables", {})
         self._create_panel("plot_twists", "Plot Twists", {})
+        self._create_panel("handouts", "Handouts", {"scenario_name": self.scenario_name})
         self._create_panel("note", "Session Notes", {"text": ""})
         self.workspace.auto_arrange()
 
@@ -376,6 +379,9 @@ class GMTableView(ctk.CTkFrame):
         if option == "Image Library":
             self._create_panel("image_library", "Image Library", {})
             return
+        if option == "Handouts":
+            self._create_panel("handouts", "Handouts", {"scenario_name": self.scenario_name})
+            return
         if option == "Loot Generator":
             self._create_panel("loot_generator", "Loot Generator", {})
             return
@@ -444,6 +450,12 @@ class GMTableView(ctk.CTkFrame):
                 )
             if kind == "image_library":
                 return GMTableImageLibraryPage(parent, initial_state=definition.state)
+            if kind == "handouts":
+                return GMTableHandoutsPage(
+                    parent,
+                    scenario_name=self.scenario_name,
+                    initial_state=definition.state,
+                )
             if kind == "loot_generator":
                 return GMTableHostedPage(
                     parent,
