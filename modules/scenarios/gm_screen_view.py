@@ -34,6 +34,7 @@ from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
 from modules.scenarios.plot_twist_panel import PlotTwistPanel, roll_plot_twist
+from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
 from modules.scenarios.session_notes import (
     build_scene_snapshot_entry,
     build_session_debrief_entry,
@@ -237,6 +238,7 @@ class GMScreenView(ctk.CTkFrame):
             "Map Tool",
             "Scene Flow",
             "Image Library",
+            "Handouts",
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
@@ -2000,6 +2002,8 @@ class GMScreenView(ctk.CTkFrame):
             self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
         elif kind == "whiteboard":
             self.open_whiteboard_tab(title=title or "Whiteboard")
+        elif kind == "handouts":
+            self.open_handouts_tab(title=title or "Handouts")
         elif kind == "puzzle_display":
             # Handle the branch where kind == 'puzzle_display'.
             puzzle_name = tab_def.get("puzzle_name")
@@ -2517,6 +2521,33 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "loot_generator"},
         )
 
+    def open_handouts_tab(self, title=None):
+        """Open the handouts page inside the GM screen."""
+        frame = GMTableHandoutsPage(
+            self._ensure_rich_host(),
+            scenario_name=self.scenario_name,
+            scenario_item=self.scenario,
+            wrappers=self.wrappers,
+            map_wrapper=self.map_wrapper,
+        )
+
+        def factory(master):
+            """Handle factory."""
+            return GMTableHandoutsPage(
+                master if master is not None else self._ensure_rich_host(),
+                scenario_name=self.scenario_name,
+                scenario_item=self.scenario,
+                wrappers=self.wrappers,
+                map_wrapper=self.map_wrapper,
+            )
+
+        self.add_tab(
+            title or "Handouts",
+            frame,
+            content_factory=factory,
+            layout_meta={"kind": "handouts", "host": "rich"},
+        )
+
     def open_random_tables_tab(self, title=None, initial_state=None):
         """Open the random tables panel inside the GM screen."""
 
@@ -3004,6 +3035,9 @@ class GMScreenView(ctk.CTkFrame):
                 opener()
             else:
                 messagebox.showerror("Image Library", "Image library is unavailable from this window.")
+            return
+        elif entity_type == "Handouts":
+            self.open_handouts_tab()
             return
         elif entity_type == "Loot Generator":
             # Handle the branch where entity_type == 'Loot Generator'.
