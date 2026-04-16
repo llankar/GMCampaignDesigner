@@ -34,7 +34,7 @@ from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_flow_content_factory
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
 from modules.scenarios.plot_twist_panel import PlotTwistPanel, roll_plot_twist
-from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
+from modules.scenarios.gm_screen.handouts.panel import create_handouts_panel
 from modules.scenarios.session_notes import (
     build_scene_snapshot_entry,
     build_session_debrief_entry,
@@ -2530,27 +2530,37 @@ class GMScreenView(ctk.CTkFrame):
 
     def open_handouts_tab(self, title=None):
         """Open the handouts page inside the GM screen."""
-        frame = GMTableHandoutsPage(
-            self._ensure_rich_host(),
+        container = ctk.CTkFrame(self._ensure_rich_host())
+        self._make_fullbleed(container)
+        panel = create_handouts_panel(
+            container,
             scenario_name=self.scenario_name,
             scenario_item=self.scenario,
             wrappers=self.wrappers,
             map_wrapper=self.map_wrapper,
         )
+        panel.pack(fill="both", expand=True)
+        container.handouts_panel = panel
 
         def factory(master):
             """Handle factory."""
-            return GMTableHandoutsPage(
-                master if master is not None else self._ensure_rich_host(),
+            host_parent = master if master is not None else self._ensure_rich_host()
+            frame = ctk.CTkFrame(host_parent)
+            self._make_fullbleed(frame)
+            created = create_handouts_panel(
+                frame,
                 scenario_name=self.scenario_name,
                 scenario_item=self.scenario,
                 wrappers=self.wrappers,
                 map_wrapper=self.map_wrapper,
             )
+            created.pack(fill="both", expand=True)
+            frame.handouts_panel = created
+            return frame
 
         self.add_tab(
             title or "Handouts",
-            frame,
+            container,
             content_factory=factory,
             layout_meta={"kind": "handouts", "host": "rich"},
         )
