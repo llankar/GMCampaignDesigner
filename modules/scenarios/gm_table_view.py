@@ -21,7 +21,7 @@ from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
-from modules.scenarios.gm_table.handouts_page import GMTableHandoutsPage
+from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
 from modules.scenarios.gm_table.pages import (
     GMTableHostedPage,
     GMTableImageLibraryPage,
@@ -454,6 +454,9 @@ class GMTableView(ctk.CTkFrame):
                 return GMTableHandoutsPage(
                     parent,
                     scenario_name=self.scenario_name,
+                    scenario_item=self.scenario,
+                    wrappers=self.wrappers,
+                    map_wrapper=self.map_wrapper,
                     initial_state=definition.state,
                 )
             if kind == "loot_generator":
