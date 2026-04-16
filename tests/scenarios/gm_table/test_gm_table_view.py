@@ -232,3 +232,62 @@ def test_context_menu_binding_helpers_skip_hosts_without_menu_api(monkeypatch) -
     )
     assert callable(recursive_handler)
     assert recursive_calls[-1][0] is widget
+
+
+def test_handle_add_option_routes_handouts_panel_creation() -> None:
+    """Add menu handouts option should spawn a handouts panel."""
+    captured = []
+    view = GMTableView.__new__(GMTableView)
+    view.scenario_name = "Night Run"
+    view._create_panel = lambda kind, title, state: captured.append((kind, title, state))
+
+    GMTableView._handle_add_option(view, "Handouts")
+
+    assert captured == [("handouts", "Handouts", {"scenario_name": "Night Run"})]
+
+
+def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
+    """Handouts panel should mount the dedicated handouts page."""
+    captured = {}
+
+    class _DummyHandoutsPage:
+        def __init__(self, parent, **kwargs) -> None:
+            captured["parent"] = parent
+            captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(gm_table_view_module, "GMTableHandoutsPage", _DummyHandoutsPage)
+
+    view = GMTableView.__new__(GMTableView)
+    view.scenario_name = "Night Run"
+    view.scenario = {"Title": "Night Run"}
+    view.wrappers = {"NPCs": object()}
+    view.map_wrapper = object()
+    definition = gm_table_view_module.PanelDefinition(
+        panel_id="panel-handouts",
+        kind="handouts",
+        title="Handouts",
+        state={"query": "map"},
+    )
+
+    mounted = GMTableView._mount_panel_content(view, object(), definition)
+
+    assert isinstance(mounted, _DummyHandoutsPage)
+    assert captured["kwargs"]["scenario_name"] == "Night Run"
+    assert captured["kwargs"]["scenario_item"] == {"Title": "Night Run"}
+    assert captured["kwargs"]["initial_state"] == {"query": "map"}
+
+
+def test_seed_default_panels_includes_handouts_opened_for_scenario() -> None:
+    """Starter tabletop should include the handouts panel bound to the current scenario."""
+    captured = []
+    view = GMTableView.__new__(GMTableView)
+    view.scenario_name = "Night Run"
+    view.open_entity_panel = lambda entity_type, name: captured.append(("open", entity_type, name))
+    view._create_panel = lambda kind, title, state: captured.append(("panel", kind, title, state))
+    view.workspace = SimpleNamespace(auto_arrange=lambda: captured.append(("arrange",)))
+
+    GMTableView._seed_default_panels(view)
+
+    assert ("panel", "handouts", "Handouts", {"scenario_name": "Night Run"}) in captured
+    assert captured[0] == ("open", "Scenarios", "Night Run")
+    assert captured[-1] == ("arrange",)
