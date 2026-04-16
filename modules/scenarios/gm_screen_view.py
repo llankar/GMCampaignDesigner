@@ -1247,8 +1247,15 @@ class GMScreenView(ctk.CTkFrame):
         if not layout_name:
             layout_name = self.layout_manager.get_scenario_default(self.scenario_name)
         if not layout_name:
+            self._seed_default_startup_tabs()
             return
         self.load_layout(layout_name, silent=True)
+
+    def _seed_default_startup_tabs(self):
+        """Seed default startup tabs when no explicit layout is available."""
+        if "Handouts" in self.tabs:
+            return
+        self.open_handouts_tab("Handouts")
 
     def _initialize_context_menu(self):
         """Internal helper for initialize context menu."""
