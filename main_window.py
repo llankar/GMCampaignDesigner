@@ -177,7 +177,9 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         self._normalize_entity_media_paths()
         self.current_gm_view = None
+        self.current_gm_table = None
         self._gm_mode = False
+        self._gm_table_window = None
         self.dice_roller_window = None
         self.dice_bar_window = None
         self.audio_controller = get_audio_controller()
@@ -1224,7 +1226,7 @@ class MainWindow(ctk.CTk):
 
     def _get_calendar_dock_if_alive(self):
         """Return calendar dock if alive."""
-        dock = getattr(self, "calendar_dock", None)
+        dock = self.__dict__.get("calendar_dock")
         if dock is None:
             return None
 
@@ -1236,6 +1238,81 @@ class MainWindow(ctk.CTk):
             return None
 
         return dock
+
+    def _get_gm_table_window(self):
+        """Return the detached GM Table window if it is still alive."""
+        window = self.__dict__.get("_gm_table_window")
+        if window is None:
+            return None
+
+        try:
+            if not window.winfo_exists():
+                self._clear_gm_table_window_reference(window)
+                return None
+        except Exception:
+            self._clear_gm_table_window_reference(window)
+            return None
+
+        return window
+
+    def _focus_detached_window(self, window) -> None:
+        """Bring a detached window to the front."""
+        try:
+            window.lift()
+        except Exception:
+            pass
+
+        try:
+            window.focus_force()
+        except Exception:
+            pass
+
+        try:
+            window.attributes("-topmost", True)
+            window.after_idle(lambda: window.attributes("-topmost", False))
+        except Exception:
+            pass
+
+    def _maximize_detached_window(self, window) -> None:
+        """Open a detached window at a desktop-friendly full size."""
+        try:
+            screen_width = int(window.winfo_screenwidth())
+            screen_height = int(window.winfo_screenheight())
+        except Exception:
+            screen_width = 1920
+            screen_height = 1080
+
+        try:
+            window.geometry(f"{screen_width}x{screen_height}+0+0")
+        except Exception:
+            pass
+
+        try:
+            window.minsize(min(screen_width, 1600), min(screen_height, 900))
+        except Exception:
+            pass
+
+    def _clear_gm_table_window_reference(self, window=None) -> None:
+        """Forget the detached GM Table window if it matches the tracked one."""
+        tracked_window = self.__dict__.get("_gm_table_window")
+        if window is not None and tracked_window is not window:
+            return
+
+        self._gm_table_window = None
+        self.current_gm_table = None
+
+    def _close_gm_table_window(self) -> None:
+        """Close the detached GM Table window if it is open."""
+        window = self._get_gm_table_window()
+        if window is None:
+            self._clear_gm_table_window_reference()
+            return
+
+        self._clear_gm_table_window_reference(window)
+        try:
+            window.destroy()
+        except Exception:
+            pass
 
     def _toggle_calendar_dock(self):
         """Toggle calendar dock."""
@@ -2666,9 +2743,6 @@ class MainWindow(ctk.CTk):
 
     def open_gm_table(self, *, show_empty_message=True, scenario_name=None):
         """Open the virtual tabletop style GM Table."""
-        self.clear_current_content()
-        self._gm_mode = True
-
         scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
         self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
         scenarios = scenario_wrapper.load_items()
@@ -2721,29 +2795,49 @@ class MainWindow(ctk.CTk):
             picker.pack(fill="both", expand=True)
             return
 
-        if getattr(self, "banner_frame", None) and self.banner_frame.winfo_exists():
-            try:
-                self.banner_frame.grid_remove()
-            except Exception:
-                pass
+        selected_title = _resolve_scenario_title(selected)
+        existing_window = self._get_gm_table_window()
+        if existing_window is not None:
+            if getattr(existing_window, "_gm_table_scenario_name", None) == selected_title or scenario_name is None:
+                self._focus_detached_window(existing_window)
+                return existing_window
+            self._close_gm_table_window()
 
-        self.inner_content_frame.grid(row=1, column=0, sticky="nsew")
-        for widget in self.inner_content_frame.winfo_children():
-            widget.destroy()
+        try:
+            from modules.scenarios.gm_table_view import GMTableView
 
-        detail_container = ctk.CTkFrame(self.inner_content_frame, fg_color="transparent")
-        detail_container.grid(row=0, column=0, sticky="nsew")
+            window = ctk.CTkToplevel(self)
+            window.title(f"GM Table - {selected_title}")
+            self._maximize_detached_window(window)
+            self._focus_detached_window(window)
 
-        from modules.scenarios.gm_table_view import GMTableView
+            def _on_close():
+                """Handle GM Table close."""
+                self._clear_gm_table_window_reference(window)
+                try:
+                    window.destroy()
+                except Exception:
+                    pass
 
-        view = GMTableView(
-            detail_container,
-            scenario_item=selected,
-            root_app=self,
-        )
-        view.pack(fill="both", expand=True)
-        self.current_gm_table = view
-        view.after_idle(view.log_workspace_opened)
+            window.protocol("WM_DELETE_WINDOW", _on_close)
+
+            detail_container = ctk.CTkFrame(window, fg_color="transparent")
+            detail_container.pack(fill="both", expand=True)
+            view = GMTableView(
+                detail_container,
+                scenario_item=selected,
+                root_app=self,
+            )
+            view.pack(fill="both", expand=True)
+            window._gm_table_view = view
+            window._gm_table_scenario_name = selected_title
+            self._gm_table_window = window
+            self.current_gm_table = view
+            view.after_idle(view.log_workspace_opened)
+            return window
+        except Exception:
+            self._close_gm_table_window()
+            raise
 
     def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):
         """Open GM screen."""

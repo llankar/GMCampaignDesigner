@@ -48,6 +48,17 @@ PANEL_MARGIN = 12
 PANEL_GUTTER = 12
 PANEL_SNAP_THRESHOLD = 48
 PANEL_RESIZE_HITBOX = 10
+VISIBLE_LAYOUT_MODES = {"floating", "left", "right", "maximize"}
+WORKSPACE_STATE_KEYS = {
+    "height",
+    "layout_mode",
+    "minimized_restore_mode",
+    "restore_geometry",
+    "width",
+    "x",
+    "y",
+    "z",
+}
 
 
 def resolve_default_panel_size(kind: str, state: dict | None = None) -> tuple[int, int]:
@@ -63,6 +74,17 @@ def resolve_default_panel_size(kind: str, state: dict | None = None) -> tuple[in
     if entity_type in {"Informations", "Places", "Bases"}:
         return 760, 580
     return 680, 560
+
+
+def _payload_state(state: dict | None) -> dict:
+    """Strip workspace-only metadata from persisted panel state."""
+    if not isinstance(state, dict):
+        return {}
+    return {
+        key: value
+        for key, value in state.items()
+        if key not in WORKSPACE_STATE_KEYS
+    }
 
 
 def _clamp(value: int, minimum: int, maximum: int) -> int:
@@ -233,7 +255,7 @@ class PanelDefinition:
 
 
 class GMTablePanel(ctk.CTkFrame):
-    """Floating panel with drag and resize affordances."""
+    """Floating panel with drag, resize, and window controls."""
 
     MIN_WIDTH = 300
     MIN_HEIGHT = 220
@@ -250,6 +272,7 @@ class GMTablePanel(ctk.CTkFrame):
         on_geometry_changed: Callable[[str], None],
         on_snap_requested: Callable[[str, str], None],
         on_toggle_maximize: Callable[[str], None],
+        on_window_action: Callable[[str, str], None],
     ) -> None:
         super().__init__(
             master,
@@ -266,10 +289,13 @@ class GMTablePanel(ctk.CTkFrame):
         self._on_geometry_changed = on_geometry_changed
         self._on_snap_requested = on_snap_requested
         self._on_toggle_maximize = on_toggle_maximize
+        self._on_window_action = on_window_action
         self._drag_origin: tuple[int, int, int, int] | None = None
         self._resize_origin: tuple[int, int, dict[str, int], str] | None = None
         self._restore_geometry: dict[str, int] | None = None
         self._layout_mode = "floating"
+        self._minimized_restore_mode = "floating"
+        self._current_geometry = {"x": 0, "y": 0, "width": width, "height": height}
         self._resize_handles: dict[str, tk.Frame] = {}
         self._is_focused = False
         self.grid_rowconfigure(1, weight=1)
@@ -277,7 +303,7 @@ class GMTablePanel(ctk.CTkFrame):
 
         self.header = ctk.CTkFrame(self, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=18)
         self.header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 0))
-        self.header.grid_columnconfigure(1, weight=1)
+        self.header.grid_columnconfigure(0, weight=1)
 
         self.eyebrow_label = ctk.CTkLabel(
             self.header,
@@ -294,10 +320,52 @@ class GMTablePanel(ctk.CTkFrame):
             font=ctk.CTkFont(size=17, weight="bold"),
             anchor="w",
         )
-        self.title_label.grid(row=1, column=0, columnspan=2, padx=14, pady=(0, 10), sticky="ew")
+        self.title_label.grid(row=1, column=0, padx=14, pady=(0, 10), sticky="ew")
 
-        close_button = ctk.CTkButton(
-            self.header,
+        self.controls = ctk.CTkFrame(self.header, fg_color="transparent")
+        self.controls.grid(row=0, column=1, rowspan=2, padx=(8, 10), pady=10, sticky="ne")
+
+        self.minimize_button = ctk.CTkButton(
+            self.controls,
+            text="-",
+            width=30,
+            height=28,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=12,
+            command=lambda: self._dispatch_window_action("minimize"),
+        )
+        self.minimize_button.pack(side="left", padx=(0, 6))
+
+        self.maximize_button = ctk.CTkButton(
+            self.controls,
+            text="Max",
+            width=54,
+            height=28,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=12,
+            command=lambda: self._dispatch_window_action("toggle_maximize"),
+        )
+        self.maximize_button.pack(side="left", padx=(0, 6))
+
+        self.actions_button = ctk.CTkButton(
+            self.controls,
+            text="...",
+            width=34,
+            height=28,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=12,
+            command=self._show_actions_menu,
+        )
+        self.actions_button.pack(side="left", padx=(0, 6))
+
+        self.close_button = ctk.CTkButton(
+            self.controls,
             text="x",
             width=30,
             height=28,
@@ -307,7 +375,9 @@ class GMTablePanel(ctk.CTkFrame):
             corner_radius=12,
             command=lambda: self._on_close(self.definition.panel_id),
         )
-        close_button.grid(row=0, column=2, rowspan=2, padx=(8, 10), pady=10, sticky="e")
+        self.close_button.pack(side="left")
+
+        self._actions_menu = tk.Menu(self, tearoff=0)
 
         self.body = ctk.CTkFrame(self, fg_color="transparent")
         self.body.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
@@ -336,6 +406,7 @@ class GMTablePanel(ctk.CTkFrame):
         self._bind_focus(self.eyebrow_label)
         self._install_drag_bindings()
         self._install_resize_bindings()
+        self._refresh_window_controls()
 
     def _bind_focus(self, widget) -> None:
         """Raise the panel when clicked."""
@@ -385,18 +456,21 @@ class GMTablePanel(ctk.CTkFrame):
 
     @property
     def layout_mode(self) -> str:
-        """Return the current docked layout mode."""
+        """Return the current layout mode."""
         return self._layout_mode
 
     def enter_layout_mode(self, mode: str, geometry: dict[str, int]) -> None:
-        """Apply a docked/maximized layout and remember the floating geometry."""
-        if mode != "floating" and self._layout_mode == "floating":
+        """Apply a docked or maximized layout and remember the floating geometry."""
+        if mode != "floating" and mode != "minimized" and self._layout_mode == "floating":
             self._restore_geometry = self.geometry_snapshot()
+        if mode != "minimized":
+            self._minimized_restore_mode = mode
         self._layout_mode = mode
         self.apply_geometry(geometry)
+        self._refresh_window_controls()
 
     def restore_layout(self, *, anchor_x_root: int | None = None, anchor_y_root: int | None = None) -> bool:
-        """Restore the last floating geometry."""
+        """Restore the last floating geometry from a snapped or maximized state."""
         if not self._restore_geometry:
             return False
         geometry = dict(self._restore_geometry)
@@ -435,24 +509,120 @@ class GMTablePanel(ctk.CTkFrame):
             min_height=self.MIN_HEIGHT,
         )
         self._layout_mode = "floating"
+        self._minimized_restore_mode = "floating"
         self.apply_geometry(constrained)
+        self._refresh_window_controls()
+        return True
+
+    def minimize(self) -> None:
+        """Hide the panel and remember how it should restore."""
+        if self._layout_mode == "minimized":
+            return
+        restore_mode = self._layout_mode if self._layout_mode in VISIBLE_LAYOUT_MODES else "floating"
+        if restore_mode == "floating":
+            self._restore_geometry = self.geometry_snapshot()
+        self._minimized_restore_mode = restore_mode
+        self._layout_mode = "minimized"
+        self.place_forget()
+        self._refresh_window_controls()
+
+    def restore_from_minimized(self, *, surface_w: int, surface_h: int) -> bool:
+        """Restore a minimized panel to its prior visible state."""
+        if self._layout_mode != "minimized":
+            return False
+        mode = self._minimized_restore_mode or "floating"
+        if mode == "floating":
+            geometry = dict(self._restore_geometry or self._current_geometry)
+            geometry = _constrain_panel_geometry(
+                int(geometry.get("x", 24)),
+                int(geometry.get("y", 24)),
+                int(geometry.get("width", self.MIN_WIDTH)),
+                int(geometry.get("height", self.MIN_HEIGHT)),
+                surface_w=surface_w,
+                surface_h=surface_h,
+                min_width=self.MIN_WIDTH,
+                min_height=self.MIN_HEIGHT,
+            )
+            self._layout_mode = "floating"
+            self.apply_geometry(geometry)
+        else:
+            self._layout_mode = mode
+            self.apply_geometry(
+                _snap_geometry(
+                    mode,
+                    surface_w=surface_w,
+                    surface_h=surface_h,
+                    min_width=self.MIN_WIDTH,
+                    min_height=self.MIN_HEIGHT,
+                )
+            )
+        self._refresh_window_controls()
         return True
 
     def clear_layout_mode(self) -> None:
         """Return to freeform mode without changing geometry."""
         self._layout_mode = "floating"
+        self._minimized_restore_mode = "floating"
+        self._refresh_window_controls()
 
     def apply_geometry(self, geometry: dict[str, int]) -> None:
         """Apply panel geometry in one place."""
         self._apply_geometry(
-            x=int(geometry.get("x", self.winfo_x())),
-            y=int(geometry.get("y", self.winfo_y())),
-            width=int(geometry.get("width", self.winfo_width())),
-            height=int(geometry.get("height", self.winfo_height())),
+            x=int(geometry.get("x", self._current_geometry["x"])),
+            y=int(geometry.get("y", self._current_geometry["y"])),
+            width=int(geometry.get("width", self._current_geometry["width"])),
+            height=int(geometry.get("height", self._current_geometry["height"])),
         )
+
+    def serialize_layout_state(self) -> dict[str, object]:
+        """Return panel layout metadata for persistence."""
+        payload: dict[str, object] = {"layout_mode": self._layout_mode}
+        if self._restore_geometry:
+            payload["restore_geometry"] = dict(self._restore_geometry)
+        if self._layout_mode == "minimized" or self._minimized_restore_mode != "floating":
+            payload["minimized_restore_mode"] = self._minimized_restore_mode
+        return payload
+
+    def _dispatch_window_action(self, action: str) -> None:
+        """Forward a window action to the workspace."""
+        self._on_window_action(self.definition.panel_id, action)
+
+    def _show_actions_menu(self) -> None:
+        """Open the window actions menu."""
+        self._on_focus(self.definition.panel_id)
+        menu = self._actions_menu
+        menu.delete(0, "end")
+        menu.add_command(label="Restore", command=lambda: self._dispatch_window_action("restore"))
+        menu.add_command(label="Minimize", command=lambda: self._dispatch_window_action("minimize"))
+        maximize_label = "Restore Size" if self._layout_mode in {"left", "right", "maximize"} else "Maximize"
+        menu.add_command(label=maximize_label, command=lambda: self._dispatch_window_action("toggle_maximize"))
+        menu.add_separator()
+        menu.add_command(label="Snap Left", command=lambda: self._dispatch_window_action("snap_left"))
+        menu.add_command(label="Snap Right", command=lambda: self._dispatch_window_action("snap_right"))
+        menu.add_separator()
+        menu.add_command(label="Close Others", command=lambda: self._dispatch_window_action("close_others"))
+        menu.add_command(label="Cascade Windows", command=lambda: self._dispatch_window_action("cascade_all"))
+        menu.add_command(label="Tile Windows", command=lambda: self._dispatch_window_action("tile_all"))
+        menu.add_command(label="Restore All", command=lambda: self._dispatch_window_action("restore_all"))
+        menu.add_separator()
+        menu.add_command(label="Close", command=lambda: self._on_close(self.definition.panel_id))
+
+        x = self.actions_button.winfo_rootx()
+        y = self.actions_button.winfo_rooty() + self.actions_button.winfo_height()
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def _refresh_window_controls(self) -> None:
+        """Refresh control labels for the current layout mode."""
+        maximize_label = "Restore" if self._layout_mode in {"left", "right", "maximize"} else "Max"
+        self.maximize_button.configure(text=maximize_label)
 
     def _start_drag(self, event) -> None:
         """Start moving a panel."""
+        if self._layout_mode == "minimized":
+            return
         self._on_focus(self.definition.panel_id)
         if self._layout_mode != "floating":
             self.restore_layout(anchor_x_root=event.x_root, anchor_y_root=event.y_root)
@@ -475,6 +645,8 @@ class GMTablePanel(ctk.CTkFrame):
             min_height=self.MIN_HEIGHT,
         )
         self.place_configure(x=geometry["x"], y=geometry["y"])
+        self._current_geometry["x"] = geometry["x"]
+        self._current_geometry["y"] = geometry["y"]
 
     def _stop_drag(self, event=None) -> None:
         """Stop dragging and snap to the workspace grid."""
@@ -514,6 +686,8 @@ class GMTablePanel(ctk.CTkFrame):
 
     def _start_resize(self, event, direction: str = "se") -> None:
         """Start resizing a panel."""
+        if self._layout_mode == "minimized":
+            return
         self._on_focus(self.definition.panel_id)
         self.clear_layout_mode()
         self._resize_origin = (event.x_root, event.y_root, self.geometry_snapshot(), direction)
@@ -543,10 +717,10 @@ class GMTablePanel(ctk.CTkFrame):
         self._resize_origin = None
         surface_w, surface_h = _surface_dimensions(self.master)
         geometry = _constrain_panel_geometry(
-            _snap(self.winfo_x()),
-            _snap(self.winfo_y()),
-            _snap(self.winfo_width()),
-            _snap(self.winfo_height()),
+            _snap(self.geometry_snapshot()["x"]),
+            _snap(self.geometry_snapshot()["y"]),
+            _snap(self.geometry_snapshot()["width"]),
+            _snap(self.geometry_snapshot()["height"]),
             surface_w=surface_w,
             surface_h=surface_h,
             min_width=self.MIN_WIDTH,
@@ -566,18 +740,19 @@ class GMTablePanel(ctk.CTkFrame):
         self.title_label.configure(text=title)
 
     def geometry_snapshot(self) -> dict[str, int]:
-        """Return the current panel geometry."""
-        return {
-            "x": int(self.winfo_x()),
-            "y": int(self.winfo_y()),
-            "width": int(self.winfo_width()),
-            "height": int(self.winfo_height()),
-        }
+        """Return the last known panel geometry."""
+        return dict(self._current_geometry)
 
     def _apply_geometry(self, *, x: int, y: int, width: int, height: int) -> None:
         """Apply size and position together."""
-        self._set_size(width, height)
-        self.place_configure(x=int(x), y=int(y))
+        self._current_geometry = {
+            "x": int(x),
+            "y": int(y),
+            "width": max(self.MIN_WIDTH, int(width)),
+            "height": max(self.MIN_HEIGHT, int(height)),
+        }
+        self._set_size(self._current_geometry["width"], self._current_geometry["height"])
+        self.place_configure(x=self._current_geometry["x"], y=self._current_geometry["y"])
 
     def _set_size(self, width: int, height: int) -> None:
         """Update the CTk widget size."""
@@ -622,8 +797,29 @@ class GMTableWorkspace(ctk.CTkFrame):
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 18))
+        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 10))
         self.surface.bind("<Configure>", self._on_surface_configure, add="+")
+
+        self.tray = ctk.CTkFrame(
+            self,
+            fg_color=TABLE_PALETTE["table_alt"],
+            corner_radius=20,
+            border_width=1,
+            border_color=TABLE_PALETTE["table_line"],
+        )
+        self.tray.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 18))
+        self.tray.grid_columnconfigure(1, weight=1)
+
+        self.tray_label = ctk.CTkLabel(
+            self.tray,
+            text="Minimized",
+            text_color=TABLE_PALETTE["muted"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        self.tray_label.grid(row=0, column=0, padx=(14, 10), pady=10, sticky="w")
+
+        self.tray_buttons = ctk.CTkFrame(self.tray, fg_color="transparent")
+        self.tray_buttons.grid(row=0, column=1, padx=(0, 12), pady=8, sticky="ew")
 
         self._empty_state = ctk.CTkLabel(
             self.surface,
@@ -632,12 +828,14 @@ class GMTableWorkspace(ctk.CTkFrame):
             font=ctk.CTkFont(size=18, weight="bold"),
         )
         self._empty_state.place(relx=0.5, rely=0.5, anchor="center")
+        self._refresh_minimized_tray()
 
     def _schedule_layout_changed(self) -> None:
         """Debounce layout persistence."""
         if self._disposed:
             return
         self._refresh_empty_state()
+        self._refresh_minimized_tray()
         if self._layout_changed_callback is None:
             return
         if self._save_job is not None:
@@ -660,6 +858,42 @@ class GMTableWorkspace(ctk.CTkFrame):
         else:
             self._empty_state.place(relx=0.5, rely=0.5, anchor="center")
 
+    def _minimized_panel_ids(self) -> list[str]:
+        """Return minimized panels in z-order."""
+        return [
+            panel_id
+            for panel_id in self._z_order
+            if panel_id in self._panels and self._panels[panel_id].layout_mode == "minimized"
+        ]
+
+    def _refresh_minimized_tray(self) -> None:
+        """Refresh the minimized panel tray."""
+        tray = getattr(self, "tray", None)
+        buttons_frame = getattr(self, "tray_buttons", None)
+        if tray is None or buttons_frame is None:
+            return
+        for child in buttons_frame.winfo_children():
+            child.destroy()
+        minimized_ids = self._minimized_panel_ids()
+        if not minimized_ids:
+            tray.grid_remove()
+            return
+        tray.grid()
+        for panel_id in minimized_ids:
+            definition = self._definitions.get(panel_id)
+            if definition is None:
+                continue
+            ctk.CTkButton(
+                buttons_frame,
+                text=definition.title,
+                height=30,
+                fg_color=TABLE_PALETTE["table_chip"],
+                hover_color="#283146",
+                text_color=TABLE_PALETTE["text"],
+                corner_radius=12,
+                command=lambda value=panel_id: self.restore_panel(value),
+            ).pack(side="left", padx=(0, 8))
+
     def _on_surface_configure(self, _event=None) -> None:
         """Keep docked panels aligned when the workspace changes size."""
         self._refresh_empty_state()
@@ -679,16 +913,104 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
         self.clamp_panels()
 
+    def _apply_focus_state(self, panel_id: str | None) -> None:
+        """Refresh visual focus across all panels."""
+        for current_id, panel in self._panels.items():
+            is_target = current_id == panel_id and panel.layout_mode != "minimized"
+            panel.set_focus_state(is_target)
+            if is_target:
+                panel.lift()
+
+    def _visible_panel_ids(self) -> list[str]:
+        """Return visible panels in z-order."""
+        return [
+            panel_id
+            for panel_id in self._z_order
+            if panel_id in self._panels and self._panels[panel_id].layout_mode != "minimized"
+        ]
+
+    def _last_visible_panel_id(self, *, exclude: str | None = None) -> str | None:
+        """Return the topmost visible panel other than an optional exclusion."""
+        for panel_id in reversed(self._z_order):
+            if panel_id == exclude:
+                continue
+            panel = self._panels.get(panel_id)
+            if panel is not None and panel.layout_mode != "minimized":
+                return panel_id
+        return None
+
+    def _surface_geometry(self) -> tuple[int, int]:
+        """Return stable workspace dimensions."""
+        self.update_idletasks()
+        return _surface_dimensions(self.surface)
+
+    def list_panels(
+        self,
+        *,
+        kinds: set[str] | None = None,
+        include_minimized: bool = True,
+    ) -> list[dict[str, object]]:
+        """Return panel records in z-order."""
+        records: list[dict[str, object]] = []
+        for panel_id in self._z_order:
+            panel = self._panels.get(panel_id)
+            definition = self._definitions.get(panel_id)
+            if panel is None or definition is None:
+                continue
+            if kinds is not None and definition.kind not in kinds:
+                continue
+            if not include_minimized and panel.layout_mode == "minimized":
+                continue
+            records.append(
+                {
+                    "panel_id": panel_id,
+                    "panel": panel,
+                    "definition": definition,
+                    "payload": self._panel_payloads.get(panel_id),
+                    "layout_mode": panel.layout_mode,
+                }
+            )
+        return records
+
+    def get_active_panel_id(
+        self,
+        *,
+        kinds: set[str] | None = None,
+        include_minimized: bool = False,
+    ) -> str | None:
+        """Return the topmost panel id matching an optional kind filter."""
+        for panel_id in reversed(self._z_order):
+            panel = self._panels.get(panel_id)
+            definition = self._definitions.get(panel_id)
+            if panel is None or definition is None:
+                continue
+            if kinds is not None and definition.kind not in kinds:
+                continue
+            if not include_minimized and panel.layout_mode == "minimized":
+                continue
+            return panel_id
+        return None
+
+    def get_panel_payload(self, panel_id: str) -> object | None:
+        """Return the hosted payload for a panel."""
+        return self._panel_payloads.get(panel_id)
+
+    def get_panel_definition(self, panel_id: str) -> PanelDefinition | None:
+        """Return a panel definition."""
+        return self._definitions.get(panel_id)
+
     def bring_to_front(self, panel_id: str) -> None:
         """Focus a panel and raise it visually."""
-        if panel_id not in self._panels:
+        panel = self._panels.get(panel_id)
+        if panel is None:
             return
-        for current_id, panel in self._panels.items():
-            panel.set_focus_state(current_id == panel_id)
-        panel = self._panels[panel_id]
-        panel.lift()
-        panel.definition.state["z"] = len(self._z_order) + 1
+        if panel.layout_mode == "minimized":
+            self.restore_panel(panel_id, focus=False)
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                return
         self._z_order = [value for value in self._z_order if value != panel_id] + [panel_id]
+        self._apply_focus_state(panel_id)
         self._schedule_layout_changed()
 
     def remove_panel(self, panel_id: str) -> None:
@@ -704,6 +1026,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 pass
         if panel is not None:
             panel.destroy()
+        self._apply_focus_state(self._last_visible_panel_id())
         self._schedule_layout_changed()
 
     def clear(self) -> None:
@@ -749,9 +1072,9 @@ class GMTableWorkspace(ctk.CTkFrame):
             on_geometry_changed=lambda _panel_id: self._schedule_layout_changed(),
             on_snap_requested=self.snap_panel,
             on_toggle_maximize=self.toggle_panel_maximize,
+            on_window_action=self.handle_window_action,
         )
-        panel._set_size(width, height)
-        panel.place(x=x, y=y)
+        panel.apply_geometry({"x": x, "y": y, "width": width, "height": height})
         panel_payload = self._build_panel(panel.body, definition)
         self._mount_payload_widget(panel.body, panel_payload)
         self._panels[definition.panel_id] = panel
@@ -763,7 +1086,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         return panel
 
     def _mount_payload_widget(self, host: ctk.CTkFrame, payload: object) -> None:
-        """Grid widget payloads that are returned directly by panel builders."""
+        """Grid widget payloads that are returned directly by builders."""
         if not isinstance(payload, tk.Widget):
             return
         try:
@@ -779,6 +1102,36 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
         payload.grid(row=0, column=0, sticky="nsew")
 
+    def handle_window_action(self, panel_id: str, action: str) -> None:
+        """Dispatch a panel window action."""
+        if action == "restore":
+            self.restore_panel(panel_id)
+            return
+        if action == "minimize":
+            self.minimize_panel(panel_id)
+            return
+        if action == "toggle_maximize":
+            self.toggle_panel_maximize(panel_id)
+            return
+        if action == "snap_left":
+            self.snap_panel(panel_id, "left")
+            return
+        if action == "snap_right":
+            self.snap_panel(panel_id, "right")
+            return
+        if action == "close_others":
+            self.close_other_panels(panel_id)
+            return
+        if action == "cascade_all":
+            self.cascade_panels()
+            return
+        if action == "tile_all":
+            self.auto_arrange()
+            return
+        if action == "restore_all":
+            self.restore_all_panels()
+            return
+
     def resize_panel(self, panel_id: str, width: int, height: int) -> None:
         """Resize an existing panel and keep it visible."""
         panel = self._panels.get(panel_id)
@@ -787,8 +1140,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         self.update_idletasks()
         surface_w, surface_h = _surface_dimensions(self.surface)
         geometry = _constrain_panel_geometry(
-            int(panel.winfo_x()),
-            int(panel.winfo_y()),
+            int(panel.geometry_snapshot()["x"]),
+            int(panel.geometry_snapshot()["y"]),
             int(width),
             int(height),
             surface_w=surface_w,
@@ -805,8 +1158,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         panel = self._panels.get(panel_id)
         if panel is None:
             return
-        current_width = max(GMTablePanel.MIN_WIDTH, int(panel.winfo_width()))
-        current_height = max(GMTablePanel.MIN_HEIGHT, int(panel.winfo_height()))
+        current_geometry = panel.geometry_snapshot()
+        current_width = max(GMTablePanel.MIN_WIDTH, int(current_geometry["width"]))
+        current_height = max(GMTablePanel.MIN_HEIGHT, int(current_geometry["height"]))
         target_width = max(current_width, int(width))
         target_height = max(current_height, int(height))
         if target_width == current_width and target_height == current_height:
@@ -819,22 +1173,82 @@ class GMTableWorkspace(ctk.CTkFrame):
         return 28 + ((index * 28) % 280), 24 + ((index * 24) % 220)
 
     def _find_snap_companion(self, panel_id: str) -> str | None:
-        """Return the next panel that should pair with a snapped panel."""
+        """Return the next visible panel that should pair with a snapped panel."""
         for candidate_id in reversed(self._z_order):
-            if candidate_id != panel_id and candidate_id in self._panels:
-                return candidate_id
+            if candidate_id == panel_id:
+                continue
+            candidate = self._panels.get(candidate_id)
+            if candidate is None or candidate.layout_mode == "minimized":
+                continue
+            return candidate_id
         return None
 
-    def _surface_geometry(self) -> tuple[int, int]:
-        """Return stable workspace dimensions."""
-        self.update_idletasks()
-        return _surface_dimensions(self.surface)
+    def minimize_panel(self, panel_id: str) -> None:
+        """Minimize a panel into the workspace tray."""
+        panel = self._panels.get(panel_id)
+        if panel is None or panel.layout_mode == "minimized":
+            return
+        panel.minimize()
+        self._apply_focus_state(self._last_visible_panel_id(exclude=panel_id))
+        self._schedule_layout_changed()
+
+    def restore_panel(self, panel_id: str, *, focus: bool = True) -> None:
+        """Restore a minimized, snapped, or maximized panel."""
+        panel = self._panels.get(panel_id)
+        if panel is None:
+            return
+        if panel.layout_mode == "minimized":
+            surface_w, surface_h = self._surface_geometry()
+            if not panel.restore_from_minimized(surface_w=surface_w, surface_h=surface_h):
+                return
+            self._schedule_layout_changed()
+            if focus:
+                self.bring_to_front(panel_id)
+            else:
+                self._apply_focus_state(self.get_active_panel_id())
+            return
+        if panel.layout_mode in {"left", "right", "maximize"} and panel.restore_layout():
+            self._schedule_layout_changed()
+            if focus:
+                self.bring_to_front(panel_id)
+            else:
+                self._apply_focus_state(self.get_active_panel_id())
+            return
+        if focus:
+            self.bring_to_front(panel_id)
+
+    def restore_all_panels(self) -> None:
+        """Restore every minimized panel."""
+        restored_any = False
+        surface_w, surface_h = self._surface_geometry()
+        for panel_id in list(self._minimized_panel_ids()):
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                continue
+            restored_any = panel.restore_from_minimized(surface_w=surface_w, surface_h=surface_h) or restored_any
+        if restored_any:
+            active = self.get_active_panel_id()
+            self._apply_focus_state(active)
+            self._schedule_layout_changed()
+
+    def close_other_panels(self, panel_id: str) -> None:
+        """Close every panel except the target panel."""
+        for candidate_id in list(self._z_order):
+            if candidate_id != panel_id:
+                self.remove_panel(candidate_id)
+        if panel_id in self._panels:
+            self.bring_to_front(panel_id)
 
     def snap_panel(self, panel_id: str, mode: str) -> None:
         """Snap a panel to the workspace edges like a desktop window."""
         panel = self._panels.get(panel_id)
         if panel is None:
             return
+        if panel.layout_mode == "minimized":
+            self.restore_panel(panel_id, focus=False)
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                return
         surface_w, surface_h = self._surface_geometry()
         geometry = _snap_geometry(
             mode,
@@ -863,11 +1277,19 @@ class GMTableWorkspace(ctk.CTkFrame):
         self.bring_to_front(panel_id)
 
     def toggle_panel_maximize(self, panel_id: str) -> None:
-        """Toggle maximize/restore from a panel header."""
+        """Toggle maximize or restore from a panel header."""
         panel = self._panels.get(panel_id)
         if panel is None:
             return
-        if panel.layout_mode == "maximize" and panel.restore_layout():
+        if panel.layout_mode == "minimized":
+            self.restore_panel(panel_id, focus=False)
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                return
+        if panel.layout_mode == "maximize":
+            self.restore_panel(panel_id)
+            return
+        if panel.layout_mode in {"left", "right"} and panel.restore_layout():
             self.bring_to_front(panel_id)
             return
         surface_w, surface_h = self._surface_geometry()
@@ -884,8 +1306,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         self.bring_to_front(panel_id)
 
     def auto_arrange(self) -> None:
-        """Tile panels across the surface."""
-        if not self._panels:
+        """Tile visible panels across the surface."""
+        visible_ids = self._visible_panel_ids()
+        if not visible_ids:
             return
         self.update_idletasks()
         surface_w = max(960, self.surface.winfo_width())
@@ -897,7 +1320,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         x = margin
         y = margin
         row_height = 0
-        for panel_id in list(self._z_order):
+        for panel_id in visible_ids:
             panel = self._panels.get(panel_id)
             definition = self._definitions.get(panel_id)
             if panel is None:
@@ -906,13 +1329,14 @@ class GMTableWorkspace(ctk.CTkFrame):
                 definition.kind if definition is not None else "entity",
                 definition.state if definition is not None else None,
             )
+            geometry = panel.geometry_snapshot()
             width = _clamp(
-                max(int(panel.winfo_width()), int(preferred_width)),
+                max(int(geometry["width"]), int(preferred_width)),
                 GMTablePanel.MIN_WIDTH,
                 max_width,
             )
             height = _clamp(
-                max(int(panel.winfo_height()), int(preferred_height)),
+                max(int(geometry["height"]), int(preferred_height)),
                 GMTablePanel.MIN_HEIGHT,
                 max_height,
             )
@@ -926,11 +1350,36 @@ class GMTableWorkspace(ctk.CTkFrame):
             x += width + gutter
         self._schedule_layout_changed()
 
+    def cascade_panels(self) -> None:
+        """Cascade visible panels diagonally like classic desktop windows."""
+        visible_ids = self._visible_panel_ids()
+        if not visible_ids:
+            return
+        surface_w, surface_h = self._surface_geometry()
+        margin = 26
+        offset = 34
+        width = _clamp(int(surface_w * 0.72), GMTablePanel.MIN_WIDTH, surface_w - (margin * 2))
+        height = _clamp(int(surface_h * 0.72), GMTablePanel.MIN_HEIGHT, surface_h - (margin * 2))
+        max_x = max(margin, surface_w - width - margin)
+        max_y = max(margin, surface_h - height - margin)
+        for index, panel_id in enumerate(visible_ids):
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                continue
+            x = min(margin + (index * offset), max_x)
+            y = min(margin + (index * offset), max_y)
+            panel.clear_layout_mode()
+            panel.apply_geometry({"x": x, "y": y, "width": width, "height": height})
+        self._apply_focus_state(visible_ids[-1])
+        self._schedule_layout_changed()
+
     def clamp_panels(self) -> None:
         """Keep panels inside a reasonable visible area."""
         self.update_idletasks()
         surface_w, surface_h = _surface_dimensions(self.surface)
         for panel in self._panels.values():
+            if panel.layout_mode == "minimized":
+                continue
             if panel.layout_mode in {"left", "right", "maximize"}:
                 panel.apply_geometry(
                     _snap_geometry(
@@ -942,17 +1391,19 @@ class GMTableWorkspace(ctk.CTkFrame):
                     )
                 )
                 continue
-            geometry = _constrain_panel_geometry(
-                int(panel.winfo_x()),
-                int(panel.winfo_y()),
-                int(panel.winfo_width()),
-                int(panel.winfo_height()),
-                surface_w=surface_w,
-                surface_h=surface_h,
-                min_width=GMTablePanel.MIN_WIDTH,
-                min_height=GMTablePanel.MIN_HEIGHT,
+            geometry = panel.geometry_snapshot()
+            panel.apply_geometry(
+                _constrain_panel_geometry(
+                    int(geometry["x"]),
+                    int(geometry["y"]),
+                    int(geometry["width"]),
+                    int(geometry["height"]),
+                    surface_w=surface_w,
+                    surface_h=surface_h,
+                    min_width=GMTablePanel.MIN_WIDTH,
+                    min_height=GMTablePanel.MIN_HEIGHT,
+                )
             )
-            panel.apply_geometry(geometry)
         self._schedule_layout_changed()
 
     def serialize(self) -> dict[str, object]:
@@ -967,6 +1418,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             snapshot = dict(definition.state or {})
             snapshot.update(panel.geometry_snapshot())
             snapshot["z"] = order
+            snapshot.update(panel.serialize_layout_state())
             if payload is not None and hasattr(payload, "get_state"):
                 try:
                     dynamic_state = payload.get_state() or {}
@@ -995,7 +1447,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 panel_id=str(item.get("panel_id") or ""),
                 kind=str(item.get("kind") or "entity"),
                 title=str(item.get("title") or "Panel"),
-                state=state,
+                state=_payload_state(state),
             )
             if not definition.panel_id:
                 continue
@@ -1005,5 +1457,32 @@ class GMTableWorkspace(ctk.CTkFrame):
                 "width": state.get("width", DEFAULT_PANEL_SIZES.get(definition.kind, DEFAULT_PANEL_SIZES["entity"])[0]),
                 "height": state.get("height", DEFAULT_PANEL_SIZES.get(definition.kind, DEFAULT_PANEL_SIZES["entity"])[1]),
             }
-            self.add_panel(definition, geometry=geometry)
+            panel = self.add_panel(definition, geometry=geometry)
+            restore_geometry = state.get("restore_geometry")
+            if isinstance(restore_geometry, dict):
+                panel._restore_geometry = {
+                    "x": int(restore_geometry.get("x", geometry["x"])),
+                    "y": int(restore_geometry.get("y", geometry["y"])),
+                    "width": int(restore_geometry.get("width", geometry["width"])),
+                    "height": int(restore_geometry.get("height", geometry["height"])),
+                }
+            layout_mode = str(state.get("layout_mode") or "floating")
+            panel._minimized_restore_mode = str(state.get("minimized_restore_mode") or "floating")
+            if layout_mode == "minimized":
+                panel._layout_mode = "minimized"
+                panel.place_forget()
+                panel._refresh_window_controls()
+            elif layout_mode in {"left", "right", "maximize"}:
+                surface_w, surface_h = self._surface_geometry()
+                panel._layout_mode = layout_mode
+                panel.apply_geometry(
+                    _snap_geometry(
+                        layout_mode,
+                        surface_w=surface_w,
+                        surface_h=surface_h,
+                        min_width=GMTablePanel.MIN_WIDTH,
+                        min_height=GMTablePanel.MIN_HEIGHT,
+                    )
+                )
+                panel._refresh_window_controls()
         self.clamp_panels()

@@ -23,6 +23,7 @@ class _FakePanel:
         self.definition = SimpleNamespace(state={})
         self._layout_mode = "floating"
         self._restore_geometry = None
+        self._minimized_restore_mode = "floating"
         self.focused = False
         self.lifted = False
 
@@ -82,6 +83,25 @@ class _FakePanel:
 
     def clear_layout_mode(self) -> None:
         self._layout_mode = "floating"
+
+    def minimize(self) -> None:
+        self._restore_geometry = self.geometry_snapshot()
+        self._minimized_restore_mode = self._layout_mode
+        self._layout_mode = "minimized"
+
+    def restore_from_minimized(self, **_kwargs) -> bool:
+        if self._layout_mode != "minimized":
+            return False
+        self._layout_mode = self._minimized_restore_mode or "floating"
+        return True
+
+    def serialize_layout_state(self) -> dict[str, object]:
+        payload: dict[str, object] = {"layout_mode": self._layout_mode}
+        if self._restore_geometry is not None:
+            payload["restore_geometry"] = dict(self._restore_geometry)
+        if self._layout_mode == "minimized":
+            payload["minimized_restore_mode"] = self._minimized_restore_mode
+        return payload
 
     def set_focus_state(self, focused: bool) -> None:
         self.focused = focused
@@ -227,6 +247,140 @@ def test_clamp_panels_reflows_maximized_panel_when_surface_changes() -> None:
     assert panel.y == PANEL_MARGIN
     assert panel.winfo_width() == 1180 - (PANEL_MARGIN * 2)
     assert panel.winfo_height() == 760 - (PANEL_MARGIN * 2)
+
+
+def test_minimize_and_restore_panel_round_trip() -> None:
+    """Workspace minimize/restore should preserve panel state and focus."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._panels = {"notes": _FakePanel(520, 360, x=84, y=56)}
+    workspace._definitions = {
+        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+    }
+    workspace._panel_payloads = {}
+    workspace._z_order = ["notes"]
+    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.update_idletasks = lambda: None
+    workspace._schedule_layout_changed = lambda: None
+    workspace._apply_focus_state = lambda _panel_id: None
+    workspace._last_visible_panel_id = lambda **_kwargs: None
+    workspace.get_active_panel_id = lambda **_kwargs: "notes"
+
+    GMTableWorkspace.minimize_panel(workspace, "notes")
+    assert workspace._panels["notes"].layout_mode == "minimized"
+
+    GMTableWorkspace.restore_panel(workspace, "notes", focus=False)
+    assert workspace._panels["notes"].layout_mode == "floating"
+
+
+def test_bring_to_front_does_not_write_z_into_definition_state() -> None:
+    """Focus changes should reorder panels without mutating payload state."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._panels = {
+        "notes": _FakePanel(520, 360, x=84, y=56),
+        "map": _FakePanel(860, 620, x=120, y=72),
+    }
+    workspace._definitions = {
+        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={"text": "plan"}),
+        "map": PanelDefinition(panel_id="map", kind="world_map", title="Map", state={"map_name": "Docks"}),
+    }
+    workspace._z_order = ["notes", "map"]
+    workspace._schedule_layout_changed = lambda: None
+    workspace._apply_focus_state = lambda _panel_id: None
+
+    GMTableWorkspace.bring_to_front(workspace, "notes")
+
+    assert workspace._z_order == ["map", "notes"]
+    assert workspace._definitions["notes"].state == {"text": "plan"}
+
+
+def test_serialize_persists_minimized_layout_metadata() -> None:
+    """Workspace snapshots should retain minimized layout state."""
+    panel = _FakePanel(520, 360, x=84, y=56)
+    panel.minimize()
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._panels = {"notes": panel}
+    workspace._definitions = {
+        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+    }
+    workspace._panel_payloads = {"notes": SimpleNamespace()}
+    workspace._z_order = ["notes"]
+
+    snapshot = GMTableWorkspace.serialize(workspace)
+
+    assert snapshot["panels"][0]["state"]["layout_mode"] == "minimized"
+    assert snapshot["panels"][0]["state"]["minimized_restore_mode"] == "floating"
+    assert snapshot["panels"][0]["state"]["restore_geometry"] == {
+        "x": 84,
+        "y": 56,
+        "width": 520,
+        "height": 360,
+    }
+
+
+def test_restore_strips_window_metadata_from_definition_state() -> None:
+    """Restored panel definitions should keep payload state separate from layout metadata."""
+    captured = {}
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace.clear = lambda: None
+    workspace.clamp_panels = lambda: None
+
+    def _add_panel(definition, *, geometry=None):
+        captured["definition"] = definition
+        captured["geometry"] = geometry
+        return _FakePanel(geometry["width"], geometry["height"], x=geometry["x"], y=geometry["y"])
+
+    workspace.add_panel = _add_panel
+
+    GMTableWorkspace.restore(
+        workspace,
+        {
+            "panels": [
+                {
+                    "panel_id": "notes",
+                    "kind": "note",
+                    "title": "Notes",
+                    "state": {
+                        "text": "Session recap",
+                        "x": 84,
+                        "y": 56,
+                        "width": 520,
+                        "height": 360,
+                        "z": 3,
+                        "layout_mode": "floating",
+                        "minimized_restore_mode": "left",
+                        "restore_geometry": {"x": 12, "y": 12, "width": 480, "height": 320},
+                    },
+                }
+            ]
+        },
+    )
+
+    assert captured["geometry"] == {"x": 84, "y": 56, "width": 520, "height": 360}
+    assert captured["definition"].state == {"text": "Session recap"}
+
+
+def test_cascade_panels_offsets_visible_windows() -> None:
+    """Cascade should offset visible windows diagonally."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._panels = {
+        "a": _FakePanel(520, 360, x=24, y=24),
+        "b": _FakePanel(520, 360, x=48, y=48),
+    }
+    workspace._definitions = {
+        "a": PanelDefinition(panel_id="a", kind="note", title="A", state={}),
+        "b": PanelDefinition(panel_id="b", kind="note", title="B", state={}),
+    }
+    workspace._panel_payloads = {}
+    workspace._z_order = ["a", "b"]
+    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.update_idletasks = lambda: None
+    workspace._schedule_layout_changed = lambda: None
+    workspace._apply_focus_state = lambda _panel_id: None
+
+    GMTableWorkspace.cascade_panels(workspace)
+
+    assert workspace._panels["b"].x > workspace._panels["a"].x
+    assert workspace._panels["b"].y > workspace._panels["a"].y
 
 
 def test_mount_payload_widget_grids_direct_child_widget() -> None:

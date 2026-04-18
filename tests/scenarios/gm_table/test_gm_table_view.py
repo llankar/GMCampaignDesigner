@@ -277,17 +277,96 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     assert captured["kwargs"]["initial_state"] == {"query": "map"}
 
 
-def test_seed_default_panels_includes_handouts_opened_for_scenario() -> None:
-    """Starter tabletop should include the handouts panel bound to the current scenario."""
+def test_seed_default_panels_builds_map_first_vtt_layout() -> None:
+    """Starter tabletop should default to a map-centric VTT workspace."""
     captured = []
     view = GMTableView.__new__(GMTableView)
     view.scenario_name = "Night Run"
-    view.open_entity_panel = lambda entity_type, name: captured.append(("open", entity_type, name))
-    view._create_panel = lambda kind, title, state: captured.append(("panel", kind, title, state))
-    view.workspace = SimpleNamespace(auto_arrange=lambda: captured.append(("arrange",)))
+    view.scenario = {"Title": "Night Run", "MapName": "Docks"}
+    view._create_panel = lambda kind, title, state, *, geometry=None: captured.append(
+        (kind, title, state, geometry)
+    )
 
     GMTableView._seed_default_panels(view)
 
-    assert ("panel", "handouts", "Handouts", {"scenario_name": "Night Run"}) in captured
-    assert captured[0] == ("open", "Scenarios", "Night Run")
-    assert captured[-1] == ("arrange",)
+    assert captured == [
+        ("world_map", "Scene Map", {"map_name": "Docks"}, {"x": 24, "y": 24, "width": 980, "height": 640}),
+        ("map_tool", "Map Tool", {"map_name": "Docks"}, {"x": 1020, "y": 24, "width": 620, "height": 640}),
+        ("handouts", "Handouts", {"scenario_name": "Night Run"}, {"x": 24, "y": 680, "width": 440, "height": 300}),
+        ("note", "Session Notes", {"text": ""}, {"x": 476, "y": 680, "width": 520, "height": 300}),
+        ("scene_flow", "Scene Flow: Night Run", {"scenario_title": "Night Run"}, {"x": 1012, "y": 680, "width": 628, "height": 300}),
+    ]
+
+
+def test_focus_or_open_map_tool_panel_reuses_existing_panel_for_active_scene() -> None:
+    """Map Tool quick action should focus the existing panel and retarget it to the active map."""
+    opened = []
+    payload = SimpleNamespace(open_map_by_name=lambda map_name: opened.append(map_name))
+    workspace = SimpleNamespace(
+        get_active_panel_id=lambda **_kwargs: "scene-panel",
+        get_panel_definition=lambda panel_id: SimpleNamespace(kind="world_map" if panel_id == "scene-panel" else "map_tool"),
+        get_panel_payload=lambda panel_id: (
+            SimpleNamespace(current_map_name="Harbor") if panel_id == "scene-panel" else payload
+        ),
+        list_panels=lambda **kwargs: ([{"panel_id": "tool-panel", "payload": payload}] if kwargs.get("kinds") == {"map_tool"} else []),
+        bring_to_front=lambda panel_id: opened.append(f"front:{panel_id}"),
+    )
+    view = GMTableView.__new__(GMTableView)
+    view.scenario = {}
+    view.workspace = workspace
+
+    panel_id = GMTableView._focus_or_open_map_tool_panel(view)
+
+    assert panel_id == "tool-panel"
+    assert opened == ["front:tool-panel", "Harbor"]
+
+
+def test_open_player_view_uses_active_world_map_payload() -> None:
+    """Player View should route directly to the focused world map panel."""
+    calls = []
+    payload = SimpleNamespace(open_player_display=lambda: calls.append("player"))
+    workspace = SimpleNamespace(
+        get_active_panel_id=lambda **_kwargs: "scene-panel",
+        get_panel_definition=lambda _panel_id: SimpleNamespace(kind="world_map"),
+        get_panel_payload=lambda _panel_id: payload,
+        list_panels=lambda **_kwargs: [],
+    )
+    view = GMTableView.__new__(GMTableView)
+    view.scenario = {}
+    view.workspace = workspace
+
+    GMTableView._open_player_view_for_active_panel(view)
+
+    assert calls == ["player"]
+
+
+def test_apply_fog_action_routes_to_active_map_panel() -> None:
+    """Fog quick actions should target the active map-capable payload."""
+    calls = []
+    payload = SimpleNamespace(
+        _set_fog=lambda mode: calls.append(("mode", mode)),
+        clear_fog=lambda: calls.append(("clear",)),
+        reset_fog=lambda: calls.append(("reset",)),
+        undo_fog=lambda: calls.append(("undo",)),
+    )
+    workspace = SimpleNamespace(
+        get_active_panel_id=lambda **_kwargs: "tool-panel",
+        get_panel_definition=lambda _panel_id: SimpleNamespace(kind="map_tool"),
+        get_panel_payload=lambda _panel_id: payload,
+        list_panels=lambda **_kwargs: [],
+    )
+    view = GMTableView.__new__(GMTableView)
+    view.workspace = workspace
+    view.scenario = {}
+
+    GMTableView._apply_fog_action(view, "add_rect")
+    GMTableView._apply_fog_action(view, "clear")
+    GMTableView._apply_fog_action(view, "reset")
+    GMTableView._apply_fog_action(view, "undo")
+
+    assert calls == [
+        ("mode", "add_rect"),
+        ("clear",),
+        ("reset",),
+        ("undo",),
+    ]

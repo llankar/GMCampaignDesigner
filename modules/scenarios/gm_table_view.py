@@ -58,6 +58,7 @@ ENTITY_TYPES = (
 )
 
 TITLE_KEY_ENTITY_TYPES = {"Scenarios", "Informations"}
+MAP_PANEL_KINDS = {"world_map", "map_tool"}
 
 
 class GMTableView(ctk.CTkFrame):
@@ -136,11 +137,14 @@ class GMTableView(ctk.CTkFrame):
             "Scenario Graph Editor",
             "separator",
             ("Save Table Layout", self.save_layout_now),
-            ("Auto Arrange Panels", self._auto_arrange_panels),
+            ("Tile Panels", self._tile_panels),
+            ("Cascade Panels", self._cascade_panels),
+            ("Restore Minimized Panels", self._restore_all_panels),
             ("Reset Table", self.reset_table),
             ("Open Chatbot", self.open_chatbot),
         ]
         self._add_menu = self._build_add_menu()
+        self._fog_menu = self._build_fog_menu()
 
         self._build_toolbar()
         self.workspace = GMTableWorkspace(
@@ -190,20 +194,93 @@ class GMTableView(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions,
-            text="Arrange",
-            width=110,
+            text="Scene",
+            width=100,
             height=36,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
             corner_radius=16,
-            command=self._auto_arrange_panels,
+            command=self._focus_or_open_world_map_panel,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Map Tool",
+            width=108,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._focus_or_open_map_tool_panel,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Player View",
+            width=116,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._open_player_view_for_active_panel,
+        ).pack(side="left", padx=(0, 10))
+
+        self.fog_button = ctk.CTkButton(
+            actions,
+            text="Fog",
+            width=84,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._show_fog_menu,
+        )
+        self.fog_button.pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Tile",
+            width=84,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._tile_panels,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Cascade",
+            width=94,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._cascade_panels,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Restore All",
+            width=118,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._restore_all_panels,
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
             actions,
             text="Save",
-            width=90,
+            width=84,
             height=36,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
@@ -215,7 +292,7 @@ class GMTableView(ctk.CTkFrame):
         ctk.CTkButton(
             actions,
             text="Reset",
-            width=90,
+            width=84,
             height=36,
             fg_color="#2B1C23",
             hover_color="#40222B",
@@ -223,6 +300,19 @@ class GMTableView(ctk.CTkFrame):
             corner_radius=16,
             command=self.reset_table,
         ).pack(side="left")
+
+    def _build_fog_menu(self) -> tk.Menu:
+        """Build tabletop fog actions for the active map-capable panel."""
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Add Fog Brush", command=lambda: self._apply_fog_action("add"))
+        menu.add_command(label="Reveal Brush", command=lambda: self._apply_fog_action("rem"))
+        menu.add_command(label="Add Fog Rectangle", command=lambda: self._apply_fog_action("add_rect"))
+        menu.add_command(label="Reveal Rectangle", command=lambda: self._apply_fog_action("rem_rect"))
+        menu.add_separator()
+        menu.add_command(label="Clear Fog", command=lambda: self._apply_fog_action("clear"))
+        menu.add_command(label="Reset Fog", command=lambda: self._apply_fog_action("reset"))
+        menu.add_command(label="Undo Fog", command=lambda: self._apply_fog_action("undo"))
+        return menu
 
     def _build_add_menu(self) -> tk.Menu:
         """Build the add panel menu."""
@@ -257,14 +347,38 @@ class GMTableView(ctk.CTkFrame):
         self._workspace_loaded = True
 
     def _seed_default_panels(self) -> None:
-        """Build a useful default workspace."""
-        self.open_entity_panel("Scenarios", self.scenario_name)
-        self._create_panel("campaign_dashboard", "Campaign Dashboard", {})
-        self._create_panel("random_tables", "Random Tables", {})
-        self._create_panel("plot_twists", "Plot Twists", {})
-        self._create_panel("handouts", "Handouts", {"scenario_name": self.scenario_name})
-        self._create_panel("note", "Session Notes", {"text": ""})
-        self.workspace.auto_arrange()
+        """Build a map-centric default workspace."""
+        starter_map_name = self._infer_starting_map_name()
+        self._create_panel(
+            "world_map",
+            "Scene Map",
+            self._panel_state(map_name=starter_map_name),
+            geometry={"x": 24, "y": 24, "width": 980, "height": 640},
+        )
+        self._create_panel(
+            "map_tool",
+            "Map Tool",
+            self._panel_state(map_name=starter_map_name),
+            geometry={"x": 1020, "y": 24, "width": 620, "height": 640},
+        )
+        self._create_panel(
+            "handouts",
+            "Handouts",
+            {"scenario_name": self.scenario_name},
+            geometry={"x": 24, "y": 680, "width": 440, "height": 300},
+        )
+        self._create_panel(
+            "note",
+            "Session Notes",
+            {"text": ""},
+            geometry={"x": 476, "y": 680, "width": 520, "height": 300},
+        )
+        self._create_panel(
+            "scene_flow",
+            f"Scene Flow: {self.scenario_name}",
+            {"scenario_title": self.scenario_name},
+            geometry={"x": 1012, "y": 680, "width": 628, "height": 300},
+        )
 
     def _persist_layout(self) -> None:
         """Persist the current workspace after edits settle."""
@@ -298,9 +412,17 @@ class GMTableView(ctk.CTkFrame):
         self.layout_store.clear_scenario_layout(self.scenario_name)
         self._seed_default_panels()
 
-    def _auto_arrange_panels(self) -> None:
+    def _tile_panels(self) -> None:
         """Tile panels into a readable layout."""
         self.workspace.auto_arrange()
+
+    def _cascade_panels(self) -> None:
+        """Cascade visible panels like desktop windows."""
+        self.workspace.cascade_panels()
+
+    def _restore_all_panels(self) -> None:
+        """Restore minimized panels from the workspace tray."""
+        self.workspace.restore_all_panels()
 
     def _panel_state(self, **state) -> dict:
         """Build a clean state dictionary."""
@@ -361,6 +483,129 @@ class GMTableView(ctk.CTkFrame):
         if fallback_value:
             aliases.add(fallback_value)
         return aliases
+
+    def _infer_starting_map_name(self) -> str | None:
+        """Infer a likely starting map from the scenario record."""
+        for key in ("Map", "MapName", "WorldMap", "WorldMapName", "SceneMap"):
+            value = str(self.scenario.get(key) or "").strip()
+            if value:
+                return value
+        return None
+
+    def _show_fog_menu(self) -> None:
+        """Open the fog menu beneath the toolbar button."""
+        x = self.fog_button.winfo_rootx()
+        y = self.fog_button.winfo_rooty() + self.fog_button.winfo_height()
+        try:
+            self._fog_menu.tk_popup(x, y)
+        finally:
+            self._fog_menu.grab_release()
+
+    def _resolve_tabletop_context(self, *, prefer_world_map: bool = False) -> tuple[str | None, str | None, object | None]:
+        """Return the most relevant map-capable panel, kind, and payload."""
+        preferred_kinds = {"world_map"} if prefer_world_map else MAP_PANEL_KINDS
+        panel_id = self.workspace.get_active_panel_id(kinds=preferred_kinds, include_minimized=False)
+        if panel_id is None and not prefer_world_map:
+            panel_id = self.workspace.get_active_panel_id(kinds=MAP_PANEL_KINDS, include_minimized=False)
+        if panel_id is None:
+            records = self.workspace.list_panels(
+                kinds={"world_map"} if prefer_world_map else MAP_PANEL_KINDS,
+                include_minimized=True,
+            )
+            if not prefer_world_map and not records:
+                records = self.workspace.list_panels(kinds=MAP_PANEL_KINDS, include_minimized=True)
+            if records:
+                panel_id = str(records[-1]["panel_id"])
+        if panel_id is None:
+            return None, None, None
+        definition = self.workspace.get_panel_definition(panel_id)
+        payload = self.workspace.get_panel_payload(panel_id)
+        kind = definition.kind if definition is not None else None
+        return panel_id, kind, payload
+
+    def _current_tabletop_map_name(self) -> str | None:
+        """Return the active map name from the tabletop when available."""
+        _panel_id, kind, payload = self._resolve_tabletop_context()
+        if kind == "world_map":
+            return str(getattr(payload, "current_map_name", "") or "").strip() or None
+        if kind == "map_tool":
+            current_map = getattr(payload, "current_map", None) or {}
+            return str(current_map.get("Name") or "").strip() or None
+        return None
+
+    def _focus_or_open_world_map_panel(self, map_name: str | None = None) -> str | None:
+        """Focus an existing world map panel or create one."""
+        target_map = str(map_name or self._current_tabletop_map_name() or self._infer_starting_map_name() or "").strip()
+        records = self.workspace.list_panels(kinds={"world_map"}, include_minimized=True)
+        if records:
+            panel_id = str(records[-1]["panel_id"])
+            self.workspace.bring_to_front(panel_id)
+            payload = records[-1]["payload"]
+            if target_map and hasattr(payload, "load_map"):
+                try:
+                    payload.load_map(target_map, push_history=False)
+                except Exception:
+                    pass
+            return panel_id
+        return self._create_panel(
+            "world_map",
+            "Scene Map",
+            self._panel_state(map_name=target_map),
+        )
+
+    def _focus_or_open_map_tool_panel(self, map_name: str | None = None) -> str | None:
+        """Focus an existing map tool panel or create one."""
+        target_map = str(map_name or self._current_tabletop_map_name() or self._infer_starting_map_name() or "").strip()
+        records = self.workspace.list_panels(kinds={"map_tool"}, include_minimized=True)
+        if records:
+            panel_id = str(records[-1]["panel_id"])
+            self.workspace.bring_to_front(panel_id)
+            payload = records[-1]["payload"]
+            if target_map and hasattr(payload, "open_map_by_name"):
+                try:
+                    payload.open_map_by_name(target_map)
+                except Exception:
+                    pass
+            return panel_id
+        return self._create_panel(
+            "map_tool",
+            "Map Tool",
+            self._panel_state(map_name=target_map),
+        )
+
+    def _open_player_view_for_active_panel(self) -> None:
+        """Open the player display for the active scene map."""
+        panel_id, kind, payload = self._resolve_tabletop_context(prefer_world_map=True)
+        if kind != "world_map" or payload is None:
+            target_map = self._current_tabletop_map_name()
+            panel_id = self._focus_or_open_world_map_panel(target_map)
+            if panel_id is None:
+                messagebox.showinfo("GM Table", "Open a scene map before launching player view.")
+                return
+            payload = self.workspace.get_panel_payload(panel_id)
+            kind = "world_map"
+        if kind == "world_map" and hasattr(payload, "open_player_display"):
+            payload.open_player_display()
+
+    def _apply_fog_action(self, action: str) -> None:
+        """Route a fog command to the active map-capable panel."""
+        _panel_id, _kind, payload = self._resolve_tabletop_context()
+        if payload is None:
+            messagebox.showinfo("GM Table", "Open a scene map or map tool panel to work with fog.")
+            return
+        if action in {"add", "rem", "add_rect", "rem_rect"} and hasattr(payload, "_set_fog"):
+            payload._set_fog(action)
+            return
+        if action == "clear" and hasattr(payload, "clear_fog"):
+            payload.clear_fog()
+            return
+        if action == "reset" and hasattr(payload, "reset_fog"):
+            payload.reset_fog()
+            return
+        if action == "undo" and hasattr(payload, "undo_fog"):
+            payload.undo_fog()
+            return
+        messagebox.showinfo("GM Table", "This panel does not support the requested fog command.")
 
     def _handle_add_option(self, option: str) -> None:
         """Route add-menu options."""
