@@ -1777,15 +1777,22 @@ class GMTableWorkspace(ctk.CTkFrame):
         menu.add_command(label="Set Current View As Home", command=self.set_home_camera)
         menu.add_separator()
         menu.add_command(label="Add Or Update Bookmark...", command=self._save_bookmark_from_prompt)
-        if getattr(self, "_bookmarks", []):
-            jump_menu = tk.Menu(menu, tearoff=0)
-            delete_menu = tk.Menu(menu, tearoff=0)
-            for bookmark in getattr(self, "_bookmarks", []):
+        bookmarks = list(getattr(self, "_bookmarks", []))
+        if bookmarks:
+            menu.add_separator()
+            for bookmark in bookmarks:
                 name = str(bookmark.get("name") or "Bookmark")
-                jump_menu.add_command(label=name, command=lambda value=name: self.jump_to_bookmark(value))
-                delete_menu.add_command(label=name, command=lambda value=name: self.delete_bookmark(value))
-            menu.add_cascade(label="Jump To Bookmark", menu=jump_menu)
-            menu.add_cascade(label="Delete Bookmark", menu=delete_menu)
+                menu.add_command(
+                    label=f"Jump: {name}",
+                    command=lambda value=name: self.jump_to_bookmark(value),
+                )
+            menu.add_separator()
+            for bookmark in bookmarks:
+                name = str(bookmark.get("name") or "Bookmark")
+                menu.add_command(
+                    label=f"Delete: {name}",
+                    command=lambda value=name: self.delete_bookmark(value),
+                )
         else:
             menu.add_command(label="No Bookmarks Yet", state="disabled")
         x = button.winfo_rootx()
