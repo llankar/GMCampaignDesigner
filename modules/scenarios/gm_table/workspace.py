@@ -1655,8 +1655,10 @@ class GMTableWorkspace(ctk.CTkFrame):
         """Finish a camera pan gesture."""
         self._pan_origin = None
 
-    def _zoom_surface(self, event) -> None:
+    def _zoom_surface(self, event):
         """Zoom the desk around the cursor position."""
+        if self._pan_origin is not None:
+            return "break"
         try:
             screen_x = int(event.x)
             screen_y = int(event.y)

@@ -906,6 +906,48 @@ def test_left_drag_pan_remains_limited_to_empty_surface_widgets() -> None:
     assert workspace._pan_origin == (120, 160, 40.0, 24.0)
 
 
+def test_zoom_surface_ignored_while_pan_is_active() -> None:
+    """Zoom events should be ignored when a pan gesture is active."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._camera_x = 40.0
+    workspace._camera_y = 24.0
+    workspace._camera_zoom = 1.0
+    workspace._pan_origin = (120, 160, 40.0, 24.0)
+    workspace._set_camera = lambda **kwargs: (_ for _ in ()).throw(
+        AssertionError("_set_camera should not be called during active pan")
+    )
+
+    result = GMTableWorkspace._zoom_surface(
+        workspace,
+        SimpleNamespace(x=200, y=140, delta=120),
+    )
+
+    assert result == "break"
+    assert workspace._camera_zoom == 1.0
+
+
+def test_zoom_surface_updates_camera_when_pan_is_inactive() -> None:
+    """Zoom should keep working normally when no pan gesture is active."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._camera_x = 40.0
+    workspace._camera_y = 24.0
+    workspace._camera_zoom = 1.0
+    workspace._pan_origin = None
+    workspace._panels = {}
+    workspace._camera_status_label = None
+    workspace._minimap_canvas = None
+    workspace._schedule_layout_changed = lambda: None
+    workspace.clear_snap_preview = lambda: None
+    workspace.clamp_panels = lambda: None
+
+    GMTableWorkspace._zoom_surface(
+        workspace,
+        SimpleNamespace(x=200, y=140, delta=120),
+    )
+
+    assert workspace._camera_zoom > 1.0
+
+
 def test_bind_surface_navigation_registers_middle_pan_on_workspace_toplevel() -> None:
     """Middle-button pan should be scoped to this workspace via the containing toplevel."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
