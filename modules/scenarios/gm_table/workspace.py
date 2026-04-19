@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Callable
 
 import customtkinter as ctk
+from modules.helpers import theme_manager
+from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
 
 
@@ -26,6 +28,8 @@ TABLE_PALETTE = {
     "accent_soft": "#453116",
     "danger": "#F87171",
 }
+
+TABLE_CANVAS_BG = "#0D111B"
 
 
 DEFAULT_PANEL_SIZES = {
@@ -1210,6 +1214,17 @@ class GMTableWorkspace(ctk.CTkFrame):
         self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 10))
         self.surface.bind("<Configure>", self._on_surface_configure, add="+")
 
+        self._desk_texture_canvas = tk.Canvas(
+            self.surface,
+            bg=TABLE_CANVAS_BG,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+        )
+        self._desk_texture_canvas.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
+        self._desk_texture = InfiniteDeskTexture(self._desk_texture_canvas)
+        self._desk_texture.load_theme(theme_manager.get_theme())
+
         self._snap_preview = ctk.CTkFrame(
             self.surface,
             fg_color=TABLE_PALETTE["accent_soft"],
@@ -1327,6 +1342,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._bind_surface_navigation()
         self.bind("<Destroy>", self._handle_workspace_destroy, add="+")
         self._refresh_navigation_hud()
+        self._refresh_desk_texture()
         self._refresh_minimap()
         self._refresh_minimized_tray()
 
@@ -1398,7 +1414,11 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def _bind_surface_navigation(self) -> None:
         """Bind camera navigation to the empty table surface."""
-        for widget in (self.surface, self._empty_state):
+        widgets = [self.surface, self._empty_state]
+        texture_canvas = getattr(self, "_desk_texture_canvas", None)
+        if texture_canvas is not None:
+            widgets.insert(1, texture_canvas)
+        for widget in widgets:
             widget.bind("<ButtonPress-1>", self._start_surface_pan, add="+")
             widget.bind("<B1-Motion>", self._pan_surface_to, add="+")
             widget.bind("<ButtonRelease-1>", self._stop_surface_pan, add="+")
@@ -1484,6 +1504,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             self._camera_zoom = _normalize_camera({"zoom": zoom})["zoom"]
         self.clear_snap_preview()
         self.clamp_panels()
+        self._refresh_desk_texture()
 
     def _camera_view_size(self) -> tuple[float, float]:
         """Return the visible world-space viewport size."""
@@ -1549,6 +1570,33 @@ class GMTableWorkspace(ctk.CTkFrame):
             if panel.layout_mode != "floating":
                 continue
             self._apply_floating_geometry(panel, self._floating_geometry_snapshot(panel))
+
+    def _refresh_desk_texture(self) -> None:
+        """Render the active theme desk texture as an infinite tiled surface."""
+        canvas = getattr(self, "_desk_texture_canvas", None)
+        texture = getattr(self, "_desk_texture", None)
+        if canvas is None or texture is None:
+            return
+        try:
+            width = int(canvas.winfo_width())
+            height = int(canvas.winfo_height())
+        except Exception:
+            width, height = self._surface_geometry()
+        if width <= 1 or height <= 1:
+            width, height = self._surface_geometry()
+        drawn = texture.draw(
+            width=width,
+            height=height,
+            camera_x=_coerce_float(getattr(self, "_camera_x", 0.0)),
+            camera_y=_coerce_float(getattr(self, "_camera_y", 0.0)),
+            zoom=max(CAMERA_MIN_ZOOM, float(getattr(self, "_camera_zoom", 1.0))),
+        )
+        if not drawn:
+            try:
+                canvas.configure(bg=TABLE_PALETTE["table_bg"])
+            except Exception:
+                pass
+        self._raise_workspace_overlays()
 
     def _refresh_navigation_hud(self) -> None:
         """Refresh camera affordances."""
@@ -1842,6 +1890,12 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def _raise_workspace_overlays(self) -> None:
         """Keep the camera HUD and minimap above every desk panel."""
+        texture_canvas = getattr(self, "_desk_texture_canvas", None)
+        if texture_canvas is not None:
+            try:
+                texture_canvas.lower()
+            except Exception:
+                pass
         for widget_name in ("_nav_hud", "_minimap_shell"):
             widget = getattr(self, widget_name, None)
             if widget is None:
