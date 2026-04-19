@@ -449,6 +449,41 @@ def test_resize_geometry_supports_dragging_from_top_left_corner() -> None:
     assert geometry["height"] == 400
 
 
+def test_resize_to_uses_drag_origin_snapshot_without_cumulative_drift() -> None:
+    """Successive drag frames should stay anchored to the initial resize snapshot."""
+    panel = GMTablePanel.__new__(GMTablePanel)
+    panel._resize_origin = (
+        100,
+        200,
+        {"x": 24.0, "y": 36.0, "width": 400, "height": 300},
+        "se",
+    )
+    panel._get_camera_zoom = lambda: 1.0
+
+    current_geometry = {"x": 24.0, "y": 36.0, "width": 400, "height": 300}
+    applied_geometries: list[dict[str, float | int]] = []
+
+    def _floating_geometry_snapshot():
+        return dict(current_geometry)
+
+    def _apply_floating_geometry(geometry):
+        current_geometry.update(geometry)
+        applied_geometries.append(dict(geometry))
+
+    panel.floating_geometry_snapshot = _floating_geometry_snapshot
+    panel.apply_floating_geometry = _apply_floating_geometry
+
+    panel._resize_to(SimpleNamespace(x_root=130, y_root=240))
+    panel._resize_to(SimpleNamespace(x_root=140, y_root=260))
+
+    assert applied_geometries[0]["width"] == 430
+    assert applied_geometries[0]["height"] == 340
+    assert applied_geometries[1]["width"] == 440
+    assert applied_geometries[1]["height"] == 360
+    assert applied_geometries[1]["x"] == 24.0
+    assert applied_geometries[1]["y"] == 36.0
+
+
 def test_clamp_panels_reflows_maximized_panel_when_surface_changes() -> None:
     """Docked panels should stay docked when the GM Table itself is resized."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
