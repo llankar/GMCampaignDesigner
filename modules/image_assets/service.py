@@ -5,6 +5,11 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from modules.image_assets.repository import ImageAssetsRepository
+from modules.image_assets.services.github_bundle_import_service import (
+    ImageLibraryBundleAnalysis,
+    ImageLibraryBundleImportService,
+    ImageLibraryBundleImportSummary,
+)
 from modules.image_assets.services.import_service import ImageAssetImportService, ImageAssetsImportSummary
 from modules.image_assets.services.search_service import (
     ImageAssetSearchResultDTO,
@@ -22,6 +27,7 @@ class ImageAssetsService:
         self.repository = repository or ImageAssetsRepository()
         self.import_service = ImageAssetImportService(self.repository)
         self.search_service = ImageAssetSearchService(self.repository)
+        self.bundle_import_service = ImageLibraryBundleImportService()
 
     def upsert_asset(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Upsert one image asset by hash/path."""
@@ -70,3 +76,11 @@ class ImageAssetsService:
             recursive=recursive,
             reindex_changed_only=reindex_changed_only,
         )
+
+    def analyze_image_library_bundle(self, zip_path: str) -> ImageLibraryBundleAnalysis:
+        """Analyze a GitHub-style image library bundle zip before import."""
+        return self.bundle_import_service.analyze_bundle(zip_path)
+
+    def import_image_library_bundle(self, zip_path: str, *, overwrite: bool) -> ImageLibraryBundleImportSummary:
+        """Import a GitHub-style image library bundle zip into image assets."""
+        return self.bundle_import_service.import_bundle(zip_path, overwrite=overwrite)
