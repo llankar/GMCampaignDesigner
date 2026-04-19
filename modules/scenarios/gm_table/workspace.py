@@ -1625,6 +1625,15 @@ class GMTableWorkspace(ctk.CTkFrame):
             zoom=target_zoom,
         )
 
+    def _pin_snapped_panels_to_world(self) -> None:
+        """Convert snapped panels into floating world-anchored panels."""
+        for panel in self._panels.values():
+            if panel.layout_mode not in SNAP_LAYOUT_MODES:
+                continue
+            world_geometry = self._screen_geometry_to_world(panel.geometry_snapshot())
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, world_geometry)
+
     def _start_surface_pan(self, event) -> None:
         """Start panning the infinite desk."""
         widget = getattr(event, "widget", None)
@@ -1632,6 +1641,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         if widget is not self.surface and widget is not self._empty_state:
             if not is_middle_button or not self._widget_is_in_surface_subtree(widget):
                 return
+        if is_middle_button:
+            self._pin_snapped_panels_to_world()
         self.surface.focus_set()
         self._pan_origin = (
             event.x_root,

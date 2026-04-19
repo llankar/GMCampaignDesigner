@@ -879,6 +879,37 @@ def test_middle_button_pan_accepts_nested_panel_content_and_ignores_unrelated_wi
     assert workspace._pan_origin is None
 
 
+def test_middle_button_pan_converts_snapped_panel_to_world_anchored_floating() -> None:
+    """Middle-drag should pin docked windows to desk coordinates before camera movement."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    panel = _FakePanel(520, 360, x=PANEL_MARGIN, y=PANEL_MARGIN)
+    panel._layout_mode = "left"
+    workspace._panels = {"notes": panel}
+    workspace.surface = _FakeWidgetNode()
+    workspace._empty_state = _FakeWidgetNode(master=workspace.surface)
+    workspace._camera_x = 400.0
+    workspace._camera_y = 240.0
+    workspace._camera_zoom = 1.0
+    workspace._pan_origin = None
+    workspace.clear_snap_preview = lambda: None
+    workspace._schedule_layout_changed = lambda: None
+    workspace.update_idletasks = lambda: None
+    workspace.surface.winfo_width = lambda: 1400
+    workspace.surface.winfo_height = lambda: 900
+
+    GMTableWorkspace._start_surface_pan(
+        workspace,
+        SimpleNamespace(widget=workspace.surface, num=2, x_root=500, y_root=320),
+    )
+    GMTableWorkspace._pan_surface_to(workspace, SimpleNamespace(x_root=560, y_root=380))
+
+    assert panel.layout_mode == "floating"
+    assert panel.world_x == 412.0
+    assert panel.world_y == 252.0
+    assert panel.x == 72
+    assert panel.y == 72
+
+
 def test_left_drag_pan_remains_limited_to_empty_surface_widgets() -> None:
     """Left-drag panning should stay scoped to the bare table surface and empty state."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
