@@ -1831,6 +1831,18 @@ class GMTableWorkspace(ctk.CTkFrame):
             panel.set_focus_state(is_target)
             if is_target:
                 panel.lift()
+        self._raise_workspace_overlays()
+
+    def _raise_workspace_overlays(self) -> None:
+        """Keep the camera HUD and minimap above every desk panel."""
+        for widget_name in ("_nav_hud", "_minimap_shell"):
+            widget = getattr(self, widget_name, None)
+            if widget is None:
+                continue
+            try:
+                widget.lift()
+            except Exception:
+                continue
 
     def _visible_panel_ids(self) -> list[str]:
         """Return visible panels in z-order."""
@@ -1927,6 +1939,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             if preview is not None:
                 preview.lift()
             panel.lift()
+        self._raise_workspace_overlays()
         self._schedule_layout_changed()
 
     def remove_panel(self, panel_id: str) -> None:
@@ -2091,6 +2104,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         panel = self._panels.get(panel_id)
         if panel is not None:
             panel.lift()
+        self._raise_workspace_overlays()
 
     def clear_snap_preview(self) -> None:
         """Hide the magnetic snap preview overlay."""

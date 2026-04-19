@@ -234,6 +234,14 @@ class _FakeLabel:
             self.text = kwargs["text"]
 
 
+class _FakeLiftWidget:
+    def __init__(self) -> None:
+        self.lifted = False
+
+    def lift(self) -> None:
+        self.lifted = True
+
+
 class _FakeCanvas:
     def __init__(self, *, width: int = 156, height: int = 84, measured_width: int = 1, measured_height: int = 1) -> None:
         self._width = width
@@ -687,6 +695,22 @@ def test_bring_to_front_does_not_write_z_into_definition_state() -> None:
 
     assert workspace._z_order == ["map", "notes"]
     assert workspace._definitions["notes"].state == {"text": "plan"}
+
+
+def test_bring_to_front_keeps_hud_and_minimap_above_panels() -> None:
+    """Home/Marks HUD and minimap should stay on top after focusing a panel."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._panels = {"notes": _FakePanel(520, 360, x=84, y=56)}
+    workspace._z_order = ["notes"]
+    workspace._schedule_layout_changed = lambda: None
+    workspace._apply_focus_state = lambda _panel_id: None
+    workspace._nav_hud = _FakeLiftWidget()
+    workspace._minimap_shell = _FakeLiftWidget()
+
+    GMTableWorkspace.bring_to_front(workspace, "notes")
+
+    assert workspace._nav_hud.lifted is True
+    assert workspace._minimap_shell.lifted is True
 
 
 def test_serialize_persists_minimized_layout_metadata() -> None:
