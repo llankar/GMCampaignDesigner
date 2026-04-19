@@ -475,6 +475,49 @@ def test_resolve_snap_mode_supports_stacks_quadrants_and_strips() -> None:
     )
 
 
+def test_resolve_snap_mode_scales_threshold_for_large_surface() -> None:
+    """Large workspaces should still snap when the pointer is near an edge."""
+    surface_w = 3840
+    surface_h = 2160
+
+    assert (
+        _resolve_snap_mode(700, 20, surface_w=surface_w, surface_h=surface_h) == "top"
+    )
+    assert (
+        _resolve_snap_mode(20, 900, surface_w=surface_w, surface_h=surface_h) == "left"
+    )
+
+
+def test_resolve_snap_mode_handles_high_dpi_like_dimensions() -> None:
+    """Scaled dimensions should keep strip and maximize hotspots reachable."""
+    surface_w = 3000
+    surface_h = 2000
+
+    assert (
+        _resolve_snap_mode(surface_w // 2, 70, surface_w=surface_w, surface_h=surface_h)
+        == "maximize"
+    )
+    assert (
+        _resolve_snap_mode(
+            surface_w // 2,
+            int(surface_h * 0.31),
+            surface_w=surface_w,
+            surface_h=surface_h,
+        )
+        == "top_strip"
+    )
+
+
+def test_resolve_snap_mode_uses_hysteresis_tolerance_near_edges() -> None:
+    """Small out-of-bounds drifts should keep the expected edge snap target."""
+    surface_w = 1400
+    surface_h = 900
+
+    assert _resolve_snap_mode(-8, 24, surface_w=surface_w, surface_h=surface_h) == "top_left"
+    assert _resolve_snap_mode(surface_w + 8, 24, surface_w=surface_w, surface_h=surface_h) == "top_right"
+    assert _resolve_snap_mode(surface_w + 8, surface_h - 24, surface_w=surface_w, surface_h=surface_h) == "bottom_right"
+
+
 def test_snap_geometry_supports_quadrants_and_strips() -> None:
     """The richer snap layouts should resolve to stable workspace geometry."""
     surface_w = 1400
