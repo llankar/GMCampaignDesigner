@@ -1061,10 +1061,9 @@ class GMTablePanel(ctk.CTkFrame):
         if self._resize_origin is None:
             return
         root_x, root_y, start_geometry, direction = self._resize_origin
-        start_world = self.floating_geometry_snapshot()
         geometry = _resize_floating_geometry(
             direction,
-            start_geometry=start_world,
+            start_geometry=start_geometry,
             delta_x=event.x_root - root_x,
             delta_y=event.y_root - root_y,
             zoom=max(CAMERA_MIN_ZOOM, float(self._get_camera_zoom())),
