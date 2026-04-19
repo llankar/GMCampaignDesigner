@@ -535,37 +535,43 @@ def _resize_floating_geometry(
     min_height: int,
 ) -> dict[str, float | int]:
     """Return resized floating geometry without constraining it to the viewport."""
-    width = int(start_geometry.get("width", min_width))
-    height = int(start_geometry.get("height", min_height))
-    x = _coerce_float(start_geometry.get("x", 0.0))
-    y = _coerce_float(start_geometry.get("y", 0.0))
+    start_width = _coerce_float(start_geometry.get("width", min_width), float(min_width))
+    start_height = _coerce_float(start_geometry.get("height", min_height), float(min_height))
+    width = start_width
+    height = start_height
+    start_x = _coerce_float(start_geometry.get("x", 0.0))
+    start_y = _coerce_float(start_geometry.get("y", 0.0))
+    x = start_x
+    y = start_y
     zoom = max(CAMERA_MIN_ZOOM, float(zoom))
+    world_delta_x = float(delta_x) / zoom
+    world_delta_y = float(delta_y) / zoom
 
     if "w" in direction:
-        x += delta_x / zoom
-        width -= int(delta_x)
+        x += world_delta_x
+        width -= world_delta_x
     if "e" in direction:
-        width += int(delta_x)
+        width += world_delta_x
     if "n" in direction:
-        y += delta_y / zoom
-        height -= int(delta_y)
+        y += world_delta_y
+        height -= world_delta_y
     if "s" in direction:
-        height += int(delta_y)
+        height += world_delta_y
 
     if width < min_width:
         if "w" in direction:
-            x = _coerce_float(start_geometry.get("x", 0.0)) + ((int(start_geometry.get("width", min_width)) - min_width) / zoom)
-        width = int(min_width)
+            x = start_x + (start_width - min_width)
+        width = float(min_width)
     if height < min_height:
         if "n" in direction:
-            y = _coerce_float(start_geometry.get("y", 0.0)) + ((int(start_geometry.get("height", min_height)) - min_height) / zoom)
-        height = int(min_height)
+            y = start_y + (start_height - min_height)
+        height = float(min_height)
 
     return _normalize_floating_geometry(
         x,
         y,
-        width,
-        height,
+        int(round(width)),
+        int(round(height)),
         min_width=min_width,
         min_height=min_height,
     )

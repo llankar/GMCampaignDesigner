@@ -13,6 +13,7 @@ from modules.scenarios.gm_table.workspace import (
     GMTableWorkspace,
     PanelDefinition,
     SNAP_MODE_LABELS,
+    _resize_floating_geometry,
     _resize_geometry,
     _resolve_snap_mode,
     _snap_geometry,
@@ -449,6 +450,66 @@ def test_resize_geometry_supports_dragging_from_top_left_corner() -> None:
     assert geometry["height"] == 400
 
 
+
+
+def test_resize_floating_geometry_keeps_zoom_1_behavior() -> None:
+    """Zoom 1.0 should keep the legacy resize deltas unchanged."""
+    geometry = _resize_floating_geometry(
+        "se",
+        start_geometry={"x": 24.0, "y": 36.0, "width": 400, "height": 300},
+        delta_x=40,
+        delta_y=20,
+        zoom=1.0,
+        min_width=GMTablePanel.MIN_WIDTH,
+        min_height=GMTablePanel.MIN_HEIGHT,
+    )
+
+    assert geometry["x"] == 24.0
+    assert geometry["y"] == 36.0
+    assert geometry["width"] == 440
+    assert geometry["height"] == 320
+
+
+def test_resize_floating_geometry_scales_resize_delta_with_zoom() -> None:
+    """Floating world geometry should resize by world delta so screen motion feels stable."""
+    start = {"x": 100.0, "y": 80.0, "width": 520, "height": 420}
+    delta_x = 60
+    delta_y = 45
+
+    half_zoom = _resize_floating_geometry(
+        "nw",
+        start_geometry=start,
+        delta_x=delta_x,
+        delta_y=delta_y,
+        zoom=0.5,
+        min_width=GMTablePanel.MIN_WIDTH,
+        min_height=GMTablePanel.MIN_HEIGHT,
+    )
+    high_zoom = _resize_floating_geometry(
+        "nw",
+        start_geometry=start,
+        delta_x=delta_x,
+        delta_y=delta_y,
+        zoom=1.5,
+        min_width=GMTablePanel.MIN_WIDTH,
+        min_height=GMTablePanel.MIN_HEIGHT,
+    )
+
+    # World deltas differ with zoom, but projected screen deltas remain stable.
+    half_zoom_width_delta_px = (start["width"] - half_zoom["width"]) * 0.5
+    high_zoom_width_delta_px = (start["width"] - high_zoom["width"]) * 1.5
+    half_zoom_height_delta_px = (start["height"] - half_zoom["height"]) * 0.5
+    high_zoom_height_delta_px = (start["height"] - high_zoom["height"]) * 1.5
+
+    assert abs(half_zoom_width_delta_px - delta_x) <= 1
+    assert abs(high_zoom_width_delta_px - delta_x) <= 1
+    assert abs(half_zoom_height_delta_px - delta_y) <= 1
+    assert abs(high_zoom_height_delta_px - delta_y) <= 1
+
+    assert half_zoom["x"] == 220.0
+    assert half_zoom["y"] == 170.0
+    assert high_zoom["x"] == 140.0
+    assert high_zoom["y"] == 110.0
 def test_resize_to_uses_drag_origin_snapshot_without_cumulative_drift() -> None:
     """Successive drag frames should stay anchored to the initial resize snapshot."""
     panel = GMTablePanel.__new__(GMTablePanel)
