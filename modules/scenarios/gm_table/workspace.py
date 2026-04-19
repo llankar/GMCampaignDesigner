@@ -279,42 +279,50 @@ def _resolve_snap_mode(
     height = max(1, int(surface_h))
     x = int(pointer_x)
     y = int(pointer_y)
-    if x < 0 or y < 0 or x > width or y > height:
+    min_threshold = max(16, int(threshold))
+    x_threshold = max(min_threshold, int(round(width * 0.06)))
+    y_threshold = max(min_threshold, int(round(height * 0.06)))
+    hysteresis = max(8, int(round(min(x_threshold, y_threshold) * 0.35)))
+
+    if x < -hysteresis or y < -hysteresis or x > width + hysteresis or y > height + hysteresis:
         return None
 
-    x_ratio = x / width
-    y_ratio = y / height
-    threshold = max(16, int(threshold))
+    clamped_x = _clamp(x, 0, width)
+    clamped_y = _clamp(y, 0, height)
+    x_ratio = clamped_x / width
+    y_ratio = clamped_y / height
+    corner_x_limit = min(int(round(width * 0.30)), int(round((x_threshold + hysteresis) * 2.2)))
+    corner_y_limit = min(int(round(height * 0.30)), int(round((y_threshold + hysteresis) * 2.2)))
 
-    if y <= threshold:
-        if x_ratio <= 0.24:
+    if clamped_y <= y_threshold + hysteresis:
+        if clamped_x <= corner_x_limit:
             return "top_left"
-        if x_ratio >= 0.76:
+        if clamped_x >= width - corner_x_limit:
             return "top_right"
-        if 0.40 <= x_ratio <= 0.60:
+        if 0.38 <= x_ratio <= 0.62:
             return "maximize"
         return "top"
-    if y >= height - threshold:
-        if x_ratio <= 0.24:
+    if clamped_y >= height - (y_threshold + hysteresis):
+        if clamped_x <= corner_x_limit:
             return "bottom_left"
-        if x_ratio >= 0.76:
+        if clamped_x >= width - corner_x_limit:
             return "bottom_right"
         return "bottom"
-    if x <= threshold:
-        if y_ratio <= 0.24:
+    if clamped_x <= x_threshold + hysteresis:
+        if clamped_y <= corner_y_limit:
             return "top_left"
-        if y_ratio >= 0.76:
+        if clamped_y >= height - corner_y_limit:
             return "bottom_left"
         return "left"
-    if x >= width - threshold:
-        if y_ratio <= 0.24:
+    if clamped_x >= width - (x_threshold + hysteresis):
+        if clamped_y <= corner_y_limit:
             return "top_right"
-        if y_ratio >= 0.76:
+        if clamped_y >= height - corner_y_limit:
             return "bottom_right"
         return "right"
-    if 0.18 <= x_ratio <= 0.82 and 0.14 <= y_ratio <= 0.28:
+    if 0.14 <= x_ratio <= 0.86 and 0.12 <= y_ratio <= 0.34:
         return "top_strip"
-    if 0.18 <= x_ratio <= 0.82 and 0.72 <= y_ratio <= 0.86:
+    if 0.14 <= x_ratio <= 0.86 and 0.66 <= y_ratio <= 0.88:
         return "bottom_strip"
     return None
 
