@@ -5,6 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from types import SimpleNamespace
 
+from modules.scenarios.gm_table.layout import fit_viewport_snap
 from modules.scenarios.gm_table.workspace import (
     PANEL_GUTTER,
     PANEL_MARGIN,
@@ -21,6 +22,9 @@ from modules.scenarios.gm_table.workspace import (
 
 
 class _FakePanel:
+    MIN_WIDTH = GMTablePanel.MIN_WIDTH
+    MIN_HEIGHT = GMTablePanel.MIN_HEIGHT
+
     def __init__(self, width: int, height: int, *, x: int = 0, y: int = 0) -> None:
         self._width = width
         self._height = height
@@ -809,13 +813,7 @@ def test_preview_snap_target_resizes_preview_without_passing_size_to_place() -> 
 
     GMTableWorkspace.preview_snap_target(workspace, "notes", "left")
 
-    expected_left = _snap_geometry(
-        "left",
-        surface_w=1400,
-        surface_h=900,
-        min_width=GMTablePanel.MIN_WIDTH,
-        min_height=GMTablePanel.MIN_HEIGHT,
-    )
+    expected_left = fit_viewport_snap(panel, workspace.surface, "left")
     assert preview.width == expected_left["width"]
     assert preview.height == expected_left["height"]
     assert preview.place_calls[-1] == {"x": expected_left["x"], "y": expected_left["y"]}
@@ -826,13 +824,7 @@ def test_preview_snap_target_resizes_preview_without_passing_size_to_place() -> 
 
     GMTableWorkspace.preview_snap_target(workspace, "notes", "bottom_right")
 
-    expected_quadrant = _snap_geometry(
-        "bottom_right",
-        surface_w=1400,
-        surface_h=900,
-        min_width=GMTablePanel.MIN_WIDTH,
-        min_height=GMTablePanel.MIN_HEIGHT,
-    )
+    expected_quadrant = fit_viewport_snap(panel, workspace.surface, "bottom_right")
     assert preview.width == expected_quadrant["width"]
     assert preview.height == expected_quadrant["height"]
     assert preview.place_calls[-1] == {
@@ -841,6 +833,53 @@ def test_preview_snap_target_resizes_preview_without_passing_size_to_place() -> 
     }
     assert label.text == SNAP_MODE_LABELS["bottom_right"]
     assert workspace._snap_preview_mode == "bottom_right"
+
+
+def test_preview_snap_target_matches_snap_panel_geometry_for_all_modes() -> None:
+    """Preview rectangle and final snapped geometry should always match."""
+    snap_modes = (
+        "left",
+        "right",
+        "top",
+        "bottom",
+        "top_left",
+        "top_right",
+        "bottom_left",
+        "bottom_right",
+        "top_strip",
+        "bottom_strip",
+        "maximize",
+    )
+    for mode in snap_modes:
+        workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+        preview = _FakePreview()
+        label = _FakeLabel()
+        panel = _FakePanel(520, 360, x=84, y=56)
+        workspace._panels = {"notes": panel}
+        workspace._definitions = {
+            "notes": PanelDefinition(
+                panel_id="notes", kind="note", title="Notes", state={}
+            ),
+        }
+        workspace._z_order = ["notes"]
+        _prepare_workspace(workspace, camera_x=320, camera_y=180)
+        workspace._snap_preview = preview
+        workspace._snap_preview_label = label
+        workspace._snap_preview_mode = None
+
+        GMTableWorkspace.preview_snap_target(workspace, "notes", mode)
+
+        preview_geometry = {
+            "x": preview.place_calls[-1]["x"],
+            "y": preview.place_calls[-1]["y"],
+            "width": preview.width,
+            "height": preview.height,
+        }
+
+        GMTableWorkspace.snap_panel(workspace, "notes", mode)
+        final_geometry = panel.geometry_snapshot()
+
+        assert preview_geometry == final_geometry
 
 
 def test_preview_snap_target_clears_overlay_for_invalid_mode() -> None:
