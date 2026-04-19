@@ -817,6 +817,8 @@ class GMTablePanel(ctk.CTkFrame):
             self._minimized_restore_mode = mode
         self._layout_mode = mode
         self.apply_geometry(geometry)
+        if mode in SNAP_LAYOUT_MODES:
+            self._world_geometry = self._screen_geometry_to_world(geometry)
         self._refresh_window_controls()
 
     def restore_layout(self, *, anchor_x_root: int | None = None, anchor_y_root: int | None = None) -> bool:
@@ -920,6 +922,21 @@ class GMTablePanel(ctk.CTkFrame):
             y=int(geometry.get("y", self._current_geometry["y"])),
             width=int(geometry.get("width", self._current_geometry["width"])),
             height=int(geometry.get("height", self._current_geometry["height"])),
+        )
+
+    def _screen_geometry_to_world(self, geometry: dict[str, int]) -> dict[str, float | int]:
+        """Convert viewport-relative geometry to world-space coordinates."""
+        world_x, world_y = self._screen_to_world(
+            int(geometry.get("x", self._current_geometry["x"])),
+            int(geometry.get("y", self._current_geometry["y"])),
+        )
+        return _normalize_floating_geometry(
+            world_x,
+            world_y,
+            int(geometry.get("width", self._current_geometry["width"])),
+            int(geometry.get("height", self._current_geometry["height"])),
+            min_width=self.MIN_WIDTH,
+            min_height=self.MIN_HEIGHT,
         )
 
     def apply_floating_geometry(
