@@ -78,9 +78,7 @@ class GMTableView(ctk.CTkFrame):
 
         self.scenario = scenario_item or {}
         self.scenario_name = (
-            self.scenario.get("Title")
-            or self.scenario.get("Name")
-            or "Scenario"
+            self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
         )
         self._root_app = root_app
         self.layout_store = layout_store or GMTableLayoutStore()
@@ -304,14 +302,29 @@ class GMTableView(ctk.CTkFrame):
     def _build_fog_menu(self) -> tk.Menu:
         """Build tabletop fog actions for the active map-capable panel."""
         menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Add Fog Brush", command=lambda: self._apply_fog_action("add"))
-        menu.add_command(label="Reveal Brush", command=lambda: self._apply_fog_action("rem"))
-        menu.add_command(label="Add Fog Rectangle", command=lambda: self._apply_fog_action("add_rect"))
-        menu.add_command(label="Reveal Rectangle", command=lambda: self._apply_fog_action("rem_rect"))
+        menu.add_command(
+            label="Add Fog Brush", command=lambda: self._apply_fog_action("add")
+        )
+        menu.add_command(
+            label="Reveal Brush", command=lambda: self._apply_fog_action("rem")
+        )
+        menu.add_command(
+            label="Add Fog Rectangle",
+            command=lambda: self._apply_fog_action("add_rect"),
+        )
+        menu.add_command(
+            label="Reveal Rectangle", command=lambda: self._apply_fog_action("rem_rect")
+        )
         menu.add_separator()
-        menu.add_command(label="Clear Fog", command=lambda: self._apply_fog_action("clear"))
-        menu.add_command(label="Reset Fog", command=lambda: self._apply_fog_action("reset"))
-        menu.add_command(label="Undo Fog", command=lambda: self._apply_fog_action("undo"))
+        menu.add_command(
+            label="Clear Fog", command=lambda: self._apply_fog_action("clear")
+        )
+        menu.add_command(
+            label="Reset Fog", command=lambda: self._apply_fog_action("reset")
+        )
+        menu.add_command(
+            label="Undo Fog", command=lambda: self._apply_fog_action("undo")
+        )
         return menu
 
     def _build_add_menu(self) -> tk.Menu:
@@ -325,7 +338,10 @@ class GMTableView(ctk.CTkFrame):
                 label, command = option
                 menu.add_command(label=label, command=command)
                 continue
-            menu.add_command(label=option, command=lambda value=option: self._handle_add_option(value))
+            menu.add_command(
+                label=option,
+                command=lambda value=option: self._handle_add_option(value),
+            )
         return menu
 
     def _show_add_menu(self) -> None:
@@ -384,12 +400,16 @@ class GMTableView(ctk.CTkFrame):
         """Persist the current workspace after edits settle."""
         if not self._workspace_loaded:
             return
-        self._layout_settle_scheduler.schedule("gm_table_layout", self._save_layout_snapshot)
+        self._layout_settle_scheduler.schedule(
+            "gm_table_layout", self._save_layout_snapshot
+        )
 
     def _save_layout_snapshot(self) -> None:
         """Write the latest workspace snapshot to storage."""
         try:
-            self.layout_store.save_scenario_layout(self.scenario_name, self.workspace.serialize())
+            self.layout_store.save_scenario_layout(
+                self.scenario_name, self.workspace.serialize()
+            )
         except Exception as exc:
             log_warning(
                 f"Unable to save GM Table layout: {exc}",
@@ -426,9 +446,15 @@ class GMTableView(ctk.CTkFrame):
 
     def _panel_state(self, **state) -> dict:
         """Build a clean state dictionary."""
-        return {key: value for key, value in state.items() if value not in (None, "", [], {})}
+        return {
+            key: value
+            for key, value in state.items()
+            if value not in (None, "", [], {})
+        }
 
-    def _create_panel(self, kind: str, title: str, state: dict, *, geometry: dict | None = None) -> str:
+    def _create_panel(
+        self, kind: str, title: str, state: dict, *, geometry: dict | None = None
+    ) -> str:
         """Create a new floating panel."""
         definition = PanelDefinition(
             panel_id=uuid4().hex,
@@ -441,7 +467,9 @@ class GMTableView(ctk.CTkFrame):
 
     def _preferred_entity_geometry(self, entity_type: str) -> dict[str, int]:
         """Return the default geometry for an entity panel."""
-        width, height = resolve_default_panel_size("entity", {"entity_type": entity_type})
+        width, height = resolve_default_panel_size(
+            "entity", {"entity_type": entity_type}
+        )
         return {"width": width, "height": height}
 
     @staticmethod
@@ -456,7 +484,9 @@ class GMTableView(ctk.CTkFrame):
             return ("Title", "Name")
         return ("Name", "Title")
 
-    def _entity_label(self, entity_type: str, item: dict | None, *, fallback: str = "") -> str:
+    def _entity_label(
+        self, entity_type: str, item: dict | None, *, fallback: str = ""
+    ) -> str:
         """Return the canonical display label for an entity."""
         if isinstance(item, dict):
             for key in self._entity_name_keys(entity_type):
@@ -501,19 +531,23 @@ class GMTableView(ctk.CTkFrame):
         finally:
             self._fog_menu.grab_release()
 
-    def _resolve_tabletop_context(self, *, prefer_world_map: bool = False) -> tuple[str | None, str | None, object | None]:
+    def _resolve_tabletop_context(
+        self, *, prefer_world_map: bool = False
+    ) -> tuple[str | None, str | None, object | None]:
         """Return the most relevant map-capable panel, kind, and payload."""
         preferred_kinds = {"world_map"} if prefer_world_map else MAP_PANEL_KINDS
-        panel_id = self.workspace.get_active_panel_id(kinds=preferred_kinds, include_minimized=False)
+        panel_id = self.workspace.get_active_panel_id(
+            kinds=preferred_kinds, include_minimized=False
+        )
         if panel_id is None and not prefer_world_map:
-            panel_id = self.workspace.get_active_panel_id(kinds=MAP_PANEL_KINDS, include_minimized=False)
+            panel_id = self.workspace.get_active_panel_id(
+                kinds=MAP_PANEL_KINDS, include_minimized=False
+            )
         if panel_id is None:
             records = self.workspace.list_panels(
                 kinds={"world_map"} if prefer_world_map else MAP_PANEL_KINDS,
                 include_minimized=True,
             )
-            if not prefer_world_map and not records:
-                records = self.workspace.list_panels(kinds=MAP_PANEL_KINDS, include_minimized=True)
             if records:
                 panel_id = str(records[-1]["panel_id"])
         if panel_id is None:
@@ -535,8 +569,15 @@ class GMTableView(ctk.CTkFrame):
 
     def _focus_or_open_world_map_panel(self, map_name: str | None = None) -> str | None:
         """Focus an existing world map panel or create one."""
-        target_map = str(map_name or self._current_tabletop_map_name() or self._infer_starting_map_name() or "").strip()
-        records = self.workspace.list_panels(kinds={"world_map"}, include_minimized=True)
+        target_map = str(
+            map_name
+            or self._current_tabletop_map_name()
+            or self._infer_starting_map_name()
+            or ""
+        ).strip()
+        records = self.workspace.list_panels(
+            kinds={"world_map"}, include_minimized=True
+        )
         if records:
             panel_id = str(records[-1]["panel_id"])
             self.workspace.bring_to_front(panel_id)
@@ -555,7 +596,12 @@ class GMTableView(ctk.CTkFrame):
 
     def _focus_or_open_map_tool_panel(self, map_name: str | None = None) -> str | None:
         """Focus an existing map tool panel or create one."""
-        target_map = str(map_name or self._current_tabletop_map_name() or self._infer_starting_map_name() or "").strip()
+        target_map = str(
+            map_name
+            or self._current_tabletop_map_name()
+            or self._infer_starting_map_name()
+            or ""
+        ).strip()
         records = self.workspace.list_panels(kinds={"map_tool"}, include_minimized=True)
         if records:
             panel_id = str(records[-1]["panel_id"])
@@ -580,7 +626,9 @@ class GMTableView(ctk.CTkFrame):
             target_map = self._current_tabletop_map_name()
             panel_id = self._focus_or_open_world_map_panel(target_map)
             if panel_id is None:
-                messagebox.showinfo("GM Table", "Open a scene map before launching player view.")
+                messagebox.showinfo(
+                    "GM Table", "Open a scene map before launching player view."
+                )
                 return
             payload = self.workspace.get_panel_payload(panel_id)
             kind = "world_map"
@@ -591,9 +639,13 @@ class GMTableView(ctk.CTkFrame):
         """Route a fog command to the active map-capable panel."""
         _panel_id, _kind, payload = self._resolve_tabletop_context()
         if payload is None:
-            messagebox.showinfo("GM Table", "Open a scene map or map tool panel to work with fog.")
+            messagebox.showinfo(
+                "GM Table", "Open a scene map or map tool panel to work with fog."
+            )
             return
-        if action in {"add", "rem", "add_rect", "rem_rect"} and hasattr(payload, "_set_fog"):
+        if action in {"add", "rem", "add_rect", "rem_rect"} and hasattr(
+            payload, "_set_fog"
+        ):
             payload._set_fog(action)
             return
         if action == "clear" and hasattr(payload, "clear_fog"):
@@ -605,7 +657,9 @@ class GMTableView(ctk.CTkFrame):
         if action == "undo" and hasattr(payload, "undo_fog"):
             payload.undo_fog()
             return
-        messagebox.showinfo("GM Table", "This panel does not support the requested fog command.")
+        messagebox.showinfo(
+            "GM Table", "This panel does not support the requested fog command."
+        )
 
     def _handle_add_option(self, option: str) -> None:
         """Route add-menu options."""
@@ -619,13 +673,19 @@ class GMTableView(ctk.CTkFrame):
             self._create_panel("map_tool", "Map Tool", {})
             return
         if option == "Scene Flow":
-            self._create_panel("scene_flow", f"Scene Flow: {self.scenario_name}", {"scenario_title": self.scenario_name})
+            self._create_panel(
+                "scene_flow",
+                f"Scene Flow: {self.scenario_name}",
+                {"scenario_title": self.scenario_name},
+            )
             return
         if option == "Image Library":
             self._create_panel("image_library", "Image Library", {})
             return
         if option == "Handouts":
-            self._create_panel("handouts", "Handouts", {"scenario_name": self.scenario_name})
+            self._create_panel(
+                "handouts", "Handouts", {"scenario_name": self.scenario_name}
+            )
             return
         if option == "Loot Generator":
             self._create_panel("loot_generator", "Loot Generator", {})
@@ -672,7 +732,9 @@ class GMTableView(ctk.CTkFrame):
             if kind == "world_map":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_world_map_content(host, definition.state),
+                    builder=lambda host: self._build_world_map_content(
+                        host, definition.state
+                    ),
                     state_getter=lambda payload: self._panel_state(
                         map_name=getattr(payload, "current_map_name", None)
                     ),
@@ -680,17 +742,24 @@ class GMTableView(ctk.CTkFrame):
             if kind == "map_tool":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_map_tool_content(host, definition.state),
+                    builder=lambda host: self._build_map_tool_content(
+                        host, definition.state
+                    ),
                     state_getter=lambda payload: self._panel_state(
-                        map_name=((getattr(payload, "current_map", None) or {}).get("Name"))
+                        map_name=(
+                            (getattr(payload, "current_map", None) or {}).get("Name")
+                        )
                     ),
                 )
             if kind == "scene_flow":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_scene_flow_content(host, definition.state),
+                    builder=lambda host: self._build_scene_flow_content(
+                        host, definition.state
+                    ),
                     state_getter=lambda _payload: self._panel_state(
-                        scenario_title=definition.state.get("scenario_title") or self.scenario_name
+                        scenario_title=definition.state.get("scenario_title")
+                        or self.scenario_name
                     ),
                 )
             if kind == "image_library":
@@ -718,7 +787,9 @@ class GMTableView(ctk.CTkFrame):
             if kind == "random_tables":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_random_tables_content(host, definition.state),
+                    builder=lambda host: self._build_random_tables_content(
+                        host, definition.state
+                    ),
                     state_getter=lambda payload: payload.get_state(),
                 )
             if kind == "plot_twists":
@@ -729,12 +800,16 @@ class GMTableView(ctk.CTkFrame):
             if kind == "entity":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_entity_content(host, definition.state),
+                    builder=lambda host: self._build_entity_content(
+                        host, definition.state
+                    ),
                 )
             if kind == "puzzle_display":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_puzzle_display_content(host, definition.state),
+                    builder=lambda host: self._build_puzzle_display_content(
+                        host, definition.state
+                    ),
                 )
             if kind == "character_graph":
                 return GMTableHostedPage(
@@ -747,7 +822,9 @@ class GMTableView(ctk.CTkFrame):
                     builder=lambda host: self._build_scenario_graph_content(host),
                 )
             if kind == "note":
-                return GMTableNotePage(parent, initial_text=str(definition.state.get("text") or ""))
+                return GMTableNotePage(
+                    parent, initial_text=str(definition.state.get("text") or "")
+                )
         except Exception as exc:
             log_warning(
                 f"Unable to build GM Table panel '{definition.title}': {exc}",
@@ -856,7 +933,9 @@ class GMTableView(ctk.CTkFrame):
         puzzle_name = state.get("puzzle_name")
         wrapper = self.wrappers.get("Puzzles")
         items = wrapper.load_items() if wrapper is not None else []
-        puzzle_item = next((item for item in items if item.get("Name") == puzzle_name), {})
+        puzzle_item = next(
+            (item for item in items if item.get("Name") == puzzle_name), {}
+        )
         frame = create_puzzle_display_frame(host, puzzle_item, scrollable=False)
         frame.grid(row=0, column=0, sticky="nsew")
         return frame
@@ -916,13 +995,16 @@ class GMTableView(ctk.CTkFrame):
     ) -> str | None:
         """Return the existing entity panel id when present."""
         layout = self.workspace.serialize()
-        lookup_names = self._entity_aliases(entity_type, item=item, fallback=entity_name)
+        lookup_names = self._entity_aliases(
+            entity_type, item=item, fallback=entity_name
+        )
         for panel in layout.get("panels", []):
             state = panel.get("state") or {}
             if (
                 panel.get("kind") == "entity"
                 and state.get("entity_type") == entity_type
-                and self._normalize_entity_name(state.get("entity_name")) in lookup_names
+                and self._normalize_entity_name(state.get("entity_name"))
+                in lookup_names
             ):
                 return str(panel.get("panel_id"))
         return None
@@ -972,14 +1054,18 @@ class GMTableView(ctk.CTkFrame):
         popup.grab_set()
         popup.focus_force()
 
-        def _open_selected(selected_type: str, selected_name: str, item: dict | None = None) -> None:
+        def _open_selected(
+            selected_type: str, selected_name: str, item: dict | None = None
+        ) -> None:
             popup.destroy()
             self.open_entity_panel(
                 selected_type,
                 self._entity_label(selected_type, item, fallback=selected_name),
             )
 
-        view = GenericListSelectionView(popup, entity_type, wrapper, template, _open_selected)
+        view = GenericListSelectionView(
+            popup, entity_type, wrapper, template, _open_selected
+        )
         view.pack(fill="both", expand=True)
 
     def _open_puzzle_selection(self) -> None:
@@ -1022,7 +1108,9 @@ class GMTableView(ctk.CTkFrame):
                 f"Unable to open GM Table chatbot: {exc}",
                 func_name="GMTableView.open_chatbot",
             )
-            messagebox.showerror("GM Table", "Chatbot is unavailable from this workspace.")
+            messagebox.showerror(
+                "GM Table", "Chatbot is unavailable from this workspace."
+            )
 
     def focus_panel(self, panel_id: str) -> None:
         """Bring a panel to the front."""

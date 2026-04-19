@@ -68,7 +68,14 @@ class _FakePanel:
             "height": self._height,
         }
 
-    def place_configure(self, *, x: int | None = None, y: int | None = None, width: int | None = None, height: int | None = None) -> None:
+    def place_configure(
+        self,
+        *,
+        x: int | None = None,
+        y: int | None = None,
+        width: int | None = None,
+        height: int | None = None,
+    ) -> None:
         if x is not None:
             self.x = x
         if y is not None:
@@ -86,7 +93,9 @@ class _FakePanel:
             height=geometry["height"],
         )
 
-    def apply_floating_geometry(self, geometry: dict[str, float | int], *, screen_geometry=None) -> None:
+    def apply_floating_geometry(
+        self, geometry: dict[str, float | int], *, screen_geometry=None
+    ) -> None:
         self.world_x = float(geometry["x"])
         self.world_y = float(geometry["y"])
         if screen_geometry is None and callable(self._project_floating_geometry):
@@ -153,8 +162,18 @@ class _FakePanel:
         self.lifted = True
 
 
-def _prepare_workspace(workspace, *, width: int = 1400, height: int = 900, camera_x: float = 0.0, camera_y: float = 0.0, zoom: float = 1.0) -> None:
-    workspace.surface = SimpleNamespace(winfo_width=lambda: width, winfo_height=lambda: height)
+def _prepare_workspace(
+    workspace,
+    *,
+    width: int = 1400,
+    height: int = 900,
+    camera_x: float = 0.0,
+    camera_y: float = 0.0,
+    zoom: float = 1.0,
+) -> None:
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: width, winfo_height=lambda: height
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
     workspace._camera_x = camera_x
@@ -283,7 +302,14 @@ class _FakeButton:
 
 
 class _FakeCanvas:
-    def __init__(self, *, width: int = 156, height: int = 84, measured_width: int = 1, measured_height: int = 1) -> None:
+    def __init__(
+        self,
+        *,
+        width: int = 156,
+        height: int = 84,
+        measured_width: int = 1,
+        measured_height: int = 1,
+    ) -> None:
         self._width = width
         self._height = height
         self._measured_width = measured_width
@@ -307,7 +333,9 @@ class _FakeCanvas:
     def delete(self, _tag: str) -> None:
         self.deleted = True
 
-    def create_rectangle(self, x0: float, y0: float, x1: float, y1: float, **_kwargs) -> None:
+    def create_rectangle(
+        self, x0: float, y0: float, x1: float, y1: float, **_kwargs
+    ) -> None:
         self.rectangles.append((x0, y0, x1, y1))
 
 
@@ -358,11 +386,17 @@ def test_snap_panel_tiles_two_panels_side_by_side() -> None:
         "map": _FakePanel(860, 620, x=420, y=48),
     }
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
-        "map": PanelDefinition(panel_id="map", kind="world_map", title="World Map", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
+        "map": PanelDefinition(
+            panel_id="map", kind="world_map", title="World Map", state={}
+        ),
     }
     workspace._z_order = ["map", "notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1400, winfo_height=lambda: 900
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
 
@@ -384,13 +418,61 @@ def test_resolve_snap_mode_supports_stacks_quadrants_and_strips() -> None:
     surface_w = 1400
     surface_h = 900
 
-    assert _resolve_snap_mode(24, 24, surface_w=surface_w, surface_h=surface_h) == "top_left"
-    assert _resolve_snap_mode(surface_w // 2, PANEL_SNAP_THRESHOLD // 2, surface_w=surface_w, surface_h=surface_h) == "maximize"
-    assert _resolve_snap_mode(surface_w // 3, PANEL_SNAP_THRESHOLD // 2, surface_w=surface_w, surface_h=surface_h) == "top"
-    assert _resolve_snap_mode(PANEL_SNAP_THRESHOLD // 2, surface_h // 2, surface_w=surface_w, surface_h=surface_h) == "left"
-    assert _resolve_snap_mode(surface_w // 2, int(surface_h * 0.20), surface_w=surface_w, surface_h=surface_h) == "top_strip"
-    assert _resolve_snap_mode(surface_w // 2, int(surface_h * 0.80), surface_w=surface_w, surface_h=surface_h) == "bottom_strip"
-    assert _resolve_snap_mode(surface_w - 24, surface_h - 24, surface_w=surface_w, surface_h=surface_h) == "bottom_right"
+    assert (
+        _resolve_snap_mode(24, 24, surface_w=surface_w, surface_h=surface_h)
+        == "top_left"
+    )
+    assert (
+        _resolve_snap_mode(
+            surface_w // 2,
+            PANEL_SNAP_THRESHOLD // 2,
+            surface_w=surface_w,
+            surface_h=surface_h,
+        )
+        == "maximize"
+    )
+    assert (
+        _resolve_snap_mode(
+            surface_w // 3,
+            PANEL_SNAP_THRESHOLD // 2,
+            surface_w=surface_w,
+            surface_h=surface_h,
+        )
+        == "top"
+    )
+    assert (
+        _resolve_snap_mode(
+            PANEL_SNAP_THRESHOLD // 2,
+            surface_h // 2,
+            surface_w=surface_w,
+            surface_h=surface_h,
+        )
+        == "left"
+    )
+    assert (
+        _resolve_snap_mode(
+            surface_w // 2,
+            int(surface_h * 0.20),
+            surface_w=surface_w,
+            surface_h=surface_h,
+        )
+        == "top_strip"
+    )
+    assert (
+        _resolve_snap_mode(
+            surface_w // 2,
+            int(surface_h * 0.80),
+            surface_w=surface_w,
+            surface_h=surface_h,
+        )
+        == "bottom_strip"
+    )
+    assert (
+        _resolve_snap_mode(
+            surface_w - 24, surface_h - 24, surface_w=surface_w, surface_h=surface_h
+        )
+        == "bottom_right"
+    )
 
 
 def test_snap_geometry_supports_quadrants_and_strips() -> None:
@@ -435,11 +517,17 @@ def test_snap_panel_stacks_two_panels_top_and_bottom() -> None:
         "map": _FakePanel(860, 620, x=420, y=48),
     }
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
-        "map": PanelDefinition(panel_id="map", kind="world_map", title="World Map", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
+        "map": PanelDefinition(
+            panel_id="map", kind="world_map", title="World Map", state={}
+        ),
     }
     workspace._z_order = ["map", "notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1400, winfo_height=lambda: 900
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
 
@@ -461,10 +549,14 @@ def test_toggle_panel_maximize_restores_previous_geometry() -> None:
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     workspace._panels = {"notes": _FakePanel(520, 360, x=84, y=56)}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._z_order = ["notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1400, winfo_height=lambda: 900
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
 
@@ -502,8 +594,6 @@ def test_resize_geometry_supports_dragging_from_top_left_corner() -> None:
     assert geometry["y"] == 140
     assert geometry["width"] == 540
     assert geometry["height"] == 400
-
-
 
 
 def test_resize_floating_geometry_keeps_zoom_1_behavior() -> None:
@@ -564,6 +654,8 @@ def test_resize_floating_geometry_scales_resize_delta_with_zoom() -> None:
     assert half_zoom["y"] == 170.0
     assert high_zoom["x"] == 140.0
     assert high_zoom["y"] == 110.0
+
+
 def test_resize_to_uses_drag_origin_snapshot_without_cumulative_drift() -> None:
     """Successive drag frames should stay anchored to the initial resize snapshot."""
     panel = GMTablePanel.__new__(GMTablePanel)
@@ -603,13 +695,19 @@ def test_clamp_panels_reflows_maximized_panel_when_surface_changes() -> None:
     """Docked panels should stay docked when the GM Table itself is resized."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     panel = _FakePanel(520, 360, x=84, y=56)
-    panel.enter_layout_mode("maximize", {"x": 12, "y": 12, "width": 1376, "height": 876})
+    panel.enter_layout_mode(
+        "maximize", {"x": 12, "y": 12, "width": 1376, "height": 876}
+    )
     workspace._panels = {"notes": panel}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._z_order = ["notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1180, winfo_height=lambda: 760)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1180, winfo_height=lambda: 760
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
 
@@ -626,13 +724,19 @@ def test_clamp_panels_reflows_top_strip_panel_when_surface_changes() -> None:
     """Strip layouts should recompute their geometry when the workspace is resized."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     panel = _FakePanel(520, 360, x=84, y=56)
-    panel.enter_layout_mode("top_strip", {"x": 12, "y": 12, "width": 1376, "height": 245})
+    panel.enter_layout_mode(
+        "top_strip", {"x": 12, "y": 12, "width": 1376, "height": 245}
+    )
     workspace._panels = {"notes": panel}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._z_order = ["notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1180, winfo_height=lambda: 760)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1180, winfo_height=lambda: 760
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
 
@@ -688,9 +792,30 @@ def test_preview_snap_target_resizes_preview_without_passing_size_to_place() -> 
     )
     assert preview.width == expected_quadrant["width"]
     assert preview.height == expected_quadrant["height"]
-    assert preview.place_calls[-1] == {"x": expected_quadrant["x"], "y": expected_quadrant["y"]}
+    assert preview.place_calls[-1] == {
+        "x": expected_quadrant["x"],
+        "y": expected_quadrant["y"],
+    }
     assert label.text == SNAP_MODE_LABELS["bottom_right"]
     assert workspace._snap_preview_mode == "bottom_right"
+
+
+def test_preview_snap_target_clears_overlay_for_invalid_mode() -> None:
+    """Invalid snap targets should hide any existing preview overlay."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    preview = _FakePreview()
+    label = _FakeLabel()
+    workspace._panels = {"notes": _FakePanel(520, 360, x=84, y=56)}
+    _prepare_workspace(workspace)
+    workspace._snap_preview = preview
+    workspace._snap_preview_label = label
+    workspace._snap_preview_mode = "left"
+
+    GMTableWorkspace.preview_snap_target(workspace, "notes", "not-a-mode")
+
+    assert workspace._snap_preview_mode is None
+    assert preview.hidden is True
+    assert preview.place_calls == []
 
 
 def test_minimize_and_restore_panel_round_trip() -> None:
@@ -698,11 +823,15 @@ def test_minimize_and_restore_panel_round_trip() -> None:
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     workspace._panels = {"notes": _FakePanel(520, 360, x=84, y=56)}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._panel_payloads = {}
     workspace._z_order = ["notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1400, winfo_height=lambda: 900
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
     workspace._apply_focus_state = lambda _panel_id: None
@@ -724,8 +853,12 @@ def test_bring_to_front_does_not_write_z_into_definition_state() -> None:
         "map": _FakePanel(860, 620, x=120, y=72),
     }
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={"text": "plan"}),
-        "map": PanelDefinition(panel_id="map", kind="world_map", title="Map", state={"map_name": "Docks"}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={"text": "plan"}
+        ),
+        "map": PanelDefinition(
+            panel_id="map", kind="world_map", title="Map", state={"map_name": "Docks"}
+        ),
     }
     workspace._z_order = ["notes", "map"]
     workspace._schedule_layout_changed = lambda: None
@@ -760,7 +893,9 @@ def test_serialize_persists_minimized_layout_metadata() -> None:
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     workspace._panels = {"notes": panel}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._panel_payloads = {"notes": SimpleNamespace()}
     workspace._z_order = ["notes"]
@@ -789,7 +924,9 @@ def test_restore_strips_window_metadata_from_definition_state() -> None:
     def _add_panel(definition, *, geometry=None):
         captured["definition"] = definition
         captured["geometry"] = geometry
-        return _FakePanel(geometry["width"], geometry["height"], x=geometry["x"], y=geometry["y"])
+        return _FakePanel(
+            geometry["width"], geometry["height"], x=geometry["x"], y=geometry["y"]
+        )
 
     workspace.add_panel = _add_panel
 
@@ -810,7 +947,12 @@ def test_restore_strips_window_metadata_from_definition_state() -> None:
                         "z": 3,
                         "layout_mode": "floating",
                         "minimized_restore_mode": "left",
-                        "restore_geometry": {"x": 12, "y": 12, "width": 480, "height": 320},
+                        "restore_geometry": {
+                            "x": 12,
+                            "y": 12,
+                            "width": 480,
+                            "height": 320,
+                        },
                     },
                 }
             ]
@@ -830,7 +972,9 @@ def test_restore_rehydrates_quadrant_layout_mode() -> None:
     workspace._surface_geometry = lambda: (1400, 900)
 
     def _add_panel(definition, *, geometry=None):
-        panel = _FakePanel(geometry["width"], geometry["height"], x=geometry["x"], y=geometry["y"])
+        panel = _FakePanel(
+            geometry["width"], geometry["height"], x=geometry["x"], y=geometry["y"]
+        )
         captured["panel"] = panel
         return panel
 
@@ -850,7 +994,12 @@ def test_restore_rehydrates_quadrant_layout_mode() -> None:
                         "width": 520,
                         "height": 360,
                         "layout_mode": "bottom_right",
-                        "restore_geometry": {"x": 84, "y": 56, "width": 520, "height": 360},
+                        "restore_geometry": {
+                            "x": 84,
+                            "y": 56,
+                            "width": 520,
+                            "height": 360,
+                        },
                     },
                 }
             ]
@@ -873,10 +1022,14 @@ def test_restore_panel_round_trips_from_quadrant_layout() -> None:
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     workspace._panels = {"notes": _FakePanel(520, 360, x=84, y=56)}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._z_order = ["notes"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1400, winfo_height=lambda: 900
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
     workspace._apply_focus_state = lambda _panel_id: None
@@ -912,11 +1065,28 @@ def test_camera_pan_reprojects_floating_panel_without_changing_size() -> None:
     assert panel.winfo_height() == 360
 
 
-def test_middle_button_pan_accepts_nested_panel_content_and_ignores_unrelated_widgets() -> None:
+def test_screen_to_world_projects_from_camera_and_zoom() -> None:
+    """Screen coordinates should map into world coordinates using camera offset and zoom."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._camera_x = 100.0
+    workspace._camera_y = 80.0
+    workspace._camera_zoom = 1.25
+
+    world_x, world_y = GMTableWorkspace._screen_to_world(workspace, 250, 100)
+
+    assert world_x == 300.0
+    assert world_y == 160.0
+
+
+def test_middle_button_pan_accepts_nested_panel_content_and_ignores_unrelated_widgets() -> (
+    None
+):
     """Middle-drag should pan from any widget inside the surface subtree, but nowhere else."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     surface = _FakeWidgetNode()
-    nested_widget = _FakeWidgetNode(master=_FakeWidgetNode(master=_FakeWidgetNode(master=surface)))
+    nested_widget = _FakeWidgetNode(
+        master=_FakeWidgetNode(master=_FakeWidgetNode(master=surface))
+    )
     unrelated_widget = _FakeWidgetNode()
     workspace.surface = surface
     workspace._empty_state = _FakeWidgetNode(master=surface)
@@ -1085,7 +1255,9 @@ def test_bind_surface_navigation_registers_middle_pan_on_workspace_toplevel() ->
         "<ButtonRelease-2>",
     }
 
-    GMTableWorkspace._handle_workspace_destroy(workspace, SimpleNamespace(widget=workspace))
+    GMTableWorkspace._handle_workspace_destroy(
+        workspace, SimpleNamespace(widget=workspace)
+    )
 
     assert {sequence for sequence, _binding_id in toplevel.unbind_calls} == {
         "<ButtonPress-2>",
@@ -1117,7 +1289,9 @@ def test_snap_layouts_remain_viewport_relative_with_camera_offset() -> None:
         "map": _FakePanel(860, 620, x=820, y=340),
     }
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
         "map": PanelDefinition(panel_id="map", kind="world_map", title="Map", state={}),
     }
     workspace._z_order = ["map", "notes"]
@@ -1137,15 +1311,15 @@ def test_snap_layouts_remain_viewport_relative_with_camera_offset() -> None:
     assert notes.y == PANEL_MARGIN
 
 
-
-
 def test_serialize_snapped_panel_uses_current_camera_instead_of_home() -> None:
     """Snapping with an offset camera should persist world coordinates for the active viewport."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     panel = _FakePanel(520, 360, x=800, y=400)
     workspace._panels = {"notes": panel}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._panel_payloads = {"notes": object()}
     workspace._z_order = ["notes"]
@@ -1159,7 +1333,10 @@ def test_serialize_snapped_panel_uses_current_camera_instead_of_home() -> None:
     assert panel_state["world_x"] == 1212.0
     assert panel_state["world_y"] == 762.0
 
-def test_ensure_panel_minimum_size_keeps_snap_layout_and_only_grows_restore_geometry() -> None:
+
+def test_ensure_panel_minimum_size_keeps_snap_layout_and_only_grows_restore_geometry() -> (
+    None
+):
     """Readable growth on an existing snapped panel must not break its active snap layout."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     panel = _FakePanel(520, 360, x=12, y=12)
@@ -1172,7 +1349,12 @@ def test_ensure_panel_minimum_size_keeps_snap_layout_and_only_grows_restore_geom
     }
     workspace._panels = {"notes": panel}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="entity", title="Scenario", state={"entity_type": "Scenarios"}),
+        "notes": PanelDefinition(
+            panel_id="notes",
+            kind="entity",
+            title="Scenario",
+            state={"entity_type": "Scenarios"},
+        ),
     }
     workspace._z_order = ["notes"]
     _prepare_workspace(workspace, camera_x=260, camera_y=120)
@@ -1190,7 +1372,9 @@ def test_ensure_panel_minimum_size_keeps_snap_layout_and_only_grows_restore_geom
     }
 
 
-def test_restore_after_snap_recovers_prior_world_geometry_when_camera_is_offset() -> None:
+def test_restore_after_snap_recovers_prior_world_geometry_when_camera_is_offset() -> (
+    None
+):
     """Restoring a snapped panel should return to the stored world coordinates."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     panel = _FakePanel(520, 360, x=48, y=36)
@@ -1198,7 +1382,9 @@ def test_restore_after_snap_recovers_prior_world_geometry_when_camera_is_offset(
     panel.world_y = 136.0
     workspace._panels = {"notes": panel}
     workspace._definitions = {
-        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+        "notes": PanelDefinition(
+            panel_id="notes", kind="note", title="Notes", state={}
+        ),
     }
     workspace._z_order = ["notes"]
     _prepare_workspace(workspace, camera_x=200, camera_y=100)
@@ -1233,7 +1419,12 @@ def test_minimap_click_recenters_camera() -> None:
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     workspace._panels = {}
     _prepare_workspace(workspace)
-    workspace._minimap_projection = {"min_x": 100.0, "min_y": 50.0, "scale": 2.0, "padding": 10.0}
+    workspace._minimap_projection = {
+        "min_x": 100.0,
+        "min_y": 50.0,
+        "scale": 2.0,
+        "padding": 10.0,
+    }
 
     GMTableWorkspace._on_minimap_click(workspace, SimpleNamespace(x=210, y=110))
 
@@ -1260,7 +1451,12 @@ def test_serialize_and_restore_round_trip_bookmarks_and_home_camera() -> None:
     restored = GMTableWorkspace.__new__(GMTableWorkspace)
     restored.clear = lambda: None
     restored.clamp_panels = lambda: None
-    restored.add_panel = lambda definition, *, geometry=None: _FakePanel(geometry["width"], geometry["height"], x=int(geometry["x"]), y=int(geometry["y"]))
+    restored.add_panel = lambda definition, *, geometry=None: _FakePanel(
+        geometry["width"],
+        geometry["height"],
+        x=int(geometry["x"]),
+        y=int(geometry["y"]),
+    )
 
     GMTableWorkspace.restore(restored, snapshot)
 
@@ -1291,7 +1487,11 @@ def test_show_bookmark_menu_lists_bookmarks_without_submenus() -> None:
 
     GMTableWorkspace._show_bookmark_menu(workspace)
 
-    labels = [entry[1]["label"] for entry in workspace._bookmark_menu.entries if entry[0] == "command"]
+    labels = [
+        entry[1]["label"]
+        for entry in workspace._bookmark_menu.entries
+        if entry[0] == "command"
+    ]
     assert "Jump To Bookmark" not in labels
     assert "Delete Bookmark" not in labels
     assert labels == [
@@ -1387,7 +1587,9 @@ def test_cascade_panels_offsets_visible_windows() -> None:
     }
     workspace._panel_payloads = {}
     workspace._z_order = ["a", "b"]
-    workspace.surface = SimpleNamespace(winfo_width=lambda: 1400, winfo_height=lambda: 900)
+    workspace.surface = SimpleNamespace(
+        winfo_width=lambda: 1400, winfo_height=lambda: 900
+    )
     workspace.update_idletasks = lambda: None
     workspace._schedule_layout_changed = lambda: None
     workspace._apply_focus_state = lambda _panel_id: None
