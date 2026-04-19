@@ -988,6 +988,41 @@ def test_snap_layouts_remain_viewport_relative_with_camera_offset() -> None:
     assert world_map.layout_mode == "right"
     assert notes.x == PANEL_MARGIN
     assert world_map.x == 1400 - PANEL_MARGIN - world_map.winfo_width()
+    GMTableWorkspace.snap_panel(workspace, "notes", "maximize")
+    assert notes.layout_mode == "maximize"
+    assert notes.x == PANEL_MARGIN
+    assert notes.y == PANEL_MARGIN
+
+
+def test_ensure_panel_minimum_size_keeps_snap_layout_and_only_grows_restore_geometry() -> None:
+    """Readable growth on an existing snapped panel must not break its active snap layout."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    panel = _FakePanel(520, 360, x=12, y=12)
+    panel._layout_mode = "left"
+    panel._restore_geometry = {
+        "x": 40.0,
+        "y": 30.0,
+        "width": 480,
+        "height": 320,
+    }
+    workspace._panels = {"notes": panel}
+    workspace._definitions = {
+        "notes": PanelDefinition(panel_id="notes", kind="entity", title="Scenario", state={"entity_type": "Scenarios"}),
+    }
+    workspace._z_order = ["notes"]
+    _prepare_workspace(workspace, camera_x=260, camera_y=120)
+
+    GMTableWorkspace.ensure_panel_minimum_size(workspace, "notes", 920, 680)
+
+    assert panel.layout_mode == "left"
+    assert panel.winfo_width() == 520
+    assert panel.winfo_height() == 360
+    assert panel._restore_geometry == {
+        "x": 40.0,
+        "y": 30.0,
+        "width": 920,
+        "height": 680,
+    }
 
 
 def test_restore_after_snap_recovers_prior_world_geometry_when_camera_is_offset() -> None:
