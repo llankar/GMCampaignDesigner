@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import customtkinter as ctk
+from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
 
 
 TABLE_PALETTE = {
@@ -2091,12 +2092,23 @@ class GMTableWorkspace(ctk.CTkFrame):
         panel = self._panels.get(panel_id)
         if panel is None:
             return
+        definition = self._definitions.get(panel_id)
+        minimum = fit_content_minimum(
+            definition.kind if definition is not None else "entity",
+            definition.state if definition is not None else {},
+        )
         current_geometry = panel.geometry_snapshot()
         current_width = max(GMTablePanel.MIN_WIDTH, int(current_geometry["width"]))
         current_height = max(GMTablePanel.MIN_HEIGHT, int(current_geometry["height"]))
-        target_width = max(current_width, int(width))
-        target_height = max(current_height, int(height))
+        target_width = max(current_width, int(width), int(minimum["width"]))
+        target_height = max(current_height, int(height), int(minimum["height"]))
         if target_width == current_width and target_height == current_height:
+            return
+        if panel.layout_mode in SNAP_LAYOUT_MODES:
+            restore = getattr(panel, "_restore_geometry", None)
+            if isinstance(restore, dict):
+                restore["width"] = max(int(restore.get("width", target_width)), target_width)
+                restore["height"] = max(int(restore.get("height", target_height)), target_height)
             return
         self.resize_panel(panel_id, target_width, target_height)
 
@@ -2198,14 +2210,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             panel = self._panels.get(panel_id)
             if panel is None:
                 return
-        surface_w, surface_h = self._surface_geometry()
-        geometry = _snap_geometry(
-            mode,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=GMTablePanel.MIN_WIDTH,
-            min_height=GMTablePanel.MIN_HEIGHT,
-        )
+        geometry = fit_viewport_snap(panel, self.surface, mode)
         panel.enter_layout_mode(mode, geometry)
         companion_mode = SNAP_COMPLEMENT_MODES.get(mode)
         if companion_mode is not None:
@@ -2215,13 +2220,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 if companion is not None:
                     companion.enter_layout_mode(
                         companion_mode,
-                        _snap_geometry(
-                            companion_mode,
-                            surface_w=surface_w,
-                            surface_h=surface_h,
-                            min_width=GMTablePanel.MIN_WIDTH,
-                            min_height=GMTablePanel.MIN_HEIGHT,
-                        ),
+                        fit_viewport_snap(companion, self.surface, companion_mode),
                     )
         self.bring_to_front(panel_id)
 
@@ -2275,18 +2274,18 @@ class GMTableWorkspace(ctk.CTkFrame):
             definition = self._definitions.get(panel_id)
             if panel is None:
                 continue
-            preferred_width, preferred_height = resolve_default_panel_size(
+            preferred = fit_content_minimum(
                 definition.kind if definition is not None else "entity",
-                definition.state if definition is not None else None,
+                definition.state if definition is not None else {},
             )
             geometry = panel.geometry_snapshot()
             width = _clamp(
-                max(int(geometry["width"]), int(preferred_width)),
+                max(int(geometry["width"]), int(preferred["width"])),
                 GMTablePanel.MIN_WIDTH,
                 max_width,
             )
             height = _clamp(
-                max(int(geometry["height"]), int(preferred_height)),
+                max(int(geometry["height"]), int(preferred["height"])),
                 GMTablePanel.MIN_HEIGHT,
                 max_height,
             )
