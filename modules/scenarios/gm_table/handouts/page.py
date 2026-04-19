@@ -9,12 +9,20 @@ import customtkinter as ctk
 from PIL import Image
 
 from modules.scenarios.gm_table.handouts.service import HandoutItem, collect_scenario_handouts
-from modules.ui.image_viewer import show_portrait
+from modules.ui.image_viewer import (
+    DEFAULT_REVEAL_ANIMATION,
+    REVEAL_ANIMATION_OPTIONS,
+    normalize_reveal_animation,
+    show_portrait,
+)
 
 _CARD_WIDTH = 148
 _CARD_HEIGHT = 164
 _CARD_GAP = 6
 _THUMBNAIL_SIZE = (128, 88)
+_ANIMATION_LABELS = tuple(label for label, _value in REVEAL_ANIMATION_OPTIONS)
+_ANIMATION_BY_LABEL = {label: value for label, value in REVEAL_ANIMATION_OPTIONS}
+_LABEL_BY_ANIMATION = {value: label for label, value in REVEAL_ANIMATION_OPTIONS}
 
 
 class GMTableHandoutsPage(ctk.CTkFrame):
@@ -43,6 +51,7 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         self._query_var = tk.StringVar(value=str(state.get("query") or ""))
         self._status_var = tk.StringVar(value="")
         self._selected_id = str(state.get("selected_id") or "")
+        self._animation_var = tk.StringVar(value=self._animation_label(state.get("animation")))
 
         self._handouts: list[HandoutItem] = []
         self._visible_cards: dict[str, ctk.CTkFrame] = {}
@@ -74,6 +83,13 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         search.bind("<KeyRelease>", lambda _event: self._render_grid())
 
         ctk.CTkButton(controls, text="Refresh", width=88, height=30, command=self.refresh).grid(row=0, column=1)
+        ctk.CTkOptionMenu(
+            controls,
+            values=list(_ANIMATION_LABELS),
+            variable=self._animation_var,
+            width=136,
+            height=30,
+        ).grid(row=0, column=2, sticky="e")
 
         ctk.CTkLabel(
             self,
@@ -225,6 +241,19 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         placeholder = Image.new("RGB", _THUMBNAIL_SIZE, color="#293241")
         return ctk.CTkImage(light_image=placeholder, dark_image=placeholder, size=_THUMBNAIL_SIZE)
 
+    @staticmethod
+    def _animation_label(value) -> str:
+        animation = normalize_reveal_animation(value)
+        return _LABEL_BY_ANIMATION.get(animation, _ANIMATION_LABELS[0])
+
+    def _selected_animation(self) -> str:
+        variable = getattr(self, "_animation_var", None)
+        if variable is None or not hasattr(variable, "get"):
+            return DEFAULT_REVEAL_ANIMATION
+        selected = variable.get()
+        animation = _ANIMATION_BY_LABEL.get(selected, selected)
+        return normalize_reveal_animation(animation)
+
     def _open_handout(self, handout: HandoutItem) -> None:
         resolved_path = str(Path(handout.path).resolve())
         if not Path(resolved_path).exists():
@@ -235,7 +264,12 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         self._selected_id = handout.id
         self._status_var.set("")
         self._highlight_selected()
-        show_portrait(resolved_path, title=handout.title)
+        show_portrait(
+            resolved_path,
+            title=handout.title,
+            subtitle=handout.subtitle,
+            animation=self._selected_animation(),
+        )
 
     def _highlight_selected(self) -> None:
         for handout_id, card in self._visible_cards.items():
@@ -251,4 +285,5 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         return {
             "query": self._query_var.get().strip(),
             "selected_id": self._selected_id,
+            "animation": self._selected_animation(),
         }

@@ -134,9 +134,8 @@ def test_render_grid_builds_compact_cards_for_collected_handouts() -> None:
     assert set(view._visible_cards.keys()) == {"one", "two", "three"}
 
 
-def test_clicking_card_opens_portrait_with_expected_path_and_title(monkeypatch, tmp_path) -> None:
-    image_path = tmp_path / "kara.png"
-    image_path.write_bytes(b"png")
+def test_clicking_card_opens_portrait_with_expected_path_title_and_subtitle(monkeypatch) -> None:
+    image_path = Path("handouts") / "kara.png"
     handout = _item(str(image_path), title="Kara Voss")
 
     monkeypatch.setattr(page_module.ctk, "CTkFrame", _Widget)
@@ -144,16 +143,28 @@ def test_clicking_card_opens_portrait_with_expected_path_and_title(monkeypatch, 
     monkeypatch.setattr(page_module.ctk, "CTkFont", lambda **_kwargs: object())
 
     shown = []
-    monkeypatch.setattr(page_module, "show_portrait", lambda path, title=None: shown.append((path, title)))
+    monkeypatch.setattr(
+        page_module,
+        "show_portrait",
+        lambda path, title=None, subtitle=None, animation=None: shown.append((path, title, subtitle, animation)),
+    )
+    monkeypatch.setattr(page_module.Path, "exists", lambda self: True)
 
     view = page_module.GMTableHandoutsPage.__new__(page_module.GMTableHandoutsPage)
     view._status_var = _Var("")
     view._selected_id = ""
+    view._animation_var = _Var("Drift Up")
     view._highlight_selected = lambda: None
     view._get_thumbnail = lambda _path: (object(), False)
 
     card = page_module.GMTableHandoutsPage._build_card(view, _GridFrame(), replace(handout))
     card.bindings["<Button-1>"](None)
 
-    assert shown == [(str(Path(image_path).resolve()), "Kara Voss")]
+    assert shown == [(str(Path(image_path).resolve()), "Kara Voss", "NPC", "drift_up")]
     assert view._selected_id == handout.id
+
+
+def test_selected_animation_defaults_to_fade_when_option_is_missing() -> None:
+    view = page_module.GMTableHandoutsPage.__new__(page_module.GMTableHandoutsPage)
+
+    assert page_module.GMTableHandoutsPage._selected_animation(view) == "fade"
