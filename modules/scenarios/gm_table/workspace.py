@@ -337,154 +337,23 @@ def _snap_geometry(
     margin: int = PANEL_MARGIN,
     gutter: int = PANEL_GUTTER,
 ) -> dict[str, int]:
-    """Return the target geometry for a snapped or maximized panel."""
-    full_width = max(min_width, int(surface_w) - (margin * 2))
-    full_height = max(min_height, int(surface_h) - (margin * 2))
-    split_width = max(min_width * 2, full_width - gutter)
-    split_height = max(min_height * 2, full_height - gutter)
-    half_width = max(min_width, split_width // 2)
-    half_height = max(min_height, split_height // 2)
-    strip_height = _clamp(
-        int(round(full_height * 0.28)),
-        min_height,
-        max(min_height, full_height - min_height - gutter),
-    )
+    """Backward-compatible wrapper around :func:`fit_viewport_snap`."""
 
-    if mode == "maximize":
-        return _constrain_panel_geometry(
-            margin,
-            margin,
-            full_width,
-            full_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
+    class _SnapPanelProxy:
+        MIN_WIDTH = 1
+        MIN_HEIGHT = 1
 
-    if mode == "left":
-        return _constrain_panel_geometry(
-            margin,
-            margin,
-            half_width,
-            full_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "right":
-        return _constrain_panel_geometry(
-            int(surface_w) - margin - half_width,
-            margin,
-            half_width,
-            full_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "top":
-        return _constrain_panel_geometry(
-            margin,
-            margin,
-            full_width,
-            half_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "bottom":
-        return _constrain_panel_geometry(
-            margin,
-            int(surface_h) - margin - half_height,
-            full_width,
-            half_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "top_left":
-        return _constrain_panel_geometry(
-            margin,
-            margin,
-            half_width,
-            half_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "top_right":
-        return _constrain_panel_geometry(
-            int(surface_w) - margin - half_width,
-            margin,
-            half_width,
-            half_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "bottom_left":
-        return _constrain_panel_geometry(
-            margin,
-            int(surface_h) - margin - half_height,
-            half_width,
-            half_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "bottom_right":
-        return _constrain_panel_geometry(
-            int(surface_w) - margin - half_width,
-            int(surface_h) - margin - half_height,
-            half_width,
-            half_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "top_strip":
-        return _constrain_panel_geometry(
-            margin,
-            margin,
-            full_width,
-            strip_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
-    if mode == "bottom_strip":
-        return _constrain_panel_geometry(
-            margin,
-            int(surface_h) - margin - strip_height,
-            full_width,
-            strip_height,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=min_width,
-            min_height=min_height,
-            margin=margin,
-        )
+    class _SnapSurfaceProxy:
+        def winfo_width(self) -> int:
+            return int(surface_w)
 
-    raise ValueError(f"Unsupported snap mode: {mode}")
+        def winfo_height(self) -> int:
+            return int(surface_h)
+
+    panel_proxy = _SnapPanelProxy()
+    panel_proxy.MIN_WIDTH = max(1, int(min_width))
+    panel_proxy.MIN_HEIGHT = max(1, int(min_height))
+    return fit_viewport_snap(panel_proxy, _SnapSurfaceProxy(), mode)
 
 
 def _resize_geometry(
@@ -2157,20 +2026,13 @@ class GMTableWorkspace(ctk.CTkFrame):
         label = getattr(self, "_snap_preview_label", None)
         if preview is None or label is None:
             return
-        surface_w, surface_h = _surface_dimensions(self.surface)
-        geometry = _snap_geometry(
-            mode,
-            surface_w=surface_w,
-            surface_h=surface_h,
-            min_width=GMTablePanel.MIN_WIDTH,
-            min_height=GMTablePanel.MIN_HEIGHT,
-        )
+        panel = self._panels.get(panel_id)
+        geometry = fit_viewport_snap(panel or GMTablePanel, self.surface, mode)
         self._snap_preview_mode = mode
         label.configure(text=SNAP_MODE_LABELS.get(mode, "Snap"))
         preview.configure(width=geometry["width"], height=geometry["height"])
         preview.place(x=geometry["x"], y=geometry["y"])
         preview.lift()
-        panel = self._panels.get(panel_id)
         if panel is not None:
             panel.lift()
         self._raise_workspace_overlays()
@@ -2354,16 +2216,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         if panel.layout_mode in (SNAP_LAYOUT_MODES - {"maximize"}) and panel.restore_layout():
             self.bring_to_front(panel_id)
             return
-        surface_w, surface_h = self._surface_geometry()
         panel.enter_layout_mode(
             "maximize",
-            _snap_geometry(
-                "maximize",
-                surface_w=surface_w,
-                surface_h=surface_h,
-                min_width=GMTablePanel.MIN_WIDTH,
-                min_height=GMTablePanel.MIN_HEIGHT,
-            ),
+            fit_viewport_snap(panel, self.surface, "maximize"),
         )
         self.bring_to_front(panel_id)
 
@@ -2444,20 +2299,11 @@ class GMTableWorkspace(ctk.CTkFrame):
     def clamp_panels(self) -> None:
         """Reproject floating panels and keep snapped panels viewport-relative."""
         self.update_idletasks()
-        surface_w, surface_h = _surface_dimensions(self.surface)
         for panel in self._panels.values():
             if panel.layout_mode == "minimized":
                 continue
             if panel.layout_mode in SNAP_LAYOUT_MODES:
-                panel.apply_geometry(
-                    _snap_geometry(
-                        panel.layout_mode,
-                        surface_w=surface_w,
-                        surface_h=surface_h,
-                        min_width=GMTablePanel.MIN_WIDTH,
-                        min_height=GMTablePanel.MIN_HEIGHT,
-                    )
-                )
+                panel.apply_geometry(fit_viewport_snap(panel, self.surface, panel.layout_mode))
                 continue
             self._apply_floating_geometry(panel, self._floating_geometry_snapshot(panel))
         self._schedule_layout_changed()
@@ -2567,8 +2413,8 @@ class GMTableWorkspace(ctk.CTkFrame):
                         layout_mode,
                         surface_w=surface_w,
                         surface_h=surface_h,
-                        min_width=GMTablePanel.MIN_WIDTH,
-                        min_height=GMTablePanel.MIN_HEIGHT,
+                        min_width=panel.MIN_WIDTH,
+                        min_height=panel.MIN_HEIGHT,
                     )
                 )
                 panel._refresh_window_controls()
