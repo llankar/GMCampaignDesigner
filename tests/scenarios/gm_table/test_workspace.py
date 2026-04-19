@@ -242,6 +242,46 @@ class _FakeLiftWidget:
         self.lifted = True
 
 
+class _FakeMenu:
+    def __init__(self) -> None:
+        self.entries: list[tuple[str, dict[str, object]]] = []
+        self.deleted_ranges: list[tuple[object, object]] = []
+        self.popup_at: tuple[int, int] | None = None
+        self.release_count = 0
+
+    def delete(self, start, end=None) -> None:
+        self.deleted_ranges.append((start, end))
+        self.entries.clear()
+
+    def add_command(self, **kwargs) -> None:
+        self.entries.append(("command", kwargs))
+
+    def add_separator(self) -> None:
+        self.entries.append(("separator", {}))
+
+    def tk_popup(self, x: int, y: int) -> None:
+        self.popup_at = (x, y)
+
+    def grab_release(self) -> None:
+        self.release_count += 1
+
+
+class _FakeButton:
+    def __init__(self, x: int = 12, y: int = 24, height: int = 32) -> None:
+        self._x = x
+        self._y = y
+        self._height = height
+
+    def winfo_rootx(self) -> int:
+        return self._x
+
+    def winfo_rooty(self) -> int:
+        return self._y
+
+    def winfo_height(self) -> int:
+        return self._height
+
+
 class _FakeCanvas:
     def __init__(self, *, width: int = 156, height: int = 84, measured_width: int = 1, measured_height: int = 1) -> None:
         self._width = width
@@ -1232,6 +1272,39 @@ def test_serialize_and_restore_round_trip_bookmarks_and_home_camera() -> None:
         {"name": "North Wing", "x": 320.0, "y": 180.0, "zoom": 0.9},
         {"name": "War Room", "x": 900.0, "y": 420.0, "zoom": 1.1},
     ]
+
+
+def test_show_bookmark_menu_lists_bookmarks_without_submenus() -> None:
+    """Bookmark menu should expose jump/delete actions directly in one menu."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._bookmark_menu = _FakeMenu()
+    workspace._bookmark_button = _FakeButton()
+    workspace._bookmarks = [
+        {"name": "North Wing", "x": 320.0, "y": 180.0, "zoom": 0.9},
+        {"name": "War Room", "x": 900.0, "y": 420.0, "zoom": 1.1},
+    ]
+    workspace.jump_home = lambda: None
+    workspace.set_home_camera = lambda: None
+    workspace._save_bookmark_from_prompt = lambda: None
+    workspace.jump_to_bookmark = lambda _name: None
+    workspace.delete_bookmark = lambda _name: None
+
+    GMTableWorkspace._show_bookmark_menu(workspace)
+
+    labels = [entry[1]["label"] for entry in workspace._bookmark_menu.entries if entry[0] == "command"]
+    assert "Jump To Bookmark" not in labels
+    assert "Delete Bookmark" not in labels
+    assert labels == [
+        "Jump Home",
+        "Set Current View As Home",
+        "Add Or Update Bookmark...",
+        "Jump: North Wing",
+        "Jump: War Room",
+        "Delete: North Wing",
+        "Delete: War Room",
+    ]
+    assert workspace._bookmark_menu.popup_at == (12, 56)
+    assert workspace._bookmark_menu.release_count == 1
 
 
 def test_restore_defaults_home_camera_to_saved_camera_when_missing() -> None:
