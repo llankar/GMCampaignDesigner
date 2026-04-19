@@ -73,7 +73,9 @@ def test_open_entity_panel_only_grows_existing_panel_when_needed() -> None:
     ]
 
 
-def test_open_entity_panel_reuses_information_panel_with_title_canonicalization() -> None:
+def test_open_entity_panel_reuses_information_panel_with_title_canonicalization() -> (
+    None
+):
     """Informations panels should dedupe across Title/Name aliases."""
     captured = []
     workspace = SimpleNamespace(
@@ -101,7 +103,9 @@ def test_open_entity_panel_reuses_information_panel_with_title_canonicalization(
         "Name": "Old Note",
     }
     view._preferred_entity_geometry = lambda _entity_type: {"width": 760, "height": 580}
-    view._create_panel = lambda *args, **kwargs: captured.append(("create", args, kwargs))
+    view._create_panel = lambda *args, **kwargs: captured.append(
+        ("create", args, kwargs)
+    )
 
     GMTableView.open_entity_panel(view, "Informations", "Old Note")
 
@@ -158,11 +162,15 @@ def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
     view = GMTableView.__new__(GMTableView)
     expected_item = {"Title": "Night Run"}
     view._load_entity_item = lambda _entity_type, _name: expected_item
-    callback = lambda *args, **kwargs: None
+    def callback(*args, **kwargs):
+        return None
+
     view.open_entity_panel = callback
     host = object()
 
-    monkeypatch.setattr(gm_table_view_module, "create_entity_detail_frame", _fake_factory)
+    monkeypatch.setattr(
+        gm_table_view_module, "create_entity_detail_frame", _fake_factory
+    )
 
     frame = GMTableView._build_entity_content(
         view,
@@ -188,8 +196,12 @@ def test_context_menu_handler_resolution_is_safe_without_gm_screen_api() -> None
         def _show_context_menu(self, _event):
             return None
 
-    assert entity_detail_factory._resolve_context_menu_handler(_HostWithoutMenu()) is None
-    assert callable(entity_detail_factory._resolve_context_menu_handler(_HostWithMenu()))
+    assert (
+        entity_detail_factory._resolve_context_menu_handler(_HostWithoutMenu()) is None
+    )
+    assert callable(
+        entity_detail_factory._resolve_context_menu_handler(_HostWithMenu())
+    )
 
 
 def test_context_menu_binding_helpers_skip_hosts_without_menu_api(monkeypatch) -> None:
@@ -218,7 +230,10 @@ def test_context_menu_binding_helpers_skip_hosts_without_menu_api(monkeypatch) -
     assert entity_detail_factory._bind_host_context_menu(widget, object()) is None
     assert widget.bind_calls == []
 
-    assert entity_detail_factory._bind_host_context_menu_recursively(widget, object()) is None
+    assert (
+        entity_detail_factory._bind_host_context_menu_recursively(widget, object())
+        is None
+    )
     assert recursive_calls == []
 
     handler = entity_detail_factory._bind_host_context_menu(widget, _HostWithMenu())
@@ -239,7 +254,9 @@ def test_handle_add_option_routes_handouts_panel_creation() -> None:
     captured = []
     view = GMTableView.__new__(GMTableView)
     view.scenario_name = "Night Run"
-    view._create_panel = lambda kind, title, state: captured.append((kind, title, state))
+    view._create_panel = lambda kind, title, state: captured.append(
+        (kind, title, state)
+    )
 
     GMTableView._handle_add_option(view, "Handouts")
 
@@ -290,11 +307,36 @@ def test_seed_default_panels_builds_map_first_vtt_layout() -> None:
     GMTableView._seed_default_panels(view)
 
     assert captured == [
-        ("world_map", "Scene Map", {"map_name": "Docks"}, {"x": 24, "y": 24, "width": 980, "height": 640}),
-        ("map_tool", "Map Tool", {"map_name": "Docks"}, {"x": 1020, "y": 24, "width": 620, "height": 640}),
-        ("handouts", "Handouts", {"scenario_name": "Night Run"}, {"x": 24, "y": 680, "width": 440, "height": 300}),
-        ("note", "Session Notes", {"text": ""}, {"x": 476, "y": 680, "width": 520, "height": 300}),
-        ("scene_flow", "Scene Flow: Night Run", {"scenario_title": "Night Run"}, {"x": 1012, "y": 680, "width": 628, "height": 300}),
+        (
+            "world_map",
+            "Scene Map",
+            {"map_name": "Docks"},
+            {"x": 24, "y": 24, "width": 980, "height": 640},
+        ),
+        (
+            "map_tool",
+            "Map Tool",
+            {"map_name": "Docks"},
+            {"x": 1020, "y": 24, "width": 620, "height": 640},
+        ),
+        (
+            "handouts",
+            "Handouts",
+            {"scenario_name": "Night Run"},
+            {"x": 24, "y": 680, "width": 440, "height": 300},
+        ),
+        (
+            "note",
+            "Session Notes",
+            {"text": ""},
+            {"x": 476, "y": 680, "width": 520, "height": 300},
+        ),
+        (
+            "scene_flow",
+            "Scene Flow: Night Run",
+            {"scenario_title": "Night Run"},
+            {"x": 1012, "y": 680, "width": 628, "height": 300},
+        ),
     ]
 
 
@@ -304,11 +346,19 @@ def test_focus_or_open_map_tool_panel_reuses_existing_panel_for_active_scene() -
     payload = SimpleNamespace(open_map_by_name=lambda map_name: opened.append(map_name))
     workspace = SimpleNamespace(
         get_active_panel_id=lambda **_kwargs: "scene-panel",
-        get_panel_definition=lambda panel_id: SimpleNamespace(kind="world_map" if panel_id == "scene-panel" else "map_tool"),
-        get_panel_payload=lambda panel_id: (
-            SimpleNamespace(current_map_name="Harbor") if panel_id == "scene-panel" else payload
+        get_panel_definition=lambda panel_id: SimpleNamespace(
+            kind="world_map" if panel_id == "scene-panel" else "map_tool"
         ),
-        list_panels=lambda **kwargs: ([{"panel_id": "tool-panel", "payload": payload}] if kwargs.get("kinds") == {"map_tool"} else []),
+        get_panel_payload=lambda panel_id: (
+            SimpleNamespace(current_map_name="Harbor")
+            if panel_id == "scene-panel"
+            else payload
+        ),
+        list_panels=lambda **kwargs: (
+            [{"panel_id": "tool-panel", "payload": payload}]
+            if kwargs.get("kinds") == {"map_tool"}
+            else []
+        ),
         bring_to_front=lambda panel_id: opened.append(f"front:{panel_id}"),
     )
     view = GMTableView.__new__(GMTableView)
@@ -319,6 +369,34 @@ def test_focus_or_open_map_tool_panel_reuses_existing_panel_for_active_scene() -
 
     assert panel_id == "tool-panel"
     assert opened == ["front:tool-panel", "Harbor"]
+
+
+def test_resolve_tabletop_context_queries_panel_list_once_when_no_active_panel() -> (
+    None
+):
+    """Fallback panel lookup should not repeat the same list_panels query."""
+    list_calls: list[dict[str, object]] = []
+    payload = SimpleNamespace()
+    workspace = SimpleNamespace(
+        get_active_panel_id=lambda **_kwargs: None,
+        list_panels=lambda **kwargs: (
+            list_calls.append(kwargs)
+            or [{"panel_id": "tool-panel", "payload": payload}]
+        ),
+        get_panel_definition=lambda _panel_id: SimpleNamespace(kind="map_tool"),
+        get_panel_payload=lambda _panel_id: payload,
+    )
+    view = GMTableView.__new__(GMTableView)
+    view.workspace = workspace
+
+    panel_id, kind, resolved_payload = GMTableView._resolve_tabletop_context(view)
+
+    assert panel_id == "tool-panel"
+    assert kind == "map_tool"
+    assert resolved_payload is payload
+    assert list_calls == [
+        {"kinds": gm_table_view_module.MAP_PANEL_KINDS, "include_minimized": True}
+    ]
 
 
 def test_open_player_view_uses_active_world_map_payload() -> None:
