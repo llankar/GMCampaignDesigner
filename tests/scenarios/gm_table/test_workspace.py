@@ -35,6 +35,7 @@ class _FakePanel:
         self.focused = False
         self.lifted = False
         self._project_floating_geometry = None
+        self._screen_to_world = None
 
     @property
     def layout_mode(self) -> str:
@@ -103,6 +104,10 @@ class _FakePanel:
             self._restore_geometry = self.floating_geometry_snapshot()
         self._layout_mode = mode
         self.apply_geometry(geometry)
+        if mode != "floating" and callable(self._screen_to_world):
+            world_x, world_y = self._screen_to_world(geometry["x"], geometry["y"])
+            self.world_x = float(world_x)
+            self.world_y = float(world_y)
 
     def restore_layout(self, **_kwargs) -> bool:
         if self._restore_geometry is None:
@@ -159,6 +164,7 @@ def _prepare_workspace(workspace, *, width: int = 1400, height: int = 900, camer
     workspace._bookmarks = []
     for panel in getattr(workspace, "_panels", {}).values():
         panel._project_floating_geometry = workspace._project_floating_geometry
+        panel._screen_to_world = workspace._screen_to_world
 
 
 class _FakePreview:
@@ -1066,6 +1072,28 @@ def test_snap_layouts_remain_viewport_relative_with_camera_offset() -> None:
     assert notes.x == PANEL_MARGIN
     assert notes.y == PANEL_MARGIN
 
+
+
+
+def test_serialize_snapped_panel_uses_current_camera_instead_of_home() -> None:
+    """Snapping with an offset camera should persist world coordinates for the active viewport."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    panel = _FakePanel(520, 360, x=800, y=400)
+    workspace._panels = {"notes": panel}
+    workspace._definitions = {
+        "notes": PanelDefinition(panel_id="notes", kind="note", title="Notes", state={}),
+    }
+    workspace._panel_payloads = {"notes": object()}
+    workspace._z_order = ["notes"]
+    _prepare_workspace(workspace, camera_x=1200, camera_y=750)
+
+    GMTableWorkspace.snap_panel(workspace, "notes", "left")
+    serialized = GMTableWorkspace.serialize(workspace)
+    panel_state = serialized["panels"][0]["state"]
+
+    assert panel_state["layout_mode"] == "left"
+    assert panel_state["world_x"] == 1212.0
+    assert panel_state["world_y"] == 762.0
 
 def test_ensure_panel_minimum_size_keeps_snap_layout_and_only_grows_restore_geometry() -> None:
     """Readable growth on an existing snapped panel must not break its active snap layout."""
