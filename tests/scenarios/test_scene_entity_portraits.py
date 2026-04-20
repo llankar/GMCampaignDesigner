@@ -102,3 +102,28 @@ def test_attach_entity_avatars_uses_cache_for_same_entity(tmp_path, monkeypatch)
 
     assert first[0]["avatar"] is second[0]["avatar"]
     assert open_calls["count"] == 1
+
+
+def test_attach_entity_avatars_uses_line_when_name_missing(tmp_path, monkeypatch):
+    portrait_path = tmp_path / "npc_briefing_portrait.png"
+    portrait_path.write_bytes(b"not-an-image")
+
+    monkeypatch.setattr(subject.ctk, "CTkImage", _FakeCTkImage)
+    monkeypatch.setattr(subject.ConfigHelper, "get_campaign_dir", staticmethod(lambda: str(tmp_path)))
+    monkeypatch.setattr(subject.Image, "open", lambda _path: _FakeImageObj())
+
+    gm_view = _FakeGMView(
+        wrappers={
+            "NPCs": _FakeWrapper(
+                [
+                    {"Name": "Avery", "Portrait": str(portrait_path)},
+                ]
+            )
+        }
+    )
+
+    briefing_rows = [{"line": "Avery", "avatar": None}]
+    prepared = subject.attach_entity_avatars("NPCs", briefing_rows, gm_view)
+
+    assert prepared[0]["avatar"] is not None
+    assert prepared[0]["avatar"].size == (24, 24)
