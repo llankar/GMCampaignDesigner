@@ -10,7 +10,14 @@ from typing import Callable
 import customtkinter as ctk
 from modules.helpers import theme_manager
 from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
-from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
+from modules.scenarios.gm_table.layout import (
+    AlignmentGuide,
+    equal_spacing,
+    fit_content_minimum,
+    fit_viewport_snap,
+    nearest_edge_snap,
+    pack_cluster,
+)
 
 
 TABLE_PALETTE = {
@@ -60,6 +67,7 @@ CAMERA_ZOOM_STEP = 0.15
 MINIMAP_WIDTH = 176
 MINIMAP_HEIGHT = 118
 MINIMAP_PADDING = 16
+WORLD_ALIGNMENT_THRESHOLD_PX = 18
 SNAP_LAYOUT_MODES = {
     "left",
     "right",
@@ -876,6 +884,14 @@ class GMTablePanel(ctk.CTkFrame):
             snap_menu.add_command(label=label, command=lambda value=mode: self._dispatch_window_action(f"snap:{value}"))
         menu.add_cascade(label="Snap Layout", menu=snap_menu)
         menu.add_separator()
+        menu.add_command(label="Align Left", command=lambda: self._dispatch_window_action("align_left"))
+        menu.add_command(label="Align Top", command=lambda: self._dispatch_window_action("align_top"))
+        menu.add_command(
+            label="Distribute Horizontally",
+            command=lambda: self._dispatch_window_action("distribute_horizontal"),
+        )
+        menu.add_command(label="Pack Cluster", command=lambda: self._dispatch_window_action("pack_cluster"))
+        menu.add_separator()
         menu.add_command(label="Close Others", command=lambda: self._dispatch_window_action("close_others"))
         menu.add_command(label="Cascade Windows", command=lambda: self._dispatch_window_action("cascade_all"))
         menu.add_command(label="Tile Windows", command=lambda: self._dispatch_window_action("tile_all"))
@@ -1117,6 +1133,15 @@ class GMTableWorkspace(ctk.CTkFrame):
         )
         self._snap_preview_label.place(relx=0.5, rely=0.5, anchor="center")
         self._snap_preview.place_forget()
+        self._alignment_guide_canvas = tk.Canvas(
+            self.surface,
+            highlightthickness=0,
+            bd=0,
+            relief="flat",
+            bg=TABLE_CANVAS_BG,
+        )
+        self._alignment_guide_canvas.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
+        self._alignment_guide_canvas.place_forget()
 
         self._nav_hud = ctk.CTkFrame(
             self.surface,
@@ -1208,6 +1233,9 @@ class GMTableWorkspace(ctk.CTkFrame):
 
         self.tray_buttons = ctk.CTkFrame(self.tray, fg_color="transparent")
         self.tray_buttons.grid(row=0, column=1, padx=(0, 12), pady=8, sticky="ew")
+        self.tray_actions = ctk.CTkFrame(self.tray, fg_color="transparent")
+        self.tray_actions.grid(row=0, column=2, padx=(0, 12), pady=8, sticky="e")
+        self._build_tray_actions()
 
         self._empty_state = ctk.CTkLabel(
             self.surface,
@@ -1222,6 +1250,34 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._refresh_desk_texture()
         self._refresh_minimap()
         self._refresh_minimized_tray()
+
+    def _build_tray_actions(self) -> None:
+        """Build quick world-alignment commands inside the tray."""
+        actions = (
+            ("Align Left", "align_left"),
+            ("Align Top", "align_top"),
+            ("Distribute Horizontally", "distribute_horizontal"),
+            ("Pack Cluster", "pack_cluster"),
+        )
+        frame = getattr(self, "tray_actions", None)
+        if frame is None:
+            return
+        for child in frame.winfo_children():
+            child.destroy()
+        for label, action in actions:
+            ctk.CTkButton(
+                frame,
+                text=label,
+                height=30,
+                fg_color=TABLE_PALETTE["table_chip"],
+                hover_color="#283146",
+                text_color=TABLE_PALETTE["text"],
+                corner_radius=12,
+                command=lambda value=action: self.handle_window_action(
+                    self.get_active_panel_id(include_minimized=False) or "",
+                    value,
+                ),
+            ).pack(side="left", padx=(0, 8))
 
     def _schedule_layout_changed(self) -> None:
         """Debounce layout persistence."""
@@ -1270,10 +1326,11 @@ class GMTableWorkspace(ctk.CTkFrame):
         for child in buttons_frame.winfo_children():
             child.destroy()
         minimized_ids = self._minimized_panel_ids()
-        if not minimized_ids:
-            tray.grid_remove()
-            return
         tray.grid()
+        if not minimized_ids:
+            self.tray_label.configure(text="Workspace")
+            return
+        self.tray_label.configure(text="Minimized")
         for panel_id in minimized_ids:
             definition = self._definitions.get(panel_id)
             if definition is None:
@@ -1773,6 +1830,12 @@ class GMTableWorkspace(ctk.CTkFrame):
                 texture_canvas.lower()
             except Exception:
                 pass
+        guide_canvas = getattr(self, "_alignment_guide_canvas", None)
+        if guide_canvas is not None:
+            try:
+                guide_canvas.lift()
+            except Exception:
+                pass
         for widget_name in ("_nav_hud", "_minimap_shell"):
             widget = getattr(self, widget_name, None)
             if widget is None:
@@ -2004,6 +2067,18 @@ class GMTableWorkspace(ctk.CTkFrame):
         if action == "snap_right":
             self.snap_panel(panel_id, "right")
             return
+        if action == "align_left":
+            self.align_left(panel_id)
+            return
+        if action == "align_top":
+            self.align_top(panel_id)
+            return
+        if action == "distribute_horizontal":
+            self.distribute_horizontally(panel_id)
+            return
+        if action == "pack_cluster":
+            self.pack_cluster(panel_id)
+            return
         if action == "close_others":
             self.close_other_panels(panel_id)
             return
@@ -2019,7 +2094,14 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def preview_snap_target(self, panel_id: str, mode: str | None) -> None:
         """Show or hide the live snap preview while a panel is being dragged."""
-        if mode is None or mode not in SNAP_LAYOUT_MODES:
+        self._preview_world_alignment(panel_id)
+        if mode is None:
+            preview = getattr(self, "_snap_preview", None)
+            if preview is not None:
+                preview.place_forget()
+            self._snap_preview_mode = None
+            return
+        if mode not in SNAP_LAYOUT_MODES:
             self.clear_snap_preview()
             return
         preview = getattr(self, "_snap_preview", None)
@@ -2043,6 +2125,149 @@ class GMTableWorkspace(ctk.CTkFrame):
         preview = getattr(self, "_snap_preview", None)
         if preview is not None:
             preview.place_forget()
+        self._clear_alignment_guides()
+
+    def _floating_world_geometries(self, *, include_minimized: bool = False) -> dict[str, dict[str, float | int]]:
+        """Return world-space geometry snapshots for floating panels."""
+        records: dict[str, dict[str, float | int]] = {}
+        order = list(getattr(self, "_z_order", []) or list(getattr(self, "_panels", {}).keys()))
+        for panel_id in order:
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                continue
+            if panel.layout_mode != "floating":
+                if panel.layout_mode == "minimized" and include_minimized:
+                    pass
+                else:
+                    continue
+            records[panel_id] = self._floating_geometry_snapshot(panel)
+        return records
+
+    def _preview_world_alignment(self, panel_id: str) -> None:
+        """Render live world-relative alignment guides for the active drag panel."""
+        active = self._panels.get(panel_id)
+        if active is None or active.layout_mode != "floating":
+            self._clear_alignment_guides()
+            return
+        floating = self._floating_world_geometries()
+        active_geometry = floating.pop(panel_id, None)
+        if active_geometry is None:
+            self._clear_alignment_guides()
+            return
+        threshold = float(WORLD_ALIGNMENT_THRESHOLD_PX) / max(CAMERA_MIN_ZOOM, float(self._camera_zoom))
+        snap = nearest_edge_snap(active_geometry, list(floating.values()), threshold=threshold)
+        guides = list(snap.get("guides", []))
+        if not guides:
+            self._clear_alignment_guides()
+            return
+        self._render_alignment_guides(guides)
+
+    def _render_alignment_guides(self, guides: list[AlignmentGuide]) -> None:
+        """Draw world-space alignment guides in the workspace overlay layer."""
+        canvas = getattr(self, "_alignment_guide_canvas", None)
+        if canvas is None:
+            return
+        canvas.delete("all")
+        for guide in guides:
+            if guide.axis == "x":
+                x0, y0 = self._project_world_to_screen(guide.world_value, guide.span_start)
+                x1, y1 = self._project_world_to_screen(guide.world_value, guide.span_end)
+            else:
+                x0, y0 = self._project_world_to_screen(guide.span_start, guide.world_value)
+                x1, y1 = self._project_world_to_screen(guide.span_end, guide.world_value)
+            canvas.create_line(x0, y0, x1, y1, fill=TABLE_PALETTE["panel_focus"], width=2, dash=(6, 4))
+        canvas.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
+        canvas.lift()
+        self._raise_workspace_overlays()
+
+    def _clear_alignment_guides(self) -> None:
+        """Hide any live world alignment guides."""
+        canvas = getattr(self, "_alignment_guide_canvas", None)
+        if canvas is None:
+            return
+        try:
+            canvas.delete("all")
+            canvas.place_forget()
+        except Exception:
+            return
+
+    def _project_world_to_screen(self, world_x: float, world_y: float) -> tuple[int, int]:
+        """Project one world-space point into surface-local screen coordinates."""
+        zoom = max(CAMERA_MIN_ZOOM, float(getattr(self, "_camera_zoom", 1.0)))
+        x = int(round((float(world_x) - _coerce_float(getattr(self, "_camera_x", 0.0))) * zoom))
+        y = int(round((float(world_y) - _coerce_float(getattr(self, "_camera_y", 0.0))) * zoom))
+        return x, y
+
+    def align_left(self, panel_id: str | None = None) -> None:
+        """Align visible floating panels to the left edge of a reference panel."""
+        floating = self._floating_world_geometries()
+        if not floating:
+            return
+        anchor_id = panel_id if panel_id in floating else next(iter(floating.keys()))
+        target_x = float(floating[anchor_id]["x"])
+        for candidate_id, geometry in floating.items():
+            geometry["x"] = target_x
+            panel = self._panels.get(candidate_id)
+            if panel is not None:
+                panel.clear_layout_mode()
+                self._apply_floating_geometry(panel, geometry)
+        if panel_id is not None:
+            self.bring_to_front(panel_id)
+        self._schedule_layout_changed()
+
+    def align_top(self, panel_id: str | None = None) -> None:
+        """Align visible floating panels to the top edge of a reference panel."""
+        floating = self._floating_world_geometries()
+        if not floating:
+            return
+        anchor_id = panel_id if panel_id in floating else next(iter(floating.keys()))
+        target_y = float(floating[anchor_id]["y"])
+        for candidate_id, geometry in floating.items():
+            geometry["y"] = target_y
+            panel = self._panels.get(candidate_id)
+            if panel is not None:
+                panel.clear_layout_mode()
+                self._apply_floating_geometry(panel, geometry)
+        if panel_id is not None:
+            self.bring_to_front(panel_id)
+        self._schedule_layout_changed()
+
+    def distribute_horizontally(self, panel_id: str | None = None) -> None:
+        """Distribute floating panels with equal horizontal spacing."""
+        floating = self._floating_world_geometries()
+        positions = equal_spacing(floating)
+        if not positions:
+            return
+        for candidate_id, x_value in positions.items():
+            panel = self._panels.get(candidate_id)
+            geometry = floating.get(candidate_id)
+            if panel is None or geometry is None:
+                continue
+            geometry["x"] = float(x_value)
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        if panel_id is not None:
+            self.bring_to_front(panel_id)
+        self._schedule_layout_changed()
+
+    def pack_cluster(self, panel_id: str | None = None) -> None:
+        """Pack floating panels into a compact world-space cluster."""
+        floating = self._floating_world_geometries()
+        placements = pack_cluster(floating)
+        if not placements:
+            return
+        for candidate_id, (x_value, y_value) in placements.items():
+            panel = self._panels.get(candidate_id)
+            geometry = floating.get(candidate_id)
+            if panel is None or geometry is None:
+                continue
+            geometry["x"] = float(x_value)
+            geometry["y"] = float(y_value)
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        if panel_id is not None:
+            self.bring_to_front(panel_id)
+        self._schedule_layout_changed()
 
     def resize_panel(self, panel_id: str, width: int, height: int) -> None:
         """Resize an existing panel and keep it visible."""

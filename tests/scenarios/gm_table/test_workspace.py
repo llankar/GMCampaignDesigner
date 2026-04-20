@@ -5,7 +5,12 @@ from __future__ import annotations
 import tkinter as tk
 from types import SimpleNamespace
 
-from modules.scenarios.gm_table.layout import fit_viewport_snap
+from modules.scenarios.gm_table.layout import (
+    equal_spacing,
+    fit_viewport_snap,
+    nearest_edge_snap,
+    pack_cluster,
+)
 from modules.scenarios.gm_table.workspace import (
     PANEL_GUTTER,
     PANEL_MARGIN,
@@ -341,6 +346,32 @@ class _FakeCanvas:
         self, x0: float, y0: float, x1: float, y1: float, **_kwargs
     ) -> None:
         self.rectangles.append((x0, y0, x1, y1))
+
+
+class _FakeGuideCanvas:
+    def __init__(self) -> None:
+        self.lines: list[tuple[float, float, float, float]] = []
+        self.placed = False
+        self.lifted = False
+        self.hidden = False
+
+    def delete(self, _tag: str) -> None:
+        self.lines = []
+
+    def create_line(
+        self, x0: float, y0: float, x1: float, y1: float, **_kwargs
+    ) -> None:
+        self.lines.append((x0, y0, x1, y1))
+
+    def place(self, **_kwargs) -> None:
+        self.placed = True
+        self.hidden = False
+
+    def lift(self) -> None:
+        self.lifted = True
+
+    def place_forget(self) -> None:
+        self.hidden = True
 
 
 def test_auto_arrange_preserves_large_scenario_panel_geometry() -> None:
@@ -1158,6 +1189,101 @@ def test_screen_to_world_projects_from_camera_and_zoom() -> None:
 
     assert world_x == 300.0
     assert world_y == 160.0
+
+
+def test_nearest_edge_snap_is_world_space_only() -> None:
+    """Edge snapping should produce the same world output regardless of camera state."""
+    active = {"x": 104.0, "y": 60.0, "width": 200, "height": 120}
+    candidates = [{"x": 300.0, "y": 64.0, "width": 220, "height": 120}]
+
+    result_a = nearest_edge_snap(active, candidates, threshold=12.0)
+    result_b = nearest_edge_snap(active, candidates, threshold=12.0)
+
+    assert result_a["x"] == 100.0
+    assert result_b["x"] == 100.0
+    assert result_a["y"] == result_b["y"] == 64.0
+    assert len(result_a["guides"]) == len(result_b["guides"]) == 2
+
+
+def test_align_left_keeps_same_world_result_with_camera_offset_and_zoom() -> None:
+    """World alignment actions should not depend on viewport camera transform."""
+    def _build_workspace(camera_x: float, camera_y: float, zoom: float):
+        workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+        panel_a = _FakePanel(260, 180, x=80, y=120)
+        panel_a.world_x = 480.0
+        panel_a.world_y = 220.0
+        panel_b = _FakePanel(260, 180, x=460, y=180)
+        panel_b.world_x = 760.0
+        panel_b.world_y = 300.0
+        workspace._panels = {"a": panel_a, "b": panel_b}
+        workspace._definitions = {
+            "a": PanelDefinition(panel_id="a", kind="note", title="A", state={}),
+            "b": PanelDefinition(panel_id="b", kind="note", title="B", state={}),
+        }
+        workspace._z_order = ["a", "b"]
+        workspace._schedule_layout_changed = lambda: None
+        _prepare_workspace(workspace, camera_x=camera_x, camera_y=camera_y, zoom=zoom)
+        return workspace
+
+    workspace_a = _build_workspace(0.0, 0.0, 1.0)
+    workspace_b = _build_workspace(420.0, 260.0, 1.35)
+
+    GMTableWorkspace.align_left(workspace_a)
+    GMTableWorkspace.align_left(workspace_b)
+
+    assert workspace_a._panels["a"].world_x == workspace_b._panels["a"].world_x == 480.0
+    assert workspace_a._panels["b"].world_x == workspace_b._panels["b"].world_x == 480.0
+
+
+def test_distribute_and_pack_are_world_space_consistent() -> None:
+    """Distribution and packing should produce deterministic world coordinates."""
+    rectangles = {
+        "a": {"x": 200.0, "y": 120.0, "width": 220, "height": 140},
+        "b": {"x": 620.0, "y": 160.0, "width": 180, "height": 140},
+        "c": {"x": 980.0, "y": 180.0, "width": 200, "height": 140},
+    }
+
+    distributed = equal_spacing(rectangles)
+    packed = pack_cluster(rectangles)
+
+    assert distributed["a"] == 200.0
+    assert distributed["c"] == 980.0
+    assert distributed["a"] < distributed["b"] < distributed["c"]
+    assert packed["a"] == (200.0, 120.0)
+    assert packed["b"][1] >= packed["a"][1]
+    assert packed["c"][1] >= packed["b"][1]
+
+
+def test_preview_snap_target_renders_world_alignment_guides() -> None:
+    """Dragging in floating mode should draw world-relative alignment guide lines."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    preview = _FakePreview()
+    label = _FakeLabel()
+    guide_canvas = _FakeGuideCanvas()
+    panel_a = _FakePanel(220, 140, x=260, y=120)
+    panel_a.world_x = 500.0
+    panel_a.world_y = 200.0
+    panel_b = _FakePanel(220, 140, x=520, y=190)
+    panel_b.world_x = 740.0
+    panel_b.world_y = 205.0
+    workspace._panels = {"a": panel_a, "b": panel_b}
+    workspace._definitions = {
+        "a": PanelDefinition(panel_id="a", kind="note", title="A", state={}),
+        "b": PanelDefinition(panel_id="b", kind="note", title="B", state={}),
+    }
+    workspace._z_order = ["b", "a"]
+    workspace._snap_preview = preview
+    workspace._snap_preview_label = label
+    workspace._alignment_guide_canvas = guide_canvas
+    workspace._nav_hud = _FakeLiftWidget()
+    workspace._minimap_shell = _FakeLiftWidget()
+    _prepare_workspace(workspace, camera_x=420, camera_y=180, zoom=1.0)
+
+    GMTableWorkspace.preview_snap_target(workspace, "a", None)
+
+    assert guide_canvas.placed is True
+    assert guide_canvas.lifted is True
+    assert len(guide_canvas.lines) >= 1
 
 
 def test_middle_button_pan_accepts_nested_panel_content_and_ignores_unrelated_widgets() -> (
