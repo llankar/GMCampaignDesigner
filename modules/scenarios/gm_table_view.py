@@ -363,37 +363,21 @@ class GMTableView(ctk.CTkFrame):
         self._workspace_loaded = True
 
     def _seed_default_panels(self) -> None:
-        """Build a map-centric default workspace."""
-        starter_map_name = self._infer_starting_map_name()
+        """Build the default workspace focused on scenario and handouts."""
         self._create_panel(
-            "world_map",
-            "Scene Map",
-            self._panel_state(map_name=starter_map_name),
-            geometry={"x": 24, "y": 24, "width": 980, "height": 640},
-        )
-        self._create_panel(
-            "map_tool",
-            "Map Tool",
-            self._panel_state(map_name=starter_map_name),
-            geometry={"x": 1020, "y": 24, "width": 620, "height": 640},
+            "entity",
+            f"Scenario: {self.scenario_name}",
+            {
+                "entity_type": "Scenarios",
+                "entity_name": self.scenario_name,
+            },
+            geometry={"x": 24, "y": 24, "width": 1040, "height": 760},
         )
         self._create_panel(
             "handouts",
             "Handouts",
             {"scenario_name": self.scenario_name},
-            geometry={"x": 24, "y": 680, "width": 440, "height": 300},
-        )
-        self._create_panel(
-            "note",
-            "Session Notes",
-            {"text": ""},
-            geometry={"x": 476, "y": 680, "width": 520, "height": 300},
-        )
-        self._create_panel(
-            "scene_flow",
-            f"Scene Flow: {self.scenario_name}",
-            {"scenario_title": self.scenario_name},
-            geometry={"x": 1012, "y": 680, "width": 628, "height": 300},
+            geometry={"x": 1080, "y": 24, "width": 560, "height": 760},
         )
 
     def _persist_layout(self) -> None:
