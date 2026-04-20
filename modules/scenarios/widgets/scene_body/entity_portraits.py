@@ -39,7 +39,7 @@ def attach_entity_avatars(group_label: str, entities: Iterable[dict], gm_view_re
     prepared = []
     for payload in entities or []:
         updated = dict(payload)
-        entity_name = str(updated.get("name") or "").strip()
+        entity_name = str(updated.get("name") or updated.get("line") or "").strip()
         record = records_by_name.get(entity_name)
         updated["avatar"] = _build_avatar(gm_view_ref, entity_type, entity_name, record)
         prepared.append(updated)
