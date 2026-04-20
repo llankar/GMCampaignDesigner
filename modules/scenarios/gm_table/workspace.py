@@ -1233,9 +1233,6 @@ class GMTableWorkspace(ctk.CTkFrame):
 
         self.tray_buttons = ctk.CTkFrame(self.tray, fg_color="transparent")
         self.tray_buttons.grid(row=0, column=1, padx=(0, 12), pady=8, sticky="ew")
-        self.tray_actions = ctk.CTkFrame(self.tray, fg_color="transparent")
-        self.tray_actions.grid(row=0, column=2, padx=(0, 12), pady=8, sticky="e")
-        self._build_tray_actions()
 
         self._empty_state = ctk.CTkLabel(
             self.surface,
@@ -1250,34 +1247,6 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._refresh_desk_texture()
         self._refresh_minimap()
         self._refresh_minimized_tray()
-
-    def _build_tray_actions(self) -> None:
-        """Build quick world-alignment commands inside the tray."""
-        actions = (
-            ("Align Left", "align_left"),
-            ("Align Top", "align_top"),
-            ("Distribute Horizontally", "distribute_horizontal"),
-            ("Pack Cluster", "pack_cluster"),
-        )
-        frame = getattr(self, "tray_actions", None)
-        if frame is None:
-            return
-        for child in frame.winfo_children():
-            child.destroy()
-        for label, action in actions:
-            ctk.CTkButton(
-                frame,
-                text=label,
-                height=30,
-                fg_color=TABLE_PALETTE["table_chip"],
-                hover_color="#283146",
-                text_color=TABLE_PALETTE["text"],
-                corner_radius=12,
-                command=lambda value=action: self.handle_window_action(
-                    self.get_active_panel_id(include_minimized=False) or "",
-                    value,
-                ),
-            ).pack(side="left", padx=(0, 8))
 
     def _schedule_layout_changed(self) -> None:
         """Debounce layout persistence."""
@@ -2143,13 +2112,24 @@ class GMTableWorkspace(ctk.CTkFrame):
             records[panel_id] = self._floating_geometry_snapshot(panel)
         return records
 
+    def _arrangeable_world_geometries(self) -> dict[str, dict[str, float | int]]:
+        """Return world geometries for every visible panel that can be arranged."""
+        records: dict[str, dict[str, float | int]] = {}
+        order = list(getattr(self, "_z_order", []) or list(getattr(self, "_panels", {}).keys()))
+        for panel_id in order:
+            panel = self._panels.get(panel_id)
+            if panel is None or panel.layout_mode == "minimized":
+                continue
+            records[panel_id] = self._floating_geometry_snapshot(panel)
+        return records
+
     def _preview_world_alignment(self, panel_id: str) -> None:
         """Render live world-relative alignment guides for the active drag panel."""
         active = self._panels.get(panel_id)
         if active is None or active.layout_mode != "floating":
             self._clear_alignment_guides()
             return
-        floating = self._floating_world_geometries()
+        floating = self._arrangeable_world_geometries()
         active_geometry = floating.pop(panel_id, None)
         if active_geometry is None:
             self._clear_alignment_guides()
@@ -2199,8 +2179,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         return x, y
 
     def align_left(self, panel_id: str | None = None) -> None:
-        """Align visible floating panels to the left edge of a reference panel."""
-        floating = self._floating_world_geometries()
+        """Align visible panels to the left edge of a reference panel."""
+        floating = self._arrangeable_world_geometries()
         if not floating:
             return
         anchor_id = panel_id if panel_id in floating else next(iter(floating.keys()))
@@ -2216,8 +2196,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._schedule_layout_changed()
 
     def align_top(self, panel_id: str | None = None) -> None:
-        """Align visible floating panels to the top edge of a reference panel."""
-        floating = self._floating_world_geometries()
+        """Align visible panels to the top edge of a reference panel."""
+        floating = self._arrangeable_world_geometries()
         if not floating:
             return
         anchor_id = panel_id if panel_id in floating else next(iter(floating.keys()))
@@ -2233,8 +2213,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._schedule_layout_changed()
 
     def distribute_horizontally(self, panel_id: str | None = None) -> None:
-        """Distribute floating panels with equal horizontal spacing."""
-        floating = self._floating_world_geometries()
+        """Distribute visible panels with equal horizontal spacing."""
+        floating = self._arrangeable_world_geometries()
         positions = equal_spacing(floating)
         if not positions:
             return
@@ -2251,8 +2231,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._schedule_layout_changed()
 
     def pack_cluster(self, panel_id: str | None = None) -> None:
-        """Pack floating panels into a compact world-space cluster."""
-        floating = self._floating_world_geometries()
+        """Pack visible panels into a compact world-space cluster."""
+        floating = self._arrangeable_world_geometries()
         placements = pack_cluster(floating)
         if not placements:
             return
