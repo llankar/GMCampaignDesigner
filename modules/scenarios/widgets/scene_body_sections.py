@@ -5,6 +5,7 @@ from customtkinter import CTkLabel
 from modules.generic.detail_ui import get_detail_palette
 from modules.scenarios.scene_structured_fields import parse_scene_sections_with_structured_fallback
 from modules.scenarios.widgets.scene_body import create_entities_groups_grid, prepare_entities_for_group
+from modules.scenarios.widgets.scene_body.entity_portraits import attach_entity_avatars
 from modules.scenarios.widgets.scene_briefing_layout import create_scene_briefing_layout
 from modules.scenarios.widgets.scene_density import get_scene_density_style
 
@@ -349,7 +350,15 @@ def _create_description_block(
     return description_block, description_label
 
 
-def _create_entities_block(parent, npc_names, villain_names, creature_names, place_names, open_entity_callback=None):
+def _create_entities_block(
+    parent,
+    npc_names,
+    villain_names,
+    creature_names,
+    place_names,
+    open_entity_callback=None,
+    gm_view_ref=None,
+):
     """Create entities block."""
     palette = get_detail_palette()
     has_entities = bool(npc_names or villain_names or creature_names or place_names)
@@ -360,14 +369,20 @@ def _create_entities_block(parent, npc_names, villain_names, creature_names, pla
     entities_block.pack(fill="x", padx=12, pady=(0, 0))
     _create_section_title(entities_block, "Entities")
 
+    groups = (
+        ("NPCs", prepare_entities_for_group(npc_names or [])),
+        ("Villains", prepare_entities_for_group(villain_names or [])),
+        ("Creatures", prepare_entities_for_group(creature_names or [])),
+        ("Places", prepare_entities_for_group(place_names or [])),
+    )
+    groups_with_avatars = [
+        (group_label, attach_entity_avatars(group_label, entities, gm_view_ref))
+        for group_label, entities in groups
+    ]
+
     create_entities_groups_grid(
         entities_block,
-        groups=(
-            ("NPCs", prepare_entities_for_group(npc_names or [])),
-            ("Villains", prepare_entities_for_group(villain_names or [])),
-            ("Creatures", prepare_entities_for_group(creature_names or [])),
-            ("Places", prepare_entities_for_group(place_names or [])),
-        ),
+        groups=groups_with_avatars,
         palette=palette,
         open_entity_callback=open_entity_callback,
         visible_limit=6,
@@ -560,6 +575,7 @@ def build_scene_body_sections(
         creature_names,
         place_names,
         open_entity_callback=open_entity_callback,
+        gm_view_ref=gm_view_ref,
     )
     if entities_block is not None and (has_maps or has_links):
         _add_subtle_separator(shell)
