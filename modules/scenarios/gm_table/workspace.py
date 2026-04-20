@@ -2139,7 +2139,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 x1, y1 = self._project_world_to_screen(guide.span_end, guide.world_value)
             canvas.create_line(x0, y0, x1, y1, fill=TABLE_PALETTE["panel_focus"], width=2, dash=(6, 4))
         canvas.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
-        canvas.tkraise()
+        canvas.lift()
         self._raise_workspace_overlays()
 
     def _clear_alignment_guides(self) -> None:
