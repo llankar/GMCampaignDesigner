@@ -871,11 +871,6 @@ class GMTablePanel(ctk.CTkFrame):
         maximize_label = "Restore Size" if self._layout_mode in SNAP_LAYOUT_MODES else "Maximize"
         menu.add_command(label=maximize_label, command=lambda: self._dispatch_window_action("toggle_maximize"))
         menu.add_separator()
-        snap_menu = tk.Menu(menu, tearoff=0)
-        for label, mode in SNAP_MENU_LAYOUTS:
-            snap_menu.add_command(label=label, command=lambda value=mode: self._dispatch_window_action(f"snap:{value}"))
-        menu.add_cascade(label="Snap Layout", menu=snap_menu)
-        menu.add_separator()
         menu.add_command(label="Close Others", command=lambda: self._dispatch_window_action("close_others"))
         menu.add_command(label="Cascade Windows", command=lambda: self._dispatch_window_action("cascade_all"))
         menu.add_command(label="Tile Windows", command=lambda: self._dispatch_window_action("tile_all"))
@@ -921,18 +916,12 @@ class GMTablePanel(ctk.CTkFrame):
         geometry["x"] = (start_x / 100.0) + ((event.x_root - root_x) / zoom)
         geometry["y"] = (start_y / 100.0) + ((event.y_root - root_y) / zoom)
         self.apply_floating_geometry(geometry)
-        self._on_snap_preview_changed(self.definition.panel_id, self._resolve_drag_snap_mode(event))
 
     def _stop_drag(self, event=None) -> None:
         """Stop dragging and snap to the workspace grid."""
         if self._drag_origin is None:
             return
-        snap_mode = self._resolve_drag_snap_mode(event) if event is not None else None
-        self._on_snap_preview_changed(self.definition.panel_id, None)
         self._drag_origin = None
-        if snap_mode is not None:
-            self._on_snap_requested(self.definition.panel_id, snap_mode)
-            return
         geometry = self.floating_geometry_snapshot()
         geometry = _normalize_floating_geometry(
             _snap(int(round(float(geometry["x"])))),
@@ -1067,7 +1056,6 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._save_job: str | None = None
         self._surface_resize_job: str | None = None
         self._disposed = False
-        self._snap_preview_mode: str | None = None
         self._camera_x = 0.0
         self._camera_y = 0.0
         self._camera_zoom = 1.0
@@ -1101,22 +1089,6 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._desk_texture_canvas.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
         self._desk_texture = InfiniteDeskTexture(self._desk_texture_canvas)
         self._desk_texture.load_theme(theme_manager.get_theme())
-
-        self._snap_preview = ctk.CTkFrame(
-            self.surface,
-            fg_color=TABLE_PALETTE["accent_soft"],
-            corner_radius=26,
-            border_width=2,
-            border_color=TABLE_PALETTE["panel_focus"],
-        )
-        self._snap_preview_label = ctk.CTkLabel(
-            self._snap_preview,
-            text="",
-            text_color=TABLE_PALETTE["text"],
-            font=ctk.CTkFont(size=16, weight="bold"),
-        )
-        self._snap_preview_label.place(relx=0.5, rely=0.5, anchor="center")
-        self._snap_preview.place_forget()
 
         self._nav_hud = ctk.CTkFrame(
             self.surface,
@@ -1987,7 +1959,6 @@ class GMTableWorkspace(ctk.CTkFrame):
     def handle_window_action(self, panel_id: str, action: str) -> None:
         """Dispatch a panel window action."""
         if action.startswith("snap:"):
-            self.snap_panel(panel_id, action.split(":", 1)[1])
             return
         if action == "restore":
             self.restore_panel(panel_id)
@@ -1999,10 +1970,8 @@ class GMTableWorkspace(ctk.CTkFrame):
             self.toggle_panel_maximize(panel_id)
             return
         if action == "snap_left":
-            self.snap_panel(panel_id, "left")
             return
         if action == "snap_right":
-            self.snap_panel(panel_id, "right")
             return
         if action == "close_others":
             self.close_other_panels(panel_id)
@@ -2018,31 +1987,12 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
 
     def preview_snap_target(self, panel_id: str, mode: str | None) -> None:
-        """Show or hide the live snap preview while a panel is being dragged."""
-        if mode is None or mode not in SNAP_LAYOUT_MODES:
-            self.clear_snap_preview()
-            return
-        preview = getattr(self, "_snap_preview", None)
-        label = getattr(self, "_snap_preview_label", None)
-        if preview is None or label is None:
-            return
-        panel = self._panels.get(panel_id)
-        geometry = fit_viewport_snap(panel or GMTablePanel, self.surface, mode)
-        self._snap_preview_mode = mode
-        label.configure(text=SNAP_MODE_LABELS.get(mode, "Snap"))
-        preview.configure(width=geometry["width"], height=geometry["height"])
-        preview.place(x=geometry["x"], y=geometry["y"])
-        preview.lift()
-        if panel is not None:
-            panel.lift()
-        self._raise_workspace_overlays()
+        """No-op: magnetic snap preview has been removed from GM Table."""
+        _ = panel_id, mode
 
     def clear_snap_preview(self) -> None:
-        """Hide the magnetic snap preview overlay."""
-        self._snap_preview_mode = None
-        preview = getattr(self, "_snap_preview", None)
-        if preview is not None:
-            preview.place_forget()
+        """No-op: magnetic snap preview has been removed from GM Table."""
+        return
 
     def resize_panel(self, panel_id: str, width: int, height: int) -> None:
         """Resize an existing panel and keep it visible."""
