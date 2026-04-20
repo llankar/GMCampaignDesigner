@@ -164,6 +164,7 @@ def _create_description_block(
     description_font_size=13,
     npc_names=None,
     place_names=None,
+    gm_view_ref=None,
 ):
     """Create description block."""
     palette = get_detail_palette()
@@ -567,6 +568,7 @@ def build_scene_body_sections(
         description_font_size=density_style["description_font_size"],
         npc_names=npc_names,
         place_names=place_names,
+        gm_view_ref=gm_view_ref,
     )
     if has_entities or has_maps or has_links:
         _add_subtle_separator(shell)
