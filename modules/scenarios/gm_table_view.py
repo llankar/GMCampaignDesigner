@@ -159,143 +159,118 @@ class GMTableView(ctk.CTkFrame):
         bar = ctk.CTkFrame(
             self,
             fg_color=TABLE_PALETTE["table_alt"],
-            corner_radius=26,
+            corner_radius=20,
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        bar.grid(row=0, column=0, sticky="ew", padx=18, pady=18)
+        bar.grid(row=0, column=0, sticky="ew", padx=18, pady=(12, 10))
         bar.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             bar,
             text=self.scenario_name,
             text_color=TABLE_PALETTE["text"],
-            font=ctk.CTkFont(size=18, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, padx=18, pady=14, sticky="ew")
+        ).grid(row=0, column=0, padx=16, pady=9, sticky="ew")
 
         actions = ctk.CTkFrame(bar, fg_color="transparent")
-        actions.grid(row=0, column=1, padx=16, pady=14, sticky="e")
+        actions.grid(row=0, column=1, padx=12, pady=9, sticky="e")
 
         self.add_button = ctk.CTkButton(
             actions,
             text="+ Add Panel",
-            width=132,
-            height=36,
+            width=126,
+            height=32,
             fg_color=TABLE_PALETTE["accent"],
             hover_color="#D97706",
             text_color="#10131B",
-            corner_radius=16,
+            corner_radius=14,
             command=self._show_add_menu,
         )
-        self.add_button.pack(side="left", padx=(0, 10))
+        self.add_button.pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
-            text="Scene",
-            width=100,
-            height=36,
+            text="Random Tables",
+            width=126,
+            height=32,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
-            command=self._focus_or_open_world_map_panel,
-        ).pack(side="left", padx=(0, 10))
+            corner_radius=14,
+            command=self._focus_or_open_random_tables_panel,
+        ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
-            text="Map Tool",
-            width=108,
-            height=36,
+            text="Plot Twists",
+            width=104,
+            height=32,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
-            command=self._focus_or_open_map_tool_panel,
-        ).pack(side="left", padx=(0, 10))
-
-        ctk.CTkButton(
-            actions,
-            text="Player View",
-            width=116,
-            height=36,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
-            command=self._open_player_view_for_active_panel,
-        ).pack(side="left", padx=(0, 10))
-
-        self.fog_button = ctk.CTkButton(
-            actions,
-            text="Fog",
-            width=84,
-            height=36,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
-            command=self._show_fog_menu,
-        )
-        self.fog_button.pack(side="left", padx=(0, 10))
+            corner_radius=14,
+            command=self._focus_or_open_plot_twists_panel,
+        ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
             text="Tile",
-            width=84,
-            height=36,
+            width=80,
+            height=32,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._tile_panels,
-        ).pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
             text="Cascade",
-            width=94,
-            height=36,
+            width=90,
+            height=32,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._cascade_panels,
-        ).pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
             text="Restore All",
-            width=118,
-            height=36,
+            width=108,
+            height=32,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._restore_all_panels,
-        ).pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
             text="Save",
-            width=84,
-            height=36,
+            width=80,
+            height=32,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self.save_layout_now,
-        ).pack(side="left", padx=(0, 10))
+        ).pack(side="left", padx=(0, 8))
 
         ctk.CTkButton(
             actions,
             text="Reset",
-            width=84,
-            height=36,
+            width=80,
+            height=32,
             fg_color="#2B1C23",
             hover_color="#40222B",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self.reset_table,
         ).pack(side="left")
 
@@ -602,6 +577,28 @@ class GMTableView(ctk.CTkFrame):
             "Map Tool",
             self._panel_state(map_name=target_map),
         )
+
+    def _focus_or_open_random_tables_panel(self) -> str | None:
+        """Focus an existing random tables panel or create one."""
+        records = self.workspace.list_panels(
+            kinds={"random_tables"}, include_minimized=True
+        )
+        if records:
+            panel_id = str(records[-1]["panel_id"])
+            self.workspace.bring_to_front(panel_id)
+            return panel_id
+        return self._create_panel("random_tables", "Random Tables", {})
+
+    def _focus_or_open_plot_twists_panel(self) -> str | None:
+        """Focus an existing plot twists panel or create one."""
+        records = self.workspace.list_panels(
+            kinds={"plot_twists"}, include_minimized=True
+        )
+        if records:
+            panel_id = str(records[-1]["panel_id"])
+            self.workspace.bring_to_front(panel_id)
+            return panel_id
+        return self._create_panel("plot_twists", "Plot Twists", {})
 
     def _open_player_view_for_active_panel(self) -> None:
         """Open the player display for the active scene map."""
