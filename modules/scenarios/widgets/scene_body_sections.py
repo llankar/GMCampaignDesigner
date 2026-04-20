@@ -195,8 +195,24 @@ def _create_description_block(
     )
     description_label.pack(fill="x", padx=12, pady=(10, 10))
 
+    full_view_visible = ctk.BooleanVar(master=description_block, value=False)
+
+    detail_toggle = ctk.CTkButton(
+        description_block,
+        text="Voir le détail",
+        height=26,
+        corner_radius=8,
+        fg_color="transparent",
+        hover_color=palette["surface_overlay"],
+        text_color=palette["accent"],
+        border_width=1,
+        border_color=palette["pill_border"],
+    )
+    detail_toggle.pack(anchor="w", padx=12, pady=(0, 8))
+
     cards_grid = ctk.CTkFrame(description_block, fg_color="transparent")
     cards_grid.pack(fill="x", padx=12, pady=(0, 10))
+    cards_grid.pack_forget()
     cards_grid.grid_columnconfigure(0, weight=1)
     cards_grid.grid_columnconfigure(1, weight=1)
 
@@ -267,6 +283,23 @@ def _create_description_block(
                 refresh()
 
             toggle.configure(command=_toggle_section)
+
+    def _sync_full_view():
+        """Sync full view visibility."""
+        if full_view_visible.get():
+            cards_grid.pack(fill="x", padx=12, pady=(0, 10))
+            detail_toggle.configure(text="Masquer le détail")
+        else:
+            cards_grid.pack_forget()
+            detail_toggle.configure(text="Voir le détail")
+
+    def _toggle_full_view():
+        """Toggle full view visibility."""
+        full_view_visible.set(not full_view_visible.get())
+        _sync_full_view()
+
+    detail_toggle.configure(command=_toggle_full_view)
+    _sync_full_view()
 
     section_lookup = {
         str(section.get("key") or "").strip().lower(): section
