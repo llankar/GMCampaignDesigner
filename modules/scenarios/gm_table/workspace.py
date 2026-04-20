@@ -1104,7 +1104,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 10))
+        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 18))
         self.surface.bind("<Configure>", self._on_surface_configure, add="+")
 
         self._desk_texture_canvas = tk.Canvas(
@@ -1221,6 +1221,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             border_color=TABLE_PALETTE["table_line"],
         )
         self.tray.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 18))
+        self.tray.grid_remove()
         self.tray.grid_columnconfigure(1, weight=1)
 
         self.tray_label = ctk.CTkLabel(
@@ -1287,33 +1288,14 @@ class GMTableWorkspace(ctk.CTkFrame):
         ]
 
     def _refresh_minimized_tray(self) -> None:
-        """Refresh the minimized panel tray."""
+        """Keep the legacy minimized tray hidden."""
         tray = getattr(self, "tray", None)
         buttons_frame = getattr(self, "tray_buttons", None)
         if tray is None or buttons_frame is None:
             return
         for child in buttons_frame.winfo_children():
             child.destroy()
-        minimized_ids = self._minimized_panel_ids()
-        tray.grid()
-        if not minimized_ids:
-            self.tray_label.configure(text="Workspace")
-            return
-        self.tray_label.configure(text="Minimized")
-        for panel_id in minimized_ids:
-            definition = self._definitions.get(panel_id)
-            if definition is None:
-                continue
-            ctk.CTkButton(
-                buttons_frame,
-                text=definition.title,
-                height=30,
-                fg_color=TABLE_PALETTE["table_chip"],
-                hover_color="#283146",
-                text_color=TABLE_PALETTE["text"],
-                corner_radius=12,
-                command=lambda value=panel_id: self.restore_panel(value),
-            ).pack(side="left", padx=(0, 8))
+        tray.grid_remove()
 
     def _bind_surface_navigation(self) -> None:
         """Bind camera navigation to the empty table surface."""
