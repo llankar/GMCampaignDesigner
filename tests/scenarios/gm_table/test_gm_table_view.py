@@ -294,8 +294,8 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     assert captured["kwargs"]["initial_state"] == {"query": "map"}
 
 
-def test_seed_default_panels_builds_map_first_vtt_layout() -> None:
-    """Starter tabletop should default to a map-centric VTT workspace."""
+def test_seed_default_panels_opens_scenario_and_handouts_panels() -> None:
+    """Starter tabletop should open scenario details alongside handouts."""
     captured = []
     view = GMTableView.__new__(GMTableView)
     view.scenario_name = "Night Run"
@@ -308,34 +308,16 @@ def test_seed_default_panels_builds_map_first_vtt_layout() -> None:
 
     assert captured == [
         (
-            "world_map",
-            "Scene Map",
-            {"map_name": "Docks"},
-            {"x": 24, "y": 24, "width": 980, "height": 640},
-        ),
-        (
-            "map_tool",
-            "Map Tool",
-            {"map_name": "Docks"},
-            {"x": 1020, "y": 24, "width": 620, "height": 640},
+            "entity",
+            "Scenario: Night Run",
+            {"entity_type": "Scenarios", "entity_name": "Night Run"},
+            {"x": 24, "y": 24, "width": 1040, "height": 760},
         ),
         (
             "handouts",
             "Handouts",
             {"scenario_name": "Night Run"},
-            {"x": 24, "y": 680, "width": 440, "height": 300},
-        ),
-        (
-            "note",
-            "Session Notes",
-            {"text": ""},
-            {"x": 476, "y": 680, "width": 520, "height": 300},
-        ),
-        (
-            "scene_flow",
-            "Scene Flow: Night Run",
-            {"scenario_title": "Night Run"},
-            {"x": 1012, "y": 680, "width": 628, "height": 300},
+            {"x": 1080, "y": 24, "width": 560, "height": 760},
         ),
     ]
 
