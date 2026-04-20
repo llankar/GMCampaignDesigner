@@ -370,6 +370,9 @@ class _FakeGuideCanvas:
     def lift(self) -> None:
         self.lifted = True
 
+    def tkraise(self) -> None:
+        self.lift()
+
     def place_forget(self) -> None:
         self.hidden = True
 
@@ -1233,6 +1236,48 @@ def test_align_left_keeps_same_world_result_with_camera_offset_and_zoom() -> Non
 
     assert workspace_a._panels["a"].world_x == workspace_b._panels["a"].world_x == 480.0
     assert workspace_a._panels["b"].world_x == workspace_b._panels["b"].world_x == 480.0
+
+
+def test_world_arrangement_actions_include_snapped_panels() -> None:
+    """Alignment and distribution actions should include snapped (non-minimized) panels."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    panel_a = _FakePanel(260, 180, x=120, y=140)
+    panel_a.world_x = 420.0
+    panel_a.world_y = 260.0
+    panel_b = _FakePanel(260, 180, x=740, y=360)
+    panel_b.world_x = 860.0
+    panel_b.world_y = 520.0
+    panel_c = _FakePanel(260, 180, x=980, y=420)
+    panel_c.world_x = 1100.0
+    panel_c.world_y = 560.0
+    panel_b.enter_layout_mode("right", {"x": 980, "y": 0, "width": 420, "height": 900})
+    workspace._panels = {"a": panel_a, "b": panel_b, "c": panel_c}
+    workspace._definitions = {
+        "a": PanelDefinition(panel_id="a", kind="note", title="A", state={}),
+        "b": PanelDefinition(panel_id="b", kind="note", title="B", state={}),
+        "c": PanelDefinition(panel_id="c", kind="note", title="C", state={}),
+    }
+    workspace._z_order = ["a", "b", "c"]
+    workspace._schedule_layout_changed = lambda: None
+    workspace.bring_to_front = lambda *_args, **_kwargs: None
+    _prepare_workspace(workspace, camera_x=120.0, camera_y=80.0, zoom=1.2)
+
+    GMTableWorkspace.align_left(workspace, "a")
+
+    assert workspace._panels["a"].world_x == 420.0
+    assert workspace._panels["b"].world_x == 420.0
+    assert workspace._panels["b"].layout_mode == "floating"
+
+    workspace._panels["b"].enter_layout_mode("left", {"x": 0, "y": 120, "width": 420, "height": 780})
+    GMTableWorkspace.align_top(workspace, "a")
+
+    assert workspace._panels["a"].world_y == 260.0
+    assert workspace._panels["b"].world_y == 260.0
+
+    workspace._panels["b"].enter_layout_mode("left", {"x": 0, "y": 120, "width": 420, "height": 780})
+    GMTableWorkspace.distribute_horizontally(workspace, "a")
+
+    assert workspace._panels["b"].layout_mode == "floating"
 
 
 def test_distribute_and_pack_are_world_space_consistent() -> None:
