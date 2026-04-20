@@ -15,10 +15,33 @@ def _normalize_lines(values) -> list[str]:
     return items
 
 
-def _create_row(parent, *, line: str, palette: dict, icon: str = "•", emphasized: bool = False) -> ctk.CTkLabel:
+def _normalize_rows(values) -> list[dict]:
+    """Return cleaned rows with optional avatar image."""
+    rows: list[dict] = []
+    for value in values or []:
+        if isinstance(value, dict):
+            line = " ".join(str(value.get("line") or value.get("text") or "").split()).strip()
+            avatar = value.get("avatar")
+        else:
+            line = " ".join(str(value or "").split()).strip()
+            avatar = None
+        if line:
+            rows.append({"line": line, "avatar": avatar})
+    return rows
+
+
+def _create_row(parent, *, line: str, palette: dict, icon: str = "•", emphasized: bool = False, avatar=None) -> ctk.CTkLabel:
     """Create one line row inside a scene briefing column."""
+    row_shell = ctk.CTkFrame(parent, fg_color="transparent")
+    row_shell.pack(fill="x", pady=(0, 6))
+
+    if avatar is not None:
+        avatar_label = ctk.CTkLabel(row_shell, text="", image=avatar)
+        avatar_label.image = avatar
+        avatar_label.pack(side="left", padx=(0, 8), pady=1)
+
     row = ctk.CTkLabel(
-        parent,
+        row_shell,
         text=f"{icon}  {line}",
         anchor="w",
         justify="left",
@@ -26,7 +49,7 @@ def _create_row(parent, *, line: str, palette: dict, icon: str = "•", emphasiz
         font=ctk.CTkFont(size=12, weight="bold" if emphasized else "normal"),
         wraplength=0,
     )
-    row.pack(fill="x", pady=(0, 6))
+    row.pack(side="left", fill="x", expand=True)
     return row
 
 
@@ -55,7 +78,7 @@ def _create_column(
     body = ctk.CTkFrame(col, fg_color="transparent")
     body.pack(fill="both", expand=True)
 
-    rendered = _normalize_lines(lines)[:6]
+    rendered = _normalize_rows(lines)[:6]
     labels = []
 
     if not rendered:
@@ -68,14 +91,15 @@ def _create_column(
             )
         )
     else:
-        for index, line in enumerate(rendered):
+        for index, item in enumerate(rendered):
             labels.append(
                 _create_row(
                     body,
-                    line=line,
+                    line=item["line"],
                     palette=palette,
                     icon=row_icon,
                     emphasized=index == 0,
+                    avatar=item.get("avatar"),
                 )
             )
 
@@ -132,7 +156,7 @@ def create_scene_briefing_layout(
         lines=npc_names,
         palette=palette,
         row_icon="👤",
-        footer_text=f"View all {len(_normalize_lines(npc_names))} NPCs" if npc_names else None,
+        footer_text=f"View all {len(_normalize_rows(npc_names))} NPCs" if npc_names else None,
     )
     _add_vertical_separator(columns, palette)
 
