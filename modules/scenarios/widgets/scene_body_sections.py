@@ -5,6 +5,7 @@ from customtkinter import CTkLabel
 from modules.generic.detail_ui import get_detail_palette
 from modules.scenarios.scene_structured_fields import parse_scene_sections_with_structured_fallback
 from modules.scenarios.widgets.scene_body import create_entities_groups_grid, prepare_entities_for_group
+from modules.scenarios.widgets.scene_briefing_layout import create_scene_briefing_layout
 from modules.scenarios.widgets.scene_density import get_scene_density_style
 
 
@@ -154,7 +155,15 @@ def _render_card_bullets(container, items, *, expanded, font_size):
     _refresh_wrap()
 
 
-def _create_description_block(parent, body_text, *, scene_dict=None, description_font_size=13):
+def _create_description_block(
+    parent,
+    body_text,
+    *,
+    scene_dict=None,
+    description_font_size=13,
+    npc_names=None,
+    place_names=None,
+):
     """Create description block."""
     palette = get_detail_palette()
     parsed = parse_scene_sections_with_structured_fallback(scene_dict or {}, body_text)
@@ -258,6 +267,43 @@ def _create_description_block(parent, body_text, *, scene_dict=None, description
                 refresh()
 
             toggle.configure(command=_toggle_section)
+
+    section_lookup = {
+        str(section.get("key") or "").strip().lower(): section
+        for section in (parsed.get("sections") or [])
+    }
+    clue_items = list((section_lookup.get("clues/hooks") or {}).get("items") or [])
+    event_items = []
+    for key in ("conflicts/obstacles", "key beats", "transitions"):
+        # Process each key from ('conflicts/obstacles', 'key beats', 'transitions').
+        event_items.extend((section_lookup.get(key) or {}).get("items") or [])
+
+    scene_npcs = list(npc_names or [])
+    for key in ("SceneNPCs", "NPCs", "npcs"):
+        # Process each key from ('SceneNPCs', 'NPCs', 'npcs').
+        value = (scene_dict or {}).get(key)
+        if isinstance(value, list):
+            scene_npcs.extend(value)
+        elif value:
+            scene_npcs.append(value)
+
+    scene_places = list(place_names or [])
+    for key in ("SceneLocations", "Places", "places"):
+        # Process each key from ('SceneLocations', 'Places', 'places').
+        value = (scene_dict or {}).get(key)
+        if isinstance(value, list):
+            scene_places.extend(value)
+        elif value:
+            scene_places.append(value)
+
+    create_scene_briefing_layout(
+        description_block,
+        npc_names=[str(item) for item in scene_npcs],
+        place_names=[str(item) for item in scene_places],
+        clue_lines=[str(item) for item in clue_items],
+        event_lines=[str(item) for item in event_items],
+        palette=palette,
+    )
 
     def _refresh_hero_wrap(_event=None):
         """Refresh hero wrap."""
@@ -468,6 +514,8 @@ def build_scene_body_sections(
         body_text,
         scene_dict=scene_dict,
         description_font_size=density_style["description_font_size"],
+        npc_names=npc_names,
+        place_names=place_names,
     )
     if has_entities or has_maps or has_links:
         _add_subtle_separator(shell)
