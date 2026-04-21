@@ -341,10 +341,20 @@ def _create_description_block(
     ]
     scene_npc_rows = attach_entity_avatars("NPCs", scene_npc_rows, gm_view_ref)
 
+    scene_place_rows = [
+        {
+            "name": str(item),
+            "line": str(item),
+            "avatar": None,
+        }
+        for item in scene_places
+    ]
+    scene_place_rows = attach_entity_avatars("Places", scene_place_rows, gm_view_ref)
+
     create_scene_briefing_layout(
         description_block,
         npc_names=scene_npc_rows,
-        place_names=[str(item) for item in scene_places],
+        place_names=scene_place_rows,
         clue_lines=[str(item) for item in clue_items],
         event_lines=[str(item) for item in event_items],
         palette=palette,
