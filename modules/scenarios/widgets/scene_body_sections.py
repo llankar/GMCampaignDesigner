@@ -5,6 +5,7 @@ from customtkinter import CTkLabel
 from modules.generic.detail_ui import get_detail_palette
 from modules.scenarios.scene_structured_fields import parse_scene_sections_with_structured_fallback
 from modules.scenarios.widgets.scene_body import create_entities_groups_grid, prepare_entities_for_group
+from modules.scenarios.widgets.scene_body.entity_lists import merge_unique_entity_names
 from modules.scenarios.widgets.scene_body.entity_portraits import attach_entity_avatars
 from modules.scenarios.widgets.scene_briefing_layout import create_scene_briefing_layout
 from modules.scenarios.widgets.scene_density import get_scene_density_style
@@ -313,23 +314,25 @@ def _create_description_block(
         # Process each key from ('conflicts/obstacles', 'key beats', 'transitions').
         event_items.extend((section_lookup.get(key) or {}).get("items") or [])
 
-    scene_npcs = list(npc_names or [])
+    scene_npc_sources = [npc_names or []]
     for key in ("SceneNPCs", "NPCs", "npcs"):
         # Process each key from ('SceneNPCs', 'NPCs', 'npcs').
         value = (scene_dict or {}).get(key)
         if isinstance(value, list):
-            scene_npcs.extend(value)
+            scene_npc_sources.append(value)
         elif value:
-            scene_npcs.append(value)
+            scene_npc_sources.append([value])
+    scene_npcs = merge_unique_entity_names(*scene_npc_sources)
 
-    scene_places = list(place_names or [])
+    scene_place_sources = [place_names or []]
     for key in ("SceneLocations", "Places", "places"):
         # Process each key from ('SceneLocations', 'Places', 'places').
         value = (scene_dict or {}).get(key)
         if isinstance(value, list):
-            scene_places.extend(value)
+            scene_place_sources.append(value)
         elif value:
-            scene_places.append(value)
+            scene_place_sources.append([value])
+    scene_places = merge_unique_entity_names(*scene_place_sources)
 
     scene_npc_rows = [
         {
