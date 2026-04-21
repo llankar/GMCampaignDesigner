@@ -298,6 +298,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
         self._entity_tooltip_image_cache = {}
         self._entity_tooltip_hide_after_id = None
         self._entity_tooltip_active_tag = None
+        self._entity_tooltip_click_anchor = None
         self._portrait_menu_images = []
 
         self.init_toolbar()
@@ -2588,6 +2589,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
                 pass
             self._entity_tooltip_window = None
         self._entity_tooltip_active_tag = None
+        self._entity_tooltip_click_anchor = None
 
     def _dismiss_entity_tooltip(self):
         """Internal helper for dismiss entity tooltip."""
@@ -2667,15 +2669,32 @@ class ScenarioGraphEditor(ctk.CTkFrame):
 
     def _on_entity_hover_enter(self, event, entity_info, tag):
         """Handle entity hover enter."""
-        root_x = self.canvas.winfo_rootx() + event.x
-        root_y = self.canvas.winfo_rooty() + event.y
-        self._entity_tooltip_active_tag = tag
-        self._cancel_entity_tooltip_hide()
-        self._schedule_entity_tooltip(root_x, root_y, entity_info, tag)
+        # Scene flow tooltips are now click-driven.
+        return
 
     def _on_entity_hover_leave(self, event=None, tag=None):
         """Handle entity hover leave."""
-        self._schedule_entity_tooltip_hide(tag)
+        return
+
+    def _on_entity_tooltip_click(self, event, entity_info, tag):
+        """Toggle entity tooltip on click."""
+        if not self.canvas:
+            return
+        self._cancel_entity_tooltip_schedule()
+        self._cancel_entity_tooltip_hide()
+        root_x = self.canvas.winfo_rootx() + event.x
+        root_y = self.canvas.winfo_rooty() + event.y
+        self._show_entity_tooltip_at(root_x, root_y, entity_info, tag)
+        self._entity_tooltip_click_anchor = (tag, int(event.x), int(event.y))
+
+    def _handle_canvas_click_for_entity_tooltip(self, event, hit_tags):
+        """Dismiss tooltip when click occurs away from the same entity spot."""
+        if not self._entity_tooltip_window or not self._entity_tooltip_click_anchor:
+            return
+        active_tag, anchor_x, anchor_y = self._entity_tooltip_click_anchor
+        if active_tag in hit_tags and abs(int(event.x) - anchor_x) <= 2 and abs(int(event.y) - anchor_y) <= 2:
+            return
+        self._dismiss_entity_tooltip()
 
     def _bind_entity_tooltip(self, tag, entity_info):
         """Bind entity tooltip."""
@@ -2683,12 +2702,10 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return
         self.canvas.tag_bind(
             tag,
-            "<Enter>",
-            lambda event, info=entity_info, t=tag: self._on_entity_hover_enter(event, info, t),
+            "<Button-1>",
+            lambda event, info=entity_info, t=tag: self._on_entity_tooltip_click(event, info, t),
             add="+"
         )
-        self.canvas.tag_bind(tag, "<Leave>", lambda event, t=tag: self._on_entity_hover_leave(event, t), add="+")
-        self.canvas.tag_bind(tag, "<ButtonPress>", lambda event, t=tag: self._on_entity_hover_leave(event, t), add="+")
 
     def _find_mentions(self, text, candidates):
         """Find mentions."""
@@ -3851,6 +3868,7 @@ class ScenarioGraphEditor(ctk.CTkFrame):
             return
         item_id = items[0]
         tags = self.canvas.gettags(item_id)
+        self._handle_canvas_click_for_entity_tooltip(event, tags)
         if "link" in tags:
             self.selected_node = None
             self.drag_start = None
