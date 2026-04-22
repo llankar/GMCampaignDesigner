@@ -268,6 +268,37 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     self._build_toolbar()
     self._build_canvas()
 
+    def _refresh_toolbar_after_map():
+        """Force a lightweight toolbar repaint after parent frame mapping/sizing."""
+        parent = getattr(self, "parent", None)
+        if parent is None or not parent.winfo_exists():
+            return
+        try:
+            parent.update_idletasks()
+        except Exception:
+            return
+
+        toolbar = getattr(self, "_toolbar_scrollable", None)
+        if toolbar is None or not toolbar.winfo_exists():
+            return
+        xview = getattr(toolbar, "xview", None)
+        if not callable(xview):
+            return
+        try:
+            current_left = float(xview()[0])
+        except Exception:
+            current_left = 0.0
+        try:
+            toolbar.xview_moveto(0)
+            toolbar.xview_moveto(current_left)
+        except Exception:
+            pass
+
+    try:
+        self.parent.after(10, _refresh_toolbar_after_map)
+    except Exception:
+        pass
+
     # 3) Load base image + fog mask (supports static image or video)
     image_path = (item.get("Image", "") or "").strip()
     full_image_path = _resolve_campaign_path(image_path)

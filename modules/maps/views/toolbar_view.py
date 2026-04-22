@@ -69,7 +69,7 @@ def _build_toolbar(self):
     # Main toolbar container that fills the width and holds the scrollable area
     toolbar_container = ctk.CTkFrame(self.parent)
     toolbar_container.pack(side="top", fill="x", pady=(0,2)) # Added small pady for visual separation
-    # Expose on controller for downstream layout sizing
+    # Expose explicit references on controller for downstream layout hooks
     try:
         self._toolbar_container = toolbar_container
     except Exception:
@@ -81,6 +81,10 @@ def _build_toolbar(self):
     toolbar_height = 65 # Adjust as needed for your icon/widget sizes
     toolbar = ctk.CTkScrollableFrame(toolbar_container, orientation="horizontal", height=toolbar_height)
     toolbar.pack(fill="x", expand=True) # Make the scrollable area fill the container
+    try:
+        self._toolbar_scrollable = toolbar
+    except Exception:
+        pass
 
     # Load icons
     icons = {
