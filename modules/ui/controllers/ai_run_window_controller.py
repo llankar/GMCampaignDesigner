@@ -41,6 +41,15 @@ class AIRunWindowController:
         ai_pipeline_events.subscribe("*", self._on_pipeline_event)
         ai_request_state.subscribe(self._on_state_changed)
 
+    def reattach_button(self, new_menu_bar) -> None:
+        """Reattach the AI run button to a rebuilt menu bar."""
+        self.menu_bar = new_menu_bar
+        self._open_button = self.menu_bar.create_action_button(
+            text="AI Run*" if ai_request_state.state.active else "AI Run",
+            command=self.open_window,
+            width=80,
+        )
+
     def new_request_id(self) -> str:
         """Handle new request ID."""
         return uuid4().hex

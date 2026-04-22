@@ -2530,6 +2530,9 @@ class MainWindow(ctk.CTk):
         self.init_wrappers()
         if getattr(self, "menu_bar", None) is not None:
             self.menu_bar.rebuild()
+            self.create_exit_button()
+            if getattr(self, "ai_run_window_controller", None) is not None:
+                self.ai_run_window_controller.reattach_button(self.menu_bar)
 
 
     def open_faction_graph_editor(self):
