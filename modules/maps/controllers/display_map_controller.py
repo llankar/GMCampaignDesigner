@@ -119,7 +119,16 @@ ZOOM_STEP = 0.1  # 10% per wheel notch
 LINK_PATTERN = re.compile(r"(https?://|www\.)[^\s<>]+", re.IGNORECASE)
 
 class DisplayMapController:
-    def __init__(self, parent, maps_wrapper, map_template, *, root_app=None):
+    def __init__(
+        self,
+        parent,
+        maps_wrapper,
+        map_template,
+        *,
+        root_app=None,
+        initial_map_name=None,
+        defer_initial_map_until_visible=False,
+    ):
         """Initialize the DisplayMapController instance."""
         self.parent = parent
         self.maps = maps_wrapper
@@ -254,15 +263,136 @@ class DisplayMapController:
         self._fog_rect_start_world = None
         self._fog_rect_preview_id = None
         self._fog_rect_fs_preview_id = None
+        self._deferred_map_open_name = ""
+        self._deferred_map_open_apply_fit = True
+        self._deferred_map_open_after_id = None
+        self._deferred_map_open_signature = None
 
         self._maps = {m["Name"]: m for m in maps_wrapper.load_items()}
-        self.select_map()
+        initial_target = str(initial_map_name or "").strip()
+        if initial_target:
+            if defer_initial_map_until_visible:
+                self.open_map_by_name_when_ready(initial_target)
+            else:
+                self.open_map_by_name(initial_target)
+        else:
+            self.select_map()
 
         # Re-apply fit on container size changes without clobbering user panning
         try:
             self.parent.bind("<Configure>", lambda e: self._apply_fit_mode(defer=True), add="+")
         except Exception:
             pass
+
+    def _map_host_ready_for_deferred_open(self):
+        """Return whether the embedded host is ready for an initial map open."""
+        parent = getattr(self, "parent", None)
+        if parent is None:
+            return False
+        try:
+            if not parent.winfo_exists() or not parent.winfo_ismapped():
+                return False
+        except Exception:
+            return False
+        try:
+            parent.update_idletasks()
+            width = int(parent.winfo_width())
+            height = int(parent.winfo_height())
+        except Exception:
+            return False
+        if width <= 1 or height <= 1:
+            return False
+        signature = (width, height)
+        if self._deferred_map_open_signature != signature:
+            self._deferred_map_open_signature = signature
+            return False
+        return True
+
+    def _reset_deferred_map_open(self):
+        """Clear deferred embedded-open state without cancelling timers."""
+        self._deferred_map_open_name = ""
+        self._deferred_map_open_apply_fit = True
+        self._deferred_map_open_signature = None
+
+    def _cancel_after_job(self, widget, attr_name):
+        """Cancel a scheduled Tk callback tracked on this controller."""
+        after_id = getattr(self, attr_name, None)
+        if after_id is None:
+            return
+        try:
+            if widget is not None:
+                widget.after_cancel(after_id)
+        except Exception:
+            pass
+        setattr(self, attr_name, None)
+
+    def _cancel_deferred_map_open(self):
+        """Cancel any pending deferred embedded map open."""
+        self._cancel_after_job(getattr(self, "parent", None), "_deferred_map_open_after_id")
+        self._reset_deferred_map_open()
+
+    def _flush_deferred_map_open(self):
+        """Open the deferred map once the embedded host is visible and stable."""
+        self._deferred_map_open_after_id = None
+        target = str(getattr(self, "_deferred_map_open_name", "") or "").strip()
+        if not target:
+            self._reset_deferred_map_open()
+            return
+
+        parent = getattr(self, "parent", None)
+        if parent is None:
+            self._reset_deferred_map_open()
+            return
+        try:
+            if not parent.winfo_exists():
+                self._reset_deferred_map_open()
+                return
+        except Exception:
+            pass
+
+        if not self._map_host_ready_for_deferred_open():
+            try:
+                self._deferred_map_open_after_id = parent.after(15, self._flush_deferred_map_open)
+            except Exception:
+                self._deferred_map_open_after_id = None
+            return
+
+        apply_fit = bool(getattr(self, "_deferred_map_open_apply_fit", True))
+        self._reset_deferred_map_open()
+        self.open_map_by_name(target, apply_fit=apply_fit)
+
+    def open_map_by_name_when_ready(self, map_name, *, apply_fit=True):
+        """Open a map after the embedded host has been mapped and laid out."""
+        target = str(map_name or "").strip()
+        if not target:
+            return False
+
+        parent = getattr(self, "parent", None)
+        if parent is None:
+            return False
+
+        self._cancel_deferred_map_open()
+        self._deferred_map_open_name = target
+        self._deferred_map_open_apply_fit = bool(apply_fit)
+
+        try:
+            self._deferred_map_open_after_id = parent.after(0, self._flush_deferred_map_open)
+        except Exception:
+            self._reset_deferred_map_open()
+            return self.open_map_by_name(target, apply_fit=apply_fit)
+        return True
+
+    def close(self):
+        """Cancel controller-owned deferred work before the host is torn down."""
+        self._cancel_deferred_map_open()
+        canvas = getattr(self, "canvas", None)
+        for attr_name in (
+            "_marker_after_id",
+            "_marker_anim_after_id",
+            "_zoom_after_id",
+            "_zoom_final_after_id",
+        ):
+            self._cancel_after_job(canvas, attr_name)
 
     # ------------------------------------------------------------------
     # Fit-to-view behaviour
@@ -836,6 +966,7 @@ class DisplayMapController:
             )
             messagebox.showwarning("Not Found", f"Map '{target}' not found.")
             return False
+        self._cancel_deferred_map_open()
         self._on_display_map("maps", target)
         item_counts = {
             "tokens": sum(1 for entry in getattr(self, "tokens", []) if entry.get("type") == "token"),

@@ -1234,12 +1234,13 @@ class GMScreenView(ctk.CTkFrame):
         """Tear down tab content."""
         if frame is None:
             return
-        controller = getattr(frame, "whiteboard_controller", None)
-        if controller and hasattr(controller, "close"):
-            try:
-                controller.close()
-            except Exception:
-                pass
+        for attr_name in ("whiteboard_controller", "map_controller"):
+            controller = getattr(frame, attr_name, None)
+            if controller and hasattr(controller, "close"):
+                try:
+                    controller.close()
+                except Exception:
+                    pass
 
     def _apply_initial_layout(self):
         """Apply initial layout."""
@@ -2440,13 +2441,10 @@ class GMScreenView(ctk.CTkFrame):
             maps_wrapper,
             load_entity_template("maps"),
             root_app=self,
+            initial_map_name=map_name,
+            defer_initial_map_until_visible=bool(map_name),
         )
         container.map_controller = controller
-        if map_name and hasattr(controller, "open_map_by_name"):
-            try:
-                controller.open_map_by_name(map_name)
-            except Exception:
-                pass
 
         tab_title = title or (f"Map Tool: {map_name}" if map_name else "Map Tool")
 
@@ -2460,13 +2458,10 @@ class GMScreenView(ctk.CTkFrame):
                 mw,
                 load_entity_template("maps"),
                 root_app=self,
+                initial_map_name=_name,
+                defer_initial_map_until_visible=bool(_name),
             )
             c.map_controller = ctrl
-            if _name and hasattr(ctrl, "open_map_by_name"):
-                try:
-                    ctrl.open_map_by_name(_name)
-                except Exception:
-                    pass
             return c
 
         self.add_tab(
