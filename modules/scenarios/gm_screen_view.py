@@ -1256,7 +1256,7 @@ class GMScreenView(ctk.CTkFrame):
         """Seed default startup tabs when no explicit layout is available."""
         if "Handouts" in self.tabs:
             return
-        self.open_handouts_tab("Handouts")
+        self.open_handouts_tab("Handouts", activate=False)
 
     def _initialize_context_menu(self):
         """Internal helper for initialize context menu."""
@@ -2523,7 +2523,7 @@ class GMScreenView(ctk.CTkFrame):
             layout_meta={"kind": "loot_generator"},
         )
 
-    def open_handouts_tab(self, title=None):
+    def open_handouts_tab(self, title=None, activate=True):
         """Open the handouts page inside the GM screen."""
         container = ctk.CTkFrame(self._ensure_rich_host())
         self._make_fullbleed(container)
@@ -2558,6 +2558,7 @@ class GMScreenView(ctk.CTkFrame):
             container,
             content_factory=factory,
             layout_meta={"kind": "handouts", "host": "rich"},
+            activate=activate,
         )
 
     def open_random_tables_tab(self, title=None, initial_state=None):
