@@ -3,6 +3,7 @@
 import tkinter as tk
 import customtkinter as ctk
 from modules.ui.icon_dropdown import IconDropdown
+from modules.helpers.theme_manager import get_tokens
 from modules.helpers.logging_helper import log_module_import
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
 
@@ -10,6 +11,13 @@ log_module_import(__name__)
 
 def _build_toolbar(self):
     """Build toolbar."""
+    palette = get_tokens()
+    panel_bg = palette.get("panel_bg", "#111c2a")
+    panel_alt_bg = palette.get("panel_alt_bg", "#132133")
+    accent_fg = palette.get("button_fg", "#0077CC")
+    accent_hover = palette.get("button_hover", "#005fa3")
+    accent_border = palette.get("button_border", "#005fa3")
+
     section_tracker = {"count": 0}
     horizontal_spacing = 4
     control_pady = 4
@@ -24,7 +32,7 @@ def _build_toolbar(self):
         if section_tracker["count"]:
             separator = ctk.CTkFrame(
                 parent,
-                fg_color="#3a3a3a",
+                fg_color=panel_alt_bg,
                 width=2,
                 corner_radius=2,
             )
@@ -58,16 +66,16 @@ def _build_toolbar(self):
 
         content_frame = ctk.CTkFrame(
             section,
-            fg_color="#101010",
+            fg_color=panel_alt_bg,
             border_width=1,
-            border_color="#404040",
+            border_color=panel_bg,
             corner_radius=8,
         )
         content_frame.pack(side="left", fill="y", padx=(0, 4), pady=(2, 2))
         return content_frame
 
     # Main toolbar container that fills the width and holds the scrollable area
-    toolbar_container = ctk.CTkFrame(self.parent)
+    toolbar_container = ctk.CTkFrame(self.parent, fg_color=panel_bg)
     toolbar_container.pack(side="top", fill="x", pady=(0,2)) # Added small pady for visual separation
     # Expose explicit references on controller for downstream layout hooks
     try:
@@ -79,7 +87,12 @@ def _build_toolbar(self):
     # Set a fixed height for the scrollable area, width will be determined by content
     # The scrollbar will appear automatically if content width exceeds available width.
     toolbar_height = 65 # Adjust as needed for your icon/widget sizes
-    toolbar = ctk.CTkScrollableFrame(toolbar_container, orientation="horizontal", height=toolbar_height)
+    toolbar = ctk.CTkScrollableFrame(
+        toolbar_container,
+        orientation="horizontal",
+        height=toolbar_height,
+        fg_color=panel_bg,
+    )
     toolbar.pack(fill="x", expand=True) # Make the scrollable area fill the container
     try:
         self._toolbar_scrollable = toolbar
@@ -108,9 +121,9 @@ def _build_toolbar(self):
     # Fog controls
     fog_section = _create_collapsible_section(toolbar, "Fog")
     self._fog_button_default_style = {
-        "fg_color": "#0077CC",
-        "hover_color": "#005fa3",
-        "border_color": "#005fa3",
+        "fg_color": accent_fg,
+        "hover_color": accent_hover,
+        "border_color": accent_border,
         "border_width": 1,
     }
     self._fog_button_active_style = {
