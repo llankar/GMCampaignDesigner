@@ -4687,6 +4687,7 @@ class MainWindow(ctk.CTk):
             if map_name and controller and hasattr(controller, "open_map_by_name"):
                 # Fit to the window when opening from external GM windows
                 controller.open_map_by_name(map_name)
+            self._refresh_map_tool_toolbar_after_paint()
             return
 
         try:
@@ -4715,6 +4716,7 @@ class MainWindow(ctk.CTk):
             if map_name and hasattr(self.map_controller, "open_map_by_name"):
                 # Fit to the window on initial open
                 self.map_controller.open_map_by_name(map_name)
+            self._refresh_map_tool_toolbar_after_paint()
 
             def _on_close():
                 """Handle close."""
@@ -4738,6 +4740,60 @@ class MainWindow(ctk.CTk):
                 func_name="main_window.MainWindow.map_tool",
             )
             messagebox.showerror("Error", f"Failed to open Map Tool:\n{exc}")
+
+    def _refresh_map_tool_toolbar_after_paint(self):
+        """Force the Map Tool toolbar to repaint once the toplevel has finished painting."""
+        window = getattr(self, "_map_tool_window", None)
+        controller = getattr(self, "map_controller", None)
+        if window is None or controller is None:
+            return
+        if not window.winfo_exists():
+            return
+
+        def _refresh_once():
+            """Refresh toolbar widgets if they still exist."""
+            try:
+                if not window.winfo_exists():
+                    return
+                window.update_idletasks()
+            except Exception:
+                return
+
+            toolbar = getattr(controller, "_toolbar_scrollable", None)
+            if toolbar is None:
+                return
+            try:
+                if not toolbar.winfo_exists():
+                    return
+            except Exception:
+                return
+
+            try:
+                toolbar.update_idletasks()
+            except Exception:
+                pass
+
+            try:
+                xview = toolbar.xview()
+                current_left = float(xview[0]) if xview else 0.0
+                toolbar.xview_moveto(0.0)
+                toolbar.xview_moveto(current_left)
+            except Exception:
+                pass
+
+            try:
+                for child in toolbar.winfo_children():
+                    if child.winfo_exists():
+                        child.update_idletasks()
+            except Exception:
+                pass
+
+        try:
+            window.after_idle(_refresh_once)
+            window.after(80, _refresh_once)
+            window.after(180, _refresh_once)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     if "--webview" in sys.argv:
