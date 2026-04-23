@@ -97,6 +97,17 @@ From **Data & System**, open **Auto-improvement (Codex CLI)** to let the applica
   - `dry_run`: `true/false`
   - `auto_commit`: `true/false`
 
+Documentation Generation
+------------------------
+Application documentation is maintained with `scripts/generate_docs.py`.
+
+- Run `python scripts/generate_docs.py` from the repository root after UI, context-menu, screenshot, or API-surface changes.
+- The script refreshes `docs/index.html`, `docs/user-manual.html`, and the screenshot assets under `docs/images/`.
+- Run it from the same Python environment used by the app. The script launches Tkinter/customtkinter windows and uses Pillow's `ImageGrab`, so it needs an interactive desktop session.
+- Review the generated HTML and screenshots before committing them.
+
+For the full maintainer workflow and troubleshooting notes, see `docs/documentation_maintenance.md`.
+
 Contributing
 Contributions to GMCampaignDesigner2 are welcome! To contribute:
 

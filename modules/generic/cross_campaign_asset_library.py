@@ -1412,14 +1412,22 @@ class OnlineGalleryDialog(ctk.CTkToplevel):
         self._bundle_map.clear()
         self._show_detail(None)
 
+        def schedule_on_ui(callback):
+            """Skip async UI work if the window is already closing."""
+            try:
+                if self.winfo_exists():
+                    self.after(0, callback)
+            except Exception:
+                return
+
         def worker():
             """Handle worker."""
             try:
                 bundles = self.client.list_bundles()
             except Exception as exc:
-                self.after(0, lambda exc=exc: self._handle_error(exc))
+                schedule_on_ui(lambda exc=exc: self._handle_error(exc))
                 return
-            self.after(0, lambda: self._populate(bundles))
+            schedule_on_ui(lambda: self._populate(bundles))
 
         threading.Thread(target=worker, daemon=True).start()
 

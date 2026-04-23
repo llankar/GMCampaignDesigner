@@ -300,6 +300,39 @@ def ensure_dirs():
 
 def grab_widget_screenshot(widget, name: str):
     """Handle grab widget screenshot."""
+    def settle_widget(target, cycles=6, delay=0.05):
+        """Allow Tk geometry and deferred drawing callbacks to settle."""
+        for _ in range(cycles):
+            try:
+                target.update_idletasks()
+                target.update()
+            except Exception:
+                break
+            time.sleep(delay)
+
+    def raise_window_for_capture(target):
+        """Bring a Tk toplevel to the foreground so ImageGrab sees the real pixels."""
+        if os.name != "nt":
+            return
+        try:
+            import ctypes
+        except Exception:
+            return
+
+        try:
+            hwnd = int(target.winfo_id())
+        except Exception:
+            return
+
+        SW_RESTORE = 9
+        user32 = ctypes.windll.user32
+        try:
+            user32.ShowWindow(hwnd, SW_RESTORE)
+            user32.BringWindowToTop(hwnd)
+            user32.SetForegroundWindow(hwnd)
+        except Exception:
+            return
+
     # Update geometry and bring to front
     top = None
     try:
@@ -313,10 +346,10 @@ def grab_widget_screenshot(widget, name: str):
                 top.attributes("-topmost", True)
             except Exception:
                 pass
+            raise_window_for_capture(top)
     except Exception:
         top = None
-    widget.update_idletasks()
-    widget.update()
+    settle_widget(top or widget, cycles=8, delay=0.06)
     # Compute absolute screen bbox
     try:
         # Keep grab widget screenshot resilient if this step fails.
@@ -328,30 +361,23 @@ def grab_widget_screenshot(widget, name: str):
         screen_h = widget.winfo_screenheight()
     except Exception:
         return None
-    if w <= 0 or h <= 0:
-        # Fallback to full screen
-        w = screen_w
-        h = screen_h
-        x = 0
-        y = 0
+    if w <= 1 or h <= 1:
+        return None
 
-    # If nearly fullscreen, capture entire screen to avoid cutting edges
-    fullscreen_like = (abs(w - screen_w) < 40 and abs(h - screen_h) < 80) or (w >= screen_w - 20)
-    if fullscreen_like:
-        bbox = (0, 0, screen_w, screen_h)
-    else:
-        margin = 8
-        bbox = (
-            max(0, x - margin),
-            max(0, y - margin),
-            min(screen_w, x + w + margin),
-            min(screen_h, y + h + margin),
-        )
+    margin = 8
+    bbox = (
+        max(0, x - margin),
+        max(0, y - margin),
+        min(screen_w, x + w + margin),
+        min(screen_h, y + h + margin),
+    )
     img_path = IMAGES_DIR / f"{name}.png"
     # Small sleep to ensure visuals are drawn
     time.sleep(0.2)
     try:
         # Keep grab widget screenshot resilient if this step fails.
+        # Tk/CustomTkinter windows need screen capture here; PrintWindow drops
+        # custom-drawn surfaces and returns mostly black images on Windows.
         img = ImageGrab.grab(bbox=bbox)
         img.save(img_path)
         return img_path
@@ -370,10 +396,758 @@ def screenshot_app_views():
     """Handle screenshot app views."""
     os.environ["DOCS_MODE"] = "1"
     sys.path.insert(0, str(ROOT))
+    python_root = Path(sys.base_prefix)
+    tcl_root = python_root / "tcl"
+    tcl_library = tcl_root / "tcl8.6"
+    tk_library = tcl_root / "tk8.6"
+    original_cwd = Path.cwd()
+    original_tcl_library = os.environ.get("TCL_LIBRARY")
+    original_tk_library = os.environ.get("TK_LIBRARY")
+    app = None
+    def restore_tk_runtime():
+        """Restore process state after docs screenshot bootstrap."""
+        try:
+            os.chdir(original_cwd)
+        except Exception:
+            pass
+        if original_tcl_library is None:
+            os.environ.pop("TCL_LIBRARY", None)
+        else:
+            os.environ["TCL_LIBRARY"] = original_tcl_library
+        if original_tk_library is None:
+            os.environ.pop("TK_LIBRARY", None)
+        else:
+            os.environ["TK_LIBRARY"] = original_tk_library
+
+    if tcl_library.exists() and tk_library.exists():
+        # Tk can fail on Windows when the process starts on a different drive than
+        # the Python installation; switching to the Python root and using relative
+        # library paths makes Tcl resolve init.tcl reliably for doc generation.
+        os.chdir(python_root)
+        os.environ["TCL_LIBRARY"] = "tcl/tcl8.6"
+        os.environ["TK_LIBRARY"] = "tcl/tk8.6"
     try:
         # Keep screenshot app views resilient if this step fails.
         import tkinter as tk  # noqa: F401 - imported to ensure Tk initialises
         import customtkinter as ctk
+    except Exception:
+        restore_tk_runtime()
+        return {}
+
+    shots = {}
+
+    def settle_widget(target, cycles=8, delay=0.05):
+        """Wait for Tk geometry, fonts, and deferred callbacks to finish."""
+        for _ in range(cycles):
+            try:
+                target.update_idletasks()
+                target.update()
+            except Exception:
+                break
+            time.sleep(delay)
+
+    def iter_widgets(root):
+        """Yield a widget tree without failing on transient lookup errors."""
+        try:
+            yield root
+            for child in root.winfo_children():
+                yield from iter_widgets(child)
+        except Exception:
+            return
+
+    def find_toplevel(root, *, title_contains=None):
+        """Locate a live top-level window by title fragment."""
+        matches = []
+        for widget in iter_widgets(root):
+            try:
+                is_top = isinstance(widget, ctk.CTkToplevel)
+                exists = widget.winfo_exists()
+            except Exception:
+                continue
+            if not is_top or not exists:
+                continue
+            if title_contains:
+                try:
+                    title_value = widget.title() or ""
+                except Exception:
+                    title_value = ""
+                if title_contains.lower() not in title_value.lower():
+                    continue
+            matches.append(widget)
+        return matches[-1] if matches else None
+
+    def destroy_widget(widget):
+        """Close a transient widget without failing the generator."""
+        if widget is None:
+            return
+        try:
+            widget.destroy()
+        except Exception:
+            pass
+
+    class StaticWrapper:
+        """Small immutable wrapper used for documentation-only demo screens."""
+
+        def __init__(self, items, entity_type=None):
+            self._items = [copy.deepcopy(item) for item in items]
+            self.entity_type = entity_type or ""
+
+        def load_items(self):
+            """Return wrapped items."""
+            return [copy.deepcopy(item) for item in self._items]
+
+        def save_item(self, *_args, **_kwargs):
+            """Ignore save attempts in docs mode."""
+            return None
+
+        def save_items(self, items):
+            """Store updated items in memory for widgets that expect persistence."""
+            self._items = [copy.deepcopy(item) for item in items]
+            return None
+
+    class DocsLayoutStore:
+        """Keep GM Table screenshots deterministic and side-effect free."""
+
+        def get_scenario_layout(self, _scenario_name):
+            """Return empty layout."""
+            return {}
+
+        def save_scenario_layout(self, _scenario_name, _layout):
+            """Ignore persisted layouts."""
+            return None
+
+        def clear_scenario_layout(self, _scenario_name):
+            """Ignore cleared layouts."""
+            return None
+
+    class DocsSelectionStore:
+        """Avoid persisting campaign overview selection state during doc generation."""
+
+        @staticmethod
+        def load(_campaign_record):
+            """Return empty selection state."""
+            return type("_State", (), {"arc_name": "", "scenario_title": ""})()
+
+        @staticmethod
+        def save(campaign_record, **_kwargs):
+            """Return campaign unchanged."""
+            return campaign_record
+
+    demo_scenarios = [
+        {
+            "Title": "Opening Night at Blackreef",
+            "Summary": "A diplomatic gala unravels when a theft exposes the campaign's first conspiracy.",
+            "Briefing": "Hold the peace long enough to identify who stole the resonance key.",
+            "Objective": "Secure the resonance key before the city council fractures.",
+            "Hook": "A trusted envoy disappears during the launch celebration.",
+            "Stakes": "If the theft stays unsolved, the alliance collapses by dawn.",
+            "Secrets": "The theft was staged by a council patron looking to force martial law.",
+            "Scenes": [
+                {"Title": "Grand Arrival"},
+                {"Title": "Sabotaged Toast"},
+                {"Title": "Midnight Pursuit"},
+            ],
+            "NPCs": ["Ambassador Neris", "Captain Vale"],
+            "Places": ["Blackreef Hall", "Skybridge Docks"],
+            "Factions": ["City Council", "Harbor Watch"],
+            "Villains": ["Patron Selk"],
+        },
+        {
+            "Title": "The Meridian Dead Drop",
+            "Summary": "The crew races rival agents across the transit district to intercept a leaking informant.",
+            "Briefing": "Trace the courier route and keep the dead drop from reaching a hostile broker.",
+            "Objective": "Recover the courier ledger and identify the broker's buyer.",
+            "Hook": "A coded message points to a dead drop hidden inside a moving train depot.",
+            "Stakes": "If the ledger changes hands, every safehouse in the district is compromised.",
+            "Secrets": "The courier is cooperating with the enemy to protect a sibling held off-world.",
+            "Scenes": [
+                {"Title": "Signal Intercept"},
+                {"Title": "Depot Sweep"},
+                {"Title": "Broker Exchange"},
+            ],
+            "NPCs": ["Courier Ryn", "Inspector Morrow"],
+            "Places": ["Meridian Depot", "Lower Market"],
+            "Factions": ["Rail Syndicate", "Harbor Watch"],
+            "Villains": ["Broker Thane"],
+        },
+        {
+            "Title": "Glass Cathedral Breach",
+            "Summary": "An extraction mission inside the cathedral archive reveals the villain's larger ritual network.",
+            "Briefing": "Enter the archive, steal the ritual ledger, and escape before the vault seals.",
+            "Objective": "Expose the ritual network and keep the cathedral relic out of enemy hands.",
+            "Hook": "A recovered cipher points to a vault under the cathedral floor.",
+            "Stakes": "Failure gives the enemy enough fuel to trigger citywide blackouts.",
+            "Secrets": "The relic already holds a fragment of the same energy the party is protecting.",
+            "Scenes": [
+                {"Title": "Choir Distraction"},
+                {"Title": "Archive Vault"},
+                {"Title": "Bridge Collapse"},
+            ],
+            "NPCs": ["Archivist Dema", "Captain Vale"],
+            "Places": ["Glass Cathedral", "Flooded Archive"],
+            "Factions": ["Choir Militant", "City Council"],
+            "Villains": ["Patron Selk"],
+        },
+        {
+            "Title": "Ashfall Extraction",
+            "Summary": "The finale forces the crew to evacuate allies while choosing which district to save first.",
+            "Briefing": "Coordinate the evacuation and decide how much of the city can still be held.",
+            "Objective": "Keep the evacuation corridor open and stop the reactor collapse.",
+            "Hook": "The skyline ignites as every unresolved thread converges in the harbor.",
+            "Stakes": "Thousands die or flee if the corridor closes before sunrise.",
+            "Secrets": "The reactor collapse was triggered early by an insider on the war council.",
+            "Scenes": [
+                {"Title": "Harbor Fires"},
+                {"Title": "Evacuation Line"},
+                {"Title": "Reactor Core"},
+            ],
+            "NPCs": ["Ambassador Neris", "Inspector Morrow"],
+            "Places": ["South Harbor", "Reactor Spine"],
+            "Factions": ["Harbor Watch", "Rail Syndicate"],
+            "Villains": ["War Councillor Voss"],
+        },
+    ]
+    demo_objects = [
+        {
+            "Name": "Resonance Key",
+            "Description": "A council vault key tuned to ritual harmonics and coded council seals.",
+            "Stats": "Encrypted access shard",
+            "Secrets": "Carries a hidden override signature tied to the sabotage plot.",
+            "Category": "Artifact",
+        },
+        {
+            "Name": "Ashfall Transit Case",
+            "Description": "Courier-grade case with tamper alarms, false bottom, and city rail tags.",
+            "Stats": "Armored shell, biometric latch",
+            "Secrets": "Contains the broker ledger and a second decoy compartment.",
+            "Category": "Equipment",
+        },
+        {
+            "Name": "Cathedral Relay Lens",
+            "Description": "Glass relay lens used to focus blackout rituals across harbor districts.",
+            "Stats": "Fragile focus component",
+            "Secrets": "Still holds trace energy that identifies the cathedral cell.",
+            "Category": "Arcane Device",
+        },
+    ]
+    demo_campaigns = [
+        {
+            "Name": "Shattered Meridian",
+            "Logline": "A city-scale conspiracy thriller where diplomacy, sabotage, and evacuation collide.",
+            "Genre": "Science Fiction",
+            "Tone": "Tense political survival",
+            "Setting": "Meridian Prime, a vertical harbor city balancing trade, ritual tech, and military pressure.",
+            "Status": "Running",
+            "StartDate": "2187-04-03",
+            "EndDate": "",
+            "MainObjective": "Hold the coalition together long enough to expose the sabotage network.",
+            "Stakes": "Lose the city council and Meridian becomes an occupied war port by the season finale.",
+            "Themes": "Trust under pressure\nInfrastructure as battlefield\nSacrifice without certainty",
+            "Notes": "Use the campaign builder to keep arc stakes readable and scenario ownership clear.",
+            "LinkedScenarios": [scenario["Title"] for scenario in demo_scenarios],
+            "Arcs": [
+                {
+                    "name": "Council Fracture",
+                    "summary": "Political sabotage turns routine diplomacy into survival work.",
+                    "objective": "Identify who is destabilizing the council and contain the public fallout.",
+                    "status": "Running",
+                    "thread": "Council sabotage",
+                    "scenarios": [
+                        "Opening Night at Blackreef",
+                        "The Meridian Dead Drop",
+                    ],
+                },
+                {
+                    "name": "Cathedral Fallout",
+                    "summary": "The conspiracy expands into ritual infrastructure and citywide evacuation planning.",
+                    "objective": "Expose the ritual network and keep the harbor alive long enough to evacuate civilians.",
+                    "status": "Planned",
+                    "thread": "Ritual blackout",
+                    "scenarios": [
+                        "Glass Cathedral Breach",
+                        "Ashfall Extraction",
+                    ],
+                },
+            ],
+        }
+    ]
+
+    def apply_fallback_assets():
+        """Reuse committed screenshots when live capture is unavailable."""
+        fallback_assets = {
+            "main_window": DOCS_DIR / "images" / "main_window.png",
+            "entity_scenarios": DOCS_DIR / "images" / "entity_scenarios.png",
+            "entity_pcs": DOCS_DIR / "images" / "entity_pcs.png",
+            "entity_npcs": DOCS_DIR / "images" / "entity_npcs.png",
+            "entity_creatures": DOCS_DIR / "images" / "entity_creatures.png",
+            "entity_factions": DOCS_DIR / "images" / "entity_factions.png",
+            "entity_places": DOCS_DIR / "images" / "entity_places.png",
+            "entity_informations": DOCS_DIR / "images" / "entity_informations.png",
+            "entity_clues": DOCS_DIR / "images" / "entity_clues.png",
+            "entity_maps": DOCS_DIR / "images" / "entity_maps.png",
+            "entity_books": DOCS_DIR / "images" / "entity_books.png",
+            "character_graph": DOCS_DIR / "images" / "character_graph.png",
+            "faction_graph": DOCS_DIR / "images" / "faction_graph.png",
+            "scenario_graph": DOCS_DIR / "images" / "scenario_graph.png",
+            "scenario_editor": DOCS_DIR / "images" / "scenario_editor.png",
+            "custom_fields_editor": DOCS_DIR / "images" / "custom_fields_editor.png",
+            "map_tool_selector": DOCS_DIR / "images" / "map_tool_selector.png",
+            "map_tool_map1": DOCS_DIR / "images" / "map_tool_map1.png",
+            "map_tool_map2": DOCS_DIR / "images" / "map_tool_map2.png",
+            "map_tool_rectangle": DOCS_DIR / "images" / "map_tool_rectangle.png",
+            "map_tool_oval": DOCS_DIR / "images" / "map_tool_oval.png",
+            "whiteboard": DOCS_DIR / "images" / "whiteboard.png",
+            "world_map": DOCS_DIR / "images" / "world_map.png",
+            "dice_roller": DOCS_DIR / "images" / "dice_roller.png",
+            "dice_bar": DOCS_DIR / "images" / "dice_bar.png",
+            "audio_bar": DOCS_DIR / "images" / "audio_bar.png",
+            "book_viewer": DOCS_DIR / "images" / "book_viewer.png",
+            "scene_flow_viewer": DOCS_DIR / "images" / "scene_flow_viewer.png",
+            "gm_screen": DOCS_DIR / "images" / "gm_screen.png",
+        }
+        for key, path in fallback_assets.items():
+            if (not shots.get(key)) and path.exists():
+                shots[key] = str(path)
+
+    def capture_docs_only_windows(master):
+        """Capture feature windows that do not require the full application shell."""
+        def wait_for_list_rows(view, timeout=8.0):
+            """Wait for a GenericListView to finish its first data chunk."""
+            deadline = time.time() + timeout
+            top = view.winfo_toplevel()
+            while time.time() < deadline:
+                settle_widget(top, cycles=1, delay=0.04)
+                try:
+                    tree = getattr(view, "tree", None)
+                    if getattr(view, "_initial_dataset_ready", False):
+                        if tree is not None and tree.winfo_exists() and tree.get_children():
+                            return True
+                        if getattr(view, "filtered_items", None):
+                            return True
+                except Exception:
+                    pass
+                time.sleep(0.08)
+            return False
+
+        objects_top = None
+        try:
+            from modules.generic.generic_list_view import GenericListView
+            from modules.helpers.template_loader import load_template
+
+            objects_top = ctk.CTkToplevel(master)
+            objects_top.title("Objects Manager Preview")
+            objects_top.geometry("1600x860+80+60")
+            objects_top.lift()
+            objects_top.focus_force()
+            object_view = GenericListView(
+                objects_top,
+                StaticWrapper(demo_objects, entity_type="objects"),
+                load_template("objects"),
+            )
+            object_view.pack(fill="both", expand=True)
+            object_view._load_session_id += 1
+            object_view._load_queue = None
+            object_view.items = [copy.deepcopy(item) for item in demo_objects]
+            object_view.filtered_items = [copy.deepcopy(item) for item in demo_objects]
+            object_view.refresh_list(skip_background_fetch=True)
+            wait_for_list_rows(object_view)
+            shots["entity_objects"] = str(
+                grab_widget_screenshot(object_view, "entity_objects") or ""
+            )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(objects_top)
+
+        detail_top = None
+        try:
+            from modules.generic.entity_detail_factory import create_scenario_detail_frame
+
+            detail_top = ctk.CTkToplevel(master)
+            detail_top.title("Scenario Detail Preview")
+            detail_top.geometry("1400x900")
+            detail_top.lift()
+            detail_top.focus_force()
+            detail_frame = create_scenario_detail_frame(
+                "Scenarios",
+                copy.deepcopy(demo_scenarios[0]),
+                detail_top,
+                open_entity_callback=None,
+            )
+            if detail_frame is not None:
+                detail_frame.pack(fill="both", expand=True)
+            settle_widget(detail_top)
+            shots["scenario_detail"] = str(grab_widget_screenshot(detail_top, "scenario_detail") or "")
+        except Exception:
+            pass
+        finally:
+            destroy_widget(detail_top)
+
+        generator_top = None
+        try:
+            from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
+
+            generator_top = ctk.CTkToplevel(master)
+            generator_top.title("Scenario Generator Preview")
+            generator_top.geometry("1360x900")
+            generator_top.lift()
+            generator_top.focus_force()
+            generator_view = ScenarioGeneratorView(generator_top)
+            generator_view.pack(fill="both", expand=True)
+            try:
+                generator_view.generate_campaign()
+            except Exception:
+                pass
+            settle_widget(generator_top)
+            shots["scenario_generator"] = str(
+                grab_widget_screenshot(generator_top, "scenario_generator") or ""
+            )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(generator_top)
+
+        importer_window = None
+        try:
+            from modules.scenarios.scenario_importer import ScenarioImportWindow
+
+            importer_window = ScenarioImportWindow(master)
+            try:
+                importer_window.scenario_textbox.insert(
+                    "1.0",
+                    "Title: Meridian Dead Drop\nSummary: A courier exchange goes bad at the depot.\nSecrets: The broker is working for the council saboteur.",
+                )
+            except Exception:
+                pass
+            settle_widget(importer_window)
+            shots["scenario_importer"] = str(
+                grab_widget_screenshot(importer_window, "scenario_importer") or ""
+            )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(importer_window)
+
+        scenario_builder_window = None
+        try:
+            from modules.scenarios.scenario_builder_wizard import ScenarioBuilderWizard
+
+            scenario_builder_window = ScenarioBuilderWizard(master, on_saved=lambda: None)
+            scenario_builder_window.wizard_state.update(copy.deepcopy(demo_scenarios[0]))
+            try:
+                scenario_builder_window._on_wizard_state_changed()
+            except Exception:
+                pass
+            scenario_builder_window._show_step(0)
+            settle_widget(scenario_builder_window)
+            shots["scenario_builder"] = str(
+                grab_widget_screenshot(scenario_builder_window, "scenario_builder") or ""
+            )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(scenario_builder_window)
+
+        sound_manager_window = None
+        try:
+            from modules.audio.ui.sound_manager_window import SoundManagerWindow
+
+            sound_manager_window = SoundManagerWindow(master)
+            try:
+                sound_manager_window.show()
+            except Exception:
+                pass
+            settle_widget(sound_manager_window)
+            shots["sound_manager"] = str(
+                grab_widget_screenshot(sound_manager_window, "sound_manager") or ""
+            )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(sound_manager_window)
+
+        builder_window = None
+        try:
+            from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
+
+            builder_window = CampaignBuilderWizard(
+                master,
+                campaign_wrapper=StaticWrapper(demo_campaigns),
+                scenario_wrapper=StaticWrapper(demo_scenarios),
+            )
+            builder_window._apply_campaign_to_form(demo_campaigns[0])
+            builder_window._refresh_arcs_preview()
+            builder_window._refresh_review()
+
+            for key, step_index in [
+                ("campaign_builder_foundation", 0),
+                ("campaign_builder_arcs", 1),
+                ("campaign_builder_review", 2),
+            ]:
+                builder_window._show_step(step_index)
+                settle_widget(builder_window)
+                shots[key] = str(grab_widget_screenshot(builder_window, key) or "")
+        except Exception:
+            pass
+        finally:
+            destroy_widget(builder_window)
+
+        campaign_overview_window = None
+        try:
+            from modules.campaigns.ui.graphical_display.window import CampaignGraphWindow
+
+            campaign_overview_window = CampaignGraphWindow(
+                master,
+                campaign_wrapper=StaticWrapper(demo_campaigns),
+                scenario_wrapper=StaticWrapper(demo_scenarios),
+            )
+            if hasattr(campaign_overview_window, "panel"):
+                campaign_overview_window.panel._selection_store = DocsSelectionStore()
+            settle_widget(campaign_overview_window)
+            shots["campaign_overview"] = str(
+                grab_widget_screenshot(campaign_overview_window, "campaign_overview") or ""
+            )
+
+            panel = getattr(campaign_overview_window, "panel", None)
+            if panel is not None:
+                try:
+                    panel._select_arc(1)
+                    panel._select_scenario(1)
+                except Exception:
+                    pass
+                settle_widget(campaign_overview_window)
+                shots["campaign_overview_scenario"] = str(
+                    grab_widget_screenshot(campaign_overview_window, "campaign_overview_scenario") or ""
+                )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(campaign_overview_window)
+
+        gm_table_top = None
+        try:
+            from modules.scenarios.gm_table_view import GMTableView
+
+            gm_table_top = ctk.CTkToplevel(master)
+            gm_table_top.title("GM Table Preview")
+            gm_table_top.geometry("1720x980")
+            gm_table_top.lift()
+            gm_table_top.focus_force()
+
+            gm_table_view = GMTableView(
+                gm_table_top,
+                scenario_item=copy.deepcopy(demo_scenarios[0]),
+                root_app=master,
+                layout_store=DocsLayoutStore(),
+            )
+            gm_table_view.wrappers["Scenarios"] = StaticWrapper([copy.deepcopy(demo_scenarios[0])])
+            gm_table_view.pack(fill="both", expand=True)
+
+            settle_widget(gm_table_top)
+            shots["gm_table_default"] = str(
+                grab_widget_screenshot(gm_table_top, "gm_table_default") or ""
+            )
+
+            for option in ["Campaign Dashboard", "Scene Flow", "Whiteboard", "Random Tables"]:
+                try:
+                    gm_table_view._handle_add_option(option)
+                    gm_table_top.update_idletasks()
+                    gm_table_top.update()
+                except Exception:
+                    continue
+            try:
+                gm_table_view._tile_panels()
+            except Exception:
+                pass
+            settle_widget(gm_table_top)
+            shots["gm_table_panels"] = str(
+                grab_widget_screenshot(gm_table_top, "gm_table_panels") or ""
+            )
+        except Exception:
+            pass
+        finally:
+            destroy_widget(gm_table_top)
+
+        asset_library_window = None
+        try:
+            from modules.generic.cross_campaign_asset_library import (
+                CrossCampaignAssetLibraryWindow,
+                OnlineGalleryDialog,
+            )
+            from modules.generic.cross_campaign_asset_service import CampaignDatabase
+            from modules.generic.github_gallery_client import GalleryBundleSummary
+
+            asset_library_window = CrossCampaignAssetLibraryWindow(master)
+            try:
+                asset_library_window.gallery_client._token = "docs-demo-token"
+                asset_library_window._update_publish_button_state()
+            except Exception:
+                pass
+
+            if not getattr(asset_library_window, "source_campaigns", None):
+                asset_library_window.selected_campaign = CampaignDatabase(
+                    name="Docs Demo Campaign",
+                    root=ROOT,
+                    db_path=ROOT / "docs-demo.db",
+                )
+                asset_library_window.entity_records = {
+                    key: [] for key in asset_library_window.entity_types
+                }
+                if "npcs" in asset_library_window.entity_records:
+                    asset_library_window.entity_records["npcs"] = [
+                        {
+                            "Name": "Quartermaster Hale",
+                            "Description": "Keeps the coalition supplied while hiding a side channel to the resistance.",
+                            "Portrait": "docs/images/entity_npcs.png",
+                        }
+                    ]
+                if "maps" in asset_library_window.entity_records:
+                    asset_library_window.entity_records["maps"] = [
+                        {
+                            "Name": "Meridian Harbor",
+                            "Description": "A dense operations map used for the campaign finale.",
+                            "Image": "docs/images/map_tool_map1.png",
+                        }
+                    ]
+                asset_library_window.populate_lists()
+
+            def capture_asset_library_tab(entity_type: str, shot_key: str) -> bool:
+                """Capture a populated asset library tab."""
+                tree = asset_library_window.treeviews.get(entity_type)
+                if tree is None or not tree.get_children():
+                    return False
+                label = (
+                    asset_library_window.entity_definitions.get(entity_type, {}).get("label")
+                    or entity_type.replace("_", " ").title()
+                )
+                try:
+                    asset_library_window.tabview.set(label)
+                except Exception:
+                    pass
+                first_item = tree.get_children()[0]
+                tree.selection_set(first_item)
+                tree.focus(first_item)
+                asset_library_window.update_preview_from_tree(entity_type)
+                settle_widget(asset_library_window)
+                shots[shot_key] = str(
+                    grab_widget_screenshot(asset_library_window, shot_key) or ""
+                )
+                return True
+
+            captured_overview = False
+            for entity_type in ("npcs", "objects", "places", "pcs", "creatures"):
+                if capture_asset_library_tab(entity_type, "asset_library_overview"):
+                    captured_overview = True
+                    break
+            if not captured_overview:
+                capture_asset_library_tab("maps", "asset_library_overview")
+            capture_asset_library_tab("maps", "asset_library_maps")
+
+            fake_bundles = [
+                GalleryBundleSummary(
+                    release_id=1,
+                    asset_id=101,
+                    release_name="Meridian Starter Bundle",
+                    tag="v1.0.0",
+                    asset_name="meridian_starter.zip",
+                    download_url="https://example.invalid/meridian_starter.zip",
+                    size=18_432_000,
+                    published_at=None,
+                    author="llankar",
+                    description="Starter campaign bundle with maps, NPCs, and handouts.",
+                    entity_counts={"maps": 4, "npcs": 12, "objects": 5},
+                    source_campaign="Shattered Meridian",
+                    manifest_created_at="",
+                    metadata={"bundle_mode": "asset_bundle"},
+                    html_url="https://example.invalid/releases/meridian-starter",
+                    is_draft=False,
+                    asset_count=1,
+                    asset_download_count=27,
+                ),
+                GalleryBundleSummary(
+                    release_id=2,
+                    asset_id=102,
+                    release_name="Image Library Expansion",
+                    tag="v1.1.0",
+                    asset_name="image_library_expansion.zip",
+                    download_url="https://example.invalid/image_library_expansion.zip",
+                    size=42_880_000,
+                    published_at=None,
+                    author="llankar",
+                    description="Texture and portrait pack for the shared image library.",
+                    entity_counts={"image_assets": 48},
+                    source_campaign="Shared Media",
+                    manifest_created_at="",
+                    metadata={"bundle_mode": "asset_bundle"},
+                    html_url="https://example.invalid/releases/image-library-expansion",
+                    is_draft=False,
+                    asset_count=1,
+                    asset_download_count=14,
+                ),
+            ]
+            original_list_bundles = getattr(asset_library_window.gallery_client, "list_bundles", None)
+            asset_library_window.gallery_client.list_bundles = lambda: fake_bundles
+            try:
+                asset_library_window.open_online_gallery()
+                online_dialog = getattr(asset_library_window, "_online_dialog", None)
+                if isinstance(online_dialog, OnlineGalleryDialog):
+                    online_dialog._populate(fake_bundles)
+                    children = online_dialog.tree.get_children()
+                    if children:
+                        online_dialog.tree.selection_set(children[0])
+                        online_dialog.tree.focus(children[0])
+                        online_dialog._on_select(None)
+                    settle_widget(online_dialog)
+                    shots["asset_library_online_gallery"] = str(
+                        grab_widget_screenshot(online_dialog, "asset_library_online_gallery") or ""
+                    )
+            finally:
+                if callable(original_list_bundles):
+                    asset_library_window.gallery_client.list_bundles = original_list_bundles
+        except Exception:
+            pass
+        finally:
+            dialog = getattr(asset_library_window, "_online_dialog", None) if asset_library_window is not None else None
+            destroy_widget(dialog)
+            destroy_widget(asset_library_window)
+
+    if os.name == "nt":
+        docs_root = None
+        try:
+            docs_root = ctk.CTk()
+            try:
+                offscreen_x = docs_root.winfo_screenwidth() + 200
+                offscreen_y = docs_root.winfo_screenheight() + 200
+                docs_root.geometry(f"1x1+{offscreen_x}+{offscreen_y}")
+            except Exception:
+                docs_root.geometry("1x1+3000+3000")
+            try:
+                docs_root.attributes("-alpha", 0)
+            except Exception:
+                pass
+            settle_widget(docs_root, cycles=2, delay=0.02)
+            try:
+                docs_root.tk.eval("proc bgerror {msg} {}")
+            except Exception:
+                pass
+        except Exception:
+            docs_root = None
+        try:
+            os.chdir(original_cwd)
+        except Exception:
+            pass
+        if docs_root is not None:
+            try:
+                capture_docs_only_windows(docs_root)
+            finally:
+                try:
+                    docs_root.destroy()
+                except Exception:
+                    pass
+        apply_fallback_assets()
+        restore_tk_runtime()
+        return {k: v for k, v in shots.items() if v}
+    try:
         from main_window import MainWindow
         from modules.generic.generic_model_wrapper import GenericModelWrapper
         from modules.helpers.template_loader import load_template
@@ -384,12 +1158,18 @@ def screenshot_app_views():
         from modules.generic.generic_list_selection_view import GenericListSelectionView
         from modules.generic.generic_list_view import GenericListView
     except Exception:
+        restore_tk_runtime()
         return {}
-
-    shots = {}
-
-    app = MainWindow()
-    app.update()
+    try:
+        app = MainWindow()
+    except Exception:
+        restore_tk_runtime()
+        return {}
+    try:
+        os.chdir(original_cwd)
+    except Exception:
+        pass
+    settle_widget(app)
     shots["main_window"] = str(grab_widget_screenshot(app, "main_window") or "")
 
     def capture_sidebar_sections():
@@ -541,29 +1321,110 @@ def screenshot_app_views():
 
     try:
         app.open_scenario_generator()
-        app.update()
-        shots["scenario_generator"] = str(grab_widget_screenshot(app, "scenario_generator") or "")
+        settle_widget(app)
+        generator_view = getattr(app, "current_open_view", None) or app
+        shots["scenario_generator"] = str(
+            grab_widget_screenshot(generator_view, "scenario_generator") or ""
+        )
     except Exception:
         pass
+    importer_top = None
     try:
         app.open_scenario_importer()
-        app.update()
-        shots["scenario_importer"] = str(grab_widget_screenshot(app, "scenario_importer") or "")
+        settle_widget(app)
+        importer_top = find_toplevel(app, title_contains="Import Formatted Scenario")
+        if importer_top is not None:
+            shots["scenario_importer"] = str(
+                grab_widget_screenshot(importer_top, "scenario_importer") or ""
+            )
     except Exception:
         pass
+    finally:
+        destroy_widget(importer_top)
+    scenario_builder_top = None
     try:
         app.open_scenario_builder()
-        app.update()
-        shots["scenario_builder"] = str(grab_widget_screenshot(app, "scenario_builder") or "")
+        settle_widget(app)
+        scenario_builder_top = find_toplevel(app, title_contains="Scenario Builder Wizard")
+        if scenario_builder_top is not None:
+            shots["scenario_builder"] = str(
+                grab_widget_screenshot(scenario_builder_top, "scenario_builder") or ""
+            )
     except Exception:
         pass
+    finally:
+        destroy_widget(scenario_builder_top)
+    builder_window = None
+    try:
+        from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
+
+        builder_window = CampaignBuilderWizard(
+            app,
+            campaign_wrapper=StaticWrapper(demo_campaigns),
+            scenario_wrapper=StaticWrapper(demo_scenarios),
+        )
+        builder_window._apply_campaign_to_form(demo_campaigns[0])
+        builder_window._refresh_arcs_preview()
+        builder_window._refresh_review()
+
+        for key, step_index in [
+            ("campaign_builder_foundation", 0),
+            ("campaign_builder_arcs", 1),
+            ("campaign_builder_review", 2),
+        ]:
+            builder_window._show_step(step_index)
+            settle_widget(builder_window)
+            shots[key] = str(grab_widget_screenshot(builder_window, key) or "")
+    except Exception:
+        pass
+    finally:
+        if builder_window is not None:
+            try:
+                builder_window.destroy()
+            except Exception:
+                pass
+            app.update()
+    campaign_overview_window = None
+    try:
+        from modules.campaigns.ui.graphical_display.window import CampaignGraphWindow
+
+        campaign_overview_window = CampaignGraphWindow(
+            app,
+            campaign_wrapper=StaticWrapper(demo_campaigns),
+            scenario_wrapper=StaticWrapper(demo_scenarios),
+        )
+        if hasattr(campaign_overview_window, "panel"):
+            campaign_overview_window.panel._selection_store = DocsSelectionStore()
+        settle_widget(campaign_overview_window)
+        shots["campaign_overview"] = str(
+            grab_widget_screenshot(campaign_overview_window, "campaign_overview") or ""
+        )
+
+        panel = getattr(campaign_overview_window, "panel", None)
+        if panel is not None:
+            try:
+                panel._select_arc(1)
+                panel._select_scenario(1)
+            except Exception:
+                pass
+            settle_widget(campaign_overview_window)
+            shots["campaign_overview_scenario"] = str(
+                grab_widget_screenshot(campaign_overview_window, "campaign_overview_scenario") or ""
+            )
+    except Exception:
+        pass
+    finally:
+        if campaign_overview_window is not None:
+            try:
+                campaign_overview_window.destroy()
+            except Exception:
+                pass
+            app.update()
     try:
         # Keep screenshot app views resilient if this step fails.
         app.open_scene_flow_viewer()
-        app.update(); app.update_idletasks()
-        import customtkinter as ctk
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        sf_top = tops[-1] if tops else None
+        settle_widget(app)
+        sf_top = getattr(app, "_scene_flow_window", None)
         if sf_top:
             shots["scene_flow_viewer"] = str(grab_widget_screenshot(sf_top, "scene_flow_viewer") or "")
     except Exception:
@@ -638,9 +1499,15 @@ def screenshot_app_views():
             detail_top.geometry("1400x900")
             detail_top.lift()
             detail_top.focus_force()
-            create_scenario_detail_frame("Scenarios", scenario_item, detail_top, open_entity_callback=None)
-            detail_top.update_idletasks()
-            detail_top.update()
+            detail_frame = create_scenario_detail_frame(
+                "Scenarios",
+                scenario_item,
+                detail_top,
+                open_entity_callback=None,
+            )
+            if detail_frame is not None:
+                detail_frame.pack(fill="both", expand=True)
+            settle_widget(detail_top)
             shots["scenario_detail"] = str(grab_widget_screenshot(detail_top, "scenario_detail") or "")
         except Exception:
             pass
@@ -770,9 +1637,8 @@ def screenshot_app_views():
     try:
         # Keep screenshot app views resilient if this step fails.
         app.map_tool()
-        app.update(); app.update_idletasks()
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        map_top = tops[-1] if tops else None
+        settle_widget(app)
+        map_top = getattr(app, "_map_tool_window", None)
         if map_top:
             # Continue with this path when map top is set.
             shots["map_tool_selector"] = str(grab_widget_screenshot(map_top, "map_tool_selector") or "")
@@ -784,18 +1650,18 @@ def screenshot_app_views():
                     try:
                         # Keep screenshot app views resilient if this step fails.
                         ctrl._on_display_map("maps", name)
-                        app.update(); app.update_idletasks()
+                        settle_widget(map_top)
                         key = f"map_tool_map{idx}"
                         shots[key] = str(grab_widget_screenshot(map_top, key) or "")
                     except Exception:
                         continue
                 try:
                     # Keep screenshot app views resilient if this step fails.
-                    ctrl._on_drawing_tool_change("Rectangle"); app.update()
+                    ctrl._on_drawing_tool_change("Rectangle"); settle_widget(map_top)
                     shots["map_tool_rectangle"] = str(grab_widget_screenshot(map_top, "map_tool_rectangle") or "")
-                    ctrl._on_drawing_tool_change("Oval"); app.update()
+                    ctrl._on_drawing_tool_change("Oval"); settle_widget(map_top)
                     shots["map_tool_oval"] = str(grab_widget_screenshot(map_top, "map_tool_oval") or "")
-                    ctrl._on_drawing_tool_change("Token"); app.update()
+                    ctrl._on_drawing_tool_change("Token"); settle_widget(map_top)
                 except Exception:
                     pass
     except Exception:
@@ -815,9 +1681,8 @@ def screenshot_app_views():
     try:
         # Keep screenshot app views resilient if this step fails.
         app.open_world_map()
-        app.update(); app.update_idletasks()
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        wm_top = tops[-1] if tops else None
+        settle_widget(app)
+        wm_top = getattr(app, "_world_map_window", None)
         if wm_top:
             shots["world_map"] = str(grab_widget_screenshot(wm_top, "world_map") or "")
     except Exception:
@@ -827,9 +1692,8 @@ def screenshot_app_views():
     try:
         # Keep screenshot app views resilient if this step fails.
         app.open_dice_roller()
-        app.update(); app.update_idletasks()
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        dr_top = tops[-1] if tops else None
+        settle_widget(app)
+        dr_top = getattr(app, "dice_roller_window", None)
         if dr_top:
             shots["dice_roller"] = str(grab_widget_screenshot(dr_top, "dice_roller") or "")
     except Exception:
@@ -837,9 +1701,8 @@ def screenshot_app_views():
     try:
         # Keep screenshot app views resilient if this step fails.
         app.open_dice_bar()
-        app.update(); app.update_idletasks()
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        db_top = tops[-1] if tops else None
+        settle_widget(app)
+        db_top = getattr(app, "dice_bar_window", None)
         if db_top:
             shots["dice_bar"] = str(grab_widget_screenshot(db_top, "dice_bar") or "")
     except Exception:
@@ -849,9 +1712,8 @@ def screenshot_app_views():
     try:
         # Keep screenshot app views resilient if this step fails.
         app.open_sound_manager()
-        app.update(); app.update_idletasks()
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        sm_top = tops[-1] if tops else None
+        settle_widget(app)
+        sm_top = getattr(app, "sound_manager_window", None)
         if sm_top:
             shots["sound_manager"] = str(grab_widget_screenshot(sm_top, "sound_manager") or "")
     except Exception:
@@ -859,9 +1721,8 @@ def screenshot_app_views():
     try:
         # Keep screenshot app views resilient if this step fails.
         app.open_audio_bar()
-        app.update(); app.update_idletasks()
-        tops = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
-        ab_top = tops[-1] if tops else None
+        settle_widget(app)
+        ab_top = getattr(app, "audio_bar_window", None)
         if ab_top:
             shots["audio_bar"] = str(grab_widget_screenshot(ab_top, "audio_bar") or "")
     except Exception:
@@ -934,34 +1795,228 @@ def screenshot_app_views():
         shots["gm_screen"] = str(grab_widget_screenshot(app, "gm_screen") or "")
     except Exception:
         pass
+    gm_table_top = None
+    try:
+        from modules.scenarios.gm_table_view import GMTableView
 
-    # Fallback to curated screenshots when live capture is missing or empty
-    fallback_assets = {
-        # entity managers
-        "entity_scenarios": DOCS_DIR / "images" / "entity_scenarios.png",
-        "entity_pcs": DOCS_DIR / "images" / "entity_pcs.png",
-        "entity_npcs": DOCS_DIR / "images" / "entity_npcs.png",
-        "entity_creatures": DOCS_DIR / "images" / "entity_creatures.png",
-        "entity_factions": DOCS_DIR / "images" / "entity_factions.png",
-        "entity_places": DOCS_DIR / "images" / "entity_places.png",
-        "entity_objects": DOCS_DIR / "images" / "entity_objects.png",
-        "entity_informations": DOCS_DIR / "images" / "entity_informations.png",
-        "entity_clues": DOCS_DIR / "images" / "entity_clues.png",
-        "entity_maps": DOCS_DIR / "images" / "entity_maps.png",
-        "entity_books": DOCS_DIR / "images" / "entity_books.png",
-        # bars and extras
-        "dice_bar": DOCS_DIR / "images" / "dice_bar.png",
-        "audio_bar": DOCS_DIR / "images" / "audio_bar.png",
-    }
-    for key, path in fallback_assets.items():
-        if (not shots.get(key)) and path.exists():
-            shots[key] = str(path)
+        scenario_items = []
+        try:
+            scenario_items = GenericModelWrapper("scenarios").load_items()
+        except Exception:
+            scenario_items = []
+        gm_table_scenario = copy.deepcopy(scenario_items[0]) if scenario_items else copy.deepcopy(demo_scenarios[0])
+
+        gm_table_top = ctk.CTkToplevel(app)
+        gm_table_top.title("GM Table Preview")
+        gm_table_top.geometry("1720x980")
+        gm_table_top.lift()
+        gm_table_top.focus_force()
+
+        gm_table_view = GMTableView(
+            gm_table_top,
+            scenario_item=gm_table_scenario,
+            root_app=app,
+            layout_store=DocsLayoutStore(),
+        )
+        if not scenario_items:
+            gm_table_view.wrappers["Scenarios"] = StaticWrapper([gm_table_scenario])
+        gm_table_view.pack(fill="both", expand=True)
+
+        for _ in range(6):
+            gm_table_top.update_idletasks()
+            gm_table_top.update()
+            time.sleep(0.05)
+        shots["gm_table_default"] = str(
+            grab_widget_screenshot(gm_table_top, "gm_table_default") or ""
+        )
+
+        for option in ["Campaign Dashboard", "Scene Flow", "Whiteboard", "Random Tables"]:
+            try:
+                gm_table_view._handle_add_option(option)
+                gm_table_top.update_idletasks()
+                gm_table_top.update()
+            except Exception:
+                continue
+        try:
+            gm_table_view._tile_panels()
+        except Exception:
+            pass
+        for _ in range(6):
+            gm_table_top.update_idletasks()
+            gm_table_top.update()
+            time.sleep(0.05)
+        shots["gm_table_panels"] = str(
+            grab_widget_screenshot(gm_table_top, "gm_table_panels") or ""
+        )
+    except Exception:
+        pass
+    finally:
+        if gm_table_top is not None:
+            try:
+                gm_table_top.destroy()
+            except Exception:
+                pass
+            app.update()
+    asset_library_window = None
+    try:
+        from modules.generic.cross_campaign_asset_library import OnlineGalleryDialog
+        from modules.generic.cross_campaign_asset_service import CampaignDatabase
+        from modules.generic.github_gallery_client import GalleryBundleSummary
+
+        app.open_cross_campaign_asset_library()
+        asset_library_window = getattr(app, "_asset_library_window", None)
+        if asset_library_window is not None:
+            try:
+                asset_library_window.gallery_client._token = "docs-demo-token"
+                asset_library_window._update_publish_button_state()
+            except Exception:
+                pass
+
+            if not getattr(asset_library_window, "source_campaigns", None):
+                asset_library_window.selected_campaign = CampaignDatabase(
+                    name="Docs Demo Campaign",
+                    root=ROOT,
+                    db_path=ROOT / "docs-demo.db",
+                )
+                asset_library_window.entity_records = {
+                    key: [] for key in asset_library_window.entity_types
+                }
+                if "npcs" in asset_library_window.entity_records:
+                    asset_library_window.entity_records["npcs"] = [
+                        {
+                            "Name": "Quartermaster Hale",
+                            "Description": "Keeps the coalition supplied while hiding a side channel to the resistance.",
+                            "Portrait": "docs/images/entity_npcs.png",
+                        }
+                    ]
+                if "maps" in asset_library_window.entity_records:
+                    asset_library_window.entity_records["maps"] = [
+                        {
+                            "Name": "Meridian Harbor",
+                            "Description": "A dense operations map used for the campaign finale.",
+                            "Image": "docs/images/map_tool_map1.png",
+                        }
+                    ]
+                asset_library_window.populate_lists()
+
+            def capture_asset_library_tab(entity_type: str, shot_key: str) -> bool:
+                """Capture a populated asset library tab."""
+                tree = asset_library_window.treeviews.get(entity_type)
+                if tree is None or not tree.get_children():
+                    return False
+                label = (
+                    asset_library_window.entity_definitions.get(entity_type, {}).get("label")
+                    or entity_type.replace("_", " ").title()
+                )
+                try:
+                    asset_library_window.tabview.set(label)
+                except Exception:
+                    pass
+                first_item = tree.get_children()[0]
+                tree.selection_set(first_item)
+                tree.focus(first_item)
+                asset_library_window.update_preview_from_tree(entity_type)
+                asset_library_window.update_idletasks()
+                asset_library_window.update()
+                shots[shot_key] = str(
+                    grab_widget_screenshot(asset_library_window, shot_key) or ""
+                )
+                return True
+
+            captured_overview = False
+            for entity_type in ("npcs", "objects", "places", "pcs", "creatures"):
+                if capture_asset_library_tab(entity_type, "asset_library_overview"):
+                    captured_overview = True
+                    break
+            if not captured_overview:
+                capture_asset_library_tab("maps", "asset_library_overview")
+            capture_asset_library_tab("maps", "asset_library_maps")
+
+            fake_bundles = [
+                GalleryBundleSummary(
+                    release_id=1,
+                    asset_id=101,
+                    release_name="Meridian Starter Bundle",
+                    tag="v1.0.0",
+                    asset_name="meridian_starter.zip",
+                    download_url="https://example.invalid/meridian_starter.zip",
+                    size=18_432_000,
+                    published_at=None,
+                    author="llankar",
+                    description="Starter campaign bundle with maps, NPCs, and handouts.",
+                    entity_counts={"maps": 4, "npcs": 12, "objects": 5},
+                    source_campaign="Shattered Meridian",
+                    manifest_created_at="",
+                    metadata={"bundle_mode": "asset_bundle"},
+                    html_url="https://example.invalid/releases/meridian-starter",
+                    is_draft=False,
+                    asset_count=1,
+                    asset_download_count=27,
+                ),
+                GalleryBundleSummary(
+                    release_id=2,
+                    asset_id=102,
+                    release_name="Image Library Expansion",
+                    tag="v1.1.0",
+                    asset_name="image_library_expansion.zip",
+                    download_url="https://example.invalid/image_library_expansion.zip",
+                    size=42_880_000,
+                    published_at=None,
+                    author="llankar",
+                    description="Texture and portrait pack for the shared image library.",
+                    entity_counts={"image_assets": 48},
+                    source_campaign="Shared Media",
+                    manifest_created_at="",
+                    metadata={"bundle_mode": "asset_bundle"},
+                    html_url="https://example.invalid/releases/image-library-expansion",
+                    is_draft=False,
+                    asset_count=1,
+                    asset_download_count=14,
+                ),
+            ]
+            original_list_bundles = getattr(asset_library_window.gallery_client, "list_bundles", None)
+            asset_library_window.gallery_client.list_bundles = lambda: fake_bundles
+            try:
+                asset_library_window.open_online_gallery()
+                online_dialog = getattr(asset_library_window, "_online_dialog", None)
+                if isinstance(online_dialog, OnlineGalleryDialog):
+                    online_dialog._populate(fake_bundles)
+                    children = online_dialog.tree.get_children()
+                    if children:
+                        online_dialog.tree.selection_set(children[0])
+                        online_dialog.tree.focus(children[0])
+                        online_dialog._on_select(None)
+                    online_dialog.update_idletasks()
+                    online_dialog.update()
+                    shots["asset_library_online_gallery"] = str(
+                        grab_widget_screenshot(online_dialog, "asset_library_online_gallery") or ""
+                    )
+            finally:
+                if callable(original_list_bundles):
+                    asset_library_window.gallery_client.list_bundles = original_list_bundles
+    except Exception:
+        pass
+    finally:
+        dialog = getattr(asset_library_window, "_online_dialog", None) if asset_library_window is not None else None
+        if dialog is not None:
+            try:
+                dialog.destroy()
+            except Exception:
+                pass
+        if asset_library_window is not None:
+            try:
+                asset_library_window.destroy()
+            except Exception:
+                pass
+            app.update()
+
+    apply_fallback_assets()
 
     try:
         app.destroy()
     except Exception:
         pass
-
+    restore_tk_runtime()
     return {k: v for k, v in shots.items() if v}
 
 
@@ -996,6 +2051,22 @@ def build_html(api_data, menu_data, shots):
         """.format(ts=time.strftime("%Y-%m-%d %H:%M:%S"))
     )
 
+    sections.append(
+        """
+        <section id=\"documentation-refresh\">
+          <h2>Refreshing The Documentation</h2>
+          <p>Refresh the committed documentation by running <code>python scripts/generate_docs.py</code> from the repository root.</p>
+          <ul>
+            <li>The script updates <code>docs/index.html</code>, <code>docs/user-manual.html</code>, and screenshot assets in <code>docs/images/</code>.</li>
+            <li>Run it after UI, context-menu, screenshot, or API-surface changes so the docs stay aligned with the application.</li>
+            <li>Use the same Python environment as the desktop app. The generator opens Tk/customtkinter windows and relies on Pillow <code>ImageGrab</code> for screenshots.</li>
+            <li>Review the generated HTML and screenshots before committing them.</li>
+          </ul>
+          <p>See <code>docs/documentation_maintenance.md</code> for the full maintainer workflow and troubleshooting notes.</p>
+        </section>
+        """
+    )
+
     if shots:
         # Continue with this path when shots is set.
         used = set()
@@ -1028,8 +2099,21 @@ def build_html(api_data, menu_data, shots):
             used.update(entity_keys)
 
         add_group("Detail & Editor Windows", ["scenario_detail", "scenario_editor", "custom_fields_editor"])
+        add_group("Campaign Planning", [
+            "campaign_builder_foundation",
+            "campaign_builder_arcs",
+            "campaign_builder_review",
+            "campaign_overview",
+            "campaign_overview_scenario",
+        ])
         add_group("Graph Editors", ["character_graph", "faction_graph", "scenario_graph"])
         add_group("GM & Scenario Tools", ["gm_screen", "scenario_generator", "scenario_importer"])
+        add_group("GM Virtual Table", ["gm_table_default", "gm_table_panels"])
+        add_group("Cross-campaign Asset Library", [
+            "asset_library_overview",
+            "asset_library_maps",
+            "asset_library_online_gallery",
+        ])
         add_group("Map Tools", ["map_tool_selector", "map_tool_map1", "map_tool_map2", "map_tool_rectangle", "map_tool_oval"])
         add_group("Whiteboard", ["whiteboard"])
         add_group("Dice & Music Bars", ["dice_bar", "audio_bar"])
@@ -1226,9 +2310,9 @@ def build_user_manual(shots, menu_data, py_files):
             'Utilities',
             'Launch helper tools for session prep and presentation.',
             [
-                '<b>Generate Scenario</b>, <b>Scenario Builder Wizard</b>, and <b>AI Wizard</b>: Automate outline or content generation.',
+                '<b>Campaign Builder</b>, <b>Generate Scenario</b>, <b>Scenario Builder Wizard</b>, and <b>AI Wizard</b>: Automate outline, arc planning, or content generation.',
                 '<b>Import Scenario</b>, <b>Import NPCs/Creatures from PDF</b>, and <b>Import Equipment from PDF</b>: Convert external sources into campaign data.',
-                '<b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, <b>Map Tool</b>, and <b>Whiteboard</b>: Present and prep live session visuals.',
+                '<b>Campaign Overview</b>, <b>GM Table</b>, <b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, <b>Map Tool</b>, and <b>Whiteboard</b>: Present and prep live session visuals.',
                 '<b>Portrait tools</b>: Generate portraits (SwarmUI), auto-associate NPC portraits, or import folders of art.',
                 '<b>Dice Bar</b> and <b>Open Dice Roller</b>: Quick always-on-top roller and full formula roller.',
                 '<b>Sound &amp; Music Manager</b> and <b>Audio Controls Bar</b>: Organize playlists and control playback.',
@@ -1242,7 +2326,7 @@ def build_user_manual(shots, menu_data, py_files):
         "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
         "<link rel='stylesheet' href='user-manual.css'></head><body>",
         "<header><h1>GMCampaignDesigner User Manual</h1></header>",
-        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#systems-&-data'>Systems &amp; Data</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#random-tables'>Random Tables</a><a href='#graph-editors'>Graph Editors</a><a href='#campaign-overview'>Campaign Overview</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#exports-&-handouts'>Exports &amp; Handouts</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#web-viewer'>Web Viewer</a><a href='#keyboard-shortcuts'>Keyboard Shortcuts</a><a href='#tips'>Tips</a></nav><div class='container'>"
+        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#systems-&-data'>Systems &amp; Data</a><a href='#cross-campaign-asset-library'>Cross-Campaign Asset Library</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#random-tables'>Random Tables</a><a href='#graph-editors'>Graph Editors</a><a href='#campaign-builder'>Campaign Builder</a><a href='#campaign-overview'>Campaign Overview</a><a href='#gm-virtual-table'>GM Virtual Table</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#exports-&-handouts'>Exports &amp; Handouts</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#web-viewer'>Web Viewer</a><a href='#keyboard-shortcuts'>Keyboard Shortcuts</a><a href='#tips'>Tips</a></nav><div class='container'>"
     ]
 
     parts.append(section('Getting Started',
@@ -1275,6 +2359,20 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Cross-campaign Asset Library:</b> Export/import NPCs, Objects, and Maps with media bundles; optional online gallery publishing.</li>"
         "<li><b>Set SwarmUI Path:</b> Point portrait generation to your SwarmUI install.</li>"
         "</ul>"
+    ))
+    parts.append(section('Cross-Campaign Asset Library',
+        "<p>The Cross-campaign Asset Library is the transfer hub for moving reusable content between campaigns without manually copying database rows or media folders.</p>"
+        "<ul>"
+        "<li><b>Browse source campaigns:</b> Select a neighboring campaign from the left rail and inspect its NPCs, objects, maps, and other supported entities.</li>"
+        "<li><b>Preview before transfer:</b> Each tab shows the selected record's name, summary, and image preview so you can confirm what will be exported or copied.</li>"
+        "<li><b>Export bundles:</b> <b>Export Selected…</b> packages chosen records and their media into a portable zip bundle.</li>"
+        "<li><b>Copy directly:</b> <b>Copy to Current Campaign</b> imports selected records straight into the active campaign and resolves duplicates interactively.</li>"
+        "<li><b>Import bundles:</b> <b>Import Bundle…</b> restores a shared bundle; <b>Import Image Library…</b> limits the import to image-library assets.</li>"
+        "<li><b>Online gallery:</b> Publish bundles to GitHub, browse online releases, download shared bundles, or install a full campaign package. Publishing actions require a configured GitHub token.</li>"
+        "</ul>"
+        + (img('asset_library_overview', 'Cross-campaign Asset Library overview') if shots.get('asset_library_overview') else '')
+        + (img('asset_library_maps', 'Cross-campaign Asset Library - maps tab') if shots.get('asset_library_maps') else '')
+        + (img('asset_library_online_gallery', 'Online campaign gallery') if shots.get('asset_library_online_gallery') else '')
     ))
 
     ent_menu_html = ''.join(f"<li>{item}</li>" for item in entity_menu) if entity_menu else ''
@@ -1359,14 +2457,43 @@ def build_user_manual(shots, menu_data, py_files):
         + img('faction_graph', 'Faction Graph') + img('scenario_graph', 'Scenario Graph')
     ))
 
+    parts.append(section('Campaign Builder',
+        "<p>The Campaign Builder Wizard is a structured campaign-planning flow for foundation, arc planning, AI-assisted scenario generation, and final review.</p>"
+        "<ul>"
+        "<li><b>Foundation step:</b> Define campaign identity with name, genre, tone, status, dates, logline, setting, objective, stakes, themes, notes, and optional presets.</li>"
+        "<li><b>Arc planner:</b> Build a library of arcs, edit each arc's summary/objective/thread, attach scenarios, and reorder or duplicate arcs.</li>"
+        "<li><b>AI operations:</b> Generate arcs from scenarios, generate scenarios per arc, run DB-aware validation, preview forge output, and tune generation defaults.</li>"
+        "<li><b>Review &amp; save:</b> Inspect the compiled campaign payload before saving it back into the campaign database.</li>"
+        "</ul>"
+        + (img('campaign_builder_foundation', 'Campaign Builder - foundation step') if shots.get('campaign_builder_foundation') else '')
+        + (img('campaign_builder_arcs', 'Campaign Builder - arcs planner') if shots.get('campaign_builder_arcs') else '')
+        + (img('campaign_builder_review', 'Campaign Builder - review step') if shots.get('campaign_builder_review') else '')
+    ))
+
     parts.append(section('Campaign Overview',
         "<p>The campaign overview presents a visual, campaign-facing summary built from arcs, scenarios, linked entities, and briefings. It is useful for reviewing pacing, campaign structure, and scenario dependencies without opening every editor.</p>"
         "<ul>"
-        "<li><b>Arc and scenario navigation:</b> Move between arcs and scenarios from compact selector strips.</li>"
-        "<li><b>Scenario identity:</b> Review title, synopsis, hook, stakes, and objective in a polished dashboard layout.</li>"
-        "<li><b>Linked entities browser:</b> Open related NPCs, creatures, places, and other records directly from the overview.</li>"
-        "<li><b>Campaign-facing use:</b> This view is for overview and navigation; detailed GM prep still lives in the GM Screen.</li>"
+        "<li><b>Campaign hero:</b> Review the top-level campaign identity, tone, stakes, and poster-export entry point.</li>"
+        "<li><b>Arc navigation:</b> Move across arcs with the stepper and strip while keeping summaries and objectives visible.</li>"
+        "<li><b>Scenario focus:</b> Drill into each scenario's hook, objective, stakes, scene count, and link density from the same screen.</li>"
+        "<li><b>Entity browser:</b> Open related NPCs, creatures, places, factions, and villains directly from the scenario sidebar.</li>"
+        "<li><b>Campaign-facing use:</b> This view is for overview and navigation; detailed live-session prep still lives in the GM Screen and GM Table.</li>"
         "</ul>"
+        + (img('campaign_overview', 'Campaign Overview') if shots.get('campaign_overview') else '')
+        + (img('campaign_overview_scenario', 'Campaign Overview - scenario focus') if shots.get('campaign_overview_scenario') else '')
+    ))
+
+    parts.append(section('GM Virtual Table',
+        "<p>The GM Table is the freeform virtual tabletop-style workspace for arranging panels, maps, handouts, and utilities around a single scenario.</p>"
+        "<ul>"
+        "<li><b>Open:</b> Utilities &rarr; <b>GM Table</b>, then choose a scenario. The default layout opens scenario details and handouts side by side.</li>"
+        "<li><b>Toolbar:</b> Use <b>Add Panel</b>, <b>Scene</b>, <b>Map Tool</b>, <b>Player View</b>, <b>Fog</b>, <b>Tile</b>, <b>Cascade</b>, <b>Restore All</b>, <b>Save</b>, and <b>Reset</b> to manage the workspace.</li>"
+        "<li><b>Panel types:</b> Add campaign dashboard, world map, map tool, scene flow, whiteboard, random tables, plot twists, image library, handouts, notes, graphs, or entity detail panels.</li>"
+        "<li><b>Scenario focus:</b> Layouts persist per scenario, so you can maintain different tabletops for different sessions.</li>"
+        "<li><b>Live play:</b> Use the table as the orchestration layer while dedicated tools such as Map Tool and Whiteboard keep their own specialist controls.</li>"
+        "</ul>"
+        + (img('gm_table_default', 'GM Table - default layout') if shots.get('gm_table_default') else '')
+        + (img('gm_table_panels', 'GM Table - expanded panel layout') if shots.get('gm_table_panels') else '')
     ))
 
     parts.append(section('GM Screen',
@@ -1534,13 +2661,14 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>F6</b>: Change Data Storage.</li>"
         "<li><b>F7</b>: Open Sound &amp; Music Manager.</li>"
         "<li><b>F8</b>: Open Dice Roller.</li>"
+        "<li><b>F9</b>: Open Campaign Builder.</li>"
         "<li><b>F12</b>: Exit the app.</li>"
         "<li><b>Ctrl+F</b>: Search inside the GM Screen.</li>"
         "<li><b>Ctrl+Shift+I</b>: Send selected text from the Web Text Import browser.</li>"
         "</ul>"
     ))
     parts.append(section('Tips',
-        "<div class='tip'><b>Screenshots:</b> Run <code>python scripts/generate_docs.py</code> to refresh this manual after UI changes.</div>"
+        "<div class='tip'><b>Documentation refresh:</b> Run <code>python scripts/generate_docs.py</code> from the repository root after UI, menu, screenshot, or API changes. It refreshes <code>docs/index.html</code>, this manual, and <code>docs/images/</code>.</div>"
         "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i>, <i>Campaign Dossier</i>, <i>Session Brief</i>, or <i>Export for Foundry</i> depending on the audience.</div>"
         "<div class='tip'><b>Portrait workflow:</b> Generate or link portraits from the Utilities section; double-click a portrait in any list to pop it out.</div>"
         "<div class='tip'><b>Cross-campaign reuse:</b> Use the Cross-campaign Asset Library to move NPCs, objects, and maps between campaigns with their media.</div>"

@@ -1,0 +1,22 @@
+{
+  "fields": [
+    {"name": "AssetId", "type": "text"},
+    {"name": "Name", "type": "text"},
+    {"name": "Path", "type": "file"},
+    {"name": "RelativePath", "type": "text"},
+    {"name": "SourceRoot", "type": "text"},
+    {"name": "SourceFolderName", "type": "text"},
+    {"name": "Extension", "type": "text"},
+    {"name": "Width", "type": "int"},
+    {"name": "Height", "type": "int"},
+    {"name": "FileSizeBytes", "type": "int"},
+    {"name": "Hash", "type": "text"},
+    {"name": "NameNormalized", "type": "text"},
+    {"name": "SearchTokens", "type": "list"},
+    {"name": "Tags", "type": "list"},
+    {"name": "ImportedAt", "type": "text"},
+    {"name": "UpdatedAt", "type": "text"}
+  ],
+  "custom_fields": [
+  ]
+}
