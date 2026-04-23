@@ -109,6 +109,7 @@ from modules.campaigns.services import (
 from modules.dice.dice_roller_window import DiceRollerWindow
 from modules.dice.dice_bar_window import DiceBarWindow
 from modules.audio.audio_controller import get_audio_controller
+from modules.startup import ensure_database_configured_for_startup
 
 initialize_logging()
 install_global_exception_hooks()
@@ -4751,5 +4752,6 @@ if __name__ == "__main__":
 
         _apply_update.main()
     else:
-        app = MainWindow()
-        app.mainloop()
+        if ensure_database_configured_for_startup():
+            app = MainWindow()
+            app.mainloop()
