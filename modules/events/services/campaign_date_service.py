@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date, datetime
 from typing import Any
 
@@ -17,7 +18,10 @@ class CampaignDateService:
     @classmethod
     def get_today(cls) -> date:
         """Return today."""
-        stored = get_campaign_setting(_CAMPAIGN_DATE_KEY)
+        try:
+            stored = get_campaign_setting(_CAMPAIGN_DATE_KEY)
+        except sqlite3.OperationalError:
+            return date.today()
         return cls.parse(stored) or date.today()
 
     @classmethod
