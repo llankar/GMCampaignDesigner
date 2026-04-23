@@ -31,6 +31,7 @@ from PIL import Image
 # Modular helper imports
 from modules.helpers.window_helper import position_window_at_top
 from modules.helpers import theme_manager
+from modules.helpers.customtkinter_compat import apply_ctk_button_after_cleanup_patch
 from modules.helpers.template_loader import (
     load_template,
     load_entity_definitions,
@@ -118,6 +119,7 @@ log_module_import(__name__)
 
 def configure_ui_defaults() -> None:
     """Apply global CustomTkinter defaults explicitly at app startup."""
+    apply_ctk_button_after_cleanup_patch(ctk)
     ctk.set_appearance_mode("Dark")
     theme_manager.apply_theme(theme_manager.get_theme())
 
@@ -4536,6 +4538,7 @@ class MainWindow(ctk.CTk):
         try:
             # Keep reload active campaign system resilient if this step fails.
             from modules.helpers import theme_manager
+from modules.helpers.customtkinter_compat import apply_ctk_button_after_cleanup_patch
             theme_key = theme_manager.get_theme()
             theme_manager.apply_theme(theme_key)
             self._on_theme_changed(theme_key)
