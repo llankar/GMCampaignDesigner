@@ -4538,7 +4538,6 @@ class MainWindow(ctk.CTk):
         try:
             # Keep reload active campaign system resilient if this step fails.
             from modules.helpers import theme_manager
-from modules.helpers.customtkinter_compat import apply_ctk_button_after_cleanup_patch
             theme_key = theme_manager.get_theme()
             theme_manager.apply_theme(theme_key)
             self._on_theme_changed(theme_key)
