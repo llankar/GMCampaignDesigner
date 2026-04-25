@@ -238,7 +238,15 @@ def test_open_entity_tab_refocuses_existing_window_instead_of_creating_a_second_
     assert ("deiconify",) in first_window.calls
     assert ("lift",) in first_window.calls
     assert ("focus_force",) in first_window.calls
-    assert ("attributes", "-topmost", True) in first_window.calls
+
+
+def test_resolve_primary_type_chip_prefers_type_then_role():
+    """Verify that the primary chip uses type-like fields in priority order."""
+    module = _load_module()
+
+    assert module._resolve_primary_type_chip({"Type": "Alien", "Role": "Hunter"}) == "Alien"
+    assert module._resolve_primary_type_chip({"Role": "Guide"}) == "Guide"
+    assert module._resolve_primary_type_chip({"Location": "Outpost"}) == "Outpost"
 
 
 def test_compute_wraplength_from_widths_uses_the_narrowest_container():

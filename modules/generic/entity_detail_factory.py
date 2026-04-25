@@ -280,6 +280,18 @@ def _collect_highlight_lines(entity_type, entity):
     return lines
 
 
+def _resolve_primary_type_chip(entity: dict) -> str:
+    """Return the first non-empty type-like value for the chip row."""
+    if not isinstance(entity, dict):
+        return ""
+    for key in ("Type", "Role", "Location", "Archetype"):
+        # Process each key from ('Type', 'Role', 'Location', 'Archetype').
+        value = str(entity.get(key) or "").strip()
+        if value:
+            return value
+    return ""
+
+
 def _build_portrait_widget(parent, entity_type, entity, *, size):
     """Build portrait widget."""
     portrait_sources = (
@@ -2341,9 +2353,17 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     chip_row = ctk.CTkFrame(compact_header, fg_color="transparent")
     chip_row.pack(fill="x", pady=(8, 0))
-    create_chip(chip_row, category_label.upper(), accent=True).pack(side="left", padx=(0, 8))
+    create_chip(chip_row, str(entity_label), accent=True).pack(side="left", padx=(0, 8))
+
+    primary_type = _resolve_primary_type_chip(entity)
+    if primary_type:
+        create_chip(chip_row, primary_type).pack(side="left", padx=(0, 8))
+
+    create_chip(chip_row, category_label.upper()).pack(side="left", padx=(0, 8))
     for item in meta_items[:3]:
         # Process each item from meta_items[:3].
+        if primary_type and str(item).strip() == primary_type:
+            continue
         create_chip(chip_row, item).pack(side="left", padx=(0, 8))
 
     create_highlight_card(
