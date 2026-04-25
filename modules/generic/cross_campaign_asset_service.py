@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from modules.audio.entity_audio import normalize_audio_reference
+from modules.generic.cross_campaign_bundle_extras import collect_full_campaign_extra_files
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
@@ -616,6 +617,19 @@ def export_bundle(
 
     _call_progress(progress_callback, "Collecting records...", 0.05)
 
+    if include_database and not source_campaign.db_path.exists():
+        raise FileNotFoundError(source_campaign.db_path)
+
+    selected_for_bundle = {entity: list(records) for entity, records in selected_records.items()}
+    if include_database and "image_assets" not in selected_for_bundle:
+        try:
+            selected_for_bundle["image_assets"] = load_entities("image_assets", source_campaign.db_path)
+        except Exception as exc:
+            log_warning(
+                f"Unable to include image library records for full campaign export: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service.export_bundle",
+            )
+
     data_dir = Path(tempfile.mkdtemp(prefix="asset_export_"))
     temp_root = Path(data_dir)
     manifest: dict = {
@@ -638,7 +652,7 @@ def export_bundle(
     try:
         # Keep bundle resilient if this step fails.
         (temp_root / "data").mkdir(parents=True, exist_ok=True)
-        for entity_type, records in selected_records.items():
+        for entity_type, records in selected_for_bundle.items():
             # Process each (entity_type, records) from selected_records.items().
             if not records:
                 continue
@@ -678,6 +692,29 @@ def export_bundle(
 
             if entity_type == "maps":
                 bundled_world_maps.update(_collect_world_map_entries(records, source_campaign.root))
+
+        if include_database:
+            extra_files = collect_full_campaign_extra_files(source_campaign.root)
+            if extra_files:
+                manifest["extra_files"] = []
+            for absolute_path, relative_path in extra_files:
+                bundle_path = Path("extras") / Path(relative_path)
+                bundle_abs = temp_root / bundle_path
+                bundle_abs.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    shutil.copy2(absolute_path, bundle_abs)
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to bundle extra campaign file {absolute_path}: {exc}",
+                        func_name="modules.generic.cross_campaign_asset_service.export_bundle",
+                    )
+                    continue
+                manifest["extra_files"].append(
+                    {
+                        "relative_path": relative_path,
+                        "bundle_path": bundle_path.as_posix(),
+                    }
+                )
 
         if include_systems:
             # Continue with this path when include systems is set.
@@ -1201,7 +1238,8 @@ def install_full_campaign_bundle(
         shutil.copy2(db_source, db_destination)
 
         assets = manifest.get("assets") or []
-        total_steps = max(len(assets) + 1, 1)
+        extra_files = manifest.get("extra_files") or []
+        total_steps = max(len(assets) + len(extra_files) + 1, 1)
         _call_progress(progress_callback, "Copying database", 1 / total_steps)
 
         target_root = target_dir.resolve()
@@ -1239,6 +1277,41 @@ def install_full_campaign_bundle(
                 progress_callback,
                 f"Copying assets ({index}/{len(assets)})",
                 min((index + 1) / total_steps, 1.0),
+            )
+
+        extra_offset = len(assets)
+        for index, extra_entry in enumerate(extra_files, start=1):
+            bundle_rel = str(extra_entry.get("bundle_path") or "").strip()
+            relative_path = str(extra_entry.get("relative_path") or "").replace("\\", "/").strip()
+            if not bundle_rel or not relative_path:
+                continue
+            source_extra = (temp_dir / bundle_rel).resolve()
+            if not source_extra.exists():
+                log_warning(
+                    f"Missing extra file in bundle: {bundle_rel}",
+                    func_name="modules.generic.cross_campaign_asset_service.install_full_campaign_bundle",
+                )
+                continue
+            destination = (target_root / relative_path).resolve()
+            if not str(destination).startswith(str(target_root)):
+                log_warning(
+                    f"Skipping extra file with unsafe destination path: {relative_path}",
+                    func_name="modules.generic.cross_campaign_asset_service.install_full_campaign_bundle",
+                )
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(source_extra, destination)
+            except Exception as exc:
+                log_warning(
+                    f"Failed to copy extra file {source_extra}: {exc}",
+                    func_name="modules.generic.cross_campaign_asset_service.install_full_campaign_bundle",
+                )
+                continue
+            _call_progress(
+                progress_callback,
+                f"Copying extra files ({index}/{len(extra_files)})",
+                min((extra_offset + index + 1) / total_steps, 1.0),
             )
 
         campaign_name = str(manifest.get("source_campaign", {}).get("name") or target_dir.name)

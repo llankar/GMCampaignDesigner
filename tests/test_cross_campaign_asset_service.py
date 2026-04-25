@@ -2,6 +2,7 @@
 
 import sys
 import types
+import sqlite3
 
 import pytest
 
@@ -23,6 +24,7 @@ from modules.generic.cross_campaign_asset_service import (
     _rewrite_record_paths,
     collect_assets,
     export_bundle,
+    install_full_campaign_bundle,
 )
 
 
@@ -88,3 +90,51 @@ def test_rewrite_record_paths_updates_image_library_fields(tmp_path):
     assert updated["RelativePath"] == replacement
     assert updated["Path"] == str((target_campaign_root / replacement).resolve())
     assert updated["SourceRoot"] == str(target_campaign_root)
+
+
+def test_export_bundle_full_campaign_includes_image_assets_even_without_selection(tmp_path, monkeypatch):
+    """Full campaign exports should still include image library records/assets."""
+    campaign_root = tmp_path / "source_campaign"
+    campaign_root.mkdir(parents=True, exist_ok=True)
+    db_path = campaign_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    image_file = campaign_root / "assets" / "image_library" / "tiles" / "forest.png"
+    image_file.parent.mkdir(parents=True, exist_ok=True)
+    image_file.write_bytes(b"forest-bytes")
+
+    source_campaign = CampaignDatabase(name="Source", root=campaign_root, db_path=db_path)
+    destination = tmp_path / "bundle.zip"
+
+    def fake_load_entities(entity_type, _db_path):
+        if entity_type == "image_assets":
+            return [{"Name": "Forest Tile", "RelativePath": "assets/image_library/tiles/forest.png"}]
+        return []
+
+    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+
+    manifest = export_bundle(destination, source_campaign, selected_records={}, include_database=True)
+
+    assert manifest["entities"]["image_assets"]["count"] == 1
+    assert any(asset.get("asset_type") == "image_library" for asset in manifest["assets"])
+
+
+def test_install_full_campaign_bundle_restores_random_tables_files(tmp_path):
+    """Installing a full campaign bundle should restore random table JSON files."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    random_tables_file = source_root / "static" / "data" / "random_tables" / "encounters.json"
+    random_tables_file.parent.mkdir(parents=True, exist_ok=True)
+    random_tables_file.write_text('{"categories": []}', encoding="utf-8")
+
+    source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
+    bundle_path = tmp_path / "full_bundle.zip"
+    export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
+
+    target_root = tmp_path / "installed_campaign"
+    installed = install_full_campaign_bundle(bundle_path, target_root)
+
+    restored_random_table = installed.root / "static" / "data" / "random_tables" / "encounters.json"
+    assert restored_random_table.exists()
+    assert restored_random_table.read_text(encoding="utf-8") == '{"categories": []}'
