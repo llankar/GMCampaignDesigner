@@ -2346,6 +2346,21 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         meta_items.append(f"🎵 {_audio_display_name(audio_value)}")
 
     highlight_lines = _collect_highlight_lines(entity_type, entity)
+    summary_candidates = (
+        "Description",
+        "Summary",
+        "Synopsis",
+        "Overview",
+        "Background",
+        "Notes",
+    )
+    synopsis_text = ""
+    for summary_field in summary_candidates:
+        # Process each summary_field from summary_candidates.
+        formatted_summary = format_multiline_text(entity.get(summary_field, ""))
+        if formatted_summary:
+            synopsis_text = formatted_summary
+            break
 
     spotlight_primary = entity_type in SPOTLIGHT_PRIMARY_ENTITY_TYPES
     shell, main_column, side_column = create_detail_split_layout(
@@ -2366,6 +2381,49 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         accent_lines=spotlight_accent_lines,
         prominent=spotlight_primary,
     )
+
+    synopsis_card, synopsis_body = create_section_card(
+        side_column,
+        "Synopsis",
+        "Narrative context pulled from the best available summary field.",
+        compact=True,
+    )
+    synopsis_card.pack(fill="x", pady=(0, 14))
+    if synopsis_text:
+        synopsis_line_count = synopsis_text.count("\n") + 1
+        use_textbox = len(synopsis_text) > 420 or synopsis_line_count > 7
+        if use_textbox:
+            synopsis_widget = CTkTextbox(
+                synopsis_body,
+                height=140,
+                wrap="word",
+                activate_scrollbars=False,
+                **get_textbox_style(),
+            )
+            synopsis_widget.pack(fill="x")
+            synopsis_widget.configure(text_color=palette["muted_text"])
+            synopsis_widget.insert("1.0", synopsis_text)
+            synopsis_widget.configure(state="disabled")
+        else:
+            synopsis_widget = ctk.CTkLabel(
+                synopsis_body,
+                text=synopsis_text,
+                justify="left",
+                anchor="w",
+                wraplength=360,
+                text_color=palette["muted_text"],
+                font=ctk.CTkFont(size=13),
+            )
+            synopsis_widget.pack(fill="x", anchor="w")
+    else:
+        ctk.CTkLabel(
+            synopsis_body,
+            text="No synopsis yet.",
+            justify="left",
+            anchor="w",
+            text_color=palette["muted_text"],
+            font=ctk.CTkFont(size=13),
+        ).pack(anchor="w")
 
     compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
     compact_header.pack(fill="x", pady=(0, 14))
