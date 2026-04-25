@@ -2407,45 +2407,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             continue
         render_fields.append(field)
 
-    if summary:
-        # Continue with this path when summary is set.
-        summary_card, summary_body = create_section_card(
-            column_left,
-            "Overview",
-            "A quick read built for widescreen GM screens and pop-out windows.",
-        )
-        summary_card.pack(fill="x", padx=10, pady=(0, 12))
-        summary_label = CTkLabel(
-            summary_body,
-            text=summary,
-            font=ctk.CTkFont(size=14),
-            text_color=palette["text"],
-            wraplength=540,
-            justify="left",
-        )
-        summary_label.pack(fill="x", anchor="w")
-        render_fields = [field for field in render_fields if field["name"] not in {"Description", "Summary"}]
-
-        def _update_summary_wrap(_event=None):
-            """Update summary wrap."""
-            try:
-                summary_label.configure(wraplength=max(280, column_left.winfo_width() - 70))
-            except Exception:
-                pass
-
-        summary_wrap_scheduler = LayoutSettleScheduler(column_left)
-        summary_wrap_scheduler.bind_configure(
-            column_left,
-            "summary-wraplength",
-            _update_summary_wrap,
-            when=lambda: column_left.winfo_width() > 1,
-        )
-        summary_wrap_scheduler.schedule(
-            "summary-wraplength",
-            _update_summary_wrap,
-            when=lambda: column_left.winfo_width() > 1,
-        )
-
     _populate_generic_columns([column_left, column_right], render_fields, entity, open_entity_callback)
 
     if entity_type in {"Scenarios", "Places", "Bases", "NPCs", "Villains", "Informations"}:
