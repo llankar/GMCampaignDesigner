@@ -2374,6 +2374,7 @@ def create_entity_detail_frame(
     shell, main_column, side_column = create_detail_split_layout(
         content_frame,
         spotlight_primary=spotlight_primary,
+        single_column=spotlight_only,
     )
     shell.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
@@ -2391,11 +2392,6 @@ def create_entity_detail_frame(
     )
 
     if spotlight_only:
-        try:
-            main_column.grid_forget()
-            side_column.master.grid_configure(row=0, column=0, columnspan=2, sticky="nsew")
-        except Exception:
-            pass
         return content_frame
 
     compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
