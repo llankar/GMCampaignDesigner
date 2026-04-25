@@ -629,6 +629,16 @@ def export_bundle(
                 f"Unable to include image library records for full campaign export: {exc}",
                 func_name="modules.generic.cross_campaign_asset_service.export_bundle",
             )
+    if include_database and "maps" not in selected_for_bundle:
+        # Full-campaign exports should always include map records so fog-mask
+        # files and token/marker media can be discovered and bundled.
+        try:
+            selected_for_bundle["maps"] = load_entities("maps", source_campaign.db_path)
+        except Exception as exc:
+            log_warning(
+                f"Unable to include map records for full campaign export: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service.export_bundle",
+            )
 
     data_dir = Path(tempfile.mkdtemp(prefix="asset_export_"))
     temp_root = Path(data_dir)
