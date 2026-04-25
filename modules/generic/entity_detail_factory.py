@@ -2382,8 +2382,34 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         prominent=spotlight_primary,
     )
 
+    compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
+    compact_header.pack(fill="x", pady=(0, 14))
+    compact_title = ctk.CTkLabel(
+        compact_header,
+        text=f"{entity_label} · {category_label}",
+        font=ctk.CTkFont(size=17, weight="bold"),
+        text_color=palette["text"],
+        anchor="w",
+        justify="left",
+    )
+    compact_title.pack(fill="x", anchor="w")
+
+    chip_row = ctk.CTkFrame(compact_header, fg_color="transparent")
+    chip_row.pack(fill="x", pady=(8, 0))
+    create_chip(chip_row, str(entity_label), accent=True).pack(side="left", padx=(0, 8))
+
+    if primary_type:
+        create_chip(chip_row, primary_type).pack(side="left", padx=(0, 8))
+
+    create_chip(chip_row, category_label.upper()).pack(side="left", padx=(0, 8))
+    for item in meta_items[:3]:
+        # Process each item from meta_items[:3].
+        if primary_type and str(item).strip() == primary_type:
+            continue
+        create_chip(chip_row, item).pack(side="left", padx=(0, 8))
+
     synopsis_card, synopsis_body = create_section_card(
-        side_column,
+        main_column,
         "Synopsis",
         "Narrative context pulled from the best available summary field.",
         compact=True,
@@ -2410,7 +2436,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
                 text=synopsis_text,
                 justify="left",
                 anchor="w",
-                wraplength=360,
+                wraplength=720,
                 text_color=palette["muted_text"],
                 font=ctk.CTkFont(size=13),
             )
@@ -2424,32 +2450,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             text_color=palette["muted_text"],
             font=ctk.CTkFont(size=13),
         ).pack(anchor="w")
-
-    compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
-    compact_header.pack(fill="x", pady=(0, 14))
-    compact_title = ctk.CTkLabel(
-        compact_header,
-        text=f"{entity_label} · {category_label}",
-        font=ctk.CTkFont(size=17, weight="bold"),
-        text_color=palette["text"],
-        anchor="w",
-        justify="left",
-    )
-    compact_title.pack(fill="x", anchor="w")
-
-    chip_row = ctk.CTkFrame(compact_header, fg_color="transparent")
-    chip_row.pack(fill="x", pady=(8, 0))
-    create_chip(chip_row, str(entity_label), accent=True).pack(side="left", padx=(0, 8))
-
-    if primary_type:
-        create_chip(chip_row, primary_type).pack(side="left", padx=(0, 8))
-
-    create_chip(chip_row, category_label.upper()).pack(side="left", padx=(0, 8))
-    for item in meta_items[:3]:
-        # Process each item from meta_items[:3].
-        if primary_type and str(item).strip() == primary_type:
-            continue
-        create_chip(chip_row, item).pack(side="left", padx=(0, 8))
 
     create_highlight_card(
         side_column,
