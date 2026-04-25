@@ -2417,6 +2417,8 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         field_type = field["type"]
         if field_name in {"Portrait", "Name", "Title"}:
             continue
+        if field_name == "Type" and primary_type:
+            continue
         if field_type == "list" and not field.get("linked_type"):
             continue
         render_fields.append(field)
