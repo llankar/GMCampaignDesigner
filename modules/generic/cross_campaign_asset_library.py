@@ -434,7 +434,10 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             messagebox.showinfo("No Selection", "Select at least one asset to export.")
             return
 
-        options_dialog = CheckboxDialog(
+        include_systems = True
+        include_random_tables = False
+
+        systems_dialog = CheckboxDialog(
             self,
             title="Export Options",
             message="Choose optional content to include in this export bundle:",
@@ -443,10 +446,24 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             confirm_label="Continue",
             cancel_label="Cancel",
         )
-        self.wait_window(options_dialog)
-        if options_dialog.result is None:
+        self.wait_window(systems_dialog)
+        if systems_dialog.result is None:
             return
-        include_systems = options_dialog.result
+        include_systems = systems_dialog.result
+
+        random_tables_dialog = CheckboxDialog(
+            self,
+            title="Export Options",
+            message="Do you want to include random tables files in this bundle?",
+            checkbox_label="Include random tables",
+            default=False,
+            confirm_label="Continue",
+            cancel_label="Cancel",
+        )
+        self.wait_window(random_tables_dialog)
+        if random_tables_dialog.result is None:
+            return
+        include_random_tables = random_tables_dialog.result
 
         default_name = f"asset_bundle_{self.selected_campaign.name.replace(' ', '_')}.zip"
         destination = filedialog.asksaveasfilename(
@@ -466,6 +483,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 selections,
                 include_database=False,
                 include_systems=include_systems,
+                include_random_tables=include_random_tables,
                 progress_callback=callback,
             )
 
@@ -533,11 +551,29 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         if description is None:
             return
         description = description.strip()
+
+        include_random_tables = False
+        if not publishing_full_campaign:
+            random_tables_dialog = CheckboxDialog(
+                self,
+                title="Publish Options",
+                message="Do you want to include random tables files from this campaign?",
+                checkbox_label="Include random tables",
+                default=False,
+                confirm_label="Continue",
+                cancel_label="Cancel",
+            )
+            self.wait_window(random_tables_dialog)
+            if random_tables_dialog.result is None:
+                return
+            include_random_tables = bool(random_tables_dialog.result)
+
         self._publish_bundle_to_github(
             selections=selections,
             title=title,
             description=description,
             include_database=publishing_full_campaign,
+            include_random_tables=include_random_tables,
         )
 
     def publish_image_library_to_github(self):
@@ -589,6 +625,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             title=title,
             description=description,
             include_database=False,
+            include_random_tables=False,
             progress_title="Publishing Image Library",
         )
 
@@ -599,6 +636,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         title: str,
         description: str,
         include_database: bool = False,
+        include_random_tables: bool = False,
         progress_title: str = "Publishing Bundle",
     ) -> None:
         """Internal helper for publishing a bundle to GitHub."""
@@ -621,6 +659,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                     selections,
                     include_database=include_database,
                     include_systems=True,
+                    include_random_tables=include_random_tables,
                     progress_callback=callback,
                 )
                 return self.gallery_client.publish_bundle(
@@ -746,7 +785,9 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 f"Assets skipped: {summary.get('skipped', 0)}\n"
                 f"Systems imported: {summary.get('systems_imported', 0)}\n"
                 f"Systems updated: {summary.get('systems_updated', 0)}\n"
-                f"Systems skipped: {summary.get('systems_skipped', 0)}"
+                f"Systems skipped: {summary.get('systems_skipped', 0)}\n"
+                f"Extra files imported: {summary.get('extra_files_imported', 0)}\n"
+                f"Extra files skipped: {summary.get('extra_files_skipped', 0)}"
             ),
         )
 
