@@ -67,7 +67,6 @@ log_module_import(__name__)
 
 # Configure portrait size.
 PORTRAIT_SIZE = (320, 420)
-HERO_PORTRAIT_SIZE = (280, 240)
 DEFAULT_PORTRAIT_PLACEMENT = "spotlight"
 _open_entity_windows = {}
 
@@ -2287,24 +2286,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
             content_frame.portrait_images[str(entity_label)] = portrait_widget.image
         return portrait_widget
 
-    def _make_hero_portrait(parent):
-        """Internal helper for make hero portrait."""
-        portrait_widget, portrait_path = _build_portrait_widget(
-            parent,
-            entity_type,
-            entity,
-            size=HERO_PORTRAIT_SIZE,
-        )
-        _portrait_debug(
-            entity_type,
-            entity,
-            f"hero result widget_created={portrait_widget is not None}, source={portrait_path!r}",
-        )
-        if portrait_widget is not None:
-            content_frame.portrait_images[f"{entity_label}-hero"] = portrait_widget.image
-            content_frame.portrait_label = portrait_widget
-        return portrait_widget
-
     _portrait_debug(
         entity_type,
         entity,
@@ -2326,23 +2307,12 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     if audio_value:
         meta_items.append(f"🎵 {_audio_display_name(audio_value)}")
 
-    summary_candidates = [entity.get(key) for key in ("Description", "Summary", "Role", "Secret", "Subject", "Location")]
-    summary = next((format_multiline_text(value, max_length=260) for value in summary_candidates if str(value or "").strip()), "")
     highlight_lines = _collect_highlight_lines(entity_type, entity)
-
-    hero = create_hero_header(
-        content_frame,
-        title=str(entity_label),
-        category=entity_type[:-1] if entity_type.endswith("s") else entity_type,
-        summary=summary,
-        meta_items=meta_items,
-        portrait_builder=_make_hero_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"hero", "both"} else None,
-    )
-    hero.pack(fill="x", padx=10, pady=(0, 16))
 
     shell, main_column, side_column = create_detail_split_layout(content_frame)
     shell.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
+    category_label = entity_type[:-1] if entity_type.endswith("s") else entity_type
     create_spotlight_panel(
         side_column,
         title=str(entity_label),
@@ -2351,6 +2321,25 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         fallback_text=_spotlight_fallback(entity_type),
         accent_lines=highlight_lines[:3],
     )
+
+    compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
+    compact_header.pack(fill="x", pady=(0, 14))
+    compact_title = ctk.CTkLabel(
+        compact_header,
+        text=f"{entity_label} · {category_label}",
+        font=ctk.CTkFont(size=17, weight="bold"),
+        text_color=palette["text"],
+        anchor="w",
+        justify="left",
+    )
+    compact_title.pack(fill="x", anchor="w")
+
+    chip_row = ctk.CTkFrame(compact_header, fg_color="transparent")
+    chip_row.pack(fill="x", pady=(8, 0))
+    create_chip(chip_row, category_label.upper(), accent=True).pack(side="left", padx=(0, 8))
+    for item in meta_items[:3]:
+        # Process each item from meta_items[:3].
+        create_chip(chip_row, item).pack(side="left", padx=(0, 8))
 
     create_highlight_card(
         side_column,
