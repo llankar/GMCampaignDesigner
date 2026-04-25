@@ -2321,7 +2321,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     create_spotlight_panel(
         side_column,
         title=str(entity_label),
-        subtitle="Click the portrait to open it full size." if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else "Give this entry a signature visual to own the right rail.",
         portrait_builder=_make_spotlight_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else None,
         fallback_text=_spotlight_fallback(entity_type),
         accent_lines=highlight_lines[:3],
