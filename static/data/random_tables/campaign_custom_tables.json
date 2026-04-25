@@ -89,7 +89,176 @@
           "category": "Complications"
         }
       ]
+    },
+    {
+      "id": "Scavenging",
+      "name": "Scavenging",
+      "tables": [
+        {
+          "id": "Sewers_Scavenging",
+          "title": "Sewers Scavenging",
+          "dice": "2d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 3,
+              "result": "Utility - Overalls",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 5,
+              "result": "Combat - Shotgun and Shotgun Shells (6+3CD)",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 7,
+              "result": "Syringer - Ammo (4+2CD)",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 9,
+              "result": "Sugar - Bombs (irradiated)",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 11,
+              "result": "3+5CD - Uncommon Materials",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 13,
+              "result": "Dirty - Water",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 15,
+              "result": "Key",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 17,
+              "result": "1CD - bottles of Nuka-Cola",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 19,
+              "result": "Lead - Pipe",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 21,
+              "result": "5+5CD - Common Materials",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 23,
+              "result": "Geiger - Counter",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 25,
+              "result": "Stimpak",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 27,
+              "result": "Berry - Mentats",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 29,
+              "result": "Flamer - Fuel (12+6CD)",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 30,
+              "result": "Church - of Atom Propaganda Pamphlet (“When the River Glows Green”)",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 31,
+              "result": "A - radio that only picks up one station (a man reading from The New Testament of The Last Son)",
+              "tags": []
+            },
+            {
+              "min": 32,
+              "max": 32,
+              "result": "A - handmade holy symbol of the Last Son (matching Brother Landon – The Train Job)",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 33,
+              "result": "Pristine - white robes with a green sun embroidered on the breast",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 34,
+              "result": "1+2CD - Signal Flares",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "2CD - Rad-Away",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 36,
+              "result": "Rad-X",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "Defaced - Church of Atom Propaganda Pamphlet (“Catch A Shining Star and Put It In Your Pocket”)",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 38,
+              "result": "1+5CD - Rare Materials",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 39,
+              "result": "Fusion - Cell (14+7CD)",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "Psycho",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "",
+          "category": "Scavenging"
+        }
+      ]
     }
   ],
-  "biome": "All"
+  "biome": "All",
+  "system": "Fallout"
 }
