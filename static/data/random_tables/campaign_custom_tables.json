@@ -93,6 +93,7 @@
     {
       "id": "Scavenging",
       "name": "Scavenging",
+	  
       "tables": [
         {
           "id": "Sewers_Scavenging",
@@ -255,8 +256,1934 @@
           "system": "Fallout",
           "biome": "",
           "category": "Scavenging"
+        },
+		   {
+          "id": "Fallout_Random_Ammunition",
+          "title": "Random Ammunition",
+          "dice": "2d20",
+          "description": "* Scavenger perk: only +1CD per rank additional Missiles. ** Scavenger perk: no additional Fusion Cores or Mini-Nukes.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 4,
+              "result": "2mm EC (6+3CD)",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 5,
+              "result": "Plasma Cartridge (10+5CD)",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 6,
+              "result": "Missile (2+1CD)*",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 7,
+              "result": "Fusion Core (1)**",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 9,
+              "result": "5mm (12+6CD ×10)",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 11,
+              "result": ".50 ammo (4+2CD)",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 13,
+              "result": "Syringer Ammo (4+2CD)",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 14,
+              "result": "Gamma Round (4+2CD)",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 16,
+              "result": "Flamer Fuel (12+6CD)",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 18,
+              "result": ".45 Rounds (9+4CD)",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 20,
+              "result": "10mm (8+4CD)",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 22,
+              "result": ".38 Ammo (10+5CD)",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 23,
+              "result": "Flare (2+1CD)",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 24,
+              "result": ".308 ammo (6+3CD)",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 26,
+              "result": "Shotgun Shells (6+3CD)",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 28,
+              "result": "Fusion Cell (14+7CD)",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 30,
+              "result": "Railway Spike (6+3CD)",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 32,
+              "result": ".44 Magnum (4+2CD)",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 34,
+              "result": "5.56mm (8+4CD)",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "Missile (2+1CD)*",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 36,
+              "result": "Fusion Core (1)**",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "Plasma Cartridge (10+5CD)",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 40,
+              "result": "Mini-Nuke (1+1CD)**",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Armor",
+          "title": "Random Armor",
+          "dice": "2d20",
+          "description": "Power Armor Frames do not come with a fusion core. Some armor pieces require a hit-location roll.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 4,
+              "result": "X-01 Power Armor Piece",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 6,
+              "result": "Power Armor Frame",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 8,
+              "result": "T-60 Power Armor Piece",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 10,
+              "result": "Heavy Dog Armor",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 11,
+              "result": "Sturdy Combat Armor",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 12,
+              "result": "Heavy Metal Armor",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 13,
+              "result": "Raider Power Armor Piece",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 14,
+              "result": "Medium Dog Armor",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 15,
+              "result": "Sturdy Metal Armor",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 16,
+              "result": "Heavy Raider Armor",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 17,
+              "result": "Vault-Tec Armor",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 18,
+              "result": "Sturdy Raider Armor",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "Leather Armor",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "Sturdy Raider Armor",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 21,
+              "result": "Raider Armor",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 22,
+              "result": "Sturdy Raider Armor",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 23,
+              "result": "Metal Armor",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 24,
+              "result": "Light Dog Armor",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 25,
+              "result": "Sturdy Leather Armor",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 26,
+              "result": "Combat Armor",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 27,
+              "result": "T-45 Power Armor Piece",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 28,
+              "result": "Heavy Leather Armor",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 29,
+              "result": "Synth Armor",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 30,
+              "result": "T-51 Power Armor Piece",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 32,
+              "result": "Heavy Combat Armor",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 34,
+              "result": "Sturdy Synth Armor",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "Sturdy Raider Armor",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 37,
+              "result": "Power Armor Frame",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 40,
+              "result": "Heavy Synth Armor",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Clothing",
+          "title": "Random Clothing",
+          "dice": "2d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 2,
+              "result": "Brotherhood of Steel Fatigues",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 3,
+              "result": "Welder’s Visor",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 4,
+              "result": "Brotherhood Scribe’s Hat",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 5,
+              "result": "Brotherhood of Steel Hood",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 6,
+              "result": "Brotherhood Scribe’s Armor",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 7,
+              "result": "Brotherhood of Steel Uniform",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 8,
+              "result": "Hard Hat",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 9,
+              "result": "Army Helmet",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 11,
+              "result": "Lab Coat",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 13,
+              "result": "Engineer’s Armor",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 15,
+              "result": "Road Leathers",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 17,
+              "result": "Casual Clothing",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 19,
+              "result": "Hides",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 21,
+              "result": "Harness",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 23,
+              "result": "Sack Hood",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 25,
+              "result": "Military Fatigues",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 27,
+              "result": "Tough Clothing",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 29,
+              "result": "Heavy Coat",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 31,
+              "result": "Utility Overalls",
+              "tags": []
+            },
+            {
+              "min": 32,
+              "max": 32,
+              "result": "Casual Hat",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 33,
+              "result": "Hood or Cowl",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 34,
+              "result": "Vault Jumpsuit",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 36,
+              "result": "Formal Clothing",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "Formal Hat",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 38,
+              "result": "Gas Mask",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 39,
+              "result": "Cage Armor",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "Hazmat Suit",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Food",
+          "title": "Random Food",
+          "dice": "2d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 2,
+              "result": "Tarberry",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 3,
+              "result": "Perfectly Preserved Pie",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 4,
+              "result": "Melon (non-irradiated)",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 5,
+              "result": "Carrot (non-irradiated)",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 6,
+              "result": "Institute Food Packet",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 7,
+              "result": "Sugar Bombs (preserved)",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 8,
+              "result": "Mutfruit (non-irradiated)",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 9,
+              "result": "Fancy Lads Snack Cakes (preserved)",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 10,
+              "result": "Sweet Roll",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 11,
+              "result": "Razorgrain",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 12,
+              "result": "Iguana Bits",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 13,
+              "result": "Cram",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 14,
+              "result": "Squirrel Bits",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 15,
+              "result": "BlamCo Brand Mac and Cheese",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 16,
+              "result": "Sugar Bombs",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 17,
+              "result": "Potted Meat",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 18,
+              "result": "Pork ‘n’ Beans",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "InstaMash",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "Dandy Boy Apples",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 21,
+              "result": "Canned Dog Food",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 22,
+              "result": "Fancy Lads Snack Cakes",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 23,
+              "result": "Gum Drops",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 24,
+              "result": "Mutfruit",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 25,
+              "result": "Potato Crisps",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 26,
+              "result": "Salisbury Steak",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 27,
+              "result": "Yum-Yum Deviled Eggs",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 28,
+              "result": "Brain Fungus",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 29,
+              "result": "Corn",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 30,
+              "result": "Gourd",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 31,
+              "result": "Melon",
+              "tags": []
+            },
+            {
+              "min": 32,
+              "max": 32,
+              "result": "Silt Bean",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 33,
+              "result": "Tato",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 34,
+              "result": "InstaMash (preserved)",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "Salisbury Steak (preserved)",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 36,
+              "result": "Food Paste",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "Noodle Cup",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 38,
+              "result": "Corn (non-irradiated)",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 39,
+              "result": "BlamCo Brand Mac and Cheese (preserved)",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "Tarberry",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Foraging",
+          "title": "Foraging",
+          "dice": "1d20",
+          "description": "Used for gathering food from wild plants while in the wasteland.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 1,
+              "max": 1,
+              "result": "Brain Fungus",
+              "tags": []
+            },
+            {
+              "min": 2,
+              "max": 2,
+              "result": "Glowing Fungus",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 4,
+              "result": "Carrot",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 6,
+              "result": "Corn",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 8,
+              "result": "Gourd",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 10,
+              "result": "Melon",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 12,
+              "result": "Mutfruit",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 14,
+              "result": "Razorgrain",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 16,
+              "result": "Silt Bean",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 18,
+              "result": "Tato",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "Hubflower",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "Bloodleaf",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Beverages",
+          "title": "Random Beverages",
+          "dice": "2d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 3,
+              "result": "Wine",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 5,
+              "result": "Whiskey",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 8,
+              "result": "Nuka-Cherry",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 11,
+              "result": "Nuka-Cola",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 14,
+              "result": "Bourbon",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 15,
+              "result": "Blood Pack",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 18,
+              "result": "Beer",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 23,
+              "result": "Dirty Water",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 26,
+              "result": "Purified Water",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 27,
+              "result": "Blood Pack",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 30,
+              "result": "Brahmin Milk",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 33,
+              "result": "Rum",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 36,
+              "result": "Moonshine",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 38,
+              "result": "Vodka",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 40,
+              "result": "Wine",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Nuka_Cola_Machine",
+          "title": "Nuka-Cola Machine",
+          "dice": "1d20",
+          "description": "Roll twice when a Nuka-Cola machine is found while scavenging.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 1,
+              "max": 8,
+              "result": "Empty",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 12,
+              "result": "1+2CD glass bottles (junk; scavenge for 2 common materials each)",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 15,
+              "result": "1 Nuka-Cola",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 17,
+              "result": "2 Nuka-Cola",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 18,
+              "result": "1 Nuka-Cola, 1 Nuka-Cherry",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "2 Nuka-Cola, 1 Nuka-Cherry",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "1 Nuka-Cola Quantum",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Chems",
+          "title": "Random Chems",
+          "dice": "2d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 2,
+              "result": "Super Stimpak",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 3,
+              "result": "Calmex",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 4,
+              "result": "Day Tripper",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 5,
+              "result": "Addictol",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 7,
+              "result": "Stimpak",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 9,
+              "result": "RadAway",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 11,
+              "result": "Psycho",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 13,
+              "result": "Med-X",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 15,
+              "result": "Daddy-O",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 17,
+              "result": "Rad-X (diluted)",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 19,
+              "result": "Healing Salve",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 22,
+              "result": "Dirty Water",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 24,
+              "result": "Stimpak (diluted)",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 26,
+              "result": "RadAway (diluted)",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 28,
+              "result": "Buffout",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 30,
+              "result": "Jet",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 32,
+              "result": "Mentats",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 34,
+              "result": "Rad-X",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 36,
+              "result": "Stimpak",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "Antibiotics",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 38,
+              "result": "Overdrive",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 39,
+              "result": "Fury",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "X-Cell",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Ranged_Weapons",
+          "title": "Random Ranged Weapons",
+          "dice": "2d20",
+          "description": "Ranged weapons found come with a standard quantity of their ammunition.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 3,
+              "result": "Fat Man",
+              "tags": []
+            },
+            {
+              "min": 4,
+              "max": 5,
+              "result": "Missile Launcher",
+              "tags": []
+            },
+            {
+              "min": 6,
+              "max": 6,
+              "result": "Railway Rifle",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 7,
+              "result": "Junk Jet",
+              "tags": []
+            },
+            {
+              "min": 8,
+              "max": 8,
+              "result": "Flamer",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 9,
+              "result": "Plasma Pistol",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 10,
+              "result": "Laser Rifle",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 11,
+              "result": "Institute Laser Rifle (Long Barrel, Standard Stock)",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 12,
+              "result": "Syringer",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 13,
+              "result": "Hunting Rifle",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 14,
+              "result": "Assault Rifle",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 15,
+              "result": "Laser Musket",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 16,
+              "result": "Submachine Gun",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 17,
+              "result": "10mm Pistol",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 18,
+              "result": "Pipe Bolt Action",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "Auto Pipe Rifle",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "Pipe Rifle (Long Barrel, Standard Stock)",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 21,
+              "result": "Pipe Gun",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 22,
+              "result": "Auto Pipe Gun (Automatic Receiver)",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 23,
+              "result": "Pipe Revolver",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 24,
+              "result": "Pipe Bolt Action Rifle (Long Barrel, Standard Stock)",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 25,
+              "result": "10mm Auto Pistol (Automatic Receiver)",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 26,
+              "result": "Double-Barreled Shotgun",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 27,
+              "result": ".44 Pistol",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 28,
+              "result": "Combat Rifle",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 29,
+              "result": "Scoped Hunting Rifle (Long Barrel, Short Scope)",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 30,
+              "result": "Combat Shotgun",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 31,
+              "result": "Institute Laser Pistol",
+              "tags": []
+            },
+            {
+              "min": 32,
+              "max": 32,
+              "result": "Laser Pistol",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 33,
+              "result": "Minigun",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 34,
+              "result": "Plasma Rifle (Long Barrel, Standard Stock)",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "Gatling Laser",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 36,
+              "result": "Gauss Rifle",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 38,
+              "result": "Heavy Incinerator",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 40,
+              "result": "Gamma Gun",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Melee_Weapons",
+          "title": "Random Melee Weapons",
+          "dice": "2d20",
+          "description": "",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 2,
+              "result": "Deathclaw Gauntlet",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 4,
+              "result": "Shishkebab",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 6,
+              "result": "Sledgehammer",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 8,
+              "result": "Ripper",
+              "tags": []
+            },
+            {
+              "min": 9,
+              "max": 10,
+              "result": "Boxing Glove",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 12,
+              "result": "Baton",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 14,
+              "result": "Machete",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 16,
+              "result": "Walking Cane",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 18,
+              "result": "Pool Cue",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 20,
+              "result": "Switchblade",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 22,
+              "result": "Board",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 24,
+              "result": "Lead Pipe",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 26,
+              "result": "Rolling Pin",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 28,
+              "result": "Pipe Wrench",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 30,
+              "result": "Knuckles",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 32,
+              "result": "Tire Iron",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 34,
+              "result": "Sword",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 36,
+              "result": "Aluminum Baseball Bat",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 38,
+              "result": "Power Fist",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 40,
+              "result": "Super Sledge",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Thrown_Explosive_Weapons",
+          "title": "Random Thrown and Explosive Weapons",
+          "dice": "2d20",
+          "description": "Items are found in the listed quantity.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 2,
+              "result": "1 Nuka Grenade",
+              "tags": []
+            },
+            {
+              "min": 3,
+              "max": 4,
+              "result": "1 Pulse Mine",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 6,
+              "result": "1 Plasma Mine",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 9,
+              "result": "1 Bottlecap Mine",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 12,
+              "result": "2+1CD Frag Grenades",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 14,
+              "result": "2+1CD Molotov Cocktails",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 19,
+              "result": "2+1CD Javelins",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 22,
+              "result": "4+2CD Throwing Knives",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 27,
+              "result": "2+1CD Baseball Grenades",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 29,
+              "result": "2+1CD Molotov Cocktails",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 32,
+              "result": "2+1CD Tomahawks",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 35,
+              "result": "1 Frag Mine",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 37,
+              "result": "1 Plasma Grenade",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 39,
+              "result": "1 Pulse Grenade",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "1 Nuke Mine",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Random_Oddities_Valuables",
+          "title": "Random Oddities and Valuables",
+          "dice": "3d20",
+          "description": "This table uses 3d20 rather than 2d20.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 3,
+              "max": 4,
+              "result": "Regeneration Field",
+              "tags": []
+            },
+            {
+              "min": 5,
+              "max": 6,
+              "result": "Pre-War Money worth 5d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 7,
+              "max": 9,
+              "result": "5d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 10,
+              "max": 10,
+              "result": "Stealth Field",
+              "tags": []
+            },
+            {
+              "min": 11,
+              "max": 11,
+              "result": "Recon Sensors",
+              "tags": []
+            },
+            {
+              "min": 12,
+              "max": 12,
+              "result": "Diagnosis Mod",
+              "tags": []
+            },
+            {
+              "min": 13,
+              "max": 13,
+              "result": "Geiger Counter",
+              "tags": []
+            },
+            {
+              "min": 14,
+              "max": 14,
+              "result": "Doctor’s Bag",
+              "tags": []
+            },
+            {
+              "min": 15,
+              "max": 15,
+              "result": "Magazine (see p.172)",
+              "tags": []
+            },
+            {
+              "min": 16,
+              "max": 16,
+              "result": "Pre-War Money worth 4d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 17,
+              "max": 17,
+              "result": "4d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 18,
+              "max": 18,
+              "result": "Container",
+              "tags": []
+            },
+            {
+              "min": 19,
+              "max": 19,
+              "result": "Hazard Detection Mod",
+              "tags": []
+            },
+            {
+              "min": 20,
+              "max": 20,
+              "result": "Radio",
+              "tags": []
+            },
+            {
+              "min": 21,
+              "max": 21,
+              "result": "Lockpick Set",
+              "tags": []
+            },
+            {
+              "min": 22,
+              "max": 22,
+              "result": "Holotape Player",
+              "tags": []
+            },
+            {
+              "min": 23,
+              "max": 23,
+              "result": "Large Backpack",
+              "tags": []
+            },
+            {
+              "min": 24,
+              "max": 24,
+              "result": "Pre-War Money worth 3d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 25,
+              "max": 25,
+              "result": "3d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 26,
+              "max": 26,
+              "result": "Integral Boiler Mod",
+              "tags": []
+            },
+            {
+              "min": 27,
+              "max": 27,
+              "result": "1+2CD Signal Flares",
+              "tags": []
+            },
+            {
+              "min": 28,
+              "max": 28,
+              "result": "Pre-War Money worth 2d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 29,
+              "max": 29,
+              "result": "2d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 30,
+              "max": 30,
+              "result": "2+1CD Bobby Pins",
+              "tags": []
+            },
+            {
+              "min": 31,
+              "max": 31,
+              "result": "1d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 32,
+              "max": 32,
+              "result": "Pre-War Money worth 1d20 Caps",
+              "tags": []
+            },
+            {
+              "min": 33,
+              "max": 33,
+              "result": "4+2CD Bobby Pins",
+              "tags": []
+            },
+            {
+              "min": 34,
+              "max": 34,
+              "result": "Small Backpack",
+              "tags": []
+            },
+            {
+              "min": 35,
+              "max": 35,
+              "result": "Torch",
+              "tags": []
+            },
+            {
+              "min": 36,
+              "max": 36,
+              "result": "Note or Holotape",
+              "tags": []
+            },
+            {
+              "min": 37,
+              "max": 37,
+              "result": "6+3CD Bobby Pins",
+              "tags": []
+            },
+            {
+              "min": 38,
+              "max": 38,
+              "result": "Robot Repair Kit",
+              "tags": []
+            },
+            {
+              "min": 39,
+              "max": 39,
+              "result": "First Aid Kit",
+              "tags": []
+            },
+            {
+              "min": 40,
+              "max": 40,
+              "result": "Lantern",
+              "tags": []
+            },
+            {
+              "min": 41,
+              "max": 41,
+              "result": "Multi-Tool",
+              "tags": []
+            },
+            {
+              "min": 42,
+              "max": 42,
+              "result": "Hacking Module",
+              "tags": []
+            },
+            {
+              "min": 43,
+              "max": 43,
+              "result": "Lockpick Module",
+              "tags": []
+            },
+            {
+              "min": 44,
+              "max": 44,
+              "result": "Container, Locked",
+              "tags": []
+            },
+            {
+              "min": 45,
+              "max": 45,
+              "result": "8+4CD Bobby Pins",
+              "tags": []
+            },
+            {
+              "min": 46,
+              "max": 46,
+              "result": "Stealth Boy",
+              "tags": []
+            },
+            {
+              "min": 47,
+              "max": 47,
+              "result": "Deluxe Toolkit",
+              "tags": []
+            },
+            {
+              "min": 48,
+              "max": 48,
+              "result": "Flashlight",
+              "tags": []
+            },
+            {
+              "min": 49,
+              "max": 49,
+              "result": "Behavioral Analysis Mod",
+              "tags": []
+            },
+            {
+              "min": 50,
+              "max": 50,
+              "result": "Radiation Coils",
+              "tags": []
+            },
+            {
+              "min": 51,
+              "max": 51,
+              "result": "Sensor Array",
+              "tags": []
+            },
+            {
+              "min": 52,
+              "max": 54,
+              "result": "Key",
+              "tags": []
+            },
+            {
+              "min": 55,
+              "max": 57,
+              "result": "10+5CD Bobby Pins",
+              "tags": []
+            },
+            {
+              "min": 58,
+              "max": 59,
+              "result": "Stimpak Diffuser",
+              "tags": []
+            },
+            {
+              "min": 60,
+              "max": 60,
+              "result": "Tesla Coils",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
+        },
+        {
+          "id": "Fallout_Junk",
+          "title": "Junk",
+          "dice": "2d20",
+          "description": "When junk is found while scavenging, roll 2d20 for the quantity. Salvaging takes 10 minutes per item and an INT + Repair test difficulty 0; roll 1CD per junk item for common materials, +1CD per AP spent. Scrapper adds uncommon/rare materials as described in the survival rules.",
+          "tags": [],
+          "entries": [
+            {
+              "min": 2,
+              "max": 40,
+              "result": "Roll result = number of junk items found. Each junk item has Weight 2 and Value 2 caps; it may be salvaged for materials with an INT + Repair test.",
+              "tags": []
+            }
+          ],
+          "system": "Fallout",
+          "biome": "All",
+          "category": "Scavenging"
         }
-      ]
+       ]
     }
   ],
   "biome": "All",
