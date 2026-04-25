@@ -14,13 +14,15 @@ from .theme import create_chip, create_section_card, get_detail_palette
 LAYOUT_BREAKPOINT = 1180
 
 
-def create_detail_split_layout(parent, *, sidebar_width: int = 380):
+def create_detail_split_layout(parent, *, sidebar_width: int = 380, spotlight_primary: bool = False):
     """Build a 16:9-friendly content split with a main stage and a utility rail."""
 
     palette = get_detail_palette()
     shell = ctk.CTkFrame(parent, fg_color="transparent")
+    side_weight = 4 if spotlight_primary else 3
+    side_minsize = max(sidebar_width, 460 if spotlight_primary else 380)
     shell.grid_columnconfigure(0, weight=5)
-    shell.grid_columnconfigure(1, weight=3, minsize=sidebar_width)
+    shell.grid_columnconfigure(1, weight=side_weight, minsize=side_minsize)
     shell.grid_rowconfigure(0, weight=1)
 
     main_column = ctk.CTkFrame(shell, fg_color="transparent")
@@ -88,14 +90,19 @@ def create_spotlight_panel(
     portrait_builder=None,
     fallback_text: str = "No portrait linked yet.",
     accent_lines: Iterable[str] | None = None,
+    prominent: bool = False,
 ):
     """Create spotlight panel."""
     palette = get_detail_palette()
+    title_size = 20 if prominent else 18
+    portrait_height = 520 if prominent else 430
+    accent_border = palette["accent"] if prominent else palette["pill_border"]
+    accent_border_width = 2 if prominent else 1
     card = ctk.CTkFrame(
         parent,
         fg_color=palette["surface_overlay"],
-        border_width=1,
-        border_color=palette["pill_border"],
+        border_width=accent_border_width,
+        border_color=accent_border,
         corner_radius=22,
     )
     card.pack(fill="x", pady=(0, 14))
@@ -106,7 +113,7 @@ def create_spotlight_panel(
     ctk.CTkLabel(
         header,
         text=title,
-        font=ctk.CTkFont(size=18, weight="bold"),
+        font=ctk.CTkFont(size=title_size, weight="bold"),
         text_color=palette["text"],
         justify="left",
         wraplength=280,
@@ -127,7 +134,7 @@ def create_spotlight_panel(
         border_width=1,
         border_color=palette["muted_border"],
         corner_radius=20,
-        height=430,
+        height=portrait_height,
     )
     portrait_shell.pack(fill="x", padx=18, pady=(0, 16))
     portrait_shell.pack_propagate(False)
@@ -158,7 +165,7 @@ def create_spotlight_panel(
             text="Add art to turn this panel into a full-height character spotlight.",
             font=ctk.CTkFont(size=12),
             text_color=palette["muted_text"],
-            wraplength=240,
+            wraplength=260 if prominent else 240,
             justify="center",
         ).pack()
 
