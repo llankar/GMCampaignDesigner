@@ -69,6 +69,7 @@ log_module_import(__name__)
 PORTRAIT_SIZE = (320, 420)
 DEFAULT_PORTRAIT_PLACEMENT = "spotlight"
 _open_entity_windows = {}
+SPOTLIGHT_PRIMARY_ENTITY_TYPES = {"NPCs", "Villains", "Creatures", "Places"}
 
 
 def _portrait_debug(entity_type, entity, message):
@@ -2309,7 +2310,11 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
 
     highlight_lines = _collect_highlight_lines(entity_type, entity)
 
-    shell, main_column, side_column = create_detail_split_layout(content_frame)
+    spotlight_primary = entity_type in SPOTLIGHT_PRIMARY_ENTITY_TYPES
+    shell, main_column, side_column = create_detail_split_layout(
+        content_frame,
+        spotlight_primary=spotlight_primary,
+    )
     shell.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
     category_label = entity_type[:-1] if entity_type.endswith("s") else entity_type
@@ -2320,6 +2325,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         portrait_builder=_make_spotlight_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else None,
         fallback_text=_spotlight_fallback(entity_type),
         accent_lines=highlight_lines[:3],
+        prominent=spotlight_primary,
     )
 
     compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
