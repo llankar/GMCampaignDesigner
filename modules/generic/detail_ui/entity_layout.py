@@ -94,7 +94,6 @@ def create_spotlight_panel(
 ):
     """Create spotlight panel."""
     palette = get_detail_palette()
-    title_size = 20 if prominent else 18
     portrait_height = 520 if prominent else 430
     accent_border = palette["accent"] if prominent else palette["pill_border"]
     accent_border_width = 2 if prominent else 1
@@ -110,14 +109,6 @@ def create_spotlight_panel(
     header = ctk.CTkFrame(card, fg_color="transparent")
     header.pack(fill="x", padx=18, pady=(18, 10))
     create_chip(header, title, accent=True).pack(anchor="w")
-    ctk.CTkLabel(
-        header,
-        text=title,
-        font=ctk.CTkFont(size=title_size, weight="bold"),
-        text_color=palette["text"],
-        justify="left",
-        wraplength=280,
-    ).pack(anchor="w", pady=(12, 4))
     if subtitle:
         ctk.CTkLabel(
             header,
@@ -126,7 +117,7 @@ def create_spotlight_panel(
             text_color=palette["muted_text"],
             justify="left",
             wraplength=280,
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=(8, 0))
 
     portrait_shell = ctk.CTkFrame(
         card,
