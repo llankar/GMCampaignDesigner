@@ -2452,7 +2452,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         ).pack(anchor="w")
 
     create_highlight_card(
-        side_column,
+        main_column,
         "Highlights",
         highlight_lines,
         empty_state="Add signature fields like Role, Secret, Powers, or Motivation to surface a punchier overview.",
