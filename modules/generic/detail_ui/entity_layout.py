@@ -109,7 +109,7 @@ def create_spotlight_panel(
 
     header = ctk.CTkFrame(card, fg_color="transparent")
     header.pack(fill="x", padx=18, pady=(18, 10))
-    create_chip(header, "SPOTLIGHT", accent=True).pack(anchor="w")
+    create_chip(header, title, accent=True).pack(anchor="w")
     ctk.CTkLabel(
         header,
         text=title,
