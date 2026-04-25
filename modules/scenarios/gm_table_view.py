@@ -902,13 +902,14 @@ class GMTableView(ctk.CTkFrame):
         """Build an entity detail page."""
         entity_type = state.get("entity_type")
         entity_name = state.get("entity_name")
+        spotlight_only = bool(state.get("spotlight_only", False))
         item = self._load_entity_item(entity_type, entity_name)
         frame = create_entity_detail_frame(
             entity_type,
             item,
             master=host,
             open_entity_callback=self.open_entity_panel,
-            spotlight_only=True,
+            spotlight_only=spotlight_only,
         )
         frame.grid(row=0, column=0, sticky="nsew")
         return frame
