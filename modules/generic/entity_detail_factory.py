@@ -2237,7 +2237,14 @@ def EditWindow(self, item, template, model_wrapper, creation_mode=False, on_save
 
 
 @log_function
-def create_entity_detail_frame(entity_type, entity, master, open_entity_callback=None):
+def create_entity_detail_frame(
+    entity_type,
+    entity,
+    master,
+    open_entity_callback=None,
+    *,
+    spotlight_only: bool = False,
+):
     """
     Routes Scenarios through our custom header/body and
     everything else through the generic detail path.
@@ -2266,6 +2273,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
                 item,
                 parent,
                 open_entity_callback,
+                spotlight_only=spotlight_only,
             ),
         )
 
@@ -2381,6 +2389,14 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         accent_lines=spotlight_accent_lines,
         prominent=spotlight_primary,
     )
+
+    if spotlight_only:
+        try:
+            main_column.grid_forget()
+            side_column.master.grid_configure(row=0, column=0, columnspan=2, sticky="nsew")
+        except Exception:
+            pass
+        return content_frame
 
     compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
     compact_header.pack(fill="x", pady=(0, 14))

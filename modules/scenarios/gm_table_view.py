@@ -908,6 +908,7 @@ class GMTableView(ctk.CTkFrame):
             item,
             master=host,
             open_entity_callback=self.open_entity_panel,
+            spotlight_only=True,
         )
         frame.grid(row=0, column=0, sticky="nsew")
         return frame
