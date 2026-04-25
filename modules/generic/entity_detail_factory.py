@@ -292,6 +292,31 @@ def _resolve_primary_type_chip(entity: dict) -> str:
     return ""
 
 
+def _build_spotlight_accent_lines(highlight_lines, primary_type: str):
+    """Return spotlight accent lines without repeating the primary type chip."""
+    if not highlight_lines:
+        return []
+    normalized_primary = str(primary_type or "").strip().lower()
+    if not normalized_primary:
+        return highlight_lines[:3]
+
+    filtered_lines = []
+    for line in highlight_lines:
+        # Process each line from highlight_lines.
+        text = str(line or "").strip()
+        if not text:
+            continue
+        lowered = text.lower()
+        if lowered.startswith("type:"):
+            value = text.split(":", 1)[1].strip().lower() if ":" in text else ""
+            if value == normalized_primary:
+                continue
+        filtered_lines.append(text)
+        if len(filtered_lines) >= 3:
+            break
+    return filtered_lines
+
+
 def _build_portrait_widget(parent, entity_type, entity, *, size):
     """Build portrait widget."""
     portrait_sources = (
@@ -2330,12 +2355,15 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     shell.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
     category_label = entity_type[:-1] if entity_type.endswith("s") else entity_type
+    primary_type = _resolve_primary_type_chip(entity)
+    spotlight_accent_lines = _build_spotlight_accent_lines(highlight_lines, primary_type)
+
     create_spotlight_panel(
         side_column,
         title=str(entity_label),
         portrait_builder=_make_spotlight_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else None,
         fallback_text=_spotlight_fallback(entity_type),
-        accent_lines=highlight_lines[:3],
+        accent_lines=spotlight_accent_lines,
         prominent=spotlight_primary,
     )
 
@@ -2355,7 +2383,6 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
     chip_row.pack(fill="x", pady=(8, 0))
     create_chip(chip_row, str(entity_label), accent=True).pack(side="left", padx=(0, 8))
 
-    primary_type = _resolve_primary_type_chip(entity)
     if primary_type:
         create_chip(chip_row, primary_type).pack(side="left", padx=(0, 8))
 
