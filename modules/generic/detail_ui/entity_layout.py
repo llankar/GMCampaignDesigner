@@ -34,15 +34,24 @@ def _bind_wrap_to_parent_width(label, parent, *, horizontal_padding: int = 32, m
     label.after_idle(_refresh_wrap)
 
 
-def create_detail_split_layout(parent, *, sidebar_width: int = 380, spotlight_primary: bool = False):
+def create_detail_split_layout(
+    parent,
+    *,
+    sidebar_width: int = 380,
+    spotlight_primary: bool = False,
+    single_column: bool = False,
+):
     """Build a 16:9-friendly content split with a main stage and a utility rail."""
 
     palette = get_detail_palette()
     shell = ctk.CTkFrame(parent, fg_color="transparent")
     side_weight = 4 if spotlight_primary else 3
     side_minsize = max(sidebar_width, 460 if spotlight_primary else 380)
-    shell.grid_columnconfigure(0, weight=5)
-    shell.grid_columnconfigure(1, weight=side_weight, minsize=side_minsize)
+    if single_column:
+        shell.grid_columnconfigure(0, weight=1)
+    else:
+        shell.grid_columnconfigure(0, weight=5)
+        shell.grid_columnconfigure(1, weight=side_weight, minsize=side_minsize)
     shell.grid_rowconfigure(0, weight=1)
 
     main_column = ctk.CTkFrame(shell, fg_color="transparent")
@@ -55,10 +64,17 @@ def create_detail_split_layout(parent, *, sidebar_width: int = 380, spotlight_pr
         border_color=palette["muted_border"],
         corner_radius=24,
     )
-    side_column.grid(row=0, column=1, sticky="nsew")
+    if single_column:
+        side_column.grid(row=0, column=0, sticky="nsew")
+    else:
+        side_column.grid(row=0, column=1, sticky="nsew")
 
     side_inner = ctk.CTkFrame(side_column, fg_color="transparent")
     side_inner.pack(fill="both", expand=True, padx=18, pady=18)
+
+    if single_column:
+        main_column.grid_remove()
+        return shell, main_column, side_inner
 
     layout_scheduler = LayoutSettleScheduler(shell)
     layout_probe = {"width": None}
