@@ -14,6 +14,26 @@ from .theme import create_chip, create_section_card, get_detail_palette
 LAYOUT_BREAKPOINT = 1180
 
 
+def _bind_wrap_to_parent_width(label, parent, *, horizontal_padding: int = 32, min_wrap: int = 260) -> None:
+    """Keep a label wrap length aligned with the available parent width."""
+
+    def _refresh_wrap(_event=None):
+        """Internal helper for refresh wrap."""
+        try:
+            width = int(parent.winfo_width())
+        except Exception:
+            width = 0
+        wrap = max(min_wrap, width - horizontal_padding)
+        try:
+            if int(label.cget("wraplength")) != wrap:
+                label.configure(wraplength=wrap)
+        except Exception:
+            label.configure(wraplength=wrap)
+
+    parent.bind("<Configure>", _refresh_wrap, add="+")
+    label.after_idle(_refresh_wrap)
+
+
 def create_detail_split_layout(parent, *, sidebar_width: int = 380, spotlight_primary: bool = False):
     """Build a 16:9-friendly content split with a main stage and a utility rail."""
 
@@ -168,14 +188,16 @@ def create_spotlight_panel(
             # Process each line from accent_lines.
             if not str(line).strip():
                 continue
-            ctk.CTkLabel(
+            line_label = ctk.CTkLabel(
                 footer,
                 text=f"• {line}",
                 font=ctk.CTkFont(size=12),
                 text_color=palette["muted_text"],
                 justify="left",
                 wraplength=280,
-            ).pack(anchor="w", pady=(0, 4))
+            )
+            line_label.pack(anchor="w", fill="x", pady=(0, 4))
+            _bind_wrap_to_parent_width(line_label, footer, horizontal_padding=6, min_wrap=280)
 
     return card
 
@@ -197,23 +219,27 @@ def create_highlight_card(parent, title: str, lines: Iterable[str], *, empty_sta
         dot = ctk.CTkFrame(row, width=10, height=10, corner_radius=999, fg_color=palette["accent"])
         dot.pack(side="left", padx=(0, 10), pady=(5, 0))
         dot.pack_propagate(False)
-        ctk.CTkLabel(
+        line_label = ctk.CTkLabel(
             row,
             text=text,
             font=ctk.CTkFont(size=12),
             text_color=palette["text"],
             justify="left",
             wraplength=260,
-        ).pack(side="left", fill="x", expand=True)
+        )
+        line_label.pack(side="left", fill="x", expand=True)
+        _bind_wrap_to_parent_width(line_label, row, horizontal_padding=34, min_wrap=260)
     if not added:
-        ctk.CTkLabel(
+        empty_label = ctk.CTkLabel(
             body,
             text=empty_state,
             font=ctk.CTkFont(size=12),
             text_color=palette["muted_text"],
             justify="left",
             wraplength=260,
-        ).pack(anchor="w")
+        )
+        empty_label.pack(anchor="w", fill="x")
+        _bind_wrap_to_parent_width(empty_label, body, horizontal_padding=6, min_wrap=260)
     return card
 
 
