@@ -25,6 +25,8 @@ from modules.generic.cross_campaign_asset_service import (
     collect_assets,
     export_bundle,
     install_full_campaign_bundle,
+    analyze_bundle,
+    apply_import,
 )
 
 
@@ -181,3 +183,64 @@ def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_p
     assert restored_clue_links.read_text(encoding="utf-8") == '[{"source": "A", "target": "B"}]'
     assert restored_world_map_data.exists()
     assert restored_world_map_data.read_text(encoding="utf-8") == '{"maps": {"City": {"tokens": []}}}'
+
+
+def test_export_bundle_asset_mode_can_include_random_tables_files(tmp_path):
+    """Asset bundle exports can optionally include random-table files."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    random_tables_file = source_root / "static" / "data" / "random_tables" / "encounters.json"
+    random_tables_file.parent.mkdir(parents=True, exist_ok=True)
+    random_tables_file.write_text('{"categories": []}', encoding="utf-8")
+
+    source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
+    bundle_path = tmp_path / "asset_bundle.zip"
+    manifest = export_bundle(
+        bundle_path,
+        source_campaign,
+        selected_records={},
+        include_database=False,
+        include_random_tables=True,
+    )
+
+    extra_files = manifest.get("extra_files") or []
+    assert any(entry.get("relative_path") == "static/data/random_tables/encounters.json" for entry in extra_files)
+
+
+def test_apply_import_restores_extra_files_for_asset_bundle(tmp_path):
+    """Regular bundle imports should copy bundled extra files like random tables."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    random_tables_file = source_root / "static" / "data" / "random_tables" / "encounters.json"
+    random_tables_file.parent.mkdir(parents=True, exist_ok=True)
+    random_tables_file.write_text('{"categories": []}', encoding="utf-8")
+
+    source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
+    bundle_path = tmp_path / "asset_bundle.zip"
+    export_bundle(
+        bundle_path,
+        source_campaign,
+        selected_records={},
+        include_database=False,
+        include_random_tables=True,
+    )
+
+    target_root = tmp_path / "target"
+    target_root.mkdir(parents=True, exist_ok=True)
+    target_db = target_root / "campaign.db"
+    sqlite3.connect(target_db).close()
+    target_campaign = CampaignDatabase(name="Target", root=target_root, db_path=target_db)
+
+    analysis = analyze_bundle(bundle_path, target_campaign.db_path)
+    summary = apply_import(analysis, target_campaign, overwrite=True)
+
+    restored = target_root / "static" / "data" / "random_tables" / "encounters.json"
+    assert restored.exists()
+    assert restored.read_text(encoding="utf-8") == '{"categories": []}'
+    assert summary.get("extra_files_imported", 0) >= 1

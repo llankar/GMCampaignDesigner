@@ -609,6 +609,7 @@ def export_bundle(
     *,
     include_database: bool = False,
     include_systems: bool = True,
+    include_random_tables: bool = False,
     progress_callback=None,
 ) -> dict:
     """Export bundle."""
@@ -703,7 +704,7 @@ def export_bundle(
             if entity_type == "maps":
                 bundled_world_maps.update(_collect_world_map_entries(records, source_campaign.root))
 
-        if include_database:
+        if include_database or include_random_tables:
             extra_files = collect_full_campaign_extra_files(source_campaign.root)
             if extra_files:
                 manifest["extra_files"] = []
@@ -1141,6 +1142,49 @@ def apply_import(
                     summary["imported"] += 1
 
             save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+
+        imported_extra_files = 0
+        skipped_extra_files = 0
+        for extra_entry in analysis.manifest.get("extra_files") or []:
+            relative_path = str(extra_entry.get("relative_path") or "").replace("\\", "/").strip()
+            bundle_rel = str(extra_entry.get("bundle_path") or "").strip()
+            if not relative_path or not bundle_rel:
+                continue
+
+            source_extra = (assets_dir / bundle_rel).resolve()
+            if not source_extra.exists():
+                log_warning(
+                    f"Bundle extra file missing: {bundle_rel}",
+                    func_name="modules.generic.cross_campaign_asset_service.apply_import",
+                )
+                continue
+
+            destination = (target_campaign.root / relative_path).resolve()
+            if not str(destination).startswith(str(target_campaign.root.resolve())):
+                log_warning(
+                    f"Skipping extra file with unsafe destination path: {relative_path}",
+                    func_name="modules.generic.cross_campaign_asset_service.apply_import",
+                )
+                continue
+
+            if destination.exists() and not overwrite:
+                skipped_extra_files += 1
+                continue
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(source_extra, destination)
+                imported_extra_files += 1
+            except Exception as exc:
+                log_warning(
+                    f"Failed to copy extra file {source_extra}: {exc}",
+                    func_name="modules.generic.cross_campaign_asset_service.apply_import",
+                )
+
+        if imported_extra_files:
+            summary["extra_files_imported"] = imported_extra_files
+        if skipped_extra_files:
+            summary["extra_files_skipped"] = skipped_extra_files
 
         if analysis.systems:
             # Continue with this path when systems is set.
