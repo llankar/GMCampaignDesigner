@@ -2401,7 +2401,7 @@ def create_entity_detail_frame(entity_type, entity, master, open_entity_callback
         # Process each field from template['fields'].
         field_name = field["name"]
         field_type = field["type"]
-        if field_name == "Portrait":
+        if field_name in {"Portrait", "Name", "Title"}:
             continue
         if field_type == "list" and not field.get("linked_type"):
             continue
