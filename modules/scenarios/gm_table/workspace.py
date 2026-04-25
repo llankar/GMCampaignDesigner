@@ -132,6 +132,8 @@ def resolve_default_panel_size(kind: str, state: dict | None = None) -> tuple[in
         return 920, 680
     if entity_type in {"Informations", "Places", "Bases"}:
         return 760, 580
+    if entity_type == "Creatures":
+        return 680, 480
     return 680, 560
 
 
@@ -536,6 +538,9 @@ class GMTablePanel(ctk.CTkFrame):
         self.header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 0))
         self.header.grid_columnconfigure(0, weight=1)
 
+        normalized_kind = str(definition.kind or "").strip().lower()
+        self._show_eyebrow = normalized_kind not in {"", "entity"}
+
         self.eyebrow_label = ctk.CTkLabel(
             self.header,
             text=(definition.kind or "panel").replace("_", " ").title(),
@@ -543,6 +548,8 @@ class GMTablePanel(ctk.CTkFrame):
             font=ctk.CTkFont(size=11, weight="bold"),
         )
         self.eyebrow_label.grid(row=0, column=0, padx=(14, 8), pady=(10, 0), sticky="w")
+        if not self._show_eyebrow:
+            self.eyebrow_label.grid_remove()
 
         self.title_label = ctk.CTkLabel(
             self.header,
@@ -551,10 +558,13 @@ class GMTablePanel(ctk.CTkFrame):
             font=ctk.CTkFont(size=17, weight="bold"),
             anchor="w",
         )
-        self.title_label.grid(row=1, column=0, padx=14, pady=(0, 10), sticky="ew")
+        title_row = 1 if self._show_eyebrow else 0
+        title_pady = (0, 10) if self._show_eyebrow else (10, 10)
+        self.title_label.grid(row=title_row, column=0, padx=14, pady=title_pady, sticky="ew")
 
         self.controls = ctk.CTkFrame(self.header, fg_color="transparent")
-        self.controls.grid(row=0, column=1, rowspan=2, padx=(8, 10), pady=10, sticky="ne")
+        controls_rowspan = 2 if self._show_eyebrow else 1
+        self.controls.grid(row=0, column=1, rowspan=controls_rowspan, padx=(8, 10), pady=10, sticky="ne")
 
         self.minimize_button = ctk.CTkButton(
             self.controls,
@@ -646,7 +656,10 @@ class GMTablePanel(ctk.CTkFrame):
 
     def _install_drag_bindings(self) -> None:
         """Enable drag interactions from the header."""
-        for widget in (self.header, self.title_label, self.eyebrow_label):
+        drag_widgets = [self.header, self.title_label]
+        if self._show_eyebrow:
+            drag_widgets.append(self.eyebrow_label)
+        for widget in drag_widgets:
             widget.bind("<ButtonPress-1>", self._start_drag, add="+")
             widget.bind("<B1-Motion>", self._drag_to, add="+")
             widget.bind("<ButtonRelease-1>", self._stop_drag, add="+")
