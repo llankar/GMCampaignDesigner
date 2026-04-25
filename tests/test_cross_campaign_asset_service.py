@@ -138,3 +138,46 @@ def test_install_full_campaign_bundle_restores_random_tables_files(tmp_path):
     restored_random_table = installed.root / "static" / "data" / "random_tables" / "encounters.json"
     assert restored_random_table.exists()
     assert restored_random_table.read_text(encoding="utf-8") == '{"categories": []}'
+
+
+def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_path):
+    """Installing a full campaign bundle should restore maptools + GM table extra files."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    gm_layouts = source_root / "gm_layouts.json"
+    gm_layouts.write_text('{"layouts": {"Default": {"tabs": []}}}', encoding="utf-8")
+
+    clue_positions = source_root / "data" / "save" / "clue_positions.json"
+    clue_positions.parent.mkdir(parents=True, exist_ok=True)
+    clue_positions.write_text('{"Clue A": {"x": 10, "y": 20}}', encoding="utf-8")
+
+    clue_links = source_root / "data" / "save" / "clue_links.json"
+    clue_links.write_text('[{"source": "A", "target": "B"}]', encoding="utf-8")
+
+    world_map_data = source_root / "world_maps" / "world_map_data.json"
+    world_map_data.parent.mkdir(parents=True, exist_ok=True)
+    world_map_data.write_text('{"maps": {"City": {"tokens": []}}}', encoding="utf-8")
+
+    source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
+    bundle_path = tmp_path / "full_bundle.zip"
+    export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
+
+    target_root = tmp_path / "installed_campaign"
+    installed = install_full_campaign_bundle(bundle_path, target_root)
+
+    restored_gm_layouts = installed.root / "gm_layouts.json"
+    restored_clue_positions = installed.root / "data" / "save" / "clue_positions.json"
+    restored_clue_links = installed.root / "data" / "save" / "clue_links.json"
+    restored_world_map_data = installed.root / "world_maps" / "world_map_data.json"
+
+    assert restored_gm_layouts.exists()
+    assert restored_gm_layouts.read_text(encoding="utf-8") == '{"layouts": {"Default": {"tabs": []}}}'
+    assert restored_clue_positions.exists()
+    assert restored_clue_positions.read_text(encoding="utf-8") == '{"Clue A": {"x": 10, "y": 20}}'
+    assert restored_clue_links.exists()
+    assert restored_clue_links.read_text(encoding="utf-8") == '[{"source": "A", "target": "B"}]'
+    assert restored_world_map_data.exists()
+    assert restored_world_map_data.read_text(encoding="utf-8") == '{"maps": {"City": {"tokens": []}}}'
