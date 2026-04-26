@@ -10,7 +10,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.random_table_loader import RandomTableLoader
+from modules.helpers.random_table_loader import CAMPAIGN_CUSTOM_TABLES_FILE, RandomTableLoader
 from modules.helpers.logging_helper import log_exception, log_module_import
 from modules.scenarios.dialogs.random_table_import_dialog import RandomTableImportDialog
 from modules.scenarios.random_tables_panel import RandomTablesPanel
@@ -318,27 +318,25 @@ class RandomTableEditorDialog(ctk.CTkToplevel):
 
     def _resolve_base_path(self) -> str:
         """Resolve base path."""
-        base_path = RandomTableLoader.default_data_path()
-        campaign_dir = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables")
-        campaign_file = os.path.join(ConfigHelper.get_campaign_dir(), "static", "data", "random_tables.json")
-
-        if os.path.isdir(campaign_dir):
-            base_path = campaign_dir
-        elif os.path.exists(campaign_file):
-            base_path = campaign_file
-
-        return base_path
+        return RandomTableLoader.default_data_path()
 
     def _resolve_target_file(self, base_path: str, source_path: Optional[str]) -> str:
         """Resolve target file."""
+        campaign_custom_path = os.path.join(ConfigHelper.get_campaign_dir(), CAMPAIGN_CUSTOM_TABLES_FILE)
+
         if source_path and os.path.exists(source_path):
+            normalized_source = os.path.abspath(source_path)
+            normalized_campaign_custom = os.path.abspath(campaign_custom_path)
+            if normalized_source == normalized_campaign_custom:
+                os.makedirs(os.path.dirname(source_path) or ".", exist_ok=True)
+                return source_path
             os.makedirs(os.path.dirname(source_path) or ".", exist_ok=True)
-            return source_path
+            return campaign_custom_path
         if os.path.isdir(base_path):
-            os.makedirs(base_path, exist_ok=True)
-            return os.path.join(base_path, "campaign_custom_tables.json")
-        os.makedirs(os.path.dirname(base_path) or ".", exist_ok=True)
-        return base_path
+            os.makedirs(os.path.dirname(campaign_custom_path) or ".", exist_ok=True)
+            return campaign_custom_path
+        os.makedirs(os.path.dirname(campaign_custom_path) or ".", exist_ok=True)
+        return campaign_custom_path
 
     def _load_existing_tables(self, target_file: str) -> dict:
         """Load existing tables."""
