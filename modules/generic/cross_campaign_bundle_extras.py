@@ -8,6 +8,7 @@ from typing import List, Tuple
 
 _RANDOM_TABLE_FILE = Path("static/data/random_tables.json")
 _RANDOM_TABLE_DIR = Path("static/data/random_tables")
+_CAMPAIGN_CUSTOM_RANDOM_TABLE_FILE = Path("campaign_custom_tables.json")
 _INTERNAL_RANDOM_TABLE_CUSTOM_FILE = Path("_internal/static/data/random_tables/campaign_custom_tables.json")
 _GM_LAYOUTS_FILE = Path("gm_layouts.json")
 _GM_TABLE_MARKS_FILES = (
@@ -37,6 +38,10 @@ def collect_full_campaign_extra_files(campaign_root: Path) -> List[Tuple[Path, s
                 continue
             relative_path = file_path.relative_to(root).as_posix()
             collected.append((file_path.resolve(), relative_path))
+
+    campaign_custom_tables = (root / _CAMPAIGN_CUSTOM_RANDOM_TABLE_FILE).resolve()
+    if campaign_custom_tables.exists() and campaign_custom_tables.is_file():
+        collected.append((campaign_custom_tables, _CAMPAIGN_CUSTOM_RANDOM_TABLE_FILE.as_posix()))
 
     internal_custom_tables = (root / _INTERNAL_RANDOM_TABLE_CUSTOM_FILE).resolve()
     if internal_custom_tables.exists() and internal_custom_tables.is_file():

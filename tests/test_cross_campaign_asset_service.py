@@ -142,36 +142,28 @@ def test_install_full_campaign_bundle_restores_random_tables_files(tmp_path):
     assert restored_random_table.read_text(encoding="utf-8") == '{"categories": []}'
 
 
-def test_install_full_campaign_bundle_restores_internal_custom_random_tables_file(tmp_path):
-    """Installing a full campaign bundle should restore internal custom random tables JSON."""
+def test_install_full_campaign_bundle_restores_campaign_custom_random_tables_file(tmp_path):
+    """Installing a full campaign bundle should restore campaign custom random tables JSON."""
     source_root = tmp_path / "source"
     source_root.mkdir(parents=True, exist_ok=True)
     db_path = source_root / "campaign.db"
     sqlite3.connect(db_path).close()
 
-    internal_custom_file = (
-        source_root / "_internal" / "static" / "data" / "random_tables" / "campaign_custom_tables.json"
-    )
-    internal_custom_file.parent.mkdir(parents=True, exist_ok=True)
-    internal_custom_file.write_text('{"tables": []}', encoding="utf-8")
+    campaign_custom_file = source_root / "campaign_custom_tables.json"
+    campaign_custom_file.write_text('{"tables": []}', encoding="utf-8")
 
     source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
     bundle_path = tmp_path / "full_bundle.zip"
     manifest = export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
     extra_files = manifest.get("extra_files") or []
-    assert any(
-        entry.get("relative_path") == "_internal/static/data/random_tables/campaign_custom_tables.json"
-        for entry in extra_files
-    )
+    assert any(entry.get("relative_path") == "campaign_custom_tables.json" for entry in extra_files)
 
     target_root = tmp_path / "installed_campaign"
     installed = install_full_campaign_bundle(bundle_path, target_root)
 
-    restored_internal_custom = (
-        installed.root / "_internal" / "static" / "data" / "random_tables" / "campaign_custom_tables.json"
-    )
-    assert restored_internal_custom.exists()
-    assert restored_internal_custom.read_text(encoding="utf-8") == '{"tables": []}'
+    restored_campaign_custom = installed.root / "campaign_custom_tables.json"
+    assert restored_campaign_custom.exists()
+    assert restored_campaign_custom.read_text(encoding="utf-8") == '{"tables": []}'
 
 
 def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_path):

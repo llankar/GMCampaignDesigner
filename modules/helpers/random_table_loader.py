@@ -2,6 +2,7 @@
 
 import json
 import os
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from modules.helpers.config_helper import ConfigHelper
@@ -11,6 +12,7 @@ log_module_import(__name__)
 
 
 PLOT_TWIST_TABLE_ID = "universal_plot_twists"
+CAMPAIGN_CUSTOM_TABLES_FILE = "campaign_custom_tables.json"
 
 
 class RandomTableLoader:
@@ -55,7 +57,17 @@ class RandomTableLoader:
         self.categories = []
         self.tables = {}
 
-        for source in self._iter_sources(self.base_path):
+        sources = list(self._iter_sources(self.base_path))
+        campaign_custom_tables = self.campaign_custom_tables_path()
+        if os.path.exists(campaign_custom_tables):
+            sources.append(campaign_custom_tables)
+
+        seen_sources = set()
+        for source in sources:
+            normalized_source = str(Path(source).resolve())
+            if normalized_source in seen_sources:
+                continue
+            seen_sources.add(normalized_source)
             # Process each source from _iter_sources(base_path).
             data = self._read_source(source)
             if not data:
@@ -211,6 +223,12 @@ class RandomTableLoader:
             return None
         text = str(value).strip()
         return text or None
+
+    @staticmethod
+    def campaign_custom_tables_path() -> str:
+        """Return campaign-specific custom random table file path."""
+        campaign_dir = ConfigHelper.get_campaign_dir()
+        return os.path.join(campaign_dir, CAMPAIGN_CUSTOM_TABLES_FILE)
 
 
 def plot_twist_data_path() -> str:
