@@ -4576,6 +4576,31 @@ class MainWindow(ctk.CTk):
             self._ambiance_player = SecondScreenAmbiancePlayer(root=self)
         return self._ambiance_player
 
+    def open_ambiance_panel(self):
+        """Open ambiance controls in the active GM workspace."""
+        try:
+            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
+                self.current_gm_view.open_ambiance_tab()
+                return
+        except Exception:
+            pass
+
+        try:
+            if getattr(self, "current_gm_table", None) is not None and self.current_gm_table.winfo_exists():
+                opener = getattr(self.current_gm_table, "open_ambiance_panel", None)
+                if callable(opener):
+                    opener()
+                    return
+        except Exception:
+            pass
+
+        self.open_gm_screen(show_empty_message=True)
+        try:
+            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
+                self.current_gm_view.open_ambiance_tab()
+        except Exception:
+            pass
+
     def open_sound_manager(self):
         """Open sound manager."""
         try:
