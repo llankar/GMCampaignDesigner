@@ -14,6 +14,7 @@ from modules.helpers.logging_helper import log_info, log_warning
 from modules.ui.ambiance.media_loader import load_image, load_video, normalize_item
 from modules.ui.ambiance.models import AmbianceItem, AmbiancePlaylist, AmbianceState
 from modules.ui.ambiance.monitor import MonitorSelectionError, select_target_monitor
+from modules.ui.ambiance.monitor_selector import normalize_target_monitor
 
 _RESAMPLING = getattr(Image, "Resampling", Image)
 _RESAMPLE_MODE = getattr(_RESAMPLING, "LANCZOS", Image.LANCZOS)
@@ -39,7 +40,8 @@ class SecondScreenAmbiancePlayer:
         self._runtime_items: list[AmbianceItem] = []
         self._order: list[int] = []
         self._state = AmbianceState()
-        self._target_monitor_index: int | None = None
+        self._target_monitor_index: int | None = 0
+        self._last_monitor_warning: str | None = None
         self._photo_ref = None
         self._video = None
 
@@ -147,9 +149,17 @@ class SecondScreenAmbiancePlayer:
     def _ensure_window(self) -> None:
         if self._window is not None and self._window.winfo_exists() and self._canvas is not None:
             return
+
+        from modules.ui.image_viewer import _get_monitors
+
+        requested_index = self._target_monitor_index if self._target_monitor_index is not None else 0
+        monitor_count = len(_get_monitors())
+        target_index, warning_message = normalize_target_monitor(requested_index, monitor_count)
+        self._last_monitor_warning = warning_message
+
         monitor = select_target_monitor(
             allow_single_screen_fallback=self._allow_single_screen_fallback,
-            preferred_index=self._target_monitor_index,
+            preferred_index=target_index,
         )
 
         self._window = ctk.CTkToplevel(self._root)
@@ -175,6 +185,13 @@ class SecondScreenAmbiancePlayer:
 
         self._window.bind("<Escape>", lambda _event: self.stop())
         self._window.protocol("WM_DELETE_WINDOW", self.stop)
+
+
+    def consume_last_monitor_warning(self) -> str | None:
+        """Return and clear the latest monitor fallback warning."""
+        warning = self._last_monitor_warning
+        self._last_monitor_warning = None
+        return warning
 
     def _render_current(self) -> None:
         if self._state.is_paused or not self._state.is_running:
