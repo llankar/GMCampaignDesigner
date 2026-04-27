@@ -22,7 +22,11 @@ class MonitorSelectionError(RuntimeError):
     """Raised when no monitor can be selected for ambiance playback."""
 
 
-def select_target_monitor(*, allow_single_screen_fallback: bool = True) -> MonitorBounds:
+def select_target_monitor(
+    *,
+    allow_single_screen_fallback: bool = True,
+    preferred_index: int | None = None,
+) -> MonitorBounds:
     """Resolve monitor bounds for ambiance playback.
 
     If two monitors are available, the second one is selected.
@@ -33,6 +37,16 @@ def select_target_monitor(*, allow_single_screen_fallback: bool = True) -> Monit
     monitors = _get_monitors()
     if not monitors:
         raise MonitorSelectionError("Aucun écran détecté pour l'ambiance.")
+
+    if isinstance(preferred_index, int) and 0 <= preferred_index < len(monitors):
+        x, y, width, height = monitors[preferred_index]
+        return MonitorBounds(
+            int(x),
+            int(y),
+            int(width),
+            int(height),
+            preferred_index > 0,
+        )
 
     if len(monitors) > 1:
         x, y, width, height = monitors[1]
