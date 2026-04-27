@@ -25,7 +25,7 @@ class AmbianceSettings:
     transition: str = "fade"
     shuffle: bool = False
     loop: bool = True
-    target_monitor_index: int = 1
+    target_monitor_index: int = 0
 
 
 def load_ambiance_settings() -> AmbianceSettings:
@@ -53,8 +53,24 @@ def load_ambiance_settings() -> AmbianceSettings:
         transition=(cfg.get(_SECTION, "transition", fallback="fade") or "fade").strip().lower(),
         shuffle=_to_bool(cfg.get(_SECTION, "shuffle", fallback=False), False),
         loop=_to_bool(cfg.get(_SECTION, "loop", fallback=True), True),
-        target_monitor_index=_to_int(cfg.get(_SECTION, "target_monitor_index", fallback=1), 1),
+        target_monitor_index=_read_target_monitor_index(cfg),
     )
+
+
+def _read_target_monitor_index(cfg: configparser.ConfigParser) -> int:
+    """Load monitor index with backward compatibility for legacy 1-based values."""
+    raw_index = _to_int(cfg.get(_SECTION, "target_monitor_index", fallback=0), 0)
+    base_mode = (cfg.get(_SECTION, "target_monitor_index_base", fallback="") or "").strip().lower()
+
+    if base_mode == "one_based":
+        return max(0, raw_index - 1)
+    if base_mode == "zero_based":
+        return max(0, raw_index)
+
+    # Legacy fallback: previous builds persisted 1-based monitor indices.
+    if raw_index >= 1:
+        return raw_index - 1
+    return 0
 
 
 def save_ambiance_settings(settings: AmbianceSettings) -> None:
@@ -71,6 +87,7 @@ def save_ambiance_settings(settings: AmbianceSettings) -> None:
     payload["playlist_paths"] = json.dumps(list(settings.playlist_paths), ensure_ascii=False)
     payload["playlist_item_ids"] = json.dumps(list(settings.playlist_item_ids), ensure_ascii=False)
     payload["playlist_entries"] = json.dumps(list(settings.playlist_entries), ensure_ascii=False)
+    payload["target_monitor_index_base"] = "zero_based"
     for key, value in payload.items():
         cfg.set(_SECTION, key, str(value))
 

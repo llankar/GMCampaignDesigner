@@ -9,6 +9,9 @@ from tkinter import messagebox, simpledialog
 
 import customtkinter as ctk
 
+from modules.scenarios.gm_table.ambiance.playlist_controller import add_missing_items_to_playlist
+from modules.scenarios.gm_table.ambiance.thumb_loader import AmbianceThumbLoader
+from modules.scenarios.gm_table.ambiance.virtualized_grid import VirtualizedWallpaperGrid
 from modules.ui.ambiance.importer.service import WallpaperImportService
 from modules.ui.ambiance.importer.thumbnailer import WallpaperThumbnailer
 from modules.ui.ambiance.library.models import WallpaperLibraryItem, WallpaperQuery
@@ -28,10 +31,12 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         self._repository = CampaignWallpaperRepository()
         self._import_service = WallpaperImportService(self._repository.store)
         self._thumbnailer = WallpaperThumbnailer(size=(136, 82))
+        self._thumb_loader = AmbianceThumbLoader(self, thumbnailer=self._thumbnailer)
         self._selected_ids: set[str] = set()
         self._playlist: list[dict] = []
         self._drag_index: int | None = None
         self._restoring_ui_state = True
+        self._empty_library_card = None
 
         state = dict(initial_state or {})
         settings = load_ambiance_settings()
@@ -99,7 +104,8 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         ctk.CTkOptionMenu(filters, variable=self._media_var, values=["all", "image", "video"], width=110).grid(row=0, column=2, padx=(0, 8))
         ctk.CTkOptionMenu(filters, variable=self._orientation_var, values=["all", "landscape", "portrait", "square"], width=126).grid(row=0, column=3, padx=(0, 8))
         ctk.CTkOptionMenu(filters, variable=self._sort_var, values=["name", "created_desc", "size_desc"], width=120).grid(row=0, column=4, padx=(0, 8))
-        ctk.CTkButton(filters, text="Add to playlist", width=130, command=self._add_selected_to_playlist).grid(row=0, column=5)
+        ctk.CTkButton(filters, text="Add to playlist", width=130, command=self._add_selected_to_playlist).grid(row=0, column=5, padx=(0, 8))
+        ctk.CTkButton(filters, text="Add all to playlist", width=150, command=self._add_all_to_playlist).grid(row=0, column=6)
 
     def _build_body(self) -> None:
         body = ctk.CTkFrame(self, fg_color="transparent")
@@ -111,6 +117,14 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         self._library_frame = ctk.CTkScrollableFrame(body, fg_color="transparent")
         self._library_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
         self._library_frame.grid_columnconfigure(0, weight=1)
+
+        self._virtual_grid = VirtualizedWallpaperGrid(
+            self._library_frame,
+            row_height=106,
+            overscan_rows=3,
+            create_row=self._create_library_card,
+            bind_row=self._bind_library_card,
+        )
 
         playlist_panel = ctk.CTkFrame(body)
         playlist_panel.grid(row=0, column=1, sticky="nsew")
@@ -160,51 +174,41 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         )
 
     def _render_library(self) -> None:
-        for child in self._library_frame.winfo_children():
-            child.destroy()
         items = self._library_items()
         if not items:
-            card = ctk.CTkFrame(self._library_frame)
-            card.grid(row=0, column=0, sticky="ew", padx=4, pady=6)
-            ctk.CTkLabel(card, text="No wallpapers imported yet", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=10, pady=(10, 2))
-            ctk.CTkLabel(card, text="Import wallpapers into this campaign to build your playlist.", text_color="#9CA3AF").pack(anchor="w", padx=10, pady=(0, 10))
-            ctk.CTkButton(card, text="Open Importer", command=self._open_importer).pack(anchor="w", padx=10, pady=(0, 10))
+            self._virtual_grid.set_items([])
+            if self._empty_library_card is None or not self._empty_library_card.winfo_exists():
+                card = ctk.CTkFrame(self._library_frame)
+                card.grid(row=3, column=0, sticky="ew", padx=4, pady=6)
+                ctk.CTkLabel(card, text="No wallpapers imported yet", font=ctk.CTkFont(size=14, weight="bold")).pack(anchor="w", padx=10, pady=(10, 2))
+                ctk.CTkLabel(card, text="Import wallpapers into this campaign to build your playlist.", text_color="#9CA3AF").pack(anchor="w", padx=10, pady=(0, 10))
+                ctk.CTkButton(card, text="Open Importer", command=self._open_importer).pack(anchor="w", padx=10, pady=(0, 10))
+                self._empty_library_card = card
             return
 
-        for idx, item in enumerate(items):
-            self._render_library_card(item=item, row_idx=idx)
+        if self._empty_library_card is not None and self._empty_library_card.winfo_exists():
+            self._empty_library_card.destroy()
+            self._empty_library_card = None
+        self._virtual_grid.set_items(items)
 
-    def _render_library_card(self, *, item: WallpaperLibraryItem, row_idx: int) -> None:
-        card = ctk.CTkFrame(self._library_frame, border_width=1, border_color="#334155")
-        card.grid(row=row_idx, column=0, sticky="ew", padx=4, pady=4)
+    def _create_library_card(self, parent):
+        card = ctk.CTkFrame(parent, border_width=1, border_color="#334155")
         card.grid_columnconfigure(1, weight=1)
 
-        abs_path = self._repository.store.absolute_path(item)
-        thumb = self._thumbnailer.get(abs_path, media_type=item.media_type)
-        ctk.CTkLabel(card, text="", image=thumb, width=144).grid(row=0, column=0, rowspan=2, padx=(8, 8), pady=8)
+        thumbnail_label = ctk.CTkLabel(card, text="", width=144)
+        thumbnail_label.grid(row=0, column=0, rowspan=2, padx=(8, 8), pady=8)
 
-        selected = item.id in self._selected_ids
-        select_button = ctk.CTkCheckBox(
-            card,
-            text=item.filename,
-            onvalue=True,
-            offvalue=False,
-            command=lambda item_id=item.id: self._toggle_select(item_id),
-        )
-        if selected:
-            select_button.select()
-        else:
-            select_button.deselect()
+        select_button = ctk.CTkCheckBox(card, text="", onvalue=True, offvalue=False)
         select_button.grid(row=0, column=1, sticky="w", pady=(8, 2))
 
-        details = f"{item.media_type.title()} · {item.width or '—'}x{item.height or '—'} · {_format_size(item.filesize)}"
-        ctk.CTkLabel(card, text=details, text_color="#9CA3AF", anchor="w").grid(row=1, column=1, sticky="w", pady=(0, 8))
+        details_label = ctk.CTkLabel(card, text="", text_color="#9CA3AF", anchor="w")
+        details_label.grid(row=1, column=1, sticky="w", pady=(0, 8))
 
         quick_actions = ctk.CTkFrame(card, fg_color="transparent")
         quick_actions.grid(row=0, column=2, rowspan=2, padx=(0, 8))
-        preview_btn = ctk.CTkButton(quick_actions, text="Preview", width=74, command=lambda i=item: self._preview_item(i))
-        add_btn = ctk.CTkButton(quick_actions, text="+ Playlist", width=86, command=lambda i=item: self._add_single_to_playlist(i))
-        tag_btn = ctk.CTkButton(quick_actions, text="Tag", width=54, command=lambda i=item: self._tag_item(i))
+        preview_btn = ctk.CTkButton(quick_actions, text="Preview", width=74)
+        add_btn = ctk.CTkButton(quick_actions, text="+ Playlist", width=86)
+        tag_btn = ctk.CTkButton(quick_actions, text="Tag", width=54)
 
         def _show(_event=None):
             preview_btn.grid(row=0, column=0, padx=(0, 4), pady=(0, 4))
@@ -217,6 +221,43 @@ class GMTableAmbiancePage(ctk.CTkFrame):
 
         card.bind("<Enter>", _show)
         card.bind("<Leave>", _hide)
+
+        card._thumb_label = thumbnail_label  # type: ignore[attr-defined]
+        card._select_button = select_button  # type: ignore[attr-defined]
+        card._details_label = details_label  # type: ignore[attr-defined]
+        card._preview_btn = preview_btn  # type: ignore[attr-defined]
+        card._add_btn = add_btn  # type: ignore[attr-defined]
+        card._tag_btn = tag_btn  # type: ignore[attr-defined]
+        return card
+
+    def _bind_library_card(self, card, item: WallpaperLibraryItem, _index: int) -> None:
+        card_key = str(id(card))
+        select_button = card._select_button  # type: ignore[attr-defined]
+        select_button.configure(text=item.filename, command=lambda item_id=item.id: self._toggle_select(item_id))
+        if item.id in self._selected_ids:
+            select_button.select()
+        else:
+            select_button.deselect()
+
+        details = f"{item.media_type.title()} · {item.width or '—'}x{item.height or '—'} · {_format_size(item.filesize)}"
+        card._details_label.configure(text=details)  # type: ignore[attr-defined]
+        card._preview_btn.configure(command=lambda i=item: self._preview_item(i))  # type: ignore[attr-defined]
+        card._add_btn.configure(command=lambda i=item: self._add_single_to_playlist(i))  # type: ignore[attr-defined]
+        card._tag_btn.configure(command=lambda i=item: self._tag_item(i))  # type: ignore[attr-defined]
+
+        abs_path = self._repository.store.absolute_path(item)
+        thumb_key = f"{item.id}:{item.media_type}:{abs_path}"
+
+        def _set_thumb(image):
+            card._thumb_label.configure(image=image)  # type: ignore[attr-defined]
+
+        self._thumb_loader.request(
+            card_key=card_key,
+            thumb_key=thumb_key,
+            absolute_path=abs_path,
+            media_type=item.media_type,
+            on_ready=_set_thumb,
+        )
 
     def _render_playlist(self) -> None:
         for child in self._playlist_frame.winfo_children():
@@ -275,12 +316,21 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             self._toast("No wallpaper selected.")
             return
         for item in selected_items:
-            self._playlist.append({"id": item.id, "duration": self._safe_duration_value()})
+            self._playlist.append({"id": item.id, "path": item.relative_path, "duration": self._safe_duration_value()})
         self._render_playlist()
         self._toast(f"Added {len(selected_items)} item(s) to playlist.")
 
+    def _add_all_to_playlist(self) -> None:
+        result = add_missing_items_to_playlist(
+            playlist_entries=self._playlist,
+            library_items=self._library_items(),
+            default_duration=self._safe_duration_value(),
+        )
+        self._render_playlist()
+        self._toast(f"{result.added_count} added, {result.already_present_count} already present.")
+
     def _add_single_to_playlist(self, item: WallpaperLibraryItem) -> None:
-        self._playlist.append({"id": item.id, "duration": self._safe_duration_value()})
+        self._playlist.append({"id": item.id, "path": item.relative_path, "duration": self._safe_duration_value()})
         self._render_playlist()
         self._toast(f"Added '{item.filename}' to playlist.")
 
@@ -357,7 +407,15 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         getter = getattr(host, "get_ambiance_player", None)
         if callable(getter):
             return getter()
-        self._status_var.set("Ambiance player unavailable from this window.")
+
+        parent = self.master
+        while parent is not None:
+            getter = getattr(parent, "get_ambiance_player", None)
+            if callable(getter):
+                return getter()
+            parent = getattr(parent, "master", None)
+
+        self._status_var.set("Unable to resolve ambiance player in this window context.")
         return None
 
     def _start(self) -> None:
@@ -370,7 +428,12 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             if callable(setter):
                 setter(self._safe_monitor_index())
             player.start(playlist)
-            self._status_var.set(f"Playback started ({len(playlist.items)} media).")
+            consume_warning = getattr(player, "consume_last_monitor_warning", None)
+            monitor_warning = consume_warning() if callable(consume_warning) else None
+            if monitor_warning:
+                self._toast(monitor_warning)
+            else:
+                self._status_var.set(f"Playback started ({len(playlist.items)} media).")
             self._persist_settings()
         except Exception as exc:
             self._status_var.set(f"Start failed: {exc}")
@@ -420,6 +483,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
 
     def _on_import_completed(self) -> None:
         self._repository.rebuild()
+        self._thumb_loader.clear()
         self._render_library()
         self._toast("Wallpaper library updated.")
 
@@ -444,7 +508,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             enabled=bool(self._enabled_var.get()),
             playlist_paths=(),
             playlist_item_ids=tuple(entry["id"] for entry in self._playlist),
-            playlist_entries=tuple({"id": entry["id"], "duration": float(entry.get("duration", self._safe_duration_value()))} for entry in self._playlist),
+            playlist_entries=tuple({"id": entry["id"], "path": str(entry.get("path") or ""), "duration": float(entry.get("duration", self._safe_duration_value()))} for entry in self._playlist),
             default_duration_sec=self._safe_duration_value(),
             transition=(self._transition_var.get().strip().lower() or "fade"),
             shuffle=bool(self._shuffle_var.get()),
@@ -460,9 +524,9 @@ class GMTableAmbiancePage(ctk.CTkFrame):
 
     def _safe_monitor_index(self) -> int:
         try:
-            return max(0, int(self._monitor_var.get().strip()))
+            return int(self._monitor_var.get().strip())
         except Exception:
-            return 1
+            return 0
 
     def _toast(self, text: str) -> None:
         self._status_var.set(text)
@@ -501,7 +565,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
 
         result = self._import_service.import_files(gathered, strategy="skip")
         if result.imported_items:
-            migrated_entries = tuple({"id": item.id, "duration": settings.default_duration_sec or 8.0} for item in result.imported_items)
+            migrated_entries = tuple({"id": item.id, "path": item.relative_path, "duration": settings.default_duration_sec or 8.0} for item in result.imported_items)
             update_ambiance_settings(
                 playlist_paths=(),
                 playlist_item_ids=tuple(item.id for item in result.imported_items),
@@ -519,11 +583,12 @@ def _normalize_playlist_entries(raw_entries: list | tuple, *, default_duration: 
         item_id = str(raw.get("id") or "").strip()
         if not item_id:
             continue
+        path = str(raw.get("path") or "").strip()
         try:
             duration = max(0.5, float(raw.get("duration") or default_duration))
         except Exception:
             duration = default_duration
-        normalized.append({"id": item_id, "duration": duration})
+        normalized.append({"id": item_id, "path": path, "duration": duration})
     return normalized
 
 
