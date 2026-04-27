@@ -130,6 +130,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         playlist_panel.grid(row=0, column=1, sticky="nsew")
         playlist_panel.grid_rowconfigure(1, weight=1)
         playlist_panel.grid_columnconfigure(0, weight=1)
+        playlist_panel.grid_columnconfigure(1, weight=0)
 
         ctk.CTkLabel(playlist_panel, text="Session Playlist", anchor="w", font=ctk.CTkFont(size=14, weight="bold")).grid(
             row=0,
@@ -138,8 +139,16 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             padx=8,
             pady=(8, 6),
         )
+        ctk.CTkButton(
+            playlist_panel,
+            text="Remove all",
+            width=96,
+            fg_color="#B91C1C",
+            hover_color="#991B1B",
+            command=self._remove_all_playlist,
+        ).grid(row=0, column=1, sticky="e", padx=(0, 8), pady=(8, 6))
         self._playlist_frame = ctk.CTkScrollableFrame(playlist_panel, fg_color="transparent")
-        self._playlist_frame.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        self._playlist_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=8, pady=(0, 8))
 
     def _build_player_controls(self) -> None:
         controls = ctk.CTkFrame(self, fg_color="transparent")
@@ -339,6 +348,14 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             self._playlist.pop(index)
             self._render_playlist()
 
+    def _remove_all_playlist(self) -> None:
+        if not self._playlist:
+            self._toast("Playlist is already empty.")
+            return
+        self._playlist.clear()
+        self._render_playlist()
+        self._toast("Playlist cleared.")
+
     def _adjust_duration(self, index: int, delta: int) -> None:
         if not (0 <= index < len(self._playlist)):
             return
@@ -458,8 +475,8 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         if player is None:
             return
         try:
-            player.stop()
-            self._status_var.set("Playback stopped.")
+            player.stop(close_window=True)
+            self._status_var.set("Playback stopped and window closed.")
         except Exception as exc:
             self._status_var.set(f"Stop failed: {exc}")
 

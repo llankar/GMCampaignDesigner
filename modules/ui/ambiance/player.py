@@ -98,14 +98,16 @@ class SecondScreenAmbiancePlayer:
         self._state.is_paused = False
         self._render_current()
 
-    def stop(self, *, clear_playlist: bool = False) -> None:
+    def stop(self, *, clear_playlist: bool = False, close_window: bool = False) -> None:
         """Stop playback and clear frame resources."""
         self._cancel_scheduled()
         self._close_video()
         self._state.is_running = False
         self._state.is_paused = False
         self._state.current_index = -1
-        if self._canvas is not None:
+        if close_window:
+            self._destroy_window()
+        elif self._canvas is not None:
             self._canvas.configure(image="", text="Ambiance stoppée", fg="white", bg="black")
         if clear_playlist:
             self._playlist = AmbiancePlaylist()
@@ -183,8 +185,17 @@ class SecondScreenAmbiancePlayer:
         self._canvas = tk.Label(self._window, bg="black", bd=0, highlightthickness=0)
         self._canvas.pack(fill="both", expand=True)
 
-        self._window.bind("<Escape>", lambda _event: self.stop())
-        self._window.protocol("WM_DELETE_WINDOW", self.stop)
+        self._window.bind("<Escape>", lambda _event: self.stop(close_window=True))
+        self._window.protocol("WM_DELETE_WINDOW", lambda: self.stop(close_window=True))
+
+    def _destroy_window(self) -> None:
+        """Close the ambiance render window and release widget references."""
+        window = self._window
+        self._window = None
+        self._canvas = None
+        self._photo_ref = None
+        if window is not None and window.winfo_exists():
+            window.destroy()
 
 
     def consume_last_monitor_warning(self) -> str | None:
