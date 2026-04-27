@@ -15,6 +15,11 @@ from modules.scenarios.gm_table.ambiance.repository import (
 )
 from modules.scenarios.gm_table.ambiance.thumbnail_cache import ThumbnailCache
 from modules.ui.ambiance.models import AmbianceItem, AmbiancePlaylist
+from modules.ui.ambiance.settings import (
+    AmbianceSettings,
+    load_ambiance_settings,
+    update_ambiance_settings,
+)
 
 
 class GMTableAmbiancePage(ctk.CTkFrame):
@@ -29,13 +34,21 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         self._repository = AmbianceMediaRepository()
         self._thumbnail_cache = ThumbnailCache()
         self._records: list[AmbianceMediaRecord] = []
+        self._restoring_ui_state = True
 
-        self._folder_var = tk.StringVar(value=str(state.get("folder") or ""))
-        self._playlist_var = tk.StringVar(value=str(state.get("playlist") or ""))
+        settings = load_ambiance_settings()
+        preloaded_folder, preloaded_playlist = self._resolve_source_paths(state=state, settings=settings)
+
+        self._folder_var = tk.StringVar(value=preloaded_folder)
+        self._playlist_var = tk.StringVar(value=preloaded_playlist)
         self._status_var = tk.StringVar(value="")
-        self._duration_var = tk.StringVar(value=str(state.get("image_duration") or "8"))
-        self._loop_var = tk.BooleanVar(value=bool(state.get("loop", True)))
-        self._shuffle_var = tk.BooleanVar(value=bool(state.get("shuffle", False)))
+        duration_value = state.get("image_duration", settings.default_duration_sec)
+        self._duration_var = tk.StringVar(value=str(duration_value if duration_value not in (None, "") else "8"))
+        self._loop_var = tk.BooleanVar(value=bool(state.get("loop", settings.loop)))
+        self._shuffle_var = tk.BooleanVar(value=bool(state.get("shuffle", settings.shuffle)))
+        self._enabled_var = tk.BooleanVar(value=bool(settings.enabled))
+        self._transition_var = tk.StringVar(value=settings.transition if settings.transition in {"fade", "cut"} else "fade")
+        self._monitor_var = tk.StringVar(value=str(max(0, settings.target_monitor_index)))
 
         ctk.CTkLabel(
             self,
@@ -64,17 +77,28 @@ class GMTableAmbiancePage(ctk.CTkFrame):
 
         options = ctk.CTkFrame(self, fg_color="transparent")
         options.grid(row=2, column=0, sticky="ew", pady=(0, 6))
-        options.grid_columnconfigure(5, weight=1)
+        options.grid_columnconfigure(8, weight=1)
 
         ctk.CTkLabel(options, text="Image duration (s)").grid(row=0, column=0, sticky="w")
         ctk.CTkEntry(options, textvariable=self._duration_var, width=88, height=30).grid(row=0, column=1, padx=(6, 16), sticky="w")
         ctk.CTkCheckBox(options, text="Loop", variable=self._loop_var).grid(row=0, column=2, padx=(0, 10))
         ctk.CTkCheckBox(options, text="Shuffle", variable=self._shuffle_var).grid(row=0, column=3, padx=(0, 10))
+        ctk.CTkLabel(options, text="Transition").grid(row=0, column=4, padx=(0, 6))
+        ctk.CTkOptionMenu(
+            options,
+            variable=self._transition_var,
+            values=["fade", "cut"],
+            width=96,
+            height=30,
+        ).grid(row=0, column=5, padx=(0, 12))
+        ctk.CTkLabel(options, text="Monitor").grid(row=0, column=6, padx=(0, 6))
+        ctk.CTkEntry(options, textvariable=self._monitor_var, width=52, height=30).grid(row=0, column=7, padx=(0, 12), sticky="w")
+        ctk.CTkCheckBox(options, text="Auto resume", variable=self._enabled_var).grid(row=0, column=8, padx=(0, 10))
 
-        ctk.CTkButton(options, text="Start", width=72, command=self._start).grid(row=0, column=6, padx=(0, 6), sticky="e")
-        ctk.CTkButton(options, text="Pause", width=72, command=self._pause_or_resume).grid(row=0, column=7, padx=(0, 6), sticky="e")
-        ctk.CTkButton(options, text="Stop", width=72, command=self._stop).grid(row=0, column=8, padx=(0, 6), sticky="e")
-        ctk.CTkButton(options, text="Next", width=72, command=self._next).grid(row=0, column=9, sticky="e")
+        ctk.CTkButton(options, text="Start", width=72, command=self._start).grid(row=0, column=9, padx=(0, 6), sticky="e")
+        ctk.CTkButton(options, text="Pause", width=72, command=self._pause_or_resume).grid(row=0, column=10, padx=(0, 6), sticky="e")
+        ctk.CTkButton(options, text="Stop", width=72, command=self._stop).grid(row=0, column=11, padx=(0, 6), sticky="e")
+        ctk.CTkButton(options, text="Next", width=72, command=self._next).grid(row=0, column=12, sticky="e")
 
         self._list = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self._list.grid(row=3, column=0, sticky="nsew")
@@ -87,7 +111,70 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             text_color="#F59E0B",
         ).grid(row=4, column=0, sticky="ew", pady=(6, 0))
 
+        self._bind_persistence_traces()
         self._refresh_sources()
+        self._restoring_ui_state = False
+        if self._enabled_var.get() and self._records:
+            self.after(120, self._start)
+
+    def _resolve_source_paths(self, *, state: dict, settings: AmbianceSettings) -> tuple[str, str]:
+        folder_value = str(state.get("folder") or "")
+        playlist_value = str(state.get("playlist") or "")
+        if folder_value or playlist_value:
+            return folder_value, playlist_value
+
+        folder = ""
+        playlist = ""
+        for raw_path in settings.playlist_paths:
+            path = Path(str(raw_path)).expanduser()
+            if not playlist and path.is_file():
+                playlist = str(path)
+            elif not folder and path.is_dir():
+                folder = str(path)
+        return folder, playlist
+
+    def _bind_persistence_traces(self) -> None:
+        for variable in (
+            self._folder_var,
+            self._playlist_var,
+            self._duration_var,
+            self._loop_var,
+            self._shuffle_var,
+            self._enabled_var,
+            self._transition_var,
+            self._monitor_var,
+        ):
+            variable.trace_add("write", self._on_setting_changed)
+
+    def _on_setting_changed(self, *_args) -> None:
+        if self._restoring_ui_state:
+            return
+        self._persist_settings()
+
+    def _persist_settings(self) -> None:
+        sources = [self._playlist_var.get().strip(), self._folder_var.get().strip()]
+        valid_sources = tuple(path for path in sources if path)
+        update_ambiance_settings(
+            enabled=bool(self._enabled_var.get()),
+            playlist_paths=valid_sources,
+            default_duration_sec=self._safe_duration_value(),
+            transition=(self._transition_var.get().strip().lower() or "fade"),
+            shuffle=bool(self._shuffle_var.get()),
+            loop=bool(self._loop_var.get()),
+            target_monitor_index=self._safe_monitor_index(),
+        )
+
+    def _safe_duration_value(self) -> float:
+        try:
+            return max(0.5, float(self._duration_var.get().strip()))
+        except Exception:
+            return 8.0
+
+    def _safe_monitor_index(self) -> int:
+        try:
+            return max(0, int(self._monitor_var.get().strip()))
+        except Exception:
+            return 1
 
     def _pick_folder(self) -> None:
         selected = filedialog.askdirectory(title="Select ambiance folder")
@@ -109,12 +196,15 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         folder = self._folder_var.get().strip()
         if playlist_path:
             self._load_playlist_file(playlist_path)
+            self._persist_settings()
             return
         if folder:
             self._scan_folder()
+            self._persist_settings()
             return
         self._records = []
         self._render_records()
+        self._persist_settings()
 
     def _scan_folder(self) -> None:
         folder = self._folder_var.get().strip()
@@ -124,6 +214,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         self._records = self._repository.scan_folder(folder)
         self._status_var.set(f"{len(self._records)} media indexed from folder.")
         self._render_records()
+        self._persist_settings()
 
     def _load_playlist_file(self, playlist_path: str) -> None:
         path = Path(playlist_path).expanduser()
@@ -150,6 +241,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
                 self._duration_var.set(str(duration))
         self._status_var.set(f"{len(self._records)} media loaded from playlist.")
         self._render_records()
+        self._persist_settings()
 
     def _render_records(self) -> None:
         for child in self._list.winfo_children():
@@ -194,6 +286,7 @@ class GMTableAmbiancePage(ctk.CTkFrame):
             loop=bool(self._loop_var.get()),
             shuffle=bool(self._shuffle_var.get()),
             default_duration=default_duration,
+            transition_ms=0 if self._transition_var.get().strip().lower() == "cut" else 380,
         )
 
     def _resolve_player(self):
@@ -210,8 +303,12 @@ class GMTableAmbiancePage(ctk.CTkFrame):
         if player is None or playlist is None:
             return
         try:
+            setter = getattr(player, "set_target_monitor_index", None)
+            if callable(setter):
+                setter(self._safe_monitor_index())
             player.start(playlist)
             self._status_var.set(f"Playback started ({len(playlist.items)} media).")
+            self._persist_settings()
         except Exception as exc:
             self._status_var.set(f"Start failed: {exc}")
 

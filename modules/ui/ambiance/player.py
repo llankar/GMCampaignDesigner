@@ -39,6 +39,7 @@ class SecondScreenAmbiancePlayer:
         self._runtime_items: list[AmbianceItem] = []
         self._order: list[int] = []
         self._state = AmbianceState()
+        self._target_monitor_index: int | None = None
         self._photo_ref = None
         self._video = None
 
@@ -55,6 +56,16 @@ class SecondScreenAmbiancePlayer:
         self._build_order()
         if self._state.current_index >= len(self._order):
             self._state.current_index = -1
+
+    def set_target_monitor_index(self, monitor_index: int | None) -> None:
+        """Set preferred monitor index used on next window creation."""
+        if monitor_index is None:
+            self._target_monitor_index = None
+            return
+        try:
+            self._target_monitor_index = max(0, int(monitor_index))
+        except Exception:
+            self._target_monitor_index = None
 
     def start(self, playlist: AmbiancePlaylist | None = None) -> None:
         """Start ambiance playback."""
@@ -137,7 +148,8 @@ class SecondScreenAmbiancePlayer:
         if self._window is not None and self._window.winfo_exists() and self._canvas is not None:
             return
         monitor = select_target_monitor(
-            allow_single_screen_fallback=self._allow_single_screen_fallback
+            allow_single_screen_fallback=self._allow_single_screen_fallback,
+            preferred_index=self._target_monitor_index,
         )
 
         self._window = ctk.CTkToplevel(self._root)
