@@ -50,6 +50,8 @@ def test_menu_sections_expose_image_library_commands() -> None:
         open_dice_roller=lambda: None,
         open_sound_manager=lambda: None,
         open_timer_window=lambda: None,
+        open_ambiance_panel=lambda: None,
+        open_wallpaper_importer=lambda: None,
         open_character_creation=lambda: None,
         open_audio_bar=lambda: None,
         open_dice_bar=lambda: None,
@@ -62,7 +64,10 @@ def test_menu_sections_expose_image_library_commands() -> None:
     gm_tools = next(menu for menu in specs if menu.label == "GM Tools")
     imports_group = next(group for group in gm_tools.groups if group.title == "Imports & Media")
     labels = [item.label for item in imports_group.items]
+    live_tools = next(group for group in gm_tools.groups if group.title == "Live Table Tools")
+    live_labels = [item.label for item in live_tools.items]
 
     assert "GM Table" in table_labels
     assert "Import Image Directories…" in labels
     assert "Open Image Library" in labels
+    assert "Import Ambiance Wallpapers" in live_labels
