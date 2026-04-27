@@ -68,6 +68,7 @@ from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
+from modules.ui.ambiance import SecondScreenAmbiancePlayer
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
 from modules.events.ui.dock import CalendarDock
@@ -194,6 +195,7 @@ class MainWindow(ctk.CTk):
         self._image_directory_importer_window = None
         self._image_library_browser_window = None
         self._asset_library_window = None
+        self._ambiance_player: SecondScreenAmbiancePlayer | None = None
         self._busy_modal = None
         self._system_selector_dialog = None
         self._database_manager_dialog = None
@@ -4546,6 +4548,14 @@ class MainWindow(ctk.CTk):
 
     def destroy(self) -> None:
         """Handle destroy."""
+        if self._ambiance_player is not None:
+            try:
+                self._ambiance_player.stop()
+            except Exception as exc:
+                log_warning(
+                    f"Failed to stop ambiance player cleanly: {exc}",
+                    func_name="MainWindow.destroy",
+                )
         listener = getattr(self, "_system_listener_unsub", None)
         if callable(listener):
             try:
@@ -4559,6 +4569,12 @@ class MainWindow(ctk.CTk):
             finally:
                 self._system_listener_unsub = None
         super().destroy()
+
+    def get_ambiance_player(self) -> SecondScreenAmbiancePlayer:
+        """Return the app-level singleton ambiance player."""
+        if self._ambiance_player is None:
+            self._ambiance_player = SecondScreenAmbiancePlayer(root=self)
+        return self._ambiance_player
 
     def open_sound_manager(self):
         """Open sound manager."""
