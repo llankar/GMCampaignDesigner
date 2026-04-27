@@ -69,6 +69,7 @@ from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.ui.ambiance import SecondScreenAmbiancePlayer
+from modules.ui.ambiance.importer.dialog import AmbianceWallpaperImporterDialog
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
 from modules.events.ui.dock import CalendarDock
@@ -196,6 +197,7 @@ class MainWindow(ctk.CTk):
         self._image_library_browser_window = None
         self._asset_library_window = None
         self._ambiance_player: SecondScreenAmbiancePlayer | None = None
+        self._wallpaper_importer_window = None
         self._busy_modal = None
         self._system_selector_dialog = None
         self._database_manager_dialog = None
@@ -4600,6 +4602,26 @@ class MainWindow(ctk.CTk):
                 self.current_gm_view.open_ambiance_tab()
         except Exception:
             pass
+
+    def open_wallpaper_importer(self, *, on_complete=None):
+        """Open wallpaper importer dialog bound to the current campaign."""
+        dialog = None
+        try:
+            dialog = self._wallpaper_importer_window
+        except Exception:
+            dialog = None
+
+        if dialog is None or not dialog.winfo_exists():
+            dialog = AmbianceWallpaperImporterDialog(self, on_complete=on_complete)
+            self._wallpaper_importer_window = dialog
+            dialog.bind("<Destroy>", lambda _event: setattr(self, "_wallpaper_importer_window", None))
+            return dialog
+
+        if callable(on_complete):
+            dialog._on_complete = on_complete  # type: ignore[attr-defined]
+        dialog.lift()
+        dialog.focus_force()
+        return dialog
 
     def open_sound_manager(self):
         """Open sound manager."""

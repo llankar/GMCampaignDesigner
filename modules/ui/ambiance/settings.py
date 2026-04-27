@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import configparser
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from modules.helpers.config_helper import ConfigHelper
@@ -19,6 +19,8 @@ class AmbianceSettings:
 
     enabled: bool = False
     playlist_paths: tuple[str, ...] = ()
+    playlist_item_ids: tuple[str, ...] = ()
+    playlist_entries: tuple[dict, ...] = field(default_factory=tuple)
     default_duration_sec: float = _DEFAULT_DURATION_SEC
     transition: str = "fade"
     shuffle: bool = False
@@ -32,12 +34,18 @@ def load_ambiance_settings() -> AmbianceSettings:
     if not cfg.has_section(_SECTION):
         return AmbianceSettings()
 
-    playlist_paths_raw = cfg.get(_SECTION, "playlist_paths", fallback="[]")
-    playlist_paths = _parse_playlist_paths(playlist_paths_raw)
+    playlist_paths = _parse_json_string_list(cfg.get(_SECTION, "playlist_paths", fallback="[]"))
+    playlist_item_ids = _parse_json_string_list(cfg.get(_SECTION, "playlist_item_ids", fallback="[]"))
+    playlist_entries = _parse_json_object_list(cfg.get(_SECTION, "playlist_entries", fallback="[]"))
+
+    if playlist_item_ids and not playlist_entries:
+        playlist_entries = [{"id": item_id, "duration": _DEFAULT_DURATION_SEC} for item_id in playlist_item_ids]
 
     return AmbianceSettings(
         enabled=_to_bool(cfg.get(_SECTION, "enabled", fallback=False), False),
         playlist_paths=playlist_paths,
+        playlist_item_ids=playlist_item_ids,
+        playlist_entries=tuple(playlist_entries),
         default_duration_sec=_to_float(
             cfg.get(_SECTION, "default_duration_sec", fallback=_DEFAULT_DURATION_SEC),
             _DEFAULT_DURATION_SEC,
@@ -61,6 +69,8 @@ def save_ambiance_settings(settings: AmbianceSettings) -> None:
 
     payload = asdict(settings)
     payload["playlist_paths"] = json.dumps(list(settings.playlist_paths), ensure_ascii=False)
+    payload["playlist_item_ids"] = json.dumps(list(settings.playlist_item_ids), ensure_ascii=False)
+    payload["playlist_entries"] = json.dumps(list(settings.playlist_entries), ensure_ascii=False)
     for key, value in payload.items():
         cfg.set(_SECTION, key, str(value))
 
@@ -78,25 +88,40 @@ def update_ambiance_settings(**changes) -> AmbianceSettings:
     merged = AmbianceSettings(**(asdict(current) | changes))
     if isinstance(merged.playlist_paths, list):
         merged.playlist_paths = tuple(merged.playlist_paths)
+    if isinstance(merged.playlist_item_ids, list):
+        merged.playlist_item_ids = tuple(merged.playlist_item_ids)
+    if isinstance(merged.playlist_entries, list):
+        merged.playlist_entries = tuple(merged.playlist_entries)
     save_ambiance_settings(merged)
     return merged
 
 
-def _parse_playlist_paths(raw_value) -> tuple[str, ...]:
+def _parse_json_string_list(raw_value) -> tuple[str, ...]:
     if isinstance(raw_value, (list, tuple)):
         return tuple(str(item).strip() for item in raw_value if str(item).strip())
-    if raw_value is None:
-        return ()
-    text = str(raw_value).strip()
+    text = str(raw_value or "").strip()
     if not text:
         return ()
     try:
         decoded = json.loads(text)
     except Exception:
         return (text,)
-    if isinstance(decoded, list):
-        return tuple(str(item).strip() for item in decoded if str(item).strip())
-    return ()
+    if not isinstance(decoded, list):
+        return ()
+    return tuple(str(item).strip() for item in decoded if str(item).strip())
+
+
+def _parse_json_object_list(raw_value) -> list[dict]:
+    text = str(raw_value or "").strip()
+    if not text:
+        return []
+    try:
+        decoded = json.loads(text)
+    except Exception:
+        return []
+    if not isinstance(decoded, list):
+        return []
+    return [item for item in decoded if isinstance(item, dict)]
 
 
 def _to_bool(value, default: bool) -> bool:
