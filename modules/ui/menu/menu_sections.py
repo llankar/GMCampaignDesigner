@@ -173,6 +173,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                         _command("Dice", app.open_dice_roller, shortcut="F8", icon_key="dice_roller"),
                         _command("Sound & Music", app.open_sound_manager, shortcut="F7", icon_key="audio_controls"),
                         _command("Session Timers", app.open_timer_window, icon_key="session_timers"),
+                        _command("Ambiance Screen", app.open_ambiance_panel, icon_key="audio_controls"),
                         _command("Character Creation", app.open_character_creation),
                     ],
                 ),
