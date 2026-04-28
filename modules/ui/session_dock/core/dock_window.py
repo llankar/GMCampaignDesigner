@@ -32,7 +32,11 @@ class DockWindow(ctk.CTkToplevel):
         self.container.pack(fill="both", expand=True, padx=8, pady=8)
 
         self.protocol("WM_DELETE_WINDOW", self.hide)
-        self.bind("<Configure>", self._on_parent_configure, add="+")
+        self._parent_configure_bind_id = master.bind(
+            "<Configure>",
+            self._on_parent_configure,
+            add="+",
+        )
 
         self._apply_state_geometry()
 
@@ -108,3 +112,10 @@ class DockWindow(ctk.CTkToplevel):
             x, y = master_x + max(0, master_w - width), master_y + 64
 
         self.geometry(f"{width}x{height}+{x}+{y}")
+
+    def destroy(self) -> None:
+        """Unbind parent listeners before destroying the dock window."""
+        if self._parent_configure_bind_id is not None:
+            self._master.unbind("<Configure>", self._parent_configure_bind_id)
+            self._parent_configure_bind_id = None
+        super().destroy()
