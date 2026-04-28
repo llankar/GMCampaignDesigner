@@ -130,18 +130,39 @@ class DiceBarWindow(ctk.CTkToplevel):
         content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
-        content.grid_columnconfigure(0, weight=0)
-        content.grid_columnconfigure(1, weight=0)
-        content.grid_columnconfigure(2, weight=0)
-        content.grid_columnconfigure(3, weight=0)
-        content.grid_columnconfigure(4, weight=0)
-        content.grid_columnconfigure(5, weight=0)
+        for column in range(8):
+            content.grid_columnconfigure(column, weight=0)
+        content.grid_columnconfigure(0, weight=1)
         content.grid_columnconfigure(6, weight=1)
-        content.grid_columnconfigure(7, weight=0)
         content.grid_rowconfigure(0, weight=1)
+        content.grid_rowconfigure(1, weight=1)
         self._content_frame = content
 
-        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=200, height=30)
+        builder_pill = ctk.CTkLabel(
+            content,
+            text="ROLL BUILDER",
+            font=("Segoe UI", 10, "bold"),
+            corner_radius=8,
+            fg_color=tokens.get("sidebar_active_bg"),
+            text_color=tokens.get("sidebar_active_fg"),
+            padx=10,
+            pady=2,
+        )
+        builder_pill.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="e")
+
+        result_pill = ctk.CTkLabel(
+            content,
+            text="RESULT",
+            font=("Segoe UI", 10, "bold"),
+            corner_radius=8,
+            fg_color=tokens.get("sidebar_hover_bg"),
+            text_color=tokens.get("text_primary"),
+            padx=10,
+            pady=2,
+        )
+        result_pill.grid(row=0, column=7, padx=(4, 8), pady=4, sticky="w")
+
+        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=250, height=30)
         entry.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="new")
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
@@ -187,19 +208,19 @@ class DiceBarWindow(ctk.CTkToplevel):
         preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="nw")
         self._preset_frame = preset_frame
 
-        result_frame = ctk.CTkFrame(content, fg_color="transparent")
-        result_frame.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="new")
+        result_frame = ctk.CTkFrame(content, corner_radius=10, fg_color=tokens.get("panel_alt_bg"))
+        result_frame.grid(row=1, column=0, columnspan=7, padx=(8, 8), pady=(0, 8), sticky="new")
         result_frame.grid_columnconfigure(0, weight=1)
         result_frame.grid_columnconfigure(1, weight=0)
 
         result_container = ctk.CTkFrame(result_frame, fg_color="transparent")
-        result_container.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        result_container.grid(row=0, column=0, padx=(10, 10), pady=8, sticky="nsew")
         result_container.grid_columnconfigure(0, weight=1)
         self._register_drag_target(result_container)
         self._result_container = result_container
 
         total_container = ctk.CTkFrame(result_frame, fg_color="transparent")
-        total_container.grid(row=0, column=1, padx=(8, 0), sticky="ne")
+        total_container.grid(row=0, column=1, padx=(4, 12), pady=8, sticky="ne")
         total_container.grid_columnconfigure(0, weight=0)
         total_container.grid_columnconfigure(1, weight=0)
         self._register_drag_target(total_container)
@@ -726,4 +747,3 @@ class DiceBarWindow(ctk.CTkToplevel):
                         self._expanded_height_hint = measured
         except Exception:
             pass
-
