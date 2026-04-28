@@ -446,6 +446,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         try:
             # Keep geometry resilient if this step fails.
             self.update_idletasks()
+            screen_width = self.winfo_screenwidth()
             if self._is_collapsed:
                 # Continue with this path when is collapsed is set.
                 target = self._collapse_button or self
@@ -460,8 +461,9 @@ class DiceBarWindow(ctk.CTkToplevel):
                     if measured:
                         self._collapsed_height_hint = measured
             else:
-                width = self.winfo_screenwidth()
                 height_source = self._bar_frame or self
+                requested_width = int(height_source.winfo_reqwidth() if height_source is not None else 0)
+                width = max(40, requested_width + 2)
                 if self._expanded_height_hint is None and height_source is not None:
                     # Handle the branch where expanded height hint is missing and height source is available.
                     try:
@@ -470,6 +472,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                         measured = 0
                     if measured:
                         self._expanded_height_hint = measured
+            width = min(width, screen_width)
             if self._is_collapsed:
                 base_height = self._collapsed_height_hint
             else:

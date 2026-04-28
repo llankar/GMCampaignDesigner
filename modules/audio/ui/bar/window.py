@@ -988,13 +988,16 @@ class AudioBarWindow(ctk.CTkToplevel):
         try:
             # Keep geometry resilient if this step fails.
             self.update_idletasks()
+            screen_width = self.winfo_screenwidth()
             if self._is_collapsed:
                 target = self._collapse_button or self
                 width = max(40, int(target.winfo_reqwidth() + 8))
                 height_source = target
             else:
-                width = self.winfo_screenwidth()
                 height_source = self._bar_frame or self
+                requested_width = int(height_source.winfo_reqwidth() if height_source is not None else 0)
+                width = max(40, requested_width + 2)
+            width = min(width, screen_width)
             height = max(36, int((height_source.winfo_reqheight() if height_source else 36) + 16))
             y = self.winfo_screenheight() - height
             self.geometry(f"{width}x{height}+0+{max(0, y)}")
