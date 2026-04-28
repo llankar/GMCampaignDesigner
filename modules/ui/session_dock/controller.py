@@ -49,7 +49,7 @@ class SessionDockController:
 
     def toggle_visibility(self) -> None:
         """Toggle hidden/full mode quickly."""
-        if self._window.state.mode == "hidden":
+        if self._window.dock_state.mode == "hidden":
             self._window.set_mode("full")
         else:
             self._window.set_mode("hidden")
