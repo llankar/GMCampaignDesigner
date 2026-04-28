@@ -998,7 +998,8 @@ class AudioBarWindow(ctk.CTkToplevel):
                 requested_width = int(height_source.winfo_reqwidth() if height_source is not None else 0)
                 width = max(40, requested_width + 2)
             width = min(width, screen_width)
-            height = max(36, int((height_source.winfo_reqheight() if height_source else 36) + 16))
+            requested_height = int((height_source.winfo_reqheight() if height_source else 36) + 16)
+            height = max(36, min(requested_height, 96))
             y = self.winfo_screenheight() - height
             self.geometry(f"{width}x{height}+0+{max(0, y)}")
             dice_window = getattr(self.master, "dice_bar_window", None)

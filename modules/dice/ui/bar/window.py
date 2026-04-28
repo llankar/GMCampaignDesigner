@@ -479,7 +479,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 base_height = self._expanded_height_hint
             if not base_height:
                 base_height = height_source.winfo_reqheight() if height_source else 36
-            height = max(36, int(base_height + HEIGHT_PADDING))
+            height = max(36, min(int(base_height + HEIGHT_PADDING), 96))
             screen_height = self.winfo_screenheight()
             y = screen_height - height
 
