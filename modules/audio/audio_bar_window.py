@@ -102,15 +102,37 @@ class AudioBarWindow(ctk.CTkToplevel):
         content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
-        content.grid_columnconfigure(0, weight=0)
+        for column in range(10):
+            content.grid_columnconfigure(column, weight=0)
         content.grid_columnconfigure(1, weight=1)
-        content.grid_columnconfigure(2, weight=1)
-        content.grid_columnconfigure(3, weight=1)
         content.grid_columnconfigure(4, weight=1)
         content.grid_columnconfigure(5, weight=2)
-        content.grid_columnconfigure(14, weight=3)
-        content.grid_columnconfigure(16, weight=2)
+        content.grid_columnconfigure(8, weight=2)
         self._content_frame = content
+
+        discover_pill = ctk.CTkLabel(
+            content,
+            text="DISCOVER",
+            font=("Segoe UI", 10, "bold"),
+            corner_radius=8,
+            fg_color=tokens.get("sidebar_active_bg"),
+            text_color=tokens.get("sidebar_active_fg"),
+            padx=10,
+            pady=2,
+        )
+        discover_pill.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="w")
+
+        playback_pill = ctk.CTkLabel(
+            content,
+            text="PLAYBACK",
+            font=("Segoe UI", 10, "bold"),
+            corner_radius=8,
+            fg_color=tokens.get("sidebar_hover_bg"),
+            text_color=tokens.get("text_primary"),
+            padx=10,
+            pady=2,
+        )
+        playback_pill.grid(row=0, column=6, columnspan=3, padx=(16, 4), pady=4, sticky="w")
 
         self.section_toggle_button = ctk.CTkButton(
             content,
@@ -118,7 +140,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._toggle_section,
             width=110,
         )
-        self.section_toggle_button.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="ew")
+        self.section_toggle_button.grid(row=1, column=0, padx=(4, 8), pady=(0, 6), sticky="ew")
 
         self.search_var = tk.StringVar(value="")
         self.search_entry = ctk.CTkEntry(
@@ -126,7 +148,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             textvariable=self.search_var,
             placeholder_text="Search",
         )
-        self.search_entry.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        self.search_entry.grid(row=1, column=1, padx=4, pady=(0, 6), sticky="ew")
         self.search_entry.bind("<Return>", self._on_search_submitted)
         self.search_entry.bind("<KP_Enter>", self._on_search_submitted)
         self.search_entry.bind("<KeyRelease>", self._on_search_text_changed)
@@ -138,7 +160,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_category_selected,
             width=170,
         )
-        self.category_menu.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.category_menu.grid(row=1, column=2, padx=4, pady=(0, 6), sticky="ew")
         self.category_menu.configure(state="disabled")
 
         self.mood_menu = ctk.CTkOptionMenu(
@@ -148,7 +170,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_mood_selected,
             width=140,
         )
-        self.mood_menu.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        self.mood_menu.grid(row=1, column=3, padx=4, pady=(0, 6), sticky="ew")
         self.mood_menu.configure(state="disabled")
 
         self._search_results_menu_width = 200
@@ -161,7 +183,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_search_result_selected,
             width=self._search_results_menu_width,
         )
-        self.search_results_menu.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
+        self.search_results_menu.grid(row=1, column=4, padx=4, pady=(0, 6), sticky="ew")
         self.search_results_menu.configure(state="disabled")
         self.search_results_var.trace_add("write", self._keep_search_dropdown_width)
 
@@ -172,7 +194,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_track_selected,
             width=self._now_playing_menu_width,
         )
-        self.now_playing_menu.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
+        self.now_playing_menu.grid(row=1, column=5, padx=4, pady=(0, 6), sticky="ew")
         self.now_playing_menu.configure(state="disabled")
         self.now_playing_var.trace_add("write", self._keep_now_playing_dropdown_width)
 
@@ -180,13 +202,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             content, text="Prev", command=self._on_prev_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.prev_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
+        self.prev_button.grid(row=1, column=6, padx=4, pady=(0, 6), sticky="ew")
 
         self.play_button = ctk.CTkButton(
             content, text="Play", command=self._on_play_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.play_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
+        self.play_button.grid(row=1, column=7, padx=4, pady=(0, 6), sticky="ew")
 
         #self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
         #self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
@@ -195,13 +217,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             content, text="Stop", command=self._on_stop_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.stop_button.grid(row=0, column=8, padx=4, pady=4, sticky="ew")
+        self.stop_button.grid(row=1, column=8, padx=4, pady=(0, 6), sticky="ew")
 
         self.next_button = ctk.CTkButton(
             content, text="Next", command=self._on_next_clicked, width=70,
             fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
         )
-        self.next_button.grid(row=0, column=9, padx=4, pady=4, sticky="ew")
+        self.next_button.grid(row=1, column=9, padx=4, pady=(0, 6), sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(
             content,
@@ -209,7 +231,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.shuffle_var,
             command=self._on_shuffle_toggle,
         )
-        self.shuffle_checkbox.grid(row=0, column=10, padx=(2, 0), pady=4, sticky="w")
+        self.shuffle_checkbox.grid(row=0, column=9, padx=(4, 0), pady=4, sticky="w")
 
         self.loop_checkbox = ctk.CTkCheckBox(
             content,
@@ -217,7 +239,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.loop_var,
             command=self._on_loop_toggle,
         )
-        self.loop_checkbox.grid(row=0, column=11, padx=(2, 0), pady=4, sticky="w")
+        self.loop_checkbox.grid(row=0, column=8, padx=(4, 0), pady=4, sticky="w")
 
         self.continue_checkbox = ctk.CTkCheckBox(
             content,
@@ -225,10 +247,10 @@ class AudioBarWindow(ctk.CTkToplevel):
             variable=self.continue_var,
             command=self._on_continue_toggle,
         )
-        self.continue_checkbox.grid(row=0, column=12, padx=(2, 4), pady=4, sticky="w")
+        self.continue_checkbox.grid(row=0, column=7, padx=(4, 4), pady=4, sticky="w")
 
         volume_label = ctk.CTkLabel(content, text="Volume")
-        volume_label.grid(row=0, column=13, padx=(12, 4), pady=4, sticky="e")
+        volume_label.grid(row=0, column=1, padx=(12, 4), pady=4, sticky="e")
 
         self.volume_slider = ctk.CTkSlider(
             content,
@@ -236,13 +258,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             to=100,
             command=self._on_volume_changed,
         )
-        self.volume_slider.grid(row=0, column=14, padx=4, pady=4, sticky="ew")
+        self.volume_slider.grid(row=0, column=2, columnspan=2, padx=4, pady=4, sticky="ew")
 
         self.volume_value_label = ctk.CTkLabel(content, textvariable=self.volume_value_var, width=60)
-        self.volume_value_label.grid(row=0, column=15, padx=(4, 12), pady=4, sticky="e")
+        self.volume_value_label.grid(row=0, column=4, padx=(4, 12), pady=4, sticky="e")
 
         self.status_label = ctk.CTkLabel(content, textvariable=self.status_var, anchor="w")
-        self.status_label.grid(row=0, column=16, padx=(8, 4), pady=4, sticky="ew")
+        self.status_label.grid(row=0, column=5, padx=(8, 4), pady=4, sticky="ew")
 
         self._building_ui = False
         self._update_collapse_button()
