@@ -37,7 +37,8 @@ class DockWindow(ctk.CTkToplevel):
         self._apply_state_geometry()
 
     @property
-    def state(self) -> DockState:
+    def dock_state(self) -> DockState:
+        """Return persisted dock state without shadowing Tk's ``state()`` API."""
         return self._state
 
     def show(self) -> None:
