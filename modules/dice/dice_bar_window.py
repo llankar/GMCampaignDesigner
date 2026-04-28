@@ -127,13 +127,13 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         collapse_button = ctk.CTkButton(
             bar,
-            text="◀",
+            text="<",
             width=28,
             height=28,
             fg_color=style.accent_soft,
             hover_color=style.accent_hover,
             corner_radius=style.button_radius,
-            font=("Segoe UI Symbol", 14, "bold"),
+            font=("Segoe UI", 14, "bold"),
             command=self._toggle_collapsed,
         )
         collapse_button.grid(row=0, column=0, padx=(6, 8), pady=6, sticky="nsw")
@@ -609,7 +609,7 @@ class DiceBarWindow(ctk.CTkToplevel):
         """Update collapse button."""
         if self._collapse_button is None:
             return
-        self._collapse_button.configure(text="▶" if self._is_collapsed else "◀")
+        self._collapse_button.configure(text=">" if self._is_collapsed else "<")
 
     def _on_drag_start(self, event: tk.Event) -> None:
         """Handle drag start."""
