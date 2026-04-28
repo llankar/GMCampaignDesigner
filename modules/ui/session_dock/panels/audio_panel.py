@@ -9,7 +9,7 @@ from modules.ui.session_dock.widgets import DockIconButton, StatusPill, attach_t
 
 
 class AudioPanel(ctk.CTkFrame):
-    """Compact audio controls for ambiance and cues."""
+    """Compact audio controls for ambience and cues."""
 
     panel_id = "audio"
 
@@ -23,7 +23,7 @@ class AudioPanel(ctk.CTkFrame):
             row=0, column=0, sticky="w", padx=pad, pady=(pad, spacing("xs"))
         )
         StatusPill(self, text="Idle", tone="idle").grid(row=0, column=1, sticky="e", padx=pad, pady=(pad, spacing("xs")))
-        ctk.CTkLabel(self, text="Ambiance and cues", **BODY_LABEL_STYLE).grid(
+        ctk.CTkLabel(self, text="Ambience and cues", **BODY_LABEL_STYLE).grid(
             row=1, column=0, columnspan=2, sticky="w", padx=pad, pady=(0, spacing("sm"))
         )
 
@@ -31,5 +31,5 @@ class AudioPanel(ctk.CTkFrame):
         stop = DockIconButton(self, text="■", state="critical")
         play.grid(row=2, column=0, sticky="w", padx=(pad, spacing("xs")), pady=(0, pad))
         stop.grid(row=2, column=1, sticky="w", padx=(0, pad), pady=(0, pad))
-        attach_tooltip(play, "Play ambiance")
-        attach_tooltip(stop, "Stop ambiance")
+        attach_tooltip(play, "Play ambience")
+        attach_tooltip(stop, "Stop ambience")

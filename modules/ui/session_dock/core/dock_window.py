@@ -100,7 +100,10 @@ class DockWindow(ctk.CTkToplevel):
         master_h = self._master.winfo_height()
 
         width = 320 if self._state.mode == "full" else 220
-        height = 400 if self._state.mode == "full" else 240
+        base_height = 400 if self._state.mode == "full" else 240
+        content_height = self.container.winfo_reqheight() + 16
+        max_height = max(220, master_h - 24)
+        height = max(base_height, min(content_height, max_height))
 
         if self._state.pinned_edge == "left":
             x, y = master_x, master_y + 64
