@@ -15,19 +15,19 @@ DockEdge = Literal["left", "right", "top", "bottom"]
 class DockState:
     """Serializable dock state used across sessions."""
 
-    mode: DockMode = "compact"
+    mode: DockMode = "hidden"
     pinned_edge: DockEdge = "right"
     opacity: float = 0.96
 
     @classmethod
     def from_dict(cls, data: dict) -> "DockState":
         """Build and sanitize state from raw JSON data."""
-        mode = data.get("mode", "compact")
+        mode = data.get("mode", "hidden")
         edge = data.get("pinned_edge", "right")
         opacity = data.get("opacity", 0.96)
 
         if mode not in {"hidden", "compact", "full"}:
-            mode = "compact"
+            mode = "hidden"
         if edge not in {"left", "right", "top", "bottom"}:
             edge = "right"
         try:
