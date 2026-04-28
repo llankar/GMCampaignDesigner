@@ -1,45 +1,39 @@
-"""Session dock dice panel styled with shared session-dock tokens."""
+"""Dice panel rendered inside the session dock container."""
 
 from __future__ import annotations
 
 import customtkinter as ctk
 
-from modules.ui.session_dock.theme.component_styles import (
-    ANIMATION_STYLE,
-    BODY_LABEL_STYLE,
-    PANEL_BASE_STYLE,
-    TITLE_LABEL_STYLE,
-    button_style,
-    icon_style,
-    spacing,
-)
+from modules.ui.session_dock.theme.component_styles import BODY_LABEL_STYLE, PANEL_BASE_STYLE, TITLE_LABEL_STYLE, spacing
+from modules.ui.session_dock.widgets import DockIconButton, DockSegmentedControl, StatusPill, attach_tooltip
 
 
 class DicePanel(ctk.CTkFrame):
-    """Quick dice rolling controls for the session dock."""
+    """Quick roll controls for table actions."""
+
+    panel_id = "dice"
 
     def __init__(self, master: ctk.CTkBaseClass, **kwargs) -> None:
-        merged = {**PANEL_BASE_STYLE, **kwargs}
-        super().__init__(master, **merged)
-
+        super().__init__(master, **{**PANEL_BASE_STYLE, **kwargs})
         pad = spacing("md")
-        self.grid_columnconfigure(0, weight=1)
 
-        self.title = ctk.CTkLabel(self, text="Dice", **TITLE_LABEL_STYLE)
-        self.title.grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, spacing("xs")))
+        self.grid_columnconfigure(1, weight=1)
 
-        self.subtitle = ctk.CTkLabel(self, text="Fast checks and rolls", **BODY_LABEL_STYLE)
-        self.subtitle.grid(row=1, column=0, sticky="w", padx=pad, pady=(0, spacing("sm")))
+        ctk.CTkLabel(self, text="Dice", **TITLE_LABEL_STYLE).grid(
+            row=0, column=0, sticky="w", padx=pad, pady=(pad, spacing("xs"))
+        )
+        StatusPill(self, text="Ready", tone="success").grid(row=0, column=1, sticky="e", padx=pad, pady=(pad, spacing("xs")))
+        ctk.CTkLabel(self, text="Fast checks and rolls", **BODY_LABEL_STYLE).grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=pad, pady=(0, spacing("sm"))
+        )
 
-        self.roll_button = ctk.CTkButton(self, text="Roll d20", **button_style("active"))
-        self.roll_button.grid(row=2, column=0, sticky="ew", padx=pad, pady=(0, spacing("xs")))
+        modes = DockSegmentedControl(self, values=["d20", "d12", "d6"])
+        modes.set("d20")
+        modes.grid(row=2, column=0, columnspan=2, sticky="ew", padx=pad, pady=(0, spacing("sm")))
 
-        self.clear_button = ctk.CTkButton(self, text="Clear", **button_style("idle"))
-        self.clear_button.grid(row=3, column=0, sticky="ew", padx=pad, pady=(0, pad))
-
-        self.icon_token = icon_style("hover")
-        self.timings = ANIMATION_STYLE.copy()
-
-    def get_animation_timings(self) -> dict[str, int]:
-        """Provide animation timings used by panel transitions."""
-        return self.timings.copy()
+        roll = DockIconButton(self, text="🎲", state="active")
+        clear = DockIconButton(self, text="⟲")
+        roll.grid(row=3, column=0, sticky="w", padx=(pad, spacing("xs")), pady=(0, pad))
+        clear.grid(row=3, column=1, sticky="w", padx=(0, pad), pady=(0, pad))
+        attach_tooltip(roll, "Roll selected die")
+        attach_tooltip(clear, "Clear result")

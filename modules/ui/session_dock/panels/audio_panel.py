@@ -1,45 +1,35 @@
-"""Session dock audio panel styled with shared session-dock tokens."""
+"""Audio panel rendered inside the session dock container."""
 
 from __future__ import annotations
 
 import customtkinter as ctk
 
-from modules.ui.session_dock.theme.component_styles import (
-    ANIMATION_STYLE,
-    BODY_LABEL_STYLE,
-    PANEL_BASE_STYLE,
-    TITLE_LABEL_STYLE,
-    button_style,
-    icon_style,
-    spacing,
-)
+from modules.ui.session_dock.theme.component_styles import BODY_LABEL_STYLE, PANEL_BASE_STYLE, TITLE_LABEL_STYLE, spacing
+from modules.ui.session_dock.widgets import DockIconButton, StatusPill, attach_tooltip
 
 
 class AudioPanel(ctk.CTkFrame):
-    """Compact audio controls for the session dock."""
+    """Compact audio controls for ambiance and cues."""
+
+    panel_id = "audio"
 
     def __init__(self, master: ctk.CTkBaseClass, **kwargs) -> None:
-        merged = {**PANEL_BASE_STYLE, **kwargs}
-        super().__init__(master, **merged)
-
+        super().__init__(master, **{**PANEL_BASE_STYLE, **kwargs})
         pad = spacing("md")
-        self.grid_columnconfigure(0, weight=1)
 
-        self.title = ctk.CTkLabel(self, text="Audio", **TITLE_LABEL_STYLE)
-        self.title.grid(row=0, column=0, sticky="w", padx=pad, pady=(pad, spacing("xs")))
+        self.grid_columnconfigure(1, weight=1)
 
-        self.subtitle = ctk.CTkLabel(self, text="Ambiance and cues", **BODY_LABEL_STYLE)
-        self.subtitle.grid(row=1, column=0, sticky="w", padx=pad, pady=(0, spacing("sm")))
+        ctk.CTkLabel(self, text="Audio", **TITLE_LABEL_STYLE).grid(
+            row=0, column=0, sticky="w", padx=pad, pady=(pad, spacing("xs"))
+        )
+        StatusPill(self, text="Idle", tone="idle").grid(row=0, column=1, sticky="e", padx=pad, pady=(pad, spacing("xs")))
+        ctk.CTkLabel(self, text="Ambiance and cues", **BODY_LABEL_STYLE).grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=pad, pady=(0, spacing("sm"))
+        )
 
-        self.play_button = ctk.CTkButton(self, text="Play", **button_style("idle"))
-        self.play_button.grid(row=2, column=0, sticky="ew", padx=pad, pady=(0, spacing("xs")))
-
-        self.stop_button = ctk.CTkButton(self, text="Stop", **button_style("critical"))
-        self.stop_button.grid(row=3, column=0, sticky="ew", padx=pad, pady=(0, pad))
-
-        self.icon_token = icon_style("idle")
-        self.timings = ANIMATION_STYLE.copy()
-
-    def get_animation_timings(self) -> dict[str, int]:
-        """Provide animation timings used by panel transitions."""
-        return self.timings.copy()
+        play = DockIconButton(self, text="▶")
+        stop = DockIconButton(self, text="■", state="critical")
+        play.grid(row=2, column=0, sticky="w", padx=(pad, spacing("xs")), pady=(0, pad))
+        stop.grid(row=2, column=1, sticky="w", padx=(0, pad), pady=(0, pad))
+        attach_tooltip(play, "Play ambiance")
+        attach_tooltip(stop, "Stop ambiance")
