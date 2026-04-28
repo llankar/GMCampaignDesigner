@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional
 
 import customtkinter as ctk
 from modules.helpers import theme_manager
+from modules.ui.styles.compact_bar_style import build_compact_bar_style
 
 from modules.audio.audio_constants import DEFAULT_SECTION, SECTION_TITLES
 from modules.audio.audio_controller import AudioController, get_audio_controller
@@ -84,7 +85,14 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         tokens = theme_manager.get_tokens()
-        bar = ctk.CTkFrame(self, corner_radius=0, fg_color=tokens.get("panel_bg"))
+        style = build_compact_bar_style(tokens)
+        bar = ctk.CTkFrame(
+            self,
+            corner_radius=14,
+            fg_color=style.shell_bg,
+            border_width=style.border_width,
+            border_color=style.panel_border,
+        )
         bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         bar.grid_columnconfigure(0, weight=0)
         bar.grid_columnconfigure(1, weight=1)
@@ -94,12 +102,20 @@ class AudioBarWindow(ctk.CTkToplevel):
             bar,
             text="◀",
             width=16,
-            fg_color=tokens.get("button_fg"),
+            fg_color=style.accent_soft,
+            hover_color=style.accent_hover,
+            corner_radius=style.button_radius,
             command=self._toggle_collapsed,
         )
         self._collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
 
-        content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
+        content = ctk.CTkFrame(
+            bar,
+            corner_radius=12,
+            fg_color=style.content_bg,
+            border_width=1,
+            border_color=style.panel_border,
+        )
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         for column in range(10):
@@ -114,9 +130,9 @@ class AudioBarWindow(ctk.CTkToplevel):
             content,
             text="DISCOVER",
             font=("Segoe UI", 10, "bold"),
-            corner_radius=8,
-            fg_color=tokens.get("sidebar_active_bg"),
-            text_color=tokens.get("sidebar_active_fg"),
+            corner_radius=style.pill_radius,
+            fg_color=style.badge_fg,
+            text_color=style.badge_text,
             padx=10,
             pady=2,
         )
@@ -126,9 +142,9 @@ class AudioBarWindow(ctk.CTkToplevel):
             content,
             text="PLAYBACK",
             font=("Segoe UI", 10, "bold"),
-            corner_radius=8,
-            fg_color=tokens.get("sidebar_hover_bg"),
-            text_color=tokens.get("text_primary"),
+            corner_radius=style.pill_radius,
+            fg_color=style.accent_soft,
+            text_color=style.badge_text,
             padx=10,
             pady=2,
         )
@@ -200,13 +216,15 @@ class AudioBarWindow(ctk.CTkToplevel):
 
         self.prev_button = ctk.CTkButton(
             content, text="Prev", command=self._on_prev_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=style.accent_soft, hover_color=style.accent_hover, text_color=style.button_text,
+            corner_radius=style.button_radius,
         )
         self.prev_button.grid(row=1, column=6, padx=4, pady=(0, 6), sticky="ew")
 
         self.play_button = ctk.CTkButton(
             content, text="Play", command=self._on_play_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=style.accent_strong, hover_color=style.accent_hover, text_color=style.button_text,
+            corner_radius=style.button_radius,
         )
         self.play_button.grid(row=1, column=7, padx=4, pady=(0, 6), sticky="ew")
 
@@ -215,13 +233,15 @@ class AudioBarWindow(ctk.CTkToplevel):
 
         self.stop_button = ctk.CTkButton(
             content, text="Stop", command=self._on_stop_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=style.accent_soft, hover_color=style.accent_hover, text_color=style.button_text,
+            corner_radius=style.button_radius,
         )
         self.stop_button.grid(row=1, column=8, padx=4, pady=(0, 6), sticky="ew")
 
         self.next_button = ctk.CTkButton(
             content, text="Next", command=self._on_next_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=style.accent_soft, hover_color=style.accent_hover, text_color=style.button_text,
+            corner_radius=style.button_radius,
         )
         self.next_button.grid(row=1, column=9, padx=4, pady=(0, 6), sticky="ew")
 

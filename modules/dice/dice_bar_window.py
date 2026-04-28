@@ -8,6 +8,7 @@ from typing import List, Tuple
 
 import customtkinter as ctk
 from modules.helpers import theme_manager
+from modules.ui.styles.compact_bar_style import build_compact_bar_style
 
 from modules.dice import dice_engine
 from modules.dice import dice_preferences
@@ -108,7 +109,14 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         tokens = theme_manager.get_tokens()
-        bar = ctk.CTkFrame(self, corner_radius=0, fg_color=tokens.get("panel_bg"))
+        style = build_compact_bar_style(tokens)
+        bar = ctk.CTkFrame(
+            self,
+            corner_radius=14,
+            fg_color=style.shell_bg,
+            border_width=style.border_width,
+            border_color=style.panel_border,
+        )
         bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=4)
         bar.grid_columnconfigure(0, weight=0)
         bar.grid_columnconfigure(1, weight=1)
@@ -121,13 +129,21 @@ class DiceBarWindow(ctk.CTkToplevel):
             bar,
             text="◀",
             width=16,
-            fg_color=tokens.get("button_fg"),
+            fg_color=style.accent_soft,
+            hover_color=style.accent_hover,
+            corner_radius=style.button_radius,
             command=self._toggle_collapsed,
         )
         collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
         self._collapse_button = collapse_button
 
-        content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
+        content = ctk.CTkFrame(
+            bar,
+            corner_radius=12,
+            fg_color=style.content_bg,
+            border_width=1,
+            border_color=style.panel_border,
+        )
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         for column in range(8):
@@ -142,9 +158,9 @@ class DiceBarWindow(ctk.CTkToplevel):
             content,
             text="ROLL BUILDER",
             font=("Segoe UI", 10, "bold"),
-            corner_radius=8,
-            fg_color=tokens.get("sidebar_active_bg"),
-            text_color=tokens.get("sidebar_active_fg"),
+            corner_radius=style.pill_radius,
+            fg_color=style.badge_fg,
+            text_color=style.badge_text,
             padx=10,
             pady=2,
         )
@@ -154,9 +170,9 @@ class DiceBarWindow(ctk.CTkToplevel):
             content,
             text="RESULT",
             font=("Segoe UI", 10, "bold"),
-            corner_radius=8,
-            fg_color=tokens.get("sidebar_hover_bg"),
-            text_color=tokens.get("text_primary"),
+            corner_radius=style.pill_radius,
+            fg_color=style.accent_soft,
+            text_color=style.badge_text,
             padx=10,
             pady=2,
         )
@@ -189,8 +205,10 @@ class DiceBarWindow(ctk.CTkToplevel):
             width=80,
             height=32,
             command=self.roll,
-            fg_color="#2fa572",
-            hover_color="#23865a",
+            fg_color=style.accent_strong,
+            hover_color=style.accent_hover,
+            text_color=style.button_text,
+            corner_radius=style.button_radius,
             font=("Segoe UI", 14, "bold"),
         )
         roll_button.grid(row=0, column=3, padx=4, pady=4, sticky="new")
@@ -201,6 +219,10 @@ class DiceBarWindow(ctk.CTkToplevel):
             width=70,
             height=32,
             command=self._clear_formula,
+            fg_color=style.accent_soft,
+            hover_color=style.accent_hover,
+            text_color=style.button_text,
+            corner_radius=style.button_radius,
         )
         clear_button.grid(row=0, column=4, padx=4, pady=4, sticky="new")
 
@@ -208,7 +230,13 @@ class DiceBarWindow(ctk.CTkToplevel):
         preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="nw")
         self._preset_frame = preset_frame
 
-        result_frame = ctk.CTkFrame(content, corner_radius=10, fg_color=tokens.get("panel_alt_bg"))
+        result_frame = ctk.CTkFrame(
+            content,
+            corner_radius=12,
+            fg_color=style.content_bg,
+            border_width=1,
+            border_color=style.panel_border,
+        )
         result_frame.grid(row=1, column=0, columnspan=7, padx=(8, 8), pady=(0, 8), sticky="new")
         result_frame.grid_columnconfigure(0, weight=1)
         result_frame.grid_columnconfigure(1, weight=0)
