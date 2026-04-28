@@ -100,13 +100,13 @@ class AudioBarWindow(ctk.CTkToplevel):
 
         self._collapse_button = ctk.CTkButton(
             bar,
-            text="◀",
+            text="<",
             width=28,
             height=28,
             fg_color=style.accent_soft,
             hover_color=style.accent_hover,
             corner_radius=style.button_radius,
-            font=("Segoe UI Symbol", 14, "bold"),
+            font=("Segoe UI", 14, "bold"),
             command=self._toggle_collapsed,
         )
         self._collapse_button.grid(row=0, column=0, padx=(6, 8), pady=6, sticky="nsw")
@@ -1034,9 +1034,9 @@ class AudioBarWindow(ctk.CTkToplevel):
         if not self._collapse_button:
             return
         if self._is_collapsed:
-            self._collapse_button.configure(text="▶")
+            self._collapse_button.configure(text=">")
         else:
-            self._collapse_button.configure(text="◀")
+            self._collapse_button.configure(text="<")
 
     # ------------------------------------------------------------------
     # Window helpers
