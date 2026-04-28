@@ -73,6 +73,8 @@ from modules.ui.ambiance.control_window import AmbianceControlWindow
 from modules.ui.ambiance.importer.dialog import AmbianceWallpaperImporterDialog
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
+from modules.ui.session_dock import SessionDockController
+from modules.ui.session_dock.panels import AudioPanel, DicePanel
 from modules.events.ui.dock import CalendarDock
 from modules.events.models.event_types import get_event_type
 from modules.events.services.timeline_simulator import CampaignTimelineSimulator
@@ -201,6 +203,7 @@ class MainWindow(ctk.CTk):
         self._ambiance_control_window = None
         self._wallpaper_importer_window = None
         self._busy_modal = None
+        self.session_dock_controller: SessionDockController | None = None
         self._system_selector_dialog = None
         self._database_manager_dialog = None
         self._update_thread = None
@@ -210,6 +213,9 @@ class MainWindow(ctk.CTk):
         root.bind_all("<Control-i>", self._on_ctrl_i)
         root.bind_all("<Control-I>", self._on_ctrl_i)
         self._bind_global_shortcuts()
+        self.session_dock_controller = SessionDockController(self)
+        self.session_dock_controller.mount_panel(AudioPanel.panel_id, AudioPanel)
+        self.session_dock_controller.mount_panel(DicePanel.panel_id, DicePanel)
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
         # Rebuild colorized UI bits when theme changes
@@ -219,6 +225,18 @@ class MainWindow(ctk.CTk):
         self.after(400, self.open_audio_bar)
         self.after(600, lambda: self._queue_update_check(force=True))
         self.after(800, self._auto_open_campaign_overview)
+
+    def mount_session_dock_panel(self, panel_id: str, panel_cls, **kwargs):
+        """Mount a panel dynamically in the session dock."""
+        if self.session_dock_controller is None:
+            self.session_dock_controller = SessionDockController(self)
+        return self.session_dock_controller.mount_panel(panel_id, panel_cls, **kwargs)
+
+    def unmount_session_dock_panel(self, panel_id: str) -> bool:
+        """Unmount a panel dynamically from the session dock."""
+        if self.session_dock_controller is None:
+            return False
+        return self.session_dock_controller.unmount_panel(panel_id)
 
     def _bind_global_shortcuts(self):
         """Bind global shortcuts."""
