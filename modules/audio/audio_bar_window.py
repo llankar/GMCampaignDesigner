@@ -346,6 +346,8 @@ class AudioBarWindow(ctk.CTkToplevel):
 
     def _dispatch_controller_event(self, section: str, event: str, payload: Dict[str, Any]) -> None:
         """Internal helper for dispatch controller event."""
+        if not self._ui_ready_for_updates():
+            return
         try:
             self.after(0, self._handle_controller_event, section, event, payload)
         except Exception as exc:  # pragma: no cover - defensive
@@ -356,6 +358,8 @@ class AudioBarWindow(ctk.CTkToplevel):
 
     def _handle_controller_event(self, section: str, event: str, payload: Dict[str, Any]) -> None:
         """Internal helper for handle controller event."""
+        if not self._ui_ready_for_updates():
+            return
         if section != self._active_section:
             return
 
@@ -659,6 +663,8 @@ class AudioBarWindow(ctk.CTkToplevel):
     # ------------------------------------------------------------------
     def _refresh_from_state(self, section: Optional[str] = None) -> None:
         """Refresh from state."""
+        if not self._ui_ready_for_updates():
+            return
         section = section or self._active_section
         state = self.controller.get_state(section)
         self._refresh_filter_menus(state)
@@ -712,6 +718,8 @@ class AudioBarWindow(ctk.CTkToplevel):
 
     def _refresh_filter_menus(self, state: Optional[Dict[str, Any]]) -> None:
         """Refresh filter menus."""
+        if not self._ui_ready_for_updates():
+            return
         library = getattr(self.controller, "library", None)
         if library is None:
             return
@@ -1047,6 +1055,25 @@ class AudioBarWindow(ctk.CTkToplevel):
         """Handle destroy event."""
         if event.widget is self:
             self._detach_controller_listener()
+
+    def _ui_ready_for_updates(self) -> bool:
+        """Return whether widgets still exist and can be safely updated."""
+        try:
+            if not self.winfo_exists():
+                return False
+        except tk.TclError:
+            return False
+
+        for widget_name in ("category_menu", "mood_menu", "now_playing_menu", "search_results_menu"):
+            widget = getattr(self, widget_name, None)
+            if widget is None:
+                return False
+            try:
+                if not widget.winfo_exists():
+                    return False
+            except tk.TclError:
+                return False
+        return True
 
     def _on_close(self) -> None:
         """Handle close."""
