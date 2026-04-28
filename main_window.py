@@ -213,9 +213,7 @@ class MainWindow(ctk.CTk):
         root.bind_all("<Control-i>", self._on_ctrl_i)
         root.bind_all("<Control-I>", self._on_ctrl_i)
         self._bind_global_shortcuts()
-        self.session_dock_controller = SessionDockController(self)
-        self.session_dock_controller.mount_panel(AudioPanel.panel_id, AudioPanel)
-        self.session_dock_controller.mount_panel(DicePanel.panel_id, DicePanel)
+        self.after(1000, self._initialize_session_dock)
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
         # Rebuild colorized UI bits when theme changes
@@ -229,7 +227,9 @@ class MainWindow(ctk.CTk):
     def mount_session_dock_panel(self, panel_id: str, panel_cls, **kwargs):
         """Mount a panel dynamically in the session dock."""
         if self.session_dock_controller is None:
-            self.session_dock_controller = SessionDockController(self)
+            self._initialize_session_dock()
+        if self.session_dock_controller is None:
+            return None
         return self.session_dock_controller.mount_panel(panel_id, panel_cls, **kwargs)
 
     def unmount_session_dock_panel(self, panel_id: str) -> bool:
@@ -237,6 +237,22 @@ class MainWindow(ctk.CTk):
         if self.session_dock_controller is None:
             return False
         return self.session_dock_controller.unmount_panel(panel_id)
+
+    def _initialize_session_dock(self) -> None:
+        """Initialize session dock without blocking main window startup."""
+        if self.session_dock_controller is not None:
+            return
+
+        try:
+            controller = SessionDockController(self)
+            controller.mount_panel(AudioPanel.panel_id, AudioPanel)
+            controller.mount_panel(DicePanel.panel_id, DicePanel)
+            self.session_dock_controller = controller
+        except Exception as exc:
+            log_exception(
+                f"Session dock initialization skipped: {exc}",
+                func_name="main_window.MainWindow._initialize_session_dock",
+            )
 
     def _bind_global_shortcuts(self):
         """Bind global shortcuts."""
