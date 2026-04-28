@@ -129,9 +129,10 @@ class DiceBarWindow(ctk.CTkToplevel):
             bar,
             text="◀",
             width=16,
-            fg_color=style.accent_soft,
+            fg_color="transparent",
             hover_color=style.accent_hover,
-            corner_radius=style.button_radius,
+            corner_radius=0,
+            border_width=0,
             command=self._toggle_collapsed,
         )
         collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
