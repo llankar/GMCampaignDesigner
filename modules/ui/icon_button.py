@@ -10,19 +10,18 @@ log_module_import(__name__)
 
 def create_icon_button(parent, icon, tooltip_text, command):
     """Create icon button."""
-    container = tk.Frame(parent, bg="#2B2B2B")
+    tokens = theme_manager.get_tokens()
+    container = tk.Frame(parent, bg=tokens.get("sidebar_header_bg", "#2B2B2B"))
 
     has_icon = icon is not None
     if has_icon:
         display_text = ""
-        width = 10
-        height = 10
+        width = 64
+        height = 64
     else:
         display_text = tooltip_text if len(tooltip_text) <= 18 else tooltip_text[:17] + "..."
         width = 160
         height = 48
-
-    tokens = theme_manager.get_tokens()
 
     btn = ctk.CTkButton(
         container,
@@ -50,4 +49,3 @@ def create_icon_button(parent, icon, tooltip_text, command):
     container.button = btn
     ToolTip(btn, tooltip_text)
     return container
-
