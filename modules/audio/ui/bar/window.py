@@ -26,6 +26,7 @@ from modules.audio.ui.bar.layout import (
 )
 from modules.audio.ui.bar.presenters import build_playlist_lookup, build_search_lookup
 from modules.helpers.logging_helper import log_exception, log_module_import
+from modules.ui.bars.style_tokens import build_bar_variants, shared_bar_tokens
 
 log_module_import(__name__)
 
@@ -96,8 +97,20 @@ class AudioBarWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         tokens = theme_manager.get_tokens()
-        bar = ctk.CTkFrame(self, corner_radius=0, fg_color=tokens.get("panel_bg"))
-        bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
+        bar_tokens = shared_bar_tokens()
+        variants = build_bar_variants(tokens)
+        bar = ctk.CTkFrame(
+            self,
+            corner_radius=bar_tokens.corner_radius_none,
+            fg_color=tokens.get("panel_bg"),
+        )
+        bar.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=bar_tokens.bar_outer_pad_x,
+            pady=bar_tokens.bar_outer_pad_y_audio,
+        )
         bar.grid_columnconfigure(0, weight=0)
         bar.grid_columnconfigure(1, weight=1)
         self._bar_frame = bar
@@ -105,13 +118,24 @@ class AudioBarWindow(ctk.CTkToplevel):
         self._collapse_button = ctk.CTkButton(
             bar,
             text="◀",
-            width=16,
-            fg_color=tokens.get("button_fg"),
+            width=bar_tokens.collapse_button_width,
+            fg_color=variants["default"].fg,
+            hover_color=variants["default"].hover,
             command=self._toggle_collapsed,
         )
-        self._collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
+        self._collapse_button.grid(
+            row=0,
+            column=0,
+            padx=(bar_tokens.spacing_xs, bar_tokens.spacing_sm),
+            pady=bar_tokens.spacing_xs,
+            sticky="nsw",
+        )
 
-        content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
+        content = ctk.CTkFrame(
+            bar,
+            corner_radius=bar_tokens.corner_radius_none,
+            fg_color=tokens.get("panel_alt_bg"),
+        )
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=0)
@@ -130,7 +154,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._toggle_section,
             width=110,
         )
-        self.section_toggle_button.grid(row=0, column=0, padx=(4, 8), pady=4, sticky="ew")
+        self.section_toggle_button.grid(
+            row=0,
+            column=0,
+            padx=(bar_tokens.spacing_xs, bar_tokens.spacing_md),
+            pady=bar_tokens.spacing_xs,
+            sticky="ew",
+        )
 
         self.search_var = tk.StringVar(value="")
         self.search_entry = ctk.CTkEntry(
@@ -138,7 +168,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             textvariable=self.search_var,
             placeholder_text="Search",
         )
-        self.search_entry.grid(row=0, column=1, padx=4, pady=4, sticky="ew")
+        self.search_entry.grid(
+            row=0,
+            column=1,
+            padx=bar_tokens.spacing_xs,
+            pady=bar_tokens.spacing_xs,
+            sticky="ew",
+        )
         self.search_entry.bind("<Return>", self._on_search_submitted)
         self.search_entry.bind("<KP_Enter>", self._on_search_submitted)
         self.search_entry.bind("<KeyRelease>", self._on_search_text_changed)
@@ -150,7 +186,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_category_selected,
             width=170,
         )
-        self.category_menu.grid(row=0, column=2, padx=4, pady=4, sticky="ew")
+        self.category_menu.grid(
+            row=0,
+            column=2,
+            padx=bar_tokens.spacing_xs,
+            pady=bar_tokens.spacing_xs,
+            sticky="ew",
+        )
         self.category_menu.configure(state="disabled")
 
         self.mood_menu = ctk.CTkOptionMenu(
@@ -160,7 +202,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_mood_selected,
             width=140,
         )
-        self.mood_menu.grid(row=0, column=3, padx=4, pady=4, sticky="ew")
+        self.mood_menu.grid(
+            row=0,
+            column=3,
+            padx=bar_tokens.spacing_xs,
+            pady=bar_tokens.spacing_xs,
+            sticky="ew",
+        )
         self.mood_menu.configure(state="disabled")
 
         self._search_results_menu_width = SEARCH_RESULTS_MENU_WIDTH
@@ -173,7 +221,13 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_search_result_selected,
             width=self._search_results_menu_width,
         )
-        self.search_results_menu.grid(row=0, column=4, padx=4, pady=4, sticky="ew")
+        self.search_results_menu.grid(
+            row=0,
+            column=4,
+            padx=bar_tokens.spacing_xs,
+            pady=bar_tokens.spacing_xs,
+            sticky="ew",
+        )
         self.search_results_menu.configure(state="disabled")
         self.search_results_var.trace_add("write", self._keep_search_dropdown_width)
 
@@ -184,36 +238,42 @@ class AudioBarWindow(ctk.CTkToplevel):
             command=self._on_track_selected,
             width=self._now_playing_menu_width,
         )
-        self.now_playing_menu.grid(row=0, column=5, padx=4, pady=4, sticky="ew")
+        self.now_playing_menu.grid(
+            row=0,
+            column=5,
+            padx=bar_tokens.spacing_xs,
+            pady=bar_tokens.spacing_xs,
+            sticky="ew",
+        )
         self.now_playing_menu.configure(state="disabled")
         self.now_playing_var.trace_add("write", self._keep_now_playing_dropdown_width)
 
         self.prev_button = ctk.CTkButton(
             content, text="Prev", command=self._on_prev_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=variants["accent"].fg, hover_color=variants["accent"].hover
         )
-        self.prev_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
+        self.prev_button.grid(row=0, column=6, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="ew")
 
         self.play_button = ctk.CTkButton(
             content, text="Play", command=self._on_play_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=variants["accent"].fg, hover_color=variants["accent"].hover
         )
-        self.play_button.grid(row=0, column=7, padx=4, pady=4, sticky="ew")
+        self.play_button.grid(row=0, column=7, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="ew")
 
         #self.pause_button = ctk.CTkButton(content, text="Pause", command=self._on_pause_clicked, width=70)
         #self.pause_button.grid(row=0, column=6, padx=4, pady=4, sticky="ew")
 
         self.stop_button = ctk.CTkButton(
             content, text="Stop", command=self._on_stop_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=variants["accent"].fg, hover_color=variants["accent"].hover
         )
-        self.stop_button.grid(row=0, column=8, padx=4, pady=4, sticky="ew")
+        self.stop_button.grid(row=0, column=8, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="ew")
 
         self.next_button = ctk.CTkButton(
             content, text="Next", command=self._on_next_clicked, width=70,
-            fg_color=tokens.get("accent_button_fg"), hover_color=tokens.get("accent_button_hover")
+            fg_color=variants["accent"].fg, hover_color=variants["accent"].hover
         )
-        self.next_button.grid(row=0, column=9, padx=4, pady=4, sticky="ew")
+        self.next_button.grid(row=0, column=9, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="ew")
 
         self.shuffle_checkbox = ctk.CTkCheckBox(
             content,

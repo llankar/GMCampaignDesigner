@@ -15,6 +15,7 @@ from modules.dice.ui.bar.formatting import TextSegment, ResultChip, format_roll_
 from modules.dice.ui.bar.geometry import HEIGHT_PADDING, INTER_BAR_GAP
 from modules.dice.ui.bar.layout import CLEAR_BUTTON_WIDTH, FORMULA_ENTRY_WIDTH, ROLL_BUTTON_WIDTH
 from modules.helpers.logging_helper import log_module_import
+from modules.ui.bars.style_tokens import build_bar_variants, shared_bar_tokens
 
 log_module_import(__name__)
 
@@ -54,11 +55,12 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._last_roll_options: Tuple[bool, bool] = (False, False)
         self._preset_frame: ctk.CTkFrame | None = None
 
-        self._result_normal_font = ctk.CTkFont(size=16)
-        self._result_emphasis_font = ctk.CTkFont(size=18, weight="bold")
-        self._result_header_font = ctk.CTkFont(size=13, weight="bold")
-        self._result_detail_font = ctk.CTkFont(size=14)
-        self._chip_total_font = ctk.CTkFont(size=18, weight="bold")
+        bar_tokens = shared_bar_tokens()
+        self._result_normal_font = ctk.CTkFont(size=bar_tokens.font_size_result)
+        self._result_emphasis_font = ctk.CTkFont(size=bar_tokens.font_size_total, weight="bold")
+        self._result_header_font = ctk.CTkFont(size=bar_tokens.font_size_header, weight="bold")
+        self._result_detail_font = ctk.CTkFont(size=bar_tokens.font_size_body)
+        self._chip_total_font = ctk.CTkFont(size=bar_tokens.font_size_total, weight="bold")
 
         self._build_ui()
         self.refresh_system_settings(initial=True)
@@ -79,8 +81,16 @@ class DiceBarWindow(ctk.CTkToplevel):
         self.grid_columnconfigure(0, weight=1)
 
         tokens = theme_manager.get_tokens()
-        bar = ctk.CTkFrame(self, corner_radius=0, fg_color=tokens.get("panel_bg"))
-        bar.grid(row=0, column=0, sticky="nsew", padx=8, pady=4)
+        bar_tokens = shared_bar_tokens()
+        variants = build_bar_variants(tokens)
+        bar = ctk.CTkFrame(self, corner_radius=bar_tokens.corner_radius_none, fg_color=tokens.get("panel_bg"))
+        bar.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=bar_tokens.bar_outer_pad_x,
+            pady=bar_tokens.bar_outer_pad_y_dice,
+        )
         bar.grid_columnconfigure(0, weight=0)
         bar.grid_columnconfigure(1, weight=1)
         bar.bind("<ButtonPress-1>", self._on_drag_start)
@@ -91,14 +101,25 @@ class DiceBarWindow(ctk.CTkToplevel):
         collapse_button = ctk.CTkButton(
             bar,
             text="◀",
-            width=16,
-            fg_color=tokens.get("button_fg"),
+            width=bar_tokens.collapse_button_width,
+            fg_color=variants["default"].fg,
+            hover_color=variants["default"].hover,
             command=self._toggle_collapsed,
         )
-        collapse_button.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="nsw")
+        collapse_button.grid(
+            row=0,
+            column=0,
+            padx=(bar_tokens.spacing_xs, bar_tokens.spacing_sm),
+            pady=bar_tokens.spacing_xs,
+            sticky="nsw",
+        )
         self._collapse_button = collapse_button
 
-        content = ctk.CTkFrame(bar, corner_radius=0, fg_color=tokens.get("panel_alt_bg"))
+        content = ctk.CTkFrame(
+            bar,
+            corner_radius=bar_tokens.corner_radius_none,
+            fg_color=tokens.get("panel_alt_bg"),
+        )
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
         content.grid_columnconfigure(0, weight=0)
@@ -113,7 +134,13 @@ class DiceBarWindow(ctk.CTkToplevel):
         self._content_frame = content
 
         entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=FORMULA_ENTRY_WIDTH, height=30)
-        entry.grid(row=0, column=0, padx=(4, 6), pady=4, sticky="new")
+        entry.grid(
+            row=0,
+            column=0,
+            padx=(bar_tokens.spacing_xs, bar_tokens.spacing_sm),
+            pady=bar_tokens.spacing_xs,
+            sticky="new",
+        )
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
 
@@ -123,7 +150,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             variable=self.exploding_var,
             checkbox_height=18,
         )
-        explode_box.grid(row=0, column=1, padx=4, pady=4, sticky="nw")
+        explode_box.grid(row=0, column=1, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="nw")
 
         separate_box = ctk.CTkCheckBox(
             content,
@@ -131,7 +158,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             variable=self.separate_var,
             checkbox_height=18,
         )
-        separate_box.grid(row=0, column=2, padx=4, pady=4, sticky="nw")
+        separate_box.grid(row=0, column=2, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="nw")
 
         roll_button = ctk.CTkButton(
             content,
@@ -139,11 +166,11 @@ class DiceBarWindow(ctk.CTkToplevel):
             width=ROLL_BUTTON_WIDTH,
             height=32,
             command=self.roll,
-            fg_color="#2fa572",
-            hover_color="#23865a",
-            font=("Segoe UI", 14, "bold"),
+            fg_color=variants["success"].fg,
+            hover_color=variants["success"].hover,
+            font=("Segoe UI", bar_tokens.font_size_body, "bold"),
         )
-        roll_button.grid(row=0, column=3, padx=4, pady=4, sticky="new")
+        roll_button.grid(row=0, column=3, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="new")
 
         clear_button = ctk.CTkButton(
             content,
@@ -151,26 +178,40 @@ class DiceBarWindow(ctk.CTkToplevel):
             width=CLEAR_BUTTON_WIDTH,
             height=32,
             command=self._clear_formula,
+            fg_color=variants["default"].fg,
+            hover_color=variants["default"].hover,
         )
-        clear_button.grid(row=0, column=4, padx=4, pady=4, sticky="new")
+        clear_button.grid(row=0, column=4, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="new")
 
         preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(row=0, column=5, padx=(6, 4), pady=4, sticky="nw")
+        preset_frame.grid(
+            row=0,
+            column=5,
+            padx=(bar_tokens.spacing_sm, bar_tokens.spacing_xs),
+            pady=bar_tokens.spacing_xs,
+            sticky="nw",
+        )
         self._preset_frame = preset_frame
 
         result_frame = ctk.CTkFrame(content, fg_color="transparent")
-        result_frame.grid(row=0, column=6, padx=(6, 4), pady=4, sticky="new")
+        result_frame.grid(
+            row=0,
+            column=6,
+            padx=(bar_tokens.spacing_sm, bar_tokens.spacing_xs),
+            pady=bar_tokens.spacing_xs,
+            sticky="new",
+        )
         result_frame.grid_columnconfigure(0, weight=1)
         result_frame.grid_columnconfigure(1, weight=0)
 
         result_container = ctk.CTkFrame(result_frame, fg_color="transparent")
-        result_container.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        result_container.grid(row=0, column=0, padx=(0, bar_tokens.spacing_md), sticky="nsew")
         result_container.grid_columnconfigure(0, weight=1)
         self._register_drag_target(result_container)
         self._result_container = result_container
 
         total_container = ctk.CTkFrame(result_frame, fg_color="transparent")
-        total_container.grid(row=0, column=1, padx=(8, 0), sticky="ne")
+        total_container.grid(row=0, column=1, padx=(bar_tokens.spacing_md, 0), sticky="ne")
         total_container.grid_columnconfigure(0, weight=0)
         total_container.grid_columnconfigure(1, weight=0)
         self._register_drag_target(total_container)
@@ -294,6 +335,8 @@ class DiceBarWindow(ctk.CTkToplevel):
             except tk.TclError:
                 pass
         tokens = theme_manager.get_tokens()
+        variants = build_bar_variants(tokens)
+        bar_tokens = shared_bar_tokens()
         for idx, faces in enumerate(self._supported_faces):
             button = ctk.CTkButton(
                 frame,
@@ -301,10 +344,10 @@ class DiceBarWindow(ctk.CTkToplevel):
                 width=48,
                 height=30,
                 command=lambda f=faces: self._append_die(f),
-                fg_color=tokens.get("accent_button_fg"),
-                hover_color=tokens.get("accent_button_hover"),
+                fg_color=variants["accent"].fg,
+                hover_color=variants["accent"].hover,
             )
-            button.grid(row=0, column=idx, padx=2, pady=0)
+            button.grid(row=0, column=idx, padx=bar_tokens.spacing_2xs, pady=0)
 
     # ------------------------------------------------------------------
     # Window helpers
@@ -459,11 +502,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         if chips:
             # Continue with this path when chips is set.
             tokens = theme_manager.get_tokens()
-            base_color   = tokens.get("panel_alt_bg", "#132133")
-            accent_color = tokens.get("accent_button_fg", "#2d3a57")
-            accent_border = tokens.get("accent_button_hover", accent_color)
-            border_color  = tokens.get("button_border", "#1f2a3d")
-            muted_text    = "#9fb2ce"
+            variants = build_bar_variants(tokens)
+            bar_tokens = shared_bar_tokens()
+            muted_text = bar_tokens.emphasis_text_muted
 
             # Put header (if any) and chips in the same row
             col = 0
@@ -476,7 +517,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                     anchor="w",
                     justify="left",
                 )
-                header_label.grid(row=0, column=col, sticky="nw", padx=(0, 8), pady=0)
+                header_label.grid(row=0, column=col, sticky="nw", padx=(0, bar_tokens.spacing_md), pady=0)
                 self._register_drag_target(header_label)
                 col += 1
 
@@ -495,9 +536,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                 # compute natural width so the button fits its text nicely
                 btn_w = measure_font.measure(label_text) + 28   # text + inner padding
 
-                fg = accent_color if chip.highlight else base_color
-                bd = accent_border if chip.highlight else border_color
-                txt = "#ffffff" if chip.highlight else "#d3dced"
+                chip_variant = variants["success"] if chip.highlight else variants["muted"]
 
                 btn = ctk.CTkButton(
                     chips_frame,
@@ -506,18 +545,23 @@ class DiceBarWindow(ctk.CTkToplevel):
                     state="disabled",                # <- disabled “chip”
                     width=btn_w,
                     height=30,
-                    corner_radius=10,
-                    fg_color=fg,
-                    hover_color=fg,                  # no hover effect when disabled anyway
-                    border_color=bd,
-                    border_width=1,
-                    text_color=txt,                  # for enabled fallback
-                    text_color_disabled=txt,         # <- keep same color when disabled
+                    corner_radius=bar_tokens.corner_radius_chip,
+                    fg_color=chip_variant.fg,
+                    hover_color=chip_variant.hover,
+                    border_color=chip_variant.border,
+                    border_width=bar_tokens.border_width_thin,
+                    text_color=chip_variant.text,
+                    text_color_disabled=chip_variant.text_disabled,
                     command=None,
                     cursor="arrow",                  # avoid “hand” cursor look
                 )
                 # keep everything on the same top line
-                btn.pack(side="left", anchor="n", padx=(0 if idx == 0 else 8, 0), pady=0)
+                btn.pack(
+                    side="left",
+                    anchor="n",
+                    padx=(0 if idx == 0 else bar_tokens.spacing_md, 0),
+                    pady=0,
+                )
                 self._register_drag_target(btn)
 
             # keep geometry tight
@@ -587,4 +631,3 @@ class DiceBarWindow(ctk.CTkToplevel):
                         self._expanded_height_hint = measured
         except Exception:
             pass
-
