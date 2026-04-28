@@ -148,7 +148,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             padx=10,
             pady=2,
         )
-        playback_pill.grid(row=0, column=6, columnspan=3, padx=(16, 4), pady=4, sticky="w")
+        playback_pill.grid(row=0, column=6, padx=(16, 8), pady=4, sticky="w")
 
         self.section_toggle_button = ctk.CTkButton(
             content,
