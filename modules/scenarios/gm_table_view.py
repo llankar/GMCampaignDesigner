@@ -21,7 +21,6 @@ from modules.objects.loot_generator_panel import LootGeneratorPanel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
-from modules.scenarios.gm_table.ambiance.page import GMTableAmbiancePage
 from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
 from modules.scenarios.gm_table.pages import (
     GMTableHostedPage,
@@ -125,7 +124,6 @@ class GMTableView(ctk.CTkFrame):
             "Scene Flow",
             "Image Library",
             "Handouts",
-            "Ambiance Screen",
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
@@ -673,9 +671,6 @@ class GMTableView(ctk.CTkFrame):
                 "handouts", "Handouts", {"scenario_name": self.scenario_name}
             )
             return
-        if option == "Ambiance Screen":
-            self.open_ambiance_panel()
-            return
         if option == "Loot Generator":
             self._create_panel("loot_generator", "Loot Generator", {})
             return
@@ -762,8 +757,6 @@ class GMTableView(ctk.CTkFrame):
                     map_wrapper=self.map_wrapper,
                     initial_state=definition.state,
                 )
-            if kind == "ambiance":
-                return GMTableAmbiancePage(parent, initial_state=definition.state)
             if kind == "loot_generator":
                 return GMTableHostedPage(
                     parent,
@@ -1085,15 +1078,6 @@ class GMTableView(ctk.CTkFrame):
             _open_selected,
         )
         view.pack(fill="both", expand=True)
-
-    def open_ambiance_panel(self) -> None:
-        """Focus an existing ambiance panel or create one."""
-        records = self.workspace.list_panels(kinds={"ambiance"}, include_minimized=True)
-        if records:
-            panel_id = str(records[-1]["panel_id"])
-            self.workspace.bring_to_front(panel_id)
-            return
-        self._create_panel("ambiance", "Ambiance Screen", {})
 
     def open_chatbot(self, event=None) -> None:
         """Open the shared chatbot from the tabletop."""

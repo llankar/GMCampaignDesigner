@@ -35,7 +35,6 @@ from modules.scenarios.scene_flow_viewer import create_scene_flow_frame, scene_f
 from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
 from modules.scenarios.plot_twist_panel import PlotTwistPanel, roll_plot_twist
 from modules.scenarios.gm_screen.handouts.panel import create_handouts_panel
-from modules.scenarios.gm_table.ambiance.page import GMTableAmbiancePage
 from modules.scenarios.session_notes import (
     build_scene_snapshot_entry,
     build_session_debrief_entry,
@@ -240,7 +239,6 @@ class GMScreenView(ctk.CTkFrame):
             "Scene Flow",
             "Image Library",
             "Handouts",
-            "Ambiance Screen",
             "Loot Generator",
             "Whiteboard",
             "Random Tables",
@@ -2014,8 +2012,6 @@ class GMScreenView(ctk.CTkFrame):
             self.open_whiteboard_tab(title=title or "Whiteboard")
         elif kind == "handouts":
             self.open_handouts_tab(title=title or "Handouts")
-        elif kind == "ambiance":
-            self.open_ambiance_tab(title=title or "Ambiance Screen")
         elif kind == "puzzle_display":
             # Handle the branch where kind == 'puzzle_display'.
             puzzle_name = tab_def.get("puzzle_name")
@@ -2565,32 +2561,6 @@ class GMScreenView(ctk.CTkFrame):
             activate=activate,
         )
 
-    def open_ambiance_tab(self, title=None, activate=True):
-        """Open the ambiance panel inside the GM screen."""
-        container = ctk.CTkFrame(self._ensure_rich_host())
-        self._make_fullbleed(container)
-        panel = GMTableAmbiancePage(container)
-        panel.pack(fill="both", expand=True)
-        container.ambiance_panel = panel
-
-        def factory(master):
-            """Create ambiance panel content."""
-            host_parent = master if master is not None else self._ensure_rich_host()
-            frame = ctk.CTkFrame(host_parent)
-            self._make_fullbleed(frame)
-            created = GMTableAmbiancePage(frame)
-            created.pack(fill="both", expand=True)
-            frame.ambiance_panel = created
-            return frame
-
-        self.add_tab(
-            title or "Ambiance Screen",
-            container,
-            content_factory=factory,
-            layout_meta={"kind": "ambiance", "host": "rich"},
-            activate=activate,
-        )
-
     def open_random_tables_tab(self, title=None, initial_state=None):
         """Open the random tables panel inside the GM screen."""
 
@@ -3081,9 +3051,6 @@ class GMScreenView(ctk.CTkFrame):
             return
         elif entity_type == "Handouts":
             self.open_handouts_tab()
-            return
-        elif entity_type == "Ambiance Screen":
-            self.open_ambiance_tab()
             return
         elif entity_type == "Loot Generator":
             # Handle the branch where entity_type == 'Loot Generator'.
