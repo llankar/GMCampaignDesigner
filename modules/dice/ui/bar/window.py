@@ -16,6 +16,7 @@ from modules.dice.ui.bar.geometry import HEIGHT_PADDING, INTER_BAR_GAP
 from modules.dice.ui.bar.layout import CLEAR_BUTTON_WIDTH, FORMULA_ENTRY_WIDTH, ROLL_BUTTON_WIDTH
 from modules.helpers.logging_helper import log_module_import
 from modules.ui.bars.style_tokens import build_bar_variants, shared_bar_tokens
+from modules.ui.tooltip import ToolTip
 
 log_module_import(__name__)
 
@@ -122,83 +123,157 @@ class DiceBarWindow(ctk.CTkToplevel):
         )
         self._content_grid_options = {"row": 0, "column": 1, "padx": 0, "pady": 0, "sticky": "nsew"}
         content.grid(**self._content_grid_options)
-        content.grid_columnconfigure(0, weight=0)
-        content.grid_columnconfigure(1, weight=0)
-        content.grid_columnconfigure(2, weight=0)
-        content.grid_columnconfigure(3, weight=0)
-        content.grid_columnconfigure(4, weight=0)
-        content.grid_columnconfigure(5, weight=0)
-        content.grid_columnconfigure(6, weight=1)
-        content.grid_columnconfigure(7, weight=0)
+        content.grid_columnconfigure(0, weight=0)  # Formula
+        content.grid_columnconfigure(1, weight=0)  # Separator
+        content.grid_columnconfigure(2, weight=0)  # Options
+        content.grid_columnconfigure(3, weight=0)  # Separator
+        content.grid_columnconfigure(4, weight=0)  # Presets
+        content.grid_columnconfigure(5, weight=0)  # Separator
+        content.grid_columnconfigure(6, weight=1)  # Results
         content.grid_rowconfigure(0, weight=1)
         self._content_frame = content
 
-        entry = ctk.CTkEntry(content, textvariable=self.formula_var, width=FORMULA_ENTRY_WIDTH, height=30)
+        control_font = ctk.CTkFont(size=bar_tokens.font_size_body)
+        secondary_label_font = ctk.CTkFont(size=bar_tokens.font_size_header)
+        secondary_text_color = tokens.get("text_muted", bar_tokens.emphasis_text_muted)
+
+        def add_separator(column: int) -> None:
+            sep = ctk.CTkFrame(
+                content,
+                width=bar_tokens.border_width_thin,
+                fg_color=tokens.get("button_border", variants["default"].border),
+            )
+            sep.grid(row=0, column=column, padx=(bar_tokens.spacing_sm, bar_tokens.spacing_sm), pady=bar_tokens.spacing_sm, sticky="ns")
+
+        formula_zone = ctk.CTkFrame(content, fg_color="transparent")
+        formula_zone.grid(row=0, column=0, padx=(bar_tokens.spacing_xs, bar_tokens.spacing_sm), pady=bar_tokens.spacing_xs, sticky="nw")
+        formula_zone.grid_columnconfigure(0, weight=0)
+        formula_zone.grid_columnconfigure(1, weight=0)
+
+        formula_label = ctk.CTkLabel(
+            formula_zone,
+            text="Expr",
+            font=secondary_label_font,
+            text_color=secondary_text_color,
+        )
+        formula_label.grid(row=0, column=0, padx=(0, bar_tokens.spacing_xs), pady=0, sticky="w")
+        ToolTip(formula_label, "Dice formula expression, for example: 2d20kh1 + 4.")
+
+        entry = ctk.CTkEntry(formula_zone, textvariable=self.formula_var, width=FORMULA_ENTRY_WIDTH, height=30, font=control_font)
         entry.grid(
             row=0,
-            column=0,
-            padx=(bar_tokens.spacing_xs, bar_tokens.spacing_sm),
-            pady=bar_tokens.spacing_xs,
+            column=1,
+            padx=0,
+            pady=0,
             sticky="new",
         )
         entry.bind("<Return>", lambda _event: self.roll())
         self._formula_entry = entry
+        ToolTip(entry, "Type a dice formula and press Enter to roll.")
 
+        add_separator(1)
+        options_zone = ctk.CTkFrame(content, fg_color="transparent")
+        options_zone.grid(row=0, column=2, padx=(bar_tokens.spacing_sm, bar_tokens.spacing_sm), pady=bar_tokens.spacing_xs, sticky="nw")
         explode_box = ctk.CTkCheckBox(
-            content,
-            text="Explode",
+            options_zone,
+            text="Exp",
             variable=self.exploding_var,
             checkbox_height=18,
+            font=control_font,
         )
-        explode_box.grid(row=0, column=1, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="nw")
+        explode_box.grid(row=0, column=0, padx=(0, bar_tokens.spacing_sm), pady=0, sticky="nw")
+        ToolTip(explode_box, "Exploding dice: reroll and add when max face is rolled.")
 
         separate_box = ctk.CTkCheckBox(
-            content,
-            text="Separate",
+            options_zone,
+            text="Sep",
             variable=self.separate_var,
             checkbox_height=18,
+            font=control_font,
         )
-        separate_box.grid(row=0, column=2, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="nw")
+        separate_box.grid(row=0, column=1, padx=(0, bar_tokens.spacing_sm), pady=0, sticky="nw")
+        ToolTip(separate_box, "Show grouped roll details for each dice term.")
 
         roll_button = ctk.CTkButton(
-            content,
+            options_zone,
             text="Roll",
             width=ROLL_BUTTON_WIDTH,
             height=32,
             command=self.roll,
             fg_color=variants["success"].fg,
             hover_color=variants["success"].hover,
-            font=("Segoe UI", bar_tokens.font_size_body, "bold"),
+            font=control_font,
         )
-        roll_button.grid(row=0, column=3, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="new")
+        roll_button.grid(row=0, column=2, padx=(0, bar_tokens.spacing_xs), pady=0, sticky="new")
 
         clear_button = ctk.CTkButton(
-            content,
+            options_zone,
             text="Clear",
             width=CLEAR_BUTTON_WIDTH,
             height=32,
             command=self._clear_formula,
             fg_color=variants["default"].fg,
             hover_color=variants["default"].hover,
+            font=control_font,
         )
-        clear_button.grid(row=0, column=4, padx=bar_tokens.spacing_xs, pady=bar_tokens.spacing_xs, sticky="new")
+        clear_button.grid(row=0, column=3, padx=0, pady=0, sticky="new")
+        ToolTip(clear_button, "Reset the formula input.")
 
-        preset_frame = ctk.CTkFrame(content, fg_color="transparent")
-        preset_frame.grid(
+        add_separator(3)
+        preset_zone = ctk.CTkFrame(content, fg_color="transparent")
+        preset_zone.grid(
             row=0,
-            column=5,
-            padx=(bar_tokens.spacing_sm, bar_tokens.spacing_xs),
+            column=4,
+            padx=(bar_tokens.spacing_sm, bar_tokens.spacing_sm),
             pady=bar_tokens.spacing_xs,
+            sticky="nw",
+        )
+        preset_zone.grid_columnconfigure(0, weight=0)
+        preset_label = ctk.CTkLabel(
+            preset_zone,
+            text="Quick",
+            font=secondary_label_font,
+            text_color=secondary_text_color,
+        )
+        preset_label.grid(row=0, column=0, padx=(0, 0), pady=(0, bar_tokens.spacing_2xs), sticky="w")
+        ToolTip(preset_label, "Quick-add common dice to the current expression.")
+
+        preset_frame = ctk.CTkFrame(preset_zone, fg_color="transparent")
+        preset_frame.grid(
+            row=1,
+            column=0,
+            padx=0,
+            pady=0,
             sticky="nw",
         )
         self._preset_frame = preset_frame
 
-        result_frame = ctk.CTkFrame(content, fg_color="transparent")
-        result_frame.grid(
+        add_separator(5)
+        result_zone = ctk.CTkFrame(content, fg_color="transparent")
+        result_zone.grid(
             row=0,
             column=6,
             padx=(bar_tokens.spacing_sm, bar_tokens.spacing_xs),
             pady=bar_tokens.spacing_xs,
+            sticky="new",
+        )
+        result_zone.grid_columnconfigure(0, weight=1)
+
+        result_label = ctk.CTkLabel(
+            result_zone,
+            text="Result",
+            font=secondary_label_font,
+            text_color=secondary_text_color,
+        )
+        result_label.grid(row=0, column=0, padx=0, pady=(0, bar_tokens.spacing_2xs), sticky="w")
+        ToolTip(result_label, "Outcome details and total value.")
+
+        result_frame = ctk.CTkFrame(result_zone, fg_color="transparent")
+        result_frame.grid(
+            row=1,
+            column=0,
+            padx=0,
+            pady=0,
             sticky="new",
         )
         result_frame.grid_columnconfigure(0, weight=1)
@@ -218,10 +293,11 @@ class DiceBarWindow(ctk.CTkToplevel):
 
         total_prefix = ctk.CTkLabel(
             total_container,
-            text="Total",
+            text="Σ",
             font=self._result_normal_font,
             anchor="ne",
             justify="right",
+            text_color=secondary_text_color,
         )
         total_prefix.grid(row=0, column=0, padx=(0, 6), sticky="ne")
         self._register_drag_target(total_prefix)
