@@ -70,4 +70,6 @@ def test_menu_sections_expose_image_library_commands() -> None:
     assert "GM Table" in table_labels
     assert "Import Image Directories…" in labels
     assert "Open Image Library" in labels
+    assert "Ambiance Control" in live_labels
+    assert "Ambiance Screen" not in live_labels
     assert "Import Ambiance Wallpapers" in live_labels

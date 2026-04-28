@@ -69,6 +69,7 @@ from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
 from modules.ui.menu_bar import AppMenuBar
 from modules.ui.ambiance import SecondScreenAmbiancePlayer
+from modules.ui.ambiance.control_window import AmbianceControlWindow
 from modules.ui.ambiance.importer.dialog import AmbianceWallpaperImporterDialog
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
@@ -197,6 +198,7 @@ class MainWindow(ctk.CTk):
         self._image_library_browser_window = None
         self._asset_library_window = None
         self._ambiance_player: SecondScreenAmbiancePlayer | None = None
+        self._ambiance_control_window = None
         self._wallpaper_importer_window = None
         self._busy_modal = None
         self._system_selector_dialog = None
@@ -4579,29 +4581,19 @@ class MainWindow(ctk.CTk):
         return self._ambiance_player
 
     def open_ambiance_panel(self):
-        """Open ambiance controls in the active GM workspace."""
-        try:
-            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
-                self.current_gm_view.open_ambiance_tab()
-                return
-        except Exception:
-            pass
-
-        try:
-            if getattr(self, "current_gm_table", None) is not None and self.current_gm_table.winfo_exists():
-                opener = getattr(self.current_gm_table, "open_ambiance_panel", None)
-                if callable(opener):
-                    opener()
-                    return
-        except Exception:
-            pass
-
-        self.open_gm_screen(show_empty_message=True)
-        try:
-            if getattr(self, "current_gm_view", None) is not None and self.current_gm_view.winfo_exists():
-                self.current_gm_view.open_ambiance_tab()
-        except Exception:
-            pass
+        """Open or focus standalone ambiance controls."""
+        window = getattr(self, "_ambiance_control_window", None)
+        if window is None or not window.winfo_exists():
+            window = AmbianceControlWindow(self)
+            self._ambiance_control_window = window
+            window.bind(
+                "<Destroy>",
+                lambda _event: setattr(self, "_ambiance_control_window", None),
+            )
+            return window
+        window.lift()
+        window.focus_force()
+        return window
 
     def open_wallpaper_importer(self, *, on_complete=None):
         """Open wallpaper importer dialog bound to the current campaign."""
