@@ -462,8 +462,7 @@ class DiceBarWindow(ctk.CTkToplevel):
                         self._collapsed_height_hint = measured
             else:
                 height_source = self._bar_frame or self
-                requested_width = int(height_source.winfo_reqwidth() if height_source is not None else 0)
-                width = max(40, requested_width + 2)
+                width = screen_width
                 if self._expanded_height_hint is None and height_source is not None:
                     # Handle the branch where expanded height hint is missing and height source is available.
                     try:

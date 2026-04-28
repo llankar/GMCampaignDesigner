@@ -995,8 +995,7 @@ class AudioBarWindow(ctk.CTkToplevel):
                 height_source = target
             else:
                 height_source = self._bar_frame or self
-                requested_width = int(height_source.winfo_reqwidth() if height_source is not None else 0)
-                width = max(40, requested_width + 2)
+                width = screen_width
             width = min(width, screen_width)
             requested_height = int((height_source.winfo_reqheight() if height_source else 36) + 16)
             height = max(36, min(requested_height, 96))
@@ -1052,6 +1051,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.lift()
             self.focus_force()
             self.attributes("-topmost", True)
+            self.after(250, self._apply_geometry)
         except Exception:
             pass
 
