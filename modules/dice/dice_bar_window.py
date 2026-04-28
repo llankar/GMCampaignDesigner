@@ -131,6 +131,7 @@ class DiceBarWindow(ctk.CTkToplevel):
             width=16,
             fg_color=style.accent_soft,
             hover_color=style.accent_hover,
+            border_width=0,
             corner_radius=style.button_radius,
             command=self._toggle_collapsed,
         )
