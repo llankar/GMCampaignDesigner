@@ -55,6 +55,9 @@ PANEL_MARGIN = 12
 PANEL_GUTTER = 12
 PANEL_SNAP_THRESHOLD = 48
 PANEL_RESIZE_HITBOX = 10
+TRAY_VISIBLE_PADY = (0, 18)
+SURFACE_PADY_WITH_TRAY = (0, 10)
+SURFACE_PADY_NO_TRAY = 0
 CAMERA_MIN_ZOOM = 0.5
 CAMERA_MAX_ZOOM = 1.75
 CAMERA_ZOOM_STEP = 0.15
@@ -1090,7 +1093,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 10))
+        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=SURFACE_PADY_WITH_TRAY)
         self.surface.bind("<Configure>", self._on_surface_configure, add="+")
 
         self._desk_texture_canvas = tk.Canvas(
@@ -1181,7 +1184,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self.tray.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 18))
+        self.tray.grid(row=1, column=0, sticky="ew", padx=18)
         self.tray.grid_columnconfigure(1, weight=1)
 
         self.tray_label = ctk.CTkLabel(
@@ -1257,9 +1260,12 @@ class GMTableWorkspace(ctk.CTkFrame):
             child.destroy()
         minimized_ids = self._minimized_panel_ids()
         if not minimized_ids:
+            self.surface.grid_configure(pady=SURFACE_PADY_NO_TRAY)
             tray.grid_remove()
             return
+        self.surface.grid_configure(pady=SURFACE_PADY_WITH_TRAY)
         tray.grid()
+        tray.grid_configure(pady=TRAY_VISIBLE_PADY)
         for panel_id in minimized_ids:
             definition = self._definitions.get(panel_id)
             if definition is None:
