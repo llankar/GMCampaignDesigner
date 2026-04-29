@@ -36,6 +36,7 @@ class GraphCanvasView(ctk.CTkFrame):
         self._connecting_from: str | None = None
         self._preview_edge_id: int | None = None
         self.edge_renderer = EdgeRenderer()
+        self.on_selection_change = None
 
         self.canvas.bind("<Button-1>", self._on_left_down)
         self.canvas.bind("<B1-Motion>", self._on_left_drag)
@@ -151,16 +152,19 @@ class GraphCanvasView(ctk.CTkFrame):
             wx, wy = self._screen_to_world(event.x, event.y)
             self._drag_offset = (wx - self.nodes[node_tag]["x"], wy - self.nodes[node_tag]["y"])
             self._update_selection_visuals()
+            self._notify_selection()
             return
         edge = self.edge_renderer.hit_test(event.x, event.y)
         if edge:
             self.selected_edge_id = edge
             self.selected_nodes.clear()
             self._redraw_edges()
+            self._notify_selection()
             return
         self.selected_nodes.clear()
         self.selected_edge_id = None
         self._update_selection_visuals()
+        self._notify_selection()
 
     def _on_left_drag(self, event):
         if self._space_pan:
@@ -228,3 +232,9 @@ class GraphCanvasView(ctk.CTkFrame):
         for node_id in self.nodes:
             self._draw_node(node_id)
         self._redraw_edges()
+
+    def _notify_selection(self) -> None:
+        if self.on_selection_change is None:
+            return
+        node_id = next(iter(self.selected_nodes), None) if self.selected_nodes else None
+        self.on_selection_change(node_id, self.selected_edge_id)
