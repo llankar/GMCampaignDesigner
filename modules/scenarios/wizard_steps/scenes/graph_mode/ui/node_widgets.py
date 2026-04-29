@@ -1,6 +1,17 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import customtkinter as ctk
+
+
+@dataclass(slots=True)
+class NodeGeometry:
+    node_id: str
+    x: float
+    y: float
+    width: float = 220
+    height: float = 100
 
 
 class NodeFields(ctk.CTkFrame):

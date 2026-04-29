@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
-from .mapper import scenes_to_node_lines
 from .schema import SCENE_DEFAULT_TITLE, normalize_scene
 from .state import GraphModeState
 from .ui.canvas_view import GraphCanvasView
@@ -33,16 +32,15 @@ class GraphModePlanner(ctk.CTkFrame):
 
     def load_scenes(self, scenes):
         self.state.scenes = [normalize_scene(scene, i) for i, scene in enumerate(scenes or [], start=1)]
-        self.canvas_view.delete("1.0", "end")
         if not self.state.scenes:
-            self.canvas_view.insert("1.0", "• Objective principal\n  → Scène 1 (à définir)")
+            self.canvas_view.load_scenes([])
             self.properties_panel.fields.title_var.set(SCENE_DEFAULT_TITLE)
             self.properties_panel.fields.objective_var.set("")
             self.properties_panel.fields.success_condition_var.set("")
             self.properties_panel.notes_box.delete("1.0", "end")
             return
 
-        self.canvas_view.insert("1.0", "\n".join(scenes_to_node_lines(self.state.scenes)))
+        self.canvas_view.load_scenes(self.state.scenes)
         first = self.state.scenes[0]
         self.properties_panel.fields.title_var.set(first.get("title") or "")
         self.properties_panel.fields.objective_var.set(first.get("objective") or "")
@@ -53,9 +51,18 @@ class GraphModePlanner(ctk.CTkFrame):
     def export_scenes(self):
         if not self.state.scenes:
             return []
-        first = dict(self.state.scenes[0])
-        first["title"] = self.properties_panel.fields.title_var.get().strip() or first.get("title") or SCENE_DEFAULT_TITLE
-        first["objective"] = self.properties_panel.fields.objective_var.get().strip()
-        first["success_condition"] = self.properties_panel.fields.success_condition_var.get().strip()
-        first["notes"] = self.properties_panel.notes_box.get("1.0", "end").strip()
-        return [first, *self.state.scenes[1:]]
+        updated = []
+        for i, scene in enumerate(self.state.scenes):
+            row = dict(scene)
+            node_id = row.get("id") or f"scene_{i+1}"
+            canvas_node = self.canvas_view.nodes.get(node_id)
+            if canvas_node:
+                row["x"] = canvas_node.get("x", row.get("x", 0))
+                row["y"] = canvas_node.get("y", row.get("y", 0))
+            if i == 0:
+                row["title"] = self.properties_panel.fields.title_var.get().strip() or row.get("title") or SCENE_DEFAULT_TITLE
+                row["objective"] = self.properties_panel.fields.objective_var.get().strip()
+                row["success_condition"] = self.properties_panel.fields.success_condition_var.get().strip()
+                row["notes"] = self.properties_panel.notes_box.get("1.0", "end").strip()
+            updated.append(row)
+        return updated
