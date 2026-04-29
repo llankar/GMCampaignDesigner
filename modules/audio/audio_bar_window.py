@@ -20,6 +20,7 @@ log_module_import(__name__)
 
 COLLAPSED_WIDTH_FLOOR = 56
 COLLAPSED_HEIGHT_FLOOR = 40
+COLLAPSED_Y_OFFSET = 8
 
 
 class AudioBarWindow(ctk.CTkToplevel):
@@ -1008,6 +1009,8 @@ class AudioBarWindow(ctk.CTkToplevel):
             collapsed_floor = COLLAPSED_HEIGHT_FLOOR if self._is_collapsed else 36
             height = max(collapsed_floor, int((height_source.winfo_reqheight() if height_source else 36) + 16))
             y = self.winfo_screenheight() - height
+            if self._is_collapsed:
+                y -= COLLAPSED_Y_OFFSET
             self.geometry(f"{width}x{height}+0+{max(0, y)}")
             dice_window = getattr(self.master, "dice_bar_window", None)
             if dice_window is not None and dice_window.winfo_exists():
