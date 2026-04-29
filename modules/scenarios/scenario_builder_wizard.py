@@ -36,6 +36,7 @@ from modules.scenarios.scenario_character_graph import (
 )
 from modules.scenarios.wizard_steps.scenes.canvas_scene_planner import CanvasScenePlanner
 from modules.scenarios.wizard_steps.scenes.guided_scene_planner import GuidedScenePlanner
+from modules.scenarios.wizard_steps.scenes.graph_scenario_planner import GraphScenarioPlanner
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS as SCENE_CARD_ENTITY_FIELDS,
     normalise_entity_list,
@@ -286,7 +287,7 @@ class ScenesPlanningStep(WizardStep):
         mode_row = ctk.CTkFrame(root, fg_color="transparent")
         mode_row.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))
         ctk.CTkLabel(mode_row, text="Planning mode", text_color="#9db4d1").pack(side="left", padx=(2, 8))
-        self.mode_switch = ctk.CTkSegmentedButton(mode_row, values=["guided", "canvas"], variable=self.mode_var, command=self._on_mode_changed)
+        self.mode_switch = ctk.CTkSegmentedButton(mode_row, values=["guided", "canvas", "graph"], variable=self.mode_var, command=self._on_mode_changed)
         self.mode_switch.pack(side="left")
 
         self._planner_holder = ctk.CTkFrame(root, fg_color="transparent")
@@ -302,6 +303,7 @@ class ScenesPlanningStep(WizardStep):
             self._planner_holder,
             entity_selector_callbacks=self._build_entity_selector_callbacks(),
         )
+        self.graph_planner = GraphScenarioPlanner(self._planner_holder)
         self._active_mode = None
         self.scenes = []
         self._set_mode("guided", remap=False)
@@ -411,22 +413,32 @@ class ScenesPlanningStep(WizardStep):
 
     def _set_mode(self, mode, *, remap):
         """Set mode."""
-        mode = "canvas" if str(mode).strip().lower() == "canvas" else "guided"
+        normalized_mode = str(mode).strip().lower()
+        mode = normalized_mode if normalized_mode in {"guided", "canvas", "graph"} else "guided"
         if self._active_mode == mode and remap:
             return
         current_scenes = self._collect_active_scenes() if remap else self.scenes
         if mode == "guided":
             self.guided_planner.grid(row=0, column=0, sticky="nsew")
             self.canvas_planner.grid_forget()
+            self.graph_planner.grid_forget()
             cards = scenes_to_guided_cards(current_scenes)
             self.guided_planner.load_cards(cards)
             self.scenes = guided_cards_to_scenes(self.guided_planner.export_cards())
-        else:
+        elif mode == "canvas":
             self.canvas_planner.grid(row=0, column=0, sticky="nsew")
             self.guided_planner.grid_forget()
+            self.graph_planner.grid_forget()
             scenes = guided_cards_to_scenes(self.guided_planner.export_cards()) if self._active_mode == "guided" and remap else current_scenes
             self.canvas_planner.load_scenes(scenes)
             self.scenes = self.canvas_planner.export_scenes()
+        else:
+            self.graph_planner.grid(row=0, column=0, sticky="nsew")
+            self.guided_planner.grid_forget()
+            self.canvas_planner.grid_forget()
+            scenes = guided_cards_to_scenes(self.guided_planner.export_cards()) if self._active_mode == "guided" and remap else current_scenes
+            self.graph_planner.load_scenes(scenes)
+            self.scenes = self.graph_planner.export_scenes()
         self._active_mode = mode
         self.mode_var.set(mode)
 
@@ -434,6 +446,8 @@ class ScenesPlanningStep(WizardStep):
         """Collect active scenes."""
         if self._active_mode == "guided":
             return guided_cards_to_scenes(self.guided_planner.export_cards())
+        if self._active_mode == "graph":
+            return self.graph_planner.export_scenes()
         return self.canvas_planner.export_scenes()
 
     def _switch_to_epic_finale_planner(self):
