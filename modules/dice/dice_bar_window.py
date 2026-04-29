@@ -523,19 +523,35 @@ class DiceBarWindow(ctk.CTkToplevel):
             if self._is_collapsed:
                 # Continue with this path when is collapsed is set.
                 target = self._collapse_button or self
+                bar_frame = self._bar_frame or self
                 button_width = int(target.winfo_reqwidth() or 0)
                 bar_border = int((self._bar_frame.cget("border_width") if self._bar_frame is not None else 0) or 0)
                 horizontal_padding = 8
                 width = max(COLLAPSED_WIDTH_FLOOR, button_width + horizontal_padding + (bar_border * 2))
-                height_source = target
-                if self._collapsed_height_hint is None and height_source is not None:
-                    # Handle the branch where collapsed height hint is missing and height source is available.
-                    try:
-                        measured = int(height_source.winfo_reqheight() or 0)
-                    except Exception:
-                        measured = 0
-                    if measured:
-                        self._collapsed_height_hint = measured
+
+                grid_info = target.grid_info() if self._collapse_button is not None else {}
+                raw_pady = grid_info.get("pady", 0)
+                vertical_padding = 0
+                if isinstance(raw_pady, tuple):
+                    vertical_padding = sum(int(value) for value in raw_pady)
+                elif isinstance(raw_pady, str):
+                    pieces = [piece.strip() for piece in raw_pady.split()] if raw_pady else []
+                    if len(pieces) == 1:
+                        vertical_padding = int(pieces[0]) * 2
+                    elif len(pieces) >= 2:
+                        vertical_padding = int(pieces[0]) + int(pieces[1])
+                else:
+                    vertical_padding = int(raw_pady) * 2
+
+                button_height = int(target.winfo_reqheight() or 0)
+                collapsed_core_height = max(
+                    int(bar_frame.winfo_reqheight() or 0),
+                    button_height + vertical_padding + (bar_border * 2),
+                )
+                collapsed_core_height += 3
+                if self._collapsed_height_hint is None or collapsed_core_height > self._collapsed_height_hint:
+                    self._collapsed_height_hint = collapsed_core_height
+                height_source = bar_frame
             else:
                 width = self.winfo_screenwidth()
                 height_source = self._bar_frame or self
