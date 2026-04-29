@@ -185,16 +185,12 @@ class GMScreenView(ctk.CTkFrame):
         self.tab_bar_canvas = ctk.CTkCanvas(self.tab_bar_container, height=44, highlightthickness=0, bg=self._palette["surface_card"])
         self.tab_bar_canvas.pack(side="top", fill="x", expand=True)
 
-        # Horizontal scrollbar at the bottom alongside layout status
-        self.tab_bar_bottom = ctk.CTkFrame(self.tab_bar_container, fg_color="transparent")
-        self.tab_bar_bottom.pack(side="bottom", fill="x")
-
+        # Keep tab scrolling available without displaying the legacy gray bar.
         self.h_scrollbar = ctk.CTkScrollbar(
-            self.tab_bar_bottom,
+            self.tab_bar_container,
             orientation="horizontal",
             command=self.tab_bar_canvas.xview
         )
-        self.h_scrollbar.pack(side="left", fill="x", expand=True)
 
         # The actual frame that holds the tab buttons
         self.tab_bar = ctk.CTkFrame(self.tab_bar_canvas, height=44, fg_color="transparent")
@@ -202,6 +198,9 @@ class GMScreenView(ctk.CTkFrame):
 
         # Connect the scrollbar to the canvas
         self.tab_bar_canvas.configure(xscrollcommand=self.h_scrollbar.set)
+        self.tab_bar_canvas.bind("<Shift-MouseWheel>", self._on_tab_bar_mousewheel_x, add="+")
+        self.tab_bar_canvas.bind("<Button-4>", self._on_tab_bar_mousewheel_x, add="+")
+        self.tab_bar_canvas.bind("<Button-5>", self._on_tab_bar_mousewheel_x, add="+")
 
         # Update the scroll region when the tab bar resizes
         self.tab_bar.bind("<Configure>", lambda e: self.tab_bar_canvas.configure(
@@ -2223,6 +2222,16 @@ class GMScreenView(ctk.CTkFrame):
             scrollregion=self.tab_bar_canvas.bbox("all")
         )
         self.dragging = None
+
+    def _on_tab_bar_mousewheel_x(self, event):
+        """Scroll the tab strip horizontally without showing a permanent scrollbar."""
+        if event is None:
+            return
+        delta = getattr(event, "delta", 0)
+        if delta > 0 or getattr(event, "num", None) == 4:
+            self.tab_bar_canvas.xview_scroll(-1, "units")
+        elif delta < 0 or getattr(event, "num", None) == 5:
+            self.tab_bar_canvas.xview_scroll(1, "units")
 
     def toggle_detach_tab(self, name):
         """Toggle detach tab."""
