@@ -37,6 +37,11 @@ from modules.scenarios.scenario_character_graph import (
 from modules.scenarios.wizard_steps.scenes.canvas_scene_planner import CanvasScenePlanner
 from modules.scenarios.wizard_steps.scenes.guided_scene_planner import GuidedScenePlanner
 from modules.scenarios.wizard_steps.scenes.graph_mode import GraphModePlanner
+from modules.scenarios.wizard_steps.scenes.graph_mode.mapper import (
+    graph_document_to_scenes,
+    scenes_to_graph_document,
+)
+from modules.scenarios.wizard_steps.scenes.graph_mode.schema import GraphScenarioDocument
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS as SCENE_CARD_ENTITY_FIELDS,
     normalise_entity_list,
@@ -516,6 +521,18 @@ class ScenesPlanningStep(WizardStep):
         self._scenario_summary = coerce_text(scenario.get("Summary") or scenario.get("Text"))
         self._scenario_secrets = coerce_text(scenario.get("Secrets") or scenario.get("Secret"))
         scenes_payload = [canonicalise_scene(scene, index=i) for i, scene in enumerate(scenario.get("Scenes") or [])]
+        graph_doc_payload = scenario.get("_SceneGraphDocument")
+        if isinstance(graph_doc_payload, dict):
+            try:
+                graph_doc = GraphScenarioDocument(
+                    schema_version=str(graph_doc_payload.get("schema_version") or "1.0"),
+                    nodes=tuple(),
+                    edges=tuple(),
+                    meta=graph_doc_payload.get("meta") if isinstance(graph_doc_payload.get("meta"), dict) else None,
+                )
+                scenes_payload = [canonicalise_scene(scene, index=i) for i, scene in enumerate(graph_document_to_scenes(graph_doc))]
+            except Exception:
+                pass
         layout = scenario.get("_SceneLayout")
         if isinstance(layout, list):
             for idx, scene in enumerate(scenes_payload):
@@ -560,6 +577,11 @@ class ScenesPlanningStep(WizardStep):
         self._scenario_summary = state.get("Summary", "")
         self._scenario_secrets = state.get("Secrets") or state.get("Secret") or ""
         scenes = [canonicalise_scene(scene, index=i) for i, scene in enumerate(state.get("Scenes") or [])]
+        graph_doc_payload = state.get("_SceneGraphDocument")
+        if isinstance(graph_doc_payload, dict):
+            graph_scenes = graph_doc_payload.get("scenes")
+            if isinstance(graph_scenes, list):
+                scenes = [canonicalise_scene(scene, index=i) for i, scene in enumerate(graph_scenes)]
         layout = state.get("_SceneLayout")
         if isinstance(layout, list):
             for idx, scene in enumerate(scenes):
@@ -615,6 +637,36 @@ class ScenesPlanningStep(WizardStep):
             layout.append(copy.deepcopy(scene.get("_canvas") or {}))
         state["Scenes"] = payload
         state["_SceneLayout"] = layout
+        try:
+            graph_doc = scenes_to_graph_document(self.scenes)
+            state["_SceneGraphDocument"] = {
+                "schema_version": graph_doc.schema_version,
+                "nodes": [
+                    {
+                        "id": n.id,
+                        "type": n.type,
+                        "title": n.title,
+                        "position": {"x": n.position.x, "y": n.position.y},
+                        "payload": copy.deepcopy(n.payload),
+                        "active": n.active,
+                    }
+                    for n in graph_doc.nodes
+                ],
+                "edges": [
+                    {
+                        "id": e.id,
+                        "source": e.source,
+                        "target": e.target,
+                        "label": e.label,
+                        "condition_type": e.condition_type,
+                    }
+                    for e in graph_doc.edges
+                ],
+                "meta": copy.deepcopy(graph_doc.meta) if isinstance(graph_doc.meta, dict) else None,
+                "scenes": copy.deepcopy(self.scenes),
+            }
+        except Exception:
+            pass
 
         if isinstance(self._root_extra_fields, dict):
             for key, value in self._root_extra_fields.items():
