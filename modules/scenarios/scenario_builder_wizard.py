@@ -416,44 +416,65 @@ class ScenesPlanningStep(WizardStep):
         """Handle mode changed."""
         self._set_mode(value, remap=True)
 
+    def _normalise_mode_key(self, mode):
+        """Normalise planner mode key."""
+        normalized_mode = str(mode or "").strip().lower()
+        if normalized_mode in {"guided", "canvas", "graph"}:
+            return normalized_mode
+        return "guided"
+
+    def _convert_scenes_between_modes(self, scenes, source_mode, target_mode):
+        """Convert scene payloads between planner modes while preserving content."""
+        source_mode = self._normalise_mode_key(source_mode)
+        target_mode = self._normalise_mode_key(target_mode)
+        scene_rows = [canonicalise_scene(scene, index=i) for i, scene in enumerate(scenes or [])]
+        if source_mode == "guided" and target_mode in {"canvas", "graph"}:
+            return guided_cards_to_scenes(scenes_to_guided_cards(scene_rows))
+        if source_mode in {"canvas", "graph"} and target_mode == "guided":
+            return guided_cards_to_scenes(scenes_to_guided_cards(scene_rows))
+        return scene_rows
+
     def _set_mode(self, mode, *, remap):
         """Set mode."""
-        normalized_mode = str(mode).strip().lower()
-        mode = normalized_mode if normalized_mode in {"guided", "canvas", "graph"} else "guided"
-        if self._active_mode == mode and remap:
+        mode = self._normalise_mode_key(mode)
+        current_mode = self._normalise_mode_key(self._active_mode)
+        if current_mode == mode and remap:
             return
-        current_scenes = self._collect_active_scenes() if remap else self.scenes
+        current_scenes = self._collect_active_scenes() if remap else [canonicalise_scene(scene, index=i) for i, scene in enumerate(self.scenes or [])]
+        mapped_scenes = self._convert_scenes_between_modes(current_scenes, current_mode, mode)
+
         if mode == "guided":
             self.guided_planner.grid(row=0, column=0, sticky="nsew")
             self.canvas_planner.grid_forget()
             self.graph_planner.grid_forget()
-            cards = scenes_to_guided_cards(current_scenes)
-            self.guided_planner.load_cards(cards)
+            self.guided_planner.load_cards(scenes_to_guided_cards(mapped_scenes))
             self.scenes = guided_cards_to_scenes(self.guided_planner.export_cards())
         elif mode == "canvas":
             self.canvas_planner.grid(row=0, column=0, sticky="nsew")
             self.guided_planner.grid_forget()
             self.graph_planner.grid_forget()
-            scenes = guided_cards_to_scenes(self.guided_planner.export_cards()) if self._active_mode == "guided" and remap else current_scenes
-            self.canvas_planner.load_scenes(scenes)
+            self.canvas_planner.load_scenes(mapped_scenes)
             self.scenes = self.canvas_planner.export_scenes()
         else:
             self.graph_planner.grid(row=0, column=0, sticky="nsew")
             self.guided_planner.grid_forget()
             self.canvas_planner.grid_forget()
-            scenes = guided_cards_to_scenes(self.guided_planner.export_cards()) if self._active_mode == "guided" and remap else current_scenes
-            self.graph_planner.load_scenes(scenes)
+            self.graph_planner.load_scenes(mapped_scenes)
             self.scenes = self.graph_planner.export_scenes()
+
         self._active_mode = mode
         self.mode_var.set(mode)
 
     def _collect_active_scenes(self):
         """Collect active scenes."""
-        if self._active_mode == "guided":
-            return guided_cards_to_scenes(self.guided_planner.export_cards())
-        if self._active_mode == "graph":
-            return self.graph_planner.export_scenes()
-        return self.canvas_planner.export_scenes()
+        mode = self._normalise_mode_key(self._active_mode)
+        if mode == "guided":
+            scenes = guided_cards_to_scenes(self.guided_planner.export_cards())
+        elif mode == "graph":
+            scenes = self.graph_planner.export_scenes()
+        else:
+            scenes = self.canvas_planner.export_scenes()
+        return [canonicalise_scene(scene, index=i) for i, scene in enumerate(scenes or [])]
 
     def _switch_to_epic_finale_planner(self):
         """Internal helper for switch to epic finale planner."""
