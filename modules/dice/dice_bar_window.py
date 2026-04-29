@@ -130,7 +130,9 @@ class DiceBarWindow(ctk.CTkToplevel):
         collapse_button = ctk.CTkButton(
             bar,
             text="◀",
-            width=16,
+            width=30,
+            height=26,
+            font=("Segoe UI Symbol", 16),
             fg_color="transparent",
             hover_color=style.accent_hover,
             corner_radius=0,
