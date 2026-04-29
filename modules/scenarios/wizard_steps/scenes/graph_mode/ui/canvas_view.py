@@ -128,6 +128,26 @@ class GraphCanvasView(ctk.CTkFrame):
         n = self.nodes[node_id]
         return (n["x"] + (self.NODE_W if out else 0), n["y"] + self.NODE_H / 2)
 
+
+    def focus_on_node(self, node_id: str) -> None:
+        if node_id not in self.nodes:
+            return
+        self.selected_nodes = {node_id}
+        self.selected_edge_id = None
+        node = self.nodes[node_id]
+        self.pan_x = (self.canvas.winfo_width() or 900) / 2 - (node["x"] + self.NODE_W / 2) * self.zoom
+        self.pan_y = (self.canvas.winfo_height() or 600) / 2 - (node["y"] + self.NODE_H / 2) * self.zoom
+        self.redraw_full()
+        self._notify_selection()
+
+    def focus_on_edge(self, edge_id: str) -> None:
+        if not any(existing_edge_id == edge_id for existing_edge_id, _src, _dst in self.edges):
+            return
+        self.selected_edge_id = edge_id
+        self.selected_nodes.clear()
+        self._redraw_edges()
+        self._notify_selection()
+
     def _on_left_down(self, event):
         if self._space_pan:
             self._on_pan_start(event)
