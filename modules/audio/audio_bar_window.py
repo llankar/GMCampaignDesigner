@@ -114,7 +114,7 @@ class AudioBarWindow(ctk.CTkToplevel):
             border_width=0,
             command=self._toggle_collapsed,
         )
-        self._collapse_button.grid(row=0, column=0, padx=(4, 6), pady=(3, 3), sticky="nsw")
+        self._collapse_button.grid(row=0, column=0, padx=(4, 6), pady=(1, 3), sticky="nsw")
 
         content = ctk.CTkFrame(
             bar,
