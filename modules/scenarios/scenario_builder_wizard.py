@@ -36,7 +36,7 @@ from modules.scenarios.scenario_character_graph import (
 )
 from modules.scenarios.wizard_steps.scenes.canvas_scene_planner import CanvasScenePlanner
 from modules.scenarios.wizard_steps.scenes.guided_scene_planner import GuidedScenePlanner
-from modules.scenarios.wizard_steps.scenes.graph_scenario_planner import GraphScenarioPlanner
+from modules.scenarios.wizard_steps.scenes.graph_mode import GraphModePlanner
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS as SCENE_CARD_ENTITY_FIELDS,
     normalise_entity_list,
@@ -303,7 +303,7 @@ class ScenesPlanningStep(WizardStep):
             self._planner_holder,
             entity_selector_callbacks=self._build_entity_selector_callbacks(),
         )
-        self.graph_planner = GraphScenarioPlanner(self._planner_holder)
+        self.graph_planner = GraphModePlanner(self._planner_holder)
         self._active_mode = None
         self.scenes = []
         self._set_mode("guided", remap=False)
