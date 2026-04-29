@@ -18,6 +18,8 @@ log_module_import(__name__)
 
 INTER_BAR_GAP = 0
 HEIGHT_PADDING = 10
+COLLAPSED_WIDTH_FLOOR = 56
+COLLAPSED_HEIGHT_FLOOR = 40
 
 
 @dataclass(frozen=True)
@@ -518,7 +520,10 @@ class DiceBarWindow(ctk.CTkToplevel):
             if self._is_collapsed:
                 # Continue with this path when is collapsed is set.
                 target = self._collapse_button or self
-                width = max(40, int(target.winfo_reqwidth() + 8))
+                button_width = int(target.winfo_reqwidth() or 0)
+                bar_border = int((self._bar_frame.cget("border_width") if self._bar_frame is not None else 0) or 0)
+                horizontal_padding = 8
+                width = max(COLLAPSED_WIDTH_FLOOR, button_width + horizontal_padding + (bar_border * 2))
                 height_source = target
                 if self._collapsed_height_hint is None and height_source is not None:
                     # Handle the branch where collapsed height hint is missing and height source is available.
@@ -545,7 +550,8 @@ class DiceBarWindow(ctk.CTkToplevel):
                 base_height = self._expanded_height_hint
             if not base_height:
                 base_height = height_source.winfo_reqheight() if height_source else 36
-            height = max(36, int(base_height + HEIGHT_PADDING))
+            collapsed_floor = COLLAPSED_HEIGHT_FLOOR if self._is_collapsed else 36
+            height = max(collapsed_floor, int(base_height + HEIGHT_PADDING))
             screen_height = self.winfo_screenheight()
             y = screen_height - height
 

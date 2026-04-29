@@ -18,6 +18,9 @@ from modules.helpers.logging_helper import log_exception, log_module_import
 
 log_module_import(__name__)
 
+COLLAPSED_WIDTH_FLOOR = 56
+COLLAPSED_HEIGHT_FLOOR = 40
+
 
 class AudioBarWindow(ctk.CTkToplevel):
     """Light-weight controller that mirrors the shared audio state."""
@@ -991,12 +994,16 @@ class AudioBarWindow(ctk.CTkToplevel):
             self.update_idletasks()
             if self._is_collapsed:
                 target = self._collapse_button or self
-                width = max(40, int(target.winfo_reqwidth() + 8))
+                button_width = int(target.winfo_reqwidth() or 0)
+                bar_border = int((self._bar_frame.cget("border_width") if self._bar_frame is not None else 0) or 0)
+                horizontal_padding = 8
+                width = max(COLLAPSED_WIDTH_FLOOR, button_width + horizontal_padding + (bar_border * 2))
                 height_source = target
             else:
                 width = self.winfo_screenwidth()
                 height_source = self._bar_frame or self
-            height = max(36, int((height_source.winfo_reqheight() if height_source else 36) + 16))
+            collapsed_floor = COLLAPSED_HEIGHT_FLOOR if self._is_collapsed else 36
+            height = max(collapsed_floor, int((height_source.winfo_reqheight() if height_source else 36) + 16))
             y = self.winfo_screenheight() - height
             self.geometry(f"{width}x{height}+0+{max(0, y)}")
             dice_window = getattr(self.master, "dice_bar_window", None)
