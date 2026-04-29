@@ -78,6 +78,7 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
 
         ctk.CTkButton(side, text="Add directory...", command=self._add_directory).pack(fill="x", pady=(0, 6))
         ctk.CTkButton(side, text="Bulk add...", command=self._bulk_add_directories).pack(fill="x", pady=6)
+        ctk.CTkButton(side, text="Import ZIP...", command=self._import_bundle_zip).pack(fill="x", pady=6)
         ctk.CTkButton(side, text="Remove selected", command=self._remove_selected).pack(fill="x", pady=6)
         ctk.CTkButton(side, text="Clear", command=self._clear).pack(fill="x", pady=6)
 
@@ -121,6 +122,52 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
                 break
 
         self._append_roots(selected_roots)
+
+    def _import_bundle_zip(self) -> None:
+        """Import a GitHub-style image-library bundle zip into the shared library."""
+        zip_path = filedialog.askopenfilename(
+            parent=self,
+            title="Import GitHub Image Library ZIP",
+            filetypes=[("Zip Files", "*.zip"), ("All Files", "*.*")],
+        )
+        if not zip_path:
+            return
+
+        analysis = self._service.analyze_image_library_bundle(zip_path)
+        if not analysis.has_image_assets:
+            messagebox.showinfo(
+                "No Image Library Assets",
+                "This archive does not contain any image library assets.",
+                parent=self,
+            )
+            return
+
+        overwrite = True
+        if analysis.duplicate_names:
+            response = messagebox.askyesnocancel(
+                "Overwrite Existing Image Library Entries?",
+                "Some image assets already exist in the active campaign.\n\n"
+                f"Image assets: {len(analysis.duplicate_names)}\n\n"
+                "Yes = overwrite duplicates\n"
+                "No = keep existing and skip duplicates\n"
+                "Cancel = abort import",
+                parent=self,
+            )
+            if response is None:
+                return
+            overwrite = bool(response)
+
+        summary = self._service.import_image_library_bundle(zip_path, overwrite=overwrite)
+        messagebox.showinfo(
+            "ZIP Import Complete",
+            (
+                "Image library ZIP import completed.\n\n"
+                f"Imported: {summary.imported}\n"
+                f"Updated: {summary.updated}\n"
+                f"Skipped: {summary.skipped}"
+            ),
+            parent=self,
+        )
 
     def _append_roots(self, candidates: list[str]) -> None:
         """Append incoming root candidates after normalization and dedupe."""
