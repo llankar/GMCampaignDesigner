@@ -564,3 +564,36 @@ def test_export_visual_flow_allows_opt_in_sentinel_export():
         }
     )
     assert [scene["Title"] for scene in scenes] == ["Start", "Scene 1"]
+
+
+def test_duplicate_titles_use_stable_target_ids_in_build_and_export():
+    scenes = [
+        {"Title": "Start", "_extra_fields": {"id": "scene-start"}, "LinkData": [{"target": "Fork", "target_id": "scene-fork-b"}]},
+        {"Title": "Fork", "_extra_fields": {"id": "scene-fork-a"}, "NextScenes": []},
+        {"Title": "Fork", "_extra_fields": {"id": "scene-fork-b"}, "NextScenes": []},
+    ]
+
+    payload = build_visual_flow_from_scenes(scenes)
+    links = payload["links"]
+    assert len(links) == 1
+    target_node = next(node for node in payload["nodes"] if node["id"] == links[0]["target"])
+    assert target_node["scene_index"] == 2
+
+    exported = export_visual_flow_to_scenes(payload, existing_scenes=scenes)
+    assert exported[0]["LinkData"][0]["target"] == "Fork"
+    assert exported[0]["LinkData"][0]["target_id"] == "scene-fork-b"
+
+
+def test_duplicate_titles_title_only_links_are_deterministic_and_mark_ambiguity():
+    scenes = [
+        {"Title": "Start", "_extra_fields": {"id": "scene-start"}, "NextScenes": ["Fork"]},
+        {"Title": "Fork", "_extra_fields": {"id": "scene-fork-a"}, "NextScenes": []},
+        {"Title": "Fork", "_extra_fields": {"id": "scene-fork-b"}, "NextScenes": []},
+    ]
+
+    payload = build_visual_flow_from_scenes(scenes)
+    assert len(payload["links"]) == 1
+    first_target = next(node for node in payload["nodes"] if node["id"] == payload["links"][0]["target"])
+    assert first_target["scene_index"] == 1
+    start_node = payload["nodes"][0]
+    assert start_node["_extra_fields"]["visual_flow_ambiguities"][0]["reason"].startswith("duplicate_title")
