@@ -313,6 +313,9 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         self._node_id_to_item = {}
         self._suspend_events = False
         self._tree = None
+        self._dragged_item_id = None
+        self._drop_target_item_id = None
+        self._drop_place_after = False
 
         if ttk and hasattr(ttk, "Treeview"):
             self._tree = ttk.Treeview(self, show="tree", selectmode="browse")
@@ -321,6 +324,11 @@ class FlowHierarchyPanel(ctk.CTkFrame):
             self._tree.bind("<Double-1>", self._emit_open)
             self._tree.bind("<Button-3>", self._show_context_menu, add="+")
             self._tree.bind("<Button-2>", self._show_context_menu, add="+")
+            self._tree.bind("<ButtonPress-1>", self._on_drag_start, add="+")
+            self._tree.bind("<B1-Motion>", self._on_drag_motion, add="+")
+            self._tree.bind("<ButtonRelease-1>", self._on_drag_release, add="+")
+            self._tree.bind("<Alt-Up>", self._on_move_up_shortcut, add="+")
+            self._tree.bind("<Alt-Down>", self._on_move_down_shortcut, add="+")
 
     def render(self, nodes, links=None, scenario_title=""):
         if not self._tree:
@@ -342,6 +350,8 @@ class FlowHierarchyPanel(ctk.CTkFrame):
             self._item_to_node_id[item_id] = node_id
             if node_id:
                 self._node_id_to_item[node_id] = item_id
+        self._dragged_item_id = None
+        self._drop_target_item_id = None
 
     def select_node(self, node_id):
         if not self._tree:
@@ -436,6 +446,56 @@ class FlowHierarchyPanel(ctk.CTkFrame):
     def _dispatch_command(self, command, **kwargs):
         if callable(self.on_context_command):
             self.on_context_command(command, kwargs)
+
+    def _on_drag_start(self, event):
+        if not self._tree:
+            return
+        item_id = self._tree.identify_row(event.y)
+        if item_id and self._item_to_node_id.get(item_id):
+            self._dragged_item_id = item_id
+            self._drop_target_item_id = None
+            self._tree.selection_set(item_id)
+            self._tree.focus(item_id)
+
+    def _on_drag_motion(self, event):
+        if not self._tree or not self._dragged_item_id:
+            return
+        item_id = self._tree.identify_row(event.y)
+        if not item_id or item_id == self._dragged_item_id or not self._item_to_node_id.get(item_id):
+            return
+        bbox = self._tree.bbox(item_id)
+        self._drop_place_after = bool(bbox and event.y > (bbox[1] + (bbox[3] // 2)))
+        self._drop_target_item_id = item_id
+        self._tree.selection_set(item_id)
+
+    def _on_drag_release(self, _event):
+        if not self._tree:
+            return
+        if self._dragged_item_id and self._drop_target_item_id:
+            dragged_id = self._item_to_node_id.get(self._dragged_item_id)
+            target_id = self._item_to_node_id.get(self._drop_target_item_id)
+            if dragged_id and target_id and dragged_id != target_id:
+                self._dispatch_command("reorder", node_id=dragged_id, target_node_id=target_id, place_after=self._drop_place_after)
+        self._dragged_item_id = None
+        self._drop_target_item_id = None
+
+    def _on_move_up_shortcut(self, *_):
+        if not self._tree:
+            return
+        selection = self._tree.selection()
+        node_id = self._item_to_node_id.get(selection[0]) if selection else None
+        if node_id:
+            self._dispatch_command("move_up", node_id=node_id)
+        return "break"
+
+    def _on_move_down_shortcut(self, *_):
+        if not self._tree:
+            return
+        selection = self._tree.selection()
+        node_id = self._item_to_node_id.get(selection[0]) if selection else None
+        if node_id:
+            self._dispatch_command("move_down", node_id=node_id)
+        return "break"
 
 
 class FlowPropertiesPanel(ctk.CTkFrame):
@@ -679,15 +739,19 @@ class VisualFlowPlanner(ctk.CTkFrame):
     def reorder_node(self, node_id, direction):
         nodes = self.canvas.model.payload.get("nodes") or []
         idx = next((i for i, node in enumerate(nodes) if str(node.get("id") or "") == str(node_id or "")), -1)
-        if idx < 0:
-            return
         target = idx - 1 if direction == "up" else idx + 1
-        if target < 0 or target >= len(nodes):
+        if idx < 0 or target < 0 or target >= len(nodes):
             return
-        nodes[idx], nodes[target] = nodes[target], nodes[idx]
-        for pos, node in enumerate(nodes):
-            node["scene_index"] = pos
-        self._refresh_views()
+        target_id = str(nodes[target].get("id") or "")
+        place_after = direction == "down"
+        if self.canvas.model.reorder_nodes(str(node_id or ""), target_id, place_after=place_after):
+            self._refresh_views()
+            self._on_select(node_id, source="canvas")
+
+    def reorder_node_relative(self, node_id, target_node_id, place_after=False):
+        if self.canvas.model.reorder_nodes(str(node_id or ""), str(target_node_id or ""), place_after=bool(place_after)):
+            self._refresh_views()
+            self._on_select(node_id, source="canvas")
 
     def cut_node(self, node_id):
         self.copy_node(node_id)
@@ -727,6 +791,8 @@ class VisualFlowPlanner(ctk.CTkFrame):
             self.reorder_node(node_id, "up")
         elif command == "move_down" and node_id:
             self.reorder_node(node_id, "down")
+        elif command == "reorder" and node_id:
+            self.reorder_node_relative(node_id, (context or {}).get("target_node_id"), place_after=bool((context or {}).get("place_after")))
         elif command == "cut" and node_id:
             self.cut_node(node_id)
         elif command == "copy" and node_id:
