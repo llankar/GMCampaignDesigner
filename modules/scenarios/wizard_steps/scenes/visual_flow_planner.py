@@ -17,6 +17,14 @@ from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicali
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import normalise_entity_list
 from modules.scenarios.scene_structured_fields import compose_scene_text_from_fields, normalise_structured_scene_items
 from modules.scenarios.wizard_steps.scenes.flow_canvas.view import VisualFlowCanvas
+from modules.scenarios.wizard_steps.scenes.flow_properties_panel_helpers import (
+    LINK_KIND_VALUES,
+    NODE_KIND_VALUES,
+    SCENE_ENTITY_FIELDS,
+    SCENE_STRUCTURED_FIELDS,
+    multiline_from_value,
+    string_list_from_multiline,
+)
 
 _VISUAL_FLOW_VERSION = 1
 _NODE_KNOWN_KEYS = {
@@ -41,8 +49,6 @@ _PLAYABLE_NODE_KIND_TO_SCENE_TYPE = {
     "action": "Action",
     "note": "Note",
 }
-_SCENE_ENTITY_FIELDS = ("NPCs", "Creatures", "Places", "Clues", "Bases", "Maps")
-_SCENE_STRUCTURED_FIELDS = ("SceneBeats", "SceneClues", "SceneChallenges", "SceneTwists", "SceneRewards")
 
 
 def _slugify(text: str) -> str:
@@ -386,11 +392,118 @@ class FlowHierarchyPanel(ctk.CTkFrame):
 
 
 class FlowPropertiesPanel(ctk.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, on_change=None, entity_selector_callbacks=None):
         super().__init__(master)
-        self.title_var = ctk.StringVar(value="")
+        self.on_change = on_change
+        self.entity_selector_callbacks = entity_selector_callbacks or {}
+        self._node = None
+        self._link = None
+        self._id_edit_enabled = False
+
         ctk.CTkLabel(self, text="Properties").pack(anchor="w", padx=8, pady=(8, 4))
-        ctk.CTkEntry(self, textvariable=self.title_var).pack(fill="x", padx=8, pady=(0, 8))
+        self._body = ctk.CTkFrame(self, fg_color="transparent")
+        self._body.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self._render_empty()
+
+    def bind_item(self, node=None, link=None):
+        self._node = node if isinstance(node, dict) else None
+        self._link = link if isinstance(link, dict) else None
+        self._id_edit_enabled = False
+        for child in self._body.winfo_children():
+            child.destroy()
+        if self._node:
+            self._render_node_form(self._node)
+        elif self._link:
+            self._render_link_form(self._link)
+        else:
+            self._render_empty()
+
+    def _render_empty(self):
+        ctk.CTkLabel(self._body, text="Select a node or link").pack(anchor="w")
+
+    def _render_node_form(self, node):
+        self._make_entry("id", str(node.get("id") or ""), readonly=True, key="id")
+        ctk.CTkButton(self._body, text="Toggle ID edit", width=110, command=self._toggle_id_edit).pack(anchor="w", pady=(0, 8))
+        self._make_entry("title/name", str(node.get("title") or ""), key="title")
+        self._make_combo("type", str(node.get("kind") or "scene"), NODE_KIND_VALUES, key="kind")
+        self._make_text("summary", multiline_from_value(node.get("summary")), key="summary")
+        self._make_checkbox("active", bool(node.get("active", True)), key="active")
+        self._make_entry("success condition", str(node.get("success_condition") or ""), key="success_condition")
+        self._make_entry("reward/xp", str(node.get("reward_xp") or ""), key="reward_xp")
+        self._make_entry("icon", str(node.get("icon") or ""), key="icon")
+        scene_fields = node.setdefault("scene_fields", {})
+        self._make_entry("SceneType", str(scene_fields.get("SceneType") or ""), key=("scene_fields", "SceneType"))
+        structured = scene_fields.setdefault("structured", {})
+        for field in SCENE_STRUCTURED_FIELDS:
+            self._make_text(field, multiline_from_value(structured.get(field, "")), key=("structured", field))
+        entities = scene_fields.setdefault("entities", {})
+        for field in SCENE_ENTITY_FIELDS:
+            self._make_entity_row(field, multiline_from_value(entities.get(field, [])))
+
+    def _render_link_form(self, link):
+        self._make_entry("source", str(link.get("source") or ""), key="source")
+        self._make_entry("target", str(link.get("target") or ""), key="target")
+        self._make_entry("label", str(link.get("label") or ""), key="label")
+        self._make_entry("condition", str(link.get("condition") or ""), key="condition")
+        self._make_combo("link type", str(link.get("kind") or "scene_link"), LINK_KIND_VALUES, key="kind")
+        ctk.CTkButton(self._body, text="Delete link", fg_color="#7f1d1d", hover_color="#991b1b", command=lambda: self._emit({"_delete": True})).pack(fill="x", pady=(8, 0))
+
+    def _toggle_id_edit(self):
+        self._id_edit_enabled = not self._id_edit_enabled
+        self.bind_item(self._node, self._link)
+
+    def _make_entry(self, label, value, key=None, readonly=False):
+        ctk.CTkLabel(self._body, text=label).pack(anchor="w")
+        var = ctk.StringVar(value=str(value or ""))
+        state = "normal"
+        if readonly and not self._id_edit_enabled:
+            state = "disabled"
+        entry = ctk.CTkEntry(self._body, textvariable=var, state=state)
+        entry.pack(fill="x", pady=(0, 6))
+        if key is not None and state == "normal":
+            var.trace_add("write", lambda *_a, k=key, v=var: self._emit({k: v.get()}))
+
+    def _make_combo(self, label, value, values, key=None):
+        ctk.CTkLabel(self._body, text=label).pack(anchor="w")
+        var = ctk.StringVar(value=value if value in values else values[0])
+        combo = ctk.CTkComboBox(self._body, values=list(values), variable=var, state="readonly")
+        combo.pack(fill="x", pady=(0, 6))
+        if key is not None:
+            var.trace_add("write", lambda *_a, k=key, v=var: self._emit({k: v.get()}))
+
+    def _make_text(self, label, value, key=None):
+        ctk.CTkLabel(self._body, text=label).pack(anchor="w")
+        box = ctk.CTkTextbox(self._body, height=62)
+        box.pack(fill="x", pady=(0, 6))
+        box.insert("1.0", value)
+        if key is not None:
+            box.bind("<KeyRelease>", lambda _e, k=key, b=box: self._emit({k: b.get("1.0", "end-1c")}), add="+")
+
+    def _make_checkbox(self, label, value, key=None):
+        var = ctk.BooleanVar(value=bool(value))
+        ctk.CTkCheckBox(self._body, text=label, variable=var, command=lambda k=key, v=var: self._emit({k: bool(v.get())})).pack(anchor="w", pady=(0, 6))
+
+    def _make_entity_row(self, field_name, value):
+        ctk.CTkLabel(self._body, text=field_name).pack(anchor="w")
+        row = ctk.CTkFrame(self._body, fg_color="transparent")
+        row.pack(fill="x", pady=(0, 6))
+        var = ctk.StringVar(value=value)
+        entry = ctk.CTkEntry(row, textvariable=var)
+        entry.pack(side="left", fill="x", expand=True)
+        var.trace_add("write", lambda *_a, f=field_name, v=var: self._emit({("entities", f): v.get()}))
+        callback = self.entity_selector_callbacks.get(field_name)
+        ctk.CTkButton(row, text="Select", width=70, state="normal" if callback else "disabled", command=lambda f=field_name, v=var, cb=callback: self._select_entities(f, v, cb)).pack(side="left", padx=(6, 0))
+
+    def _select_entities(self, field_name, variable, callback):
+        if not callable(callback):
+            return
+        selected = callback(string_list_from_multiline(variable.get()))
+        variable.set("\n".join(selected or []))
+        self._emit({("entities", field_name): variable.get()})
+
+    def _emit(self, changes):
+        if callable(self.on_change):
+            self.on_change(changes, node=self._node, link=self._link)
 
 
 class ComponentLibraryPanel(ctk.CTkFrame):
@@ -419,10 +532,15 @@ class VisualFlowPlanner(ctk.CTkFrame):
         self.canvas.grid(row=0, column=1, sticky="nsew")
         right = ctk.CTkFrame(self)
         right.grid(row=0, column=2, sticky="nsew")
-        self.properties = FlowPropertiesPanel(right)
+        self.properties = FlowPropertiesPanel(right, on_change=self._on_properties_change, entity_selector_callbacks=getattr(self, "entity_selector_callbacks", None))
         self.properties.pack(fill="x")
         self.library = ComponentLibraryPanel(right)
         self.library.pack(fill="both", expand=True)
+
+
+    def set_entity_selector_callbacks(self, callbacks):
+        self.entity_selector_callbacks = callbacks or {}
+        self.properties.entity_selector_callbacks = self.entity_selector_callbacks
 
     def load_from_state(self, scenes, visual_payload=None, scenario_title=""):
         self._scenario_title = str(scenario_title or "")
@@ -449,18 +567,54 @@ class VisualFlowPlanner(ctk.CTkFrame):
     def mark_dirty(self):
         self._dirty = True
 
-    def _on_select(self, node_id, source=""):
-        if not node_id:
-            return
-        if source != "hierarchy":
-            self.hierarchy.select_node(node_id)
-        if source != "canvas":
-            self.canvas.select_node(node_id, emit=False)
+    def _on_select(self, item_id, source=""):
+        payload = self.canvas.model.payload
+        node = next((n for n in (payload.get("nodes") or []) if str(n.get("id") or "") == str(item_id or "")), None)
+        link = None if node else next((l for l in (payload.get("links") or []) if str(l.get("id") or "") == str(item_id or "")), None)
+        if node and source != "hierarchy":
+            self.hierarchy.select_node(item_id)
+        if node and source != "canvas":
+            self.canvas.select_node(item_id, emit=False)
+        self.properties.bind_item(node=node, link=link)
 
     def _open_node_properties(self, node_id):
-        node = next((n for n in (self.canvas.export_payload().get("nodes") or []) if str(n.get("id") or "") == str(node_id or "")), None)
-        if node:
-            self.properties.title_var.set(str(node.get("title") or ""))
+        self._on_select(node_id, source="hierarchy")
+
+    def _on_properties_change(self, changes, node=None, link=None):
+        if not isinstance(changes, dict):
+            return
+        payload = self.canvas.model.payload
+        target = node if isinstance(node, dict) else link
+        if not isinstance(target, dict):
+            return
+        if changes.get("_delete") and link is target:
+            self.canvas.model.remove_link(str(link.get("id") or ""))
+        else:
+            scene_fields = target.setdefault("scene_fields", {}) if target is node else None
+            for key, value in changes.items():
+                if isinstance(key, tuple) and key and key[0] == "scene_fields" and node is target:
+                    scene_fields[key[1]] = str(value or "")
+                elif isinstance(key, tuple) and key and key[0] == "structured" and node is target:
+                    scene_fields.setdefault("structured", {})[key[1]] = string_list_from_multiline(value)
+                elif isinstance(key, tuple) and key and key[0] == "entities" and node is target:
+                    scene_fields.setdefault("entities", {})[key[1]] = string_list_from_multiline(value)
+                elif key == "summary" and node is target:
+                    target[key] = str(value or "")
+                elif key == "id" and node is target:
+                    new_id = str(value or "").strip()
+                    if new_id and new_id != str(target.get("id") or ""):
+                        old_id = str(target.get("id") or "")
+                        target["id"] = new_id
+                        for lk in payload.get("links") or []:
+                            if str(lk.get("source") or "") == old_id:
+                                lk["source"] = new_id
+                            if str(lk.get("target") or "") == old_id:
+                                lk["target"] = new_id
+                else:
+                    target[key] = value
+        self.mark_dirty()
+        self.hierarchy.render(payload.get("nodes") or [], payload.get("links") or [], self._scenario_title)
+        self.canvas.render()
 
     def _safe_save(self):
         callback = getattr(self, "save_state", None)
