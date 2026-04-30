@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 import re
 import tkinter as tk
 from typing import Any
@@ -29,6 +30,8 @@ from modules.scenarios.wizard_steps.scenes.flow_properties_panel_helpers import 
 )
 
 _VISUAL_FLOW_VERSION = 1
+
+LOGGER = logging.getLogger(__name__)
 _NODE_KNOWN_KEYS = {
     "id",
     "title",
@@ -140,6 +143,44 @@ def _link_targets(scene):
     return [str(target).strip() for target in (scene.get("NextScenes") or []) if str(target).strip()]
 
 
+
+
+def _scene_stable_id(scene, fallback=None):
+    extra = scene.get("_extra_fields") if isinstance(scene.get("_extra_fields"), dict) else {}
+    nested_extra = extra.get("_extra_fields") if isinstance(extra.get("_extra_fields"), dict) else {}
+    scene_id = str(extra.get("id") or nested_extra.get("id") or "").strip()
+    return scene_id or str(fallback or "").strip()
+
+
+def _link_target_ids(scene, raw_scene=None):
+    ids = []
+    sources = [scene]
+    if isinstance(raw_scene, dict):
+        sources.insert(0, raw_scene)
+    for source in sources:
+        for link in source.get("LinkData") or []:
+            if not isinstance(link, dict):
+                continue
+            target_id = str(link.get("target_id") or "").strip()
+            if target_id:
+                ids.append(target_id)
+        if ids:
+            break
+    return ids
+
+
+def _resolve_title_target(title, scenes, title_to_indexes, source_idx=None):
+    candidates = title_to_indexes.get(title, [])
+    if not candidates:
+        return None, None
+    if len(candidates) == 1:
+        return candidates[0], None
+    if source_idx is not None:
+        for idx in candidates:
+            if idx > source_idx:
+                return idx, f"duplicate_title:{title}:forward"
+    return candidates[0], f"duplicate_title:{title}:first"
+
 def _build_layered_positions(nodes, scenes):
     title_to_index = {str(scene.get("Title") or ""): idx for idx, scene in enumerate(scenes)}
     edges = {idx: [] for idx in range(len(scenes))}
@@ -189,12 +230,19 @@ def _build_layered_positions(nodes, scenes):
 
 def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
     """Create deterministic visual flow payload from scenes and optional old payload."""
-    scenes_list = [canonicalise_scene(scene if isinstance(scene, dict) else {"Title": str(scene)}, index=i) for i, scene in enumerate(scenes or [])]
+    raw_scenes = [scene if isinstance(scene, dict) else {"Title": str(scene)} for scene in (scenes or [])]
+    scenes_list = [canonicalise_scene(scene, index=i) for i, scene in enumerate(raw_scenes)]
     old_payload = existing_visual_payload if isinstance(existing_visual_payload, dict) else {}
     old_nodes = [node for node in (old_payload.get("nodes") or []) if isinstance(node, dict)]
     old_nodes_by_index = {int(node.get("scene_index")): node for node in old_nodes if isinstance(node.get("scene_index"), int)}
     old_nodes_by_id = {str(node.get("id") or "").strip(): node for node in old_nodes if str(node.get("id") or "").strip()}
     old_nodes_by_title = {str(node.get("title") or "").strip().lower(): node for node in old_nodes if str(node.get("title") or "").strip()}
+
+    scene_ids = []
+    for idx, scene in enumerate(scenes_list):
+        scene_id = _scene_stable_id(scene, fallback=f"scene-{idx + 1}")
+        scene.setdefault("_extra_fields", {})["id"] = scene_id
+        scene_ids.append(scene_id)
 
     nodes = []
     used_ids = set()
@@ -233,6 +281,7 @@ def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
                 "_extra_fields": {k: copy.deepcopy(v) for k, v in matched.items() if k not in _NODE_KNOWN_KEYS},
             }
         )
+        nodes[-1]["_extra_fields"]["id"] = scene_ids[idx] if idx < len(scene_ids) else reference_id or f"scene-{idx + 1}"
     if any(int(node.get("x", 0)) == 0 and int(node.get("y", 0)) == 0 for node in nodes):
         auto_nodes = [{"id": n["id"], "x": n["x"], "y": n["y"]} for n in nodes]
         _build_layered_positions(auto_nodes, scenes_list)
@@ -241,14 +290,32 @@ def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
                 node["x"] = auto_nodes[idx]["x"]
                 node["y"] = auto_nodes[idx]["y"]
 
-    node_by_title = {node["title"]: node["id"] for node in nodes}
+    node_by_scene_id = {scene_ids[idx]: nodes[idx]["id"] for idx in range(len(nodes))}
+    title_to_indexes = {}
+    for idx, scene in enumerate(scenes_list):
+        title_to_indexes.setdefault(str(scene.get("Title") or "").strip(), []).append(idx)
+
     links = []
     for node in nodes:
-        source_scene = scenes_list[node["scene_index"]]
-        for nxt in _link_targets(source_scene):
-            target_id = node_by_title.get(str(nxt or "").strip())
+        source_idx = node["scene_index"]
+        source_scene = scenes_list[source_idx]
+        raw_source_scene = raw_scenes[source_idx] if source_idx < len(raw_scenes) else {}
+        source_target_ids = _link_target_ids(source_scene, raw_scene=raw_source_scene)
+        for target_scene_id in source_target_ids:
+            target_id = node_by_scene_id.get(target_scene_id)
             if target_id:
                 links.append({"source": node["id"], "target": target_id, "label": "", "kind": "scene_link"})
+        if source_target_ids:
+            continue
+        for nxt in _link_targets(source_scene):
+            target_idx, reason = _resolve_title_target(str(nxt or "").strip(), scenes_list, title_to_indexes, source_idx=source_idx)
+            if target_idx is None:
+                continue
+            if reason:
+                LOGGER.warning("Ambiguous title-only link resolution for '%s' from scene index %s: %s", nxt, source_idx, reason)
+                source_scene.setdefault("_extra_fields", {}).setdefault("visual_flow_ambiguities", []).append({"target": str(nxt or "").strip(), "reason": reason})
+                node.setdefault("_extra_fields", {}).setdefault("visual_flow_ambiguities", []).append({"target": str(nxt or "").strip(), "reason": reason})
+            links.append({"source": node["id"], "target": nodes[target_idx]["id"], "label": "", "kind": "scene_link"})
     links = normalise_flow_links(nodes, links)
     return {"version": _VISUAL_FLOW_VERSION, "nodes": nodes, "links": links}
 
@@ -269,17 +336,18 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
             nodes.append(node)
     links = normalise_flow_links(nodes, payload.get("links") or [])
     existing_by_index = {idx: scene for idx, scene in enumerate(existing)}
-    existing_by_title = {
-        str(scene.get("Title") or "").strip().casefold(): scene
-        for scene in existing
-        if str(scene.get("Title") or "").strip()
-    }
+    existing_by_title = {}
+    for scene in existing:
+        key = str(scene.get("Title") or "").strip().casefold()
+        if key and key not in existing_by_title:
+            existing_by_title[key] = scene
     result = []
     for node in sorted(nodes, key=lambda n: int(n.get("scene_index", 0))):
         idx = int(node.get("scene_index", 0))
         title = str(node.get("title") or "").strip() or f"Scene {idx + 1}"
         scene = copy.deepcopy(existing_by_index.get(idx) or existing_by_title.get(title.casefold()) or {})
         scene.setdefault("_extra_fields", {})
+        scene["_extra_fields"]["id"] = str(scene.get("_extra_fields", {}).get("id") or node.get("id") or f"scene-{idx + 1}")
         scene["Title"] = title
         scene["Summary"] = str(node.get("summary") or scene.get("Summary") or "")
         node_kind = _normalise_node_kind(node.get("kind"))
@@ -311,20 +379,34 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene["Text"] = compose_scene_text_from_fields(scene)
         result.append(scene)
 
-    id_to_title = {str(node.get("id")): str(node.get("title") or "") for node in nodes}
+    id_to_scene = {str(node.get("id")): node for node in nodes}
     outgoing = {}
+    title_counts = {}
+    for node in nodes:
+        title_counts[str(node.get("title") or "")] = title_counts.get(str(node.get("title") or ""), 0) + 1
     for link in links:
         source_id = str(link["source"])
-        target_title = id_to_title.get(link["target"], "")
+        target_node = id_to_scene.get(link["target"], {})
+        target_title = str(target_node.get("title") or "")
         if not target_title:
             continue
-        outgoing.setdefault(source_id, []).append({"target": target_title, "text": str(link.get("label") or target_title)})
+        target_scene_id = str((target_node.get("_extra_fields") or {}).get("id") or "").strip()
+        outgoing_link = {"target": target_title, "text": str(link.get("label") or target_title)}
+        if title_counts.get(target_title, 0) > 1 and target_scene_id:
+            outgoing_link["target_id"] = target_scene_id
+        outgoing.setdefault(source_id, []).append(outgoing_link)
     for index, node in enumerate(sorted(nodes, key=lambda n: int(n.get("scene_index", 0)))):
         if index >= len(result):
             continue
         scene = result[index]
-        scene["LinkData"] = outgoing.get(str(node.get("id")), [])
+        raw_outgoing = outgoing.get(str(node.get("id")), [])
+        scene["LinkData"] = raw_outgoing
         normalised_links = normalise_scene_links(scene)
+        for link_idx, link in enumerate(normalised_links):
+            if link_idx < len(raw_outgoing):
+                target_id = str(raw_outgoing[link_idx].get("target_id") or "").strip()
+                if target_id:
+                    link["target_id"] = target_id
         scene["LinkData"] = normalised_links
         scene["NextScenes"] = [link["target"] for link in normalised_links]
         for key in _SCENE_RECOGNISED_KEYS:
