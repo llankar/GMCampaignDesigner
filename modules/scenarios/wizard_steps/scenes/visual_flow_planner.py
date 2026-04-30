@@ -317,6 +317,14 @@ def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
                 node.setdefault("_extra_fields", {}).setdefault("visual_flow_ambiguities", []).append({"target": str(nxt or "").strip(), "reason": reason})
             links.append({"source": node["id"], "target": nodes[target_idx]["id"], "label": "", "kind": "scene_link"})
     links = normalise_flow_links(nodes, links)
+    linked_node_ids = set()
+    for link in links:
+        linked_node_ids.add(str(link.get("source") or ""))
+        linked_node_ids.add(str(link.get("target") or ""))
+    for node in nodes:
+        node_id = str(node.get("id") or "")
+        if node_id and node_id not in linked_node_ids:
+            node.setdefault("_extra_fields", {})["visual_flow_isolated"] = "no_incoming_or_outgoing_links"
     return {"version": _VISUAL_FLOW_VERSION, "nodes": nodes, "links": links}
 
 
@@ -342,7 +350,10 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         if key and key not in existing_by_title:
             existing_by_title[key] = scene
     result = []
-    for node in sorted(nodes, key=lambda n: int(n.get("scene_index", 0))):
+    node_id_to_exported_scene = {}
+    # NOTE: scene_index is presentation order only. Logical progression is always derived
+    # from explicit links, never from index adjacency or fallback ordering.
+    for node in sorted(nodes, key=lambda n: (int(n.get("scene_index", 0)), str(n.get("id") or ""))):
         idx = int(node.get("scene_index", 0))
         title = str(node.get("title") or "").strip() or f"Scene {idx + 1}"
         scene = copy.deepcopy(existing_by_index.get(idx) or existing_by_title.get(title.casefold()) or {})
@@ -378,6 +389,7 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
             scene["Type"] = str(scene_fields.get("SceneType"))
         scene["Text"] = compose_scene_text_from_fields(scene)
         result.append(scene)
+        node_id_to_exported_scene[str(node.get("id") or "")] = scene
 
     id_to_scene = {str(node.get("id")): node for node in nodes}
     outgoing = {}
@@ -395,10 +407,10 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         if title_counts.get(target_title, 0) > 1 and target_scene_id:
             outgoing_link["target_id"] = target_scene_id
         outgoing.setdefault(source_id, []).append(outgoing_link)
-    for index, node in enumerate(sorted(nodes, key=lambda n: int(n.get("scene_index", 0)))):
-        if index >= len(result):
+    for node in sorted(nodes, key=lambda n: (int(n.get("scene_index", 0)), str(n.get("id") or ""))):
+        scene = node_id_to_exported_scene.get(str(node.get("id") or ""))
+        if scene is None:
             continue
-        scene = result[index]
         raw_outgoing = outgoing.get(str(node.get("id")), [])
         scene["LinkData"] = raw_outgoing
         normalised_links = normalise_scene_links(scene)
@@ -419,6 +431,17 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         for key in _SCENE_REQUIRED_EXPORT_STRING_FIELDS:
             scene.setdefault(key, "")
         scene["Text"] = compose_scene_text_from_fields(scene)
+    # Deterministic handling for disconnected nodes: keep them exported and mark them.
+    isolated_node_ids = {str(node.get("id") or "") for node in nodes}
+    for link in links:
+        isolated_node_ids.discard(str(link.get("source") or ""))
+        isolated_node_ids.discard(str(link.get("target") or ""))
+    for node_id in sorted(nid for nid in isolated_node_ids if nid):
+        scene = node_id_to_exported_scene.get(node_id)
+        if scene is None:
+            continue
+        scene.setdefault("_extra_fields", {})["visual_flow_isolated"] = "no_incoming_or_outgoing_links"
+
     return result
 
 
