@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -24,8 +25,8 @@ def make_delete_node_command(*, node_id: str, removed_node: dict[str, Any] | Non
 def make_update_link_command(*, link_id: str, before: dict[str, Any], after: dict[str, Any]) -> CommandResult:
     return CommandResult(
         changed=before != after,
-        before={"link_id": str(link_id or ""), "payload": dict(before or {})},
-        after={"link_id": str(link_id or ""), "payload": dict(after or {})},
+        before={"link_id": str(link_id or ""), "payload": copy.deepcopy(before or {})},
+        after={"link_id": str(link_id or ""), "payload": copy.deepcopy(after or {})},
     )
 
 
@@ -33,5 +34,5 @@ def make_create_link_command(*, source_id: str, target_id: str, link_payload: di
     return CommandResult(
         changed=bool(source_id and target_id),
         before={},
-        after={"source": str(source_id or ""), "target": str(target_id or ""), "link": dict(link_payload or {})},
+        after={"source": str(source_id or ""), "target": str(target_id or ""), "link": copy.deepcopy(link_payload or {})},
     )
