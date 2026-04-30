@@ -44,3 +44,26 @@ def test_parity_delete_update_command_contracts_undo_ready():
     create_cmd = make_create_link_command(source_id="a", target_id="b", link_payload={"id": "a-b"})
     assert create_cmd.changed is True
     assert create_cmd.after["target"] == "b"
+
+
+def test_update_link_command_snapshots_are_deep_copied():
+    before = {"style": {"width": 1}}
+    after = {"style": {"width": 2}}
+
+    command = make_update_link_command(link_id="a-b", before=before, after=after)
+
+    before["style"]["width"] = 99
+    after["style"]["width"] = 88
+
+    assert command.before["payload"]["style"]["width"] == 1
+    assert command.after["payload"]["style"]["width"] == 2
+
+
+def test_create_link_command_snapshots_are_deep_copied():
+    link_payload = {"meta": {"label": "A->B"}}
+
+    command = make_create_link_command(source_id="a", target_id="b", link_payload=link_payload)
+
+    link_payload["meta"]["label"] = "MUTATED"
+
+    assert command.after["link"]["meta"]["label"] == "A->B"
