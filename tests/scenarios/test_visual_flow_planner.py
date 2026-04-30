@@ -174,6 +174,62 @@ def test_visual_flow_round_trip_preserves_node_kinds_via_extra_metadata():
     assert by_title["Fallback"]["kind"] == "scene"
 
 
+def test_export_visual_flow_scene_type_precedence_uses_explicit_scene_fields_over_node_kind():
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {
+                "id": "n1",
+                "scene_index": 0,
+                "title": "Conflicting",
+                "summary": "",
+                "kind": "objective",
+                "x": 0,
+                "y": 0,
+                "scene_fields": {"SceneType": "Interaction"},
+            }
+        ],
+        "links": [],
+    }
+
+    scenes = export_visual_flow_to_scenes(flow_payload)
+
+    assert scenes[0]["SceneType"] == "Interaction"
+    assert scenes[0]["Type"] == "Interaction"
+
+
+def test_export_visual_flow_scene_type_precedence_uses_node_kind_then_existing_scene():
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "n1", "scene_index": 0, "title": "KindMapped", "summary": "", "kind": "condition", "x": 0, "y": 0},
+            {
+                "id": "n2",
+                "scene_index": 1,
+                "title": "LegacyOnly",
+                "summary": "",
+                "kind": "start",
+                "x": 0,
+                "y": 0,
+                "_extra_fields": {"export_as_scene": True},
+            },
+        ],
+        "links": [],
+    }
+    existing_scenes = [
+        {"Title": "KindMapped", "SceneType": "OldType", "Type": "OldType"},
+        {"Title": "LegacyOnly", "SceneType": "Legacy Scene Type", "Type": "Legacy Type"},
+    ]
+
+    scenes = export_visual_flow_to_scenes(flow_payload, existing_scenes=existing_scenes)
+    by_title = {scene["Title"]: scene for scene in scenes}
+
+    assert by_title["KindMapped"]["SceneType"] == "Condition"
+    assert by_title["KindMapped"]["Type"] == "Condition"
+    assert by_title["LegacyOnly"]["SceneType"] == "Legacy Scene Type"
+    assert by_title["LegacyOnly"]["Type"] == "Legacy Scene Type"
+
+
 def test_visual_flow_exports_linkdata_and_nextscenes():
     flow_payload = {
         "version": 1,
