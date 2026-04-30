@@ -294,10 +294,21 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         "scene": "🎬 ",
     }
 
-    def __init__(self, master, on_select=None, on_open=None):
+    _MENU_NODE_TYPES = (
+        ("Scene", "scene"),
+        ("Objective", "objective"),
+        ("Side Objective", "side_objective"),
+        ("Interaction", "interaction"),
+        ("Condition", "condition"),
+        ("Action", "action"),
+        ("Note", "note"),
+    )
+
+    def __init__(self, master, on_select=None, on_open=None, on_context_command=None):
         super().__init__(master)
         self.on_select = on_select
         self.on_open = on_open
+        self.on_context_command = on_context_command
         self._item_to_node_id = {}
         self._node_id_to_item = {}
         self._suspend_events = False
@@ -308,6 +319,8 @@ class FlowHierarchyPanel(ctk.CTkFrame):
             self._tree.pack(fill="both", expand=True, padx=8, pady=8)
             self._tree.bind("<<TreeviewSelect>>", self._emit_select)
             self._tree.bind("<Double-1>", self._emit_open)
+            self._tree.bind("<Button-3>", self._show_context_menu, add="+")
+            self._tree.bind("<Button-2>", self._show_context_menu, add="+")
 
     def render(self, nodes, links=None, scenario_title=""):
         if not self._tree:
@@ -394,6 +407,35 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         node_id = self._item_to_node_id.get(selection[0]) if selection else None
         if node_id and self.on_open:
             self.on_open(node_id)
+
+    def _show_context_menu(self, event):
+        if not self._tree:
+            return
+        item_id = self._tree.identify_row(event.y)
+        node_id = self._item_to_node_id.get(item_id)
+        is_node_target = bool(node_id)
+        if is_node_target and item_id:
+            self._tree.selection_set(item_id)
+            self._tree.focus(item_id)
+            self._emit_select()
+        menu = tk.Menu(self, tearoff=False)
+        add_menu = tk.Menu(menu, tearoff=False)
+        for label, node_type in self._MENU_NODE_TYPES:
+            add_menu.add_command(label=label, command=lambda nt=node_type: self._dispatch_command("add", node_type=nt, node_id=node_id))
+        menu.add_cascade(label="Add", menu=add_menu)
+        menu.add_separator()
+        menu.add_command(label="Delete", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("delete", node_id=node_id))
+        menu.add_command(label="Move Up", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("move_up", node_id=node_id))
+        menu.add_command(label="Move Down", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("move_down", node_id=node_id))
+        menu.add_separator()
+        menu.add_command(label="Cut", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("cut", node_id=node_id))
+        menu.add_command(label="Copy", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("copy", node_id=node_id))
+        menu.add_command(label="Paste", command=lambda: self._dispatch_command("paste", node_id=node_id))
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _dispatch_command(self, command, **kwargs):
+        if callable(self.on_context_command):
+            self.on_context_command(command, kwargs)
 
 
 class FlowPropertiesPanel(ctk.CTkFrame):
@@ -562,7 +604,8 @@ class VisualFlowPlanner(ctk.CTkFrame):
         self._flow_payload = {"version": _VISUAL_FLOW_VERSION, "nodes": [], "links": []}
         self._scenes = []
 
-        self.hierarchy = FlowHierarchyPanel(self, on_select=self._on_select, on_open=self._open_node_properties)
+        self._clipboard_node = None
+        self.hierarchy = FlowHierarchyPanel(self, on_select=self._on_select, on_open=self._open_node_properties, on_context_command=self._handle_hierarchy_command)
         self.hierarchy.grid(row=0, column=0, sticky="nsew")
         self.canvas = VisualFlowCanvas(self, on_select=self._on_select, on_change=self.mark_dirty, on_save=self._safe_save)
         self.canvas.grid(row=0, column=1, sticky="nsew")
@@ -609,6 +652,87 @@ class VisualFlowPlanner(ctk.CTkFrame):
 
     def mark_dirty(self):
         self._dirty = True
+
+    def _refresh_views(self):
+        payload = self.canvas.model.payload
+        self.hierarchy.render(payload.get("nodes") or [], payload.get("links") or [], self._scenario_title)
+        self.canvas.render()
+        self.mark_dirty()
+
+    def _node_anchor_context(self, node_id=None):
+        return {"node_id": str(node_id or "").strip() or None}
+
+    def add_node(self, node_type, anchor_context):
+        node = self.canvas.create_node_at_viewport_center(node_type)
+        anchor_id = str((anchor_context or {}).get("node_id") or "").strip()
+        if node and anchor_id:
+            self.canvas.model.payload.setdefault("links", []).append({"source": anchor_id, "target": node["id"], "kind": "scene_link", "label": ""})
+            self.canvas.model.payload["links"] = normalise_flow_links(self.canvas.model.payload.get("nodes") or [], self.canvas.model.payload.get("links") or [])
+        if node:
+            self._refresh_views()
+            self._on_select(node.get("id"), source="canvas")
+
+    def delete_node(self, node_id):
+        if self.canvas.model.remove_node(str(node_id or "")):
+            self._refresh_views()
+
+    def reorder_node(self, node_id, direction):
+        nodes = self.canvas.model.payload.get("nodes") or []
+        idx = next((i for i, node in enumerate(nodes) if str(node.get("id") or "") == str(node_id or "")), -1)
+        if idx < 0:
+            return
+        target = idx - 1 if direction == "up" else idx + 1
+        if target < 0 or target >= len(nodes):
+            return
+        nodes[idx], nodes[target] = nodes[target], nodes[idx]
+        for pos, node in enumerate(nodes):
+            node["scene_index"] = pos
+        self._refresh_views()
+
+    def cut_node(self, node_id):
+        self.copy_node(node_id)
+        self.delete_node(node_id)
+
+    def copy_node(self, node_id):
+        node = self.canvas.model.get_node(str(node_id or ""))
+        if node:
+            self._clipboard_node = copy.deepcopy(node)
+
+    def paste_node(self, anchor_context):
+        if not isinstance(self._clipboard_node, dict):
+            return
+        nodes = self.canvas.model.payload.get("nodes") or []
+        links = self.canvas.model.payload.get("links") or []
+        clone = copy.deepcopy(self._clipboard_node)
+        clone["id"] = normalise_flow_node_id(clone.get("title") or "scene", [n.get("id") for n in nodes])
+        clone["scene_index"] = len(nodes)
+        clone["x"] = int(clone.get("x", 0)) + 40
+        clone["y"] = int(clone.get("y", 0)) + 40
+        nodes.append(clone)
+        source_id = str((anchor_context or {}).get("node_id") or "").strip()
+        if source_id and any(str(n.get("id") or "") == source_id for n in nodes):
+            links.append({"source": source_id, "target": clone["id"], "label": "", "kind": "scene_link"})
+        self.canvas.model.payload["links"] = normalise_flow_links(nodes, links)
+        self._refresh_views()
+        self._on_select(clone.get("id"), source="canvas")
+
+    def _handle_hierarchy_command(self, command, context):
+        node_id = str((context or {}).get("node_id") or "").strip() or None
+        anchor_context = self._node_anchor_context(node_id)
+        if command == "add":
+            self.add_node((context or {}).get("node_type") or "scene", anchor_context)
+        elif command == "delete" and node_id:
+            self.delete_node(node_id)
+        elif command == "move_up" and node_id:
+            self.reorder_node(node_id, "up")
+        elif command == "move_down" and node_id:
+            self.reorder_node(node_id, "down")
+        elif command == "cut" and node_id:
+            self.cut_node(node_id)
+        elif command == "copy" and node_id:
+            self.copy_node(node_id)
+        elif command == "paste":
+            self.paste_node(anchor_context)
 
     def _on_select(self, item_id, source=""):
         payload = self.canvas.model.payload
