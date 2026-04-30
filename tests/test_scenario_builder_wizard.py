@@ -5,6 +5,10 @@ import sys
 from types import SimpleNamespace
 
 import pytest
+from modules.scenarios.wizard_steps.scenes.visual_flow_planner import (
+    build_visual_flow_from_scenes,
+    export_visual_flow_to_scenes,
+)
 
 
 class _StubWidget:
@@ -497,6 +501,38 @@ def test_scene_mode_adapters_round_trip_structured_fields():
     assert round_tripped[1]["SceneClues"] == ["Stamped crate marked OR-17"]
 
 
+def test_scenes_planning_mode_switch_guided_visual_canvas_preserves_data():
+    cards = [
+        {
+            "Title": "Gate",
+            "Summary": "Arrive at the city gate.",
+            "SceneType": "Setup",
+            "SceneClues": ["Broken seal"],
+            "NPCs": ["Guard Tomas"],
+            "LinkData": [{"target": "Market", "text": "Enter city"}],
+        },
+        {
+            "Title": "Market",
+            "Summary": "Crowded square.",
+            "SceneType": "Interaction",
+            "Places": ["Grand Bazaar"],
+            "NextScenes": [],
+        },
+    ]
+
+    scenes = scenario_builder_wizard.guided_cards_to_scenes(cards)
+    visual = build_visual_flow_from_scenes(scenes)
+    exported = export_visual_flow_to_scenes(visual, existing_scenes=scenes)
+    guided_again = scenario_builder_wizard.scenes_to_guided_cards(exported)
+
+    by_title = {scene["Title"]: scene for scene in guided_again}
+    exported_by_title = {scene["Title"]: scene for scene in exported}
+    assert by_title["Gate"]["SceneClues"] == ["Broken seal"]
+    assert by_title["Gate"]["NPCs"] == ["Guard Tomas"]
+    assert exported_by_title["Gate"]["NextScenes"] == ["Market"]
+    assert by_title["Market"]["Places"] == ["Grand Bazaar"]
+
+
 def test_finish_embedded_can_persist_before_callback(monkeypatch):
     """Verify that finish embedded can persist before callback."""
     wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
@@ -751,3 +787,31 @@ def test_review_step_load_state_normalises_scene_links_for_preview_render():
     assert scenes[0]["NextScenes"] == ["Market"]
     assert scenes[1]["NextScenes"] == ["Finale"]
     assert scenes[2]["NextScenes"] == []
+
+
+def test_review_step_still_renders_visual_exported_links():
+    """Review should still render links coming from exported visual flow payload."""
+    step = scenario_builder_wizard.ReviewStep.__new__(scenario_builder_wizard.ReviewStep)
+    step.title_label = _RecordingLabel()
+    step.summary_label = _RecordingLabel()
+    step.secrets_label = _RecordingLabel()
+    step.stats_label = _RecordingLabel()
+    step.details_text = _RecordingTextbox()
+    step.flow_preview = _RecordingFlowPreview()
+
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "arrival", "scene_index": 0, "title": "Arrival", "summary": "", "kind": "scene", "x": 10, "y": 10},
+            {"id": "market", "scene_index": 1, "title": "Market", "summary": "", "kind": "scene", "x": 20, "y": 20},
+        ],
+        "links": [{"id": "arrival-market", "source": "arrival", "target": "market", "label": "", "kind": "scene_link"}],
+    }
+    exported_scenes = export_visual_flow_to_scenes(flow_payload)
+    state = {"Title": "Visual Export", "Summary": "", "Secrets": "", "Scenes": exported_scenes}
+
+    step.load_state(state)
+
+    scenes, _selected_index = step.flow_preview.calls[-1]
+    scene_by_title = {scene["Title"]: scene for scene in scenes}
+    assert scene_by_title["Arrival"]["NextScenes"] == ["Market"]

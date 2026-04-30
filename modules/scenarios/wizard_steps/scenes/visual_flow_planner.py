@@ -247,9 +247,9 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene_fields = node.get("scene_fields") if isinstance(node.get("scene_fields"), dict) else {}
         for key, value in (scene_fields.get("structured") or {}).items():
             scene[key] = copy.deepcopy(value)
-        for key in _SCENE_ENTITY_FIELDS:
+        for key in SCENE_ENTITY_FIELDS:
             scene[key] = normalise_entity_list(scene.get(key))
-        for key in _SCENE_STRUCTURED_FIELDS:
+        for key in SCENE_STRUCTURED_FIELDS:
             scene[key] = normalise_structured_scene_items(scene.get(key))
         if scene_fields.get("SceneType"):
             scene["SceneType"] = str(scene_fields.get("SceneType"))
