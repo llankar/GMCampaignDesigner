@@ -4,7 +4,7 @@ from __future__ import annotations
 
 SCENE_ENTITY_FIELDS = ("NPCs", "Creatures", "Places", "Clues", "Bases", "Maps")
 SCENE_STRUCTURED_FIELDS = ("SceneBeats", "SceneClues", "SceneChallenges", "SceneTwists", "SceneRewards")
-NODE_KIND_VALUES = ["scene", "objective", "side_objective", "interaction", "condition", "action", "note"]
+NODE_KIND_VALUES = ["scene", "objective", "side_objective", "interaction", "condition", "action", "note", "start", "end"]
 LINK_KIND_VALUES = ["scene_link", "yes", "no", "success", "failure"]
 
 

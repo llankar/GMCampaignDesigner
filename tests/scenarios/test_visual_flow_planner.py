@@ -533,3 +533,34 @@ def test_paste_generates_unique_id_skips_link_cloning_and_applies_position_offse
     links = planner.canvas.model.payload["links"]
     assert any(link["source"] == "a" and link["target"] == pasted["id"] for link in links)
     assert not any(link["source"] == pasted["id"] or link["target"] == pasted["id"] and link["source"] != "a" for link in links)
+
+def test_export_visual_flow_excludes_sentinel_nodes_by_default():
+    scenes = export_visual_flow_to_scenes(
+        {
+            "version": 1,
+            "nodes": [
+                {"id": "start", "title": "Start", "kind": "start", "scene_index": 0, "x": 0, "y": 0},
+                {"id": "s1", "title": "Scene 1", "kind": "scene", "scene_index": 1, "x": 10, "y": 10},
+                {"id": "end", "title": "End", "kind": "end", "scene_index": 2, "x": 20, "y": 20},
+            ],
+            "links": [
+                {"source": "start", "target": "s1", "kind": "scene_link"},
+                {"source": "s1", "target": "end", "kind": "scene_link"},
+            ],
+        }
+    )
+    assert [scene["Title"] for scene in scenes] == ["Scene 1"]
+
+
+def test_export_visual_flow_allows_opt_in_sentinel_export():
+    scenes = export_visual_flow_to_scenes(
+        {
+            "version": 1,
+            "nodes": [
+                {"id": "start", "title": "Start", "kind": "start", "scene_index": 0, "x": 0, "y": 0, "_extra_fields": {"export_as_scene": True}},
+                {"id": "s1", "title": "Scene 1", "kind": "scene", "scene_index": 1, "x": 10, "y": 10},
+            ],
+            "links": [{"source": "start", "target": "s1", "kind": "scene_link"}],
+        }
+    )
+    assert [scene["Title"] for scene in scenes] == ["Start", "Scene 1"]

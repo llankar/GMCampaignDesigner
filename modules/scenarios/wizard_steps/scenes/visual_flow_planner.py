@@ -77,6 +77,7 @@ _PLAYABLE_NODE_KIND_TO_SCENE_TYPE = {
     "action": "Action",
     "note": "Note",
 }
+_NON_PLAYABLE_SENTINEL_KINDS = {"start", "end"}
 _VISUAL_NODE_TYPE_FIELD = "_visual_node_type"
 _SCENE_TYPE_TO_NODE_KIND = {value: key for key, value in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.items()}
 
@@ -256,10 +257,16 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
     """Project flow payload back to scenes while preserving unknown fields."""
     existing = [copy.deepcopy(s) if isinstance(s, dict) else {"Title": str(s)} for s in (existing_scenes or [])]
     payload = flow_payload if isinstance(flow_payload, dict) else {}
-    nodes = [
-        node for node in (payload.get("nodes") or [])
-        if isinstance(node, dict) and str(node.get("kind") or "scene").strip() in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE
-    ]
+    nodes = []
+    for node in (payload.get("nodes") or []):
+        if not isinstance(node, dict):
+            continue
+        node_kind = str(node.get("kind") or "scene").strip()
+        if node_kind in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE:
+            nodes.append(node)
+            continue
+        if node_kind in _NON_PLAYABLE_SENTINEL_KINDS and bool((node.get("_extra_fields") or {}).get("export_as_scene")):
+            nodes.append(node)
     links = normalise_flow_links(nodes, payload.get("links") or [])
     existing_by_index = {idx: scene for idx, scene in enumerate(existing)}
     existing_by_title = {
@@ -492,7 +499,14 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         menu.add_separator()
         menu.add_command(label="Cut", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("cut", node_id=node_id))
         menu.add_command(label="Copy", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("copy", node_id=node_id))
-        menu.add_command(label="Paste", command=lambda: self._dispatch_command("paste", node_id=node_id))
+        menu.add_command(label="Paste", state="normal" if is_node_target else "disabled", command=lambda: self._dispatch_command("paste", node_id=node_id))
+        if not is_node_target:
+            menu.add_separator()
+            root_add_menu = tk.Menu(menu, tearoff=False)
+            for label, node_type in self._MENU_NODE_TYPES:
+                root_add_menu.add_command(label=label, command=lambda nt=node_type: self._dispatch_command("add", node_type=nt, node_id=None))
+            menu.add_cascade(label="Add at Root", menu=root_add_menu)
+            menu.add_command(label="Paste at Root", command=lambda: self._dispatch_command("paste", node_id=None))
         menu.tk_popup(event.x_root, event.y_root)
 
     def _dispatch_command(self, command, **kwargs):
