@@ -11,6 +11,7 @@ from modules.scenarios.wizard_steps.scenes.component_library.definitions import 
 from modules.scenarios.scene_flow_rendering import apply_scene_flow_canvas_styling
 from modules.scenarios.wizard_steps.scenes.component_library.node_factory import build_default_node
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
+from modules.scenarios.wizard_steps.scenes.flow_canvas.node_rendering import NODE_STYLES as _NODE_STYLES, resolve_node_visual
 from modules.scenarios.wizard_steps.scenes.visual_flow.commands import (
     make_create_link_command,
     make_delete_node_command,
@@ -36,14 +37,6 @@ def normalise_flow_node_id(title, existing_ids):
         candidate = f"{base}-{idx}"
         idx += 1
     return candidate
-
-_NODE_STYLES = {
-    "scene": {"fill": "#1f2937", "outline": "#60a5fa", "symbol": "●"},
-    "objective": {"fill": "#1f3a2e", "outline": "#34d399", "symbol": "◆"},
-    "condition": {"fill": "#3b2f1f", "outline": "#f59e0b", "symbol": "?"},
-    "action": {"fill": "#2f1f3b", "outline": "#c084fc", "symbol": "▶"},
-    "note": {"fill": "#3a3a3a", "outline": "#a3a3a3", "symbol": "■"},
-}
 
 _CONDITION_LABELS = {"yes": "Yes", "no": "No", "success": "Success", "failure": "Failure"}
 
@@ -153,16 +146,26 @@ class VisualFlowCanvas(ctk.CTkFrame):
         for node in self.model.payload.get("nodes") or []:
             nid = str(node.get("id") or "")
             kind = str(node.get("kind") or "scene")
-            style = _NODE_STYLES.get(kind, _NODE_STYLES["scene"])
+            style = resolve_node_visual(kind, selected=nid == self._selected_node_id)
             x, y = self._world_to_screen(int(node.get("x", 0)), int(node.get("y", 0)))
             w, h = 190 * self._zoom, 88 * self._zoom
-            rect = self.canvas.create_rectangle(x, y, x + w, y + h, fill=style["fill"], outline=style["outline"], width=2, tags=("node", nid))
-            self.canvas.create_text(x + 10, y + 10, text=f"{style['symbol']} {node.get('title') or 'Untitled'}", anchor="nw", fill="#f8fafc", tags=("node", nid))
-            handle = self.canvas.create_oval(x + w - 14, y + h / 2 - 6, x + w - 2, y + h / 2 + 6, fill="#38bdf8", outline="", tags=("handle", nid))
-            self._node_items[nid] = {"rect": rect, "handle": handle}
-            self.canvas.tag_bind(rect, "<Button-1>", lambda e, node_id=nid: self._start_node_drag(e, node_id))
-            self.canvas.tag_bind(rect, "<B1-Motion>", self._drag_node)
-            self.canvas.tag_bind(rect, "<ButtonRelease-1>", self._end_node_drag)
+            if style["shape"] == "diamond":
+                body = self.canvas.create_polygon(
+                    x + w / 2, y, x + w, y + h / 2, x + w / 2, y + h, x, y + h / 2,
+                    fill=style["body_fill"], outline=style["body_outline"], width=style["body_width"], tags=("node", nid)
+                )
+            elif style["shape"] == "note":
+                body = self.canvas.create_rectangle(x, y, x + w, y + h, fill=style["body_fill"], outline=style["body_outline"], width=style["body_width"], tags=("node", nid))
+                self.canvas.create_polygon(x + w - 26, y, x + w, y, x + w, y + 26, fill="#525252", outline=style["body_outline"], width=1, tags=("node", nid))
+            else:
+                body = self.canvas.create_rectangle(x, y, x + w, y + h, fill=style["body_fill"], outline=style["body_outline"], width=style["body_width"], tags=("node", nid))
+
+            self.canvas.create_text(x + 10, y + 10, text=f"{style['symbol']} {node.get('title') or 'Untitled'}", anchor="nw", fill=style["title_color"], tags=("node", nid))
+            handle = self.canvas.create_oval(x + w - 14, y + h / 2 - 6, x + w - 2, y + h / 2 + 6, fill=style["handle_fill"], outline=style["handle_outline"], tags=("handle", nid))
+            self._node_items[nid] = {"body": body, "handle": handle}
+            self.canvas.tag_bind(body, "<Button-1>", lambda e, node_id=nid: self._start_node_drag(e, node_id))
+            self.canvas.tag_bind(body, "<B1-Motion>", self._drag_node)
+            self.canvas.tag_bind(body, "<ButtonRelease-1>", self._end_node_drag)
             self.canvas.tag_bind(handle, "<Button-1>", lambda e, node_id=nid: self._start_link_drag(e, node_id))
 
     def _draw_links(self):
