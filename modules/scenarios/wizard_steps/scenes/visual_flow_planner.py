@@ -7,6 +7,11 @@ import re
 import tkinter as tk
 from typing import Any
 
+try:
+    from tkinter import ttk
+except Exception:  # pragma: no cover - test stubs may not expose ttk
+    ttk = None
+
 import customtkinter as ctk
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicalise_scene, normalise_scene_links
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import normalise_entity_list
@@ -267,22 +272,116 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
 
 
 class FlowHierarchyPanel(ctk.CTkFrame):
-    def __init__(self, master, on_select=None):
+    _KIND_PREFIX = {
+        "objective": "🟩 ",
+        "side_objective": "🔵 ",
+        "interaction": "🟨 ",
+        "condition": "🟪 ",
+        "action": "🟥 ",
+        "note": "📝 ",
+        "scene": "🎬 ",
+    }
+
+    def __init__(self, master, on_select=None, on_open=None):
         super().__init__(master)
         self.on_select = on_select
-        self._list = tk.Listbox(self, exportselection=False)
-        self._list.pack(fill="both", expand=True, padx=8, pady=8)
-        self._list.bind("<<ListboxSelect>>", self._emit_select)
+        self.on_open = on_open
+        self._item_to_node_id = {}
+        self._node_id_to_item = {}
+        self._suspend_events = False
+        self._tree = None
 
-    def render(self, nodes):
-        self._list.delete(0, "end")
-        for node in nodes or []:
-            self._list.insert("end", node.get("title") or "Untitled")
+        if ttk and hasattr(ttk, "Treeview"):
+            self._tree = ttk.Treeview(self, show="tree", selectmode="browse")
+            self._tree.pack(fill="both", expand=True, padx=8, pady=8)
+            self._tree.bind("<<TreeviewSelect>>", self._emit_select)
+            self._tree.bind("<Double-1>", self._emit_open)
+
+    def render(self, nodes, links=None, scenario_title=""):
+        if not self._tree:
+            return
+        self._item_to_node_id.clear()
+        self._node_id_to_item.clear()
+        self._tree.delete(*self._tree.get_children())
+
+        root_title = str(scenario_title or "Scenario")
+        root_id = self._tree.insert("", "end", text=f"📚 {root_title}", open=True)
+
+        ordered_nodes = self._order_nodes(nodes or [], links or [])
+        for depth, node in ordered_nodes:
+            parent = root_id if depth == 0 else self._node_id_to_item.get(str(node.get("_parent_id") or ""), root_id)
+            prefix = self._KIND_PREFIX.get(str(node.get("kind") or "scene").strip(), "🎬 ")
+            label = f"{prefix}{str(node.get('title') or 'Untitled')}"
+            item_id = self._tree.insert(parent, "end", text=label, open=True)
+            node_id = str(node.get("id") or "")
+            self._item_to_node_id[item_id] = node_id
+            if node_id:
+                self._node_id_to_item[node_id] = item_id
+
+    def select_node(self, node_id):
+        if not self._tree:
+            return
+        item_id = self._node_id_to_item.get(str(node_id or ""))
+        if not item_id:
+            return
+        self._suspend_events = True
+        try:
+            self._tree.selection_set(item_id)
+            self._tree.focus(item_id)
+            self._tree.see(item_id)
+        finally:
+            self._suspend_events = False
+
+    def _order_nodes(self, nodes, links):
+        by_id = {str(node.get("id") or ""): copy.deepcopy(node) for node in nodes if isinstance(node, dict)}
+        outgoing = {}
+        incoming = {}
+        for link in normalise_flow_links(nodes, links):
+            source = str(link.get("source") or "")
+            target = str(link.get("target") or "")
+            if source in by_id and target in by_id:
+                outgoing.setdefault(source, []).append(target)
+                incoming[target] = incoming.get(target, 0) + 1
+
+        stable_ids = [str(node.get("id") or "") for node in sorted(nodes, key=lambda n: (int(n.get("scene_index", 0)), str(n.get("id") or "")))]
+        roots = [nid for nid in stable_ids if nid and incoming.get(nid, 0) == 0] or stable_ids
+
+        ordered = []
+        seen = set()
+
+        def walk(node_id, depth):
+            if node_id in seen or node_id not in by_id:
+                return
+            seen.add(node_id)
+            node = by_id[node_id]
+            ordered.append((depth, node))
+            for child in sorted(outgoing.get(node_id, []), key=lambda cid: stable_ids.index(cid) if cid in stable_ids else 10**6):
+                if child in by_id:
+                    by_id[child]["_parent_id"] = node_id
+                walk(child, depth + 1)
+
+        for rid in roots:
+            walk(rid, 0)
+        for nid in stable_ids:
+            if nid not in seen:
+                walk(nid, 0)
+        return ordered
 
     def _emit_select(self, *_):
-        selection = self._list.curselection()
+        if self._suspend_events or not self._tree:
+            return
+        selection = self._tree.selection()
+        node_id = self._item_to_node_id.get(selection[0]) if selection else None
         if self.on_select:
-            self.on_select(selection[0] if selection else None)
+            self.on_select(node_id, source="hierarchy")
+
+    def _emit_open(self, *_):
+        if not self._tree:
+            return
+        selection = self._tree.selection()
+        node_id = self._item_to_node_id.get(selection[0]) if selection else None
+        if node_id and self.on_open:
+            self.on_open(node_id)
 
 
 class VisualFlowCanvas(ctk.CTkFrame):
@@ -291,13 +390,28 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self.on_select = on_select
         self.canvas = tk.Canvas(self, bg="#0f172a", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
+        self._node_items = {}
+        self._selected_node_id = None
 
     def render(self, payload):
         self.canvas.delete("all")
+        self._node_items.clear()
         for node in payload.get("nodes") or []:
             x, y = int(node.get("x", 0)), int(node.get("y", 0))
-            self.canvas.create_rectangle(x, y, x + 180, y + 80, fill="#1e293b", outline="#64748b")
+            node_id = str(node.get("id") or "")
+            rect = self.canvas.create_rectangle(x, y, x + 180, y + 80, fill="#1e293b", outline="#64748b", width=2)
             self.canvas.create_text(x + 8, y + 8, text=node.get("title") or "Untitled", anchor="nw", fill="#f8fafc")
+            self._node_items[node_id] = rect
+            self.canvas.tag_bind(rect, "<Button-1>", lambda _evt, nid=node_id: self.select_node(nid, emit=True))
+
+    def select_node(self, node_id, emit=False):
+        if self._selected_node_id and self._selected_node_id in self._node_items:
+            self.canvas.itemconfigure(self._node_items[self._selected_node_id], outline="#64748b")
+        self._selected_node_id = str(node_id or "")
+        if self._selected_node_id in self._node_items:
+            self.canvas.itemconfigure(self._node_items[self._selected_node_id], outline="#f59e0b")
+        if emit and self.on_select:
+            self.on_select(self._selected_node_id, source="canvas")
 
 
 class FlowPropertiesPanel(ctk.CTkFrame):
@@ -328,7 +442,7 @@ class VisualFlowPlanner(ctk.CTkFrame):
         self._flow_payload = {"version": _VISUAL_FLOW_VERSION, "nodes": [], "links": []}
         self._scenes = []
 
-        self.hierarchy = FlowHierarchyPanel(self, on_select=self._on_select)
+        self.hierarchy = FlowHierarchyPanel(self, on_select=self._on_select, on_open=self._open_node_properties)
         self.hierarchy.grid(row=0, column=0, sticky="nsew")
         self.canvas = VisualFlowCanvas(self, on_select=self._on_select)
         self.canvas.grid(row=0, column=1, sticky="nsew")
@@ -343,7 +457,7 @@ class VisualFlowPlanner(ctk.CTkFrame):
         self._scenario_title = str(scenario_title or "")
         self._scenes = [copy.deepcopy(scene) for scene in (scenes or [])]
         self._flow_payload = build_visual_flow_from_scenes(self._scenes, existing_visual_payload=visual_payload)
-        self.hierarchy.render(self._flow_payload.get("nodes") or [])
+        self.hierarchy.render(self._flow_payload.get("nodes") or [], self._flow_payload.get("links") or [], self._scenario_title)
         self.canvas.render(self._flow_payload)
         self._dirty = False
 
@@ -362,5 +476,15 @@ class VisualFlowPlanner(ctk.CTkFrame):
     def mark_dirty(self):
         self._dirty = True
 
-    def _on_select(self, _index):
-        return
+    def _on_select(self, node_id, source=""):
+        if not node_id:
+            return
+        if source != "hierarchy":
+            self.hierarchy.select_node(node_id)
+        if source != "canvas":
+            self.canvas.select_node(node_id, emit=False)
+
+    def _open_node_properties(self, node_id):
+        node = next((n for n in (self._flow_payload.get("nodes") or []) if str(n.get("id") or "") == str(node_id or "")), None)
+        if node:
+            self.properties.title_var.set(str(node.get("title") or ""))
