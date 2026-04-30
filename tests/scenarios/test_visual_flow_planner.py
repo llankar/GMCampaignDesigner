@@ -168,6 +168,38 @@ def test_model_reorder_nodes_updates_order_without_link_mutation():
     assert model.payload["links"] == original_links
 
 
+def test_model_reorder_nodes_is_deterministic_from_same_input():
+    payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "a", "scene_index": 0},
+            {"id": "b", "scene_index": 1},
+            {"id": "c", "scene_index": 2},
+            {"id": "d", "scene_index": 3},
+        ],
+        "links": [{"id": "a-b", "source": "a", "target": "b"}],
+    }
+    model_1 = FlowCanvasModel(payload)
+    model_2 = FlowCanvasModel(payload)
+    assert model_1.reorder_nodes("d", "b", place_after=False) is True
+    assert model_2.reorder_nodes("d", "b", place_after=False) is True
+    assert model_1.payload["nodes"] == model_2.payload["nodes"]
+    assert [node["id"] for node in model_1.payload["nodes"]] == ["a", "d", "b", "c"]
+    assert [node["scene_index"] for node in model_1.payload["nodes"]] == [0, 1, 2, 3]
+
+
+def test_invalid_reorder_target_detects_descendant():
+    model = FlowCanvasModel(
+        {
+            "version": 1,
+            "nodes": [{"id": "a", "scene_index": 0}, {"id": "b", "scene_index": 1}, {"id": "c", "scene_index": 2}],
+            "links": [{"id": "a-b", "source": "a", "target": "b"}, {"id": "b-c", "source": "b", "target": "c"}],
+        }
+    )
+    assert model.is_invalid_reorder_target("a", "c", model.payload["links"]) is True
+    assert model.is_invalid_reorder_target("b", "a", model.payload["links"]) is False
+
+
 class _FakeCanvas:
     def __init__(self, payload):
         self.model = FlowCanvasModel(payload)
@@ -350,3 +382,21 @@ def test_planner_load_from_state_keeps_backward_compat_without_viewport():
     planner.load_from_state(scenes, visual_payload=visual_payload, scenario_title="Campaign")
 
     assert planner.canvas.viewport_set_calls == 0
+
+
+def test_planner_reorder_rejects_drop_on_descendant():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [
+                {"id": "a", "title": "A", "kind": "scene", "scene_index": 0, "x": 0, "y": 0},
+                {"id": "b", "title": "B", "kind": "scene", "scene_index": 1, "x": 0, "y": 0},
+                {"id": "c", "title": "C", "kind": "scene", "scene_index": 2, "x": 0, "y": 0},
+            ],
+            "links": [{"id": "a-b", "source": "a", "target": "b"}, {"id": "b-c", "source": "b", "target": "c"}],
+        }
+    )
+    before = [node["id"] for node in planner.canvas.model.payload["nodes"]]
+    planner.reorder_node_relative("a", "c", place_after=False)
+    assert [node["id"] for node in planner.canvas.model.payload["nodes"]] == before
+    assert planner.canvas.render_calls == 0
