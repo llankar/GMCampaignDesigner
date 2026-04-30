@@ -831,3 +831,28 @@ def test_review_step_still_renders_visual_exported_links():
     scenes, _selected_index = step.flow_preview.calls[-1]
     scene_by_title = {scene["Title"]: scene for scene in scenes}
     assert scene_by_title["Arrival"]["NextScenes"] == ["Market"]
+
+
+def test_node_type_retention_across_guided_visual_canvas_mode_loop():
+    cards = [
+        {"Title": "Start", "Summary": "", "Type": "objective", "SceneType": "", "_canvas": {"x": 10, "y": 10}},
+        {"Title": "Talk", "Summary": "", "Type": "interaction", "SceneType": "", "_canvas": {"x": 200, "y": 80}},
+    ]
+    scenes = scenario_builder_wizard.guided_cards_to_scenes(cards)
+    visual = build_visual_flow_from_scenes(scenes)
+    visual["nodes"][0]["kind"] = "objective"
+    visual["nodes"][1]["kind"] = "interaction"
+
+    # Simulate canvas interactions changing coordinates but not node kinds.
+    visual["nodes"][0]["x"] = 44
+    visual["nodes"][0]["y"] = 55
+
+    exported = export_visual_flow_to_scenes(visual, existing_scenes=scenes)
+    guided_again = scenario_builder_wizard.scenes_to_guided_cards(exported)
+    rebuilt = build_visual_flow_from_scenes(exported, existing_visual_payload=visual)
+
+    by_title = {row["Title"]: row for row in guided_again}
+    kinds = {node["title"]: node["kind"] for node in rebuilt["nodes"]}
+    assert kinds["Start"] == "objective"
+    assert kinds["Talk"] == "interaction"
+    assert by_title["Start"]["_canvas"] == {"x": 44, "y": 55}
