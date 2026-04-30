@@ -8,6 +8,7 @@ from tkinter import simpledialog
 import customtkinter as ctk
 
 from modules.scenarios.scene_flow_rendering import apply_scene_flow_canvas_styling
+from modules.scenarios.wizard_steps.scenes.component_library.node_factory import build_default_node
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
 def _slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-") or "scene"
@@ -221,9 +222,27 @@ class VisualFlowCanvas(ctk.CTkFrame):
 
     def _add_node_at(self, sx, sy, kind):
         wx, wy = self._screen_to_world(sx, sy)
-        node_id = normalise_flow_node_id(kind, [n.get("id") for n in self.model.payload.get("nodes") or []])
-        self.model.payload.setdefault("nodes", []).append({"id": node_id, "title": kind.title(), "scene_index": len(self.model.payload.get("nodes") or []), "x": int(wx), "y": int(wy), "kind": kind, "summary": ""})
+        existing_nodes = self.model.payload.get("nodes") or []
+        node = build_default_node(kind=kind, x=int(wx), y=int(wy), existing_ids=[n.get("id") for n in existing_nodes], scene_index=len(existing_nodes))
+        self.model.payload.setdefault("nodes", []).append(node)
         self._emit_change(); self.render()
+
+    def create_node_at_viewport_center(self, kind):
+        cx = self.canvas.winfo_width() / 2
+        cy = self.canvas.winfo_height() / 2
+        wx, wy = self._screen_to_world(cx, cy)
+        existing_nodes = self.model.payload.get("nodes") or []
+        node = build_default_node(
+            kind=kind,
+            x=int(wx),
+            y=int(wy),
+            existing_ids=[n.get("id") for n in existing_nodes],
+            scene_index=len(existing_nodes),
+        )
+        self.model.payload.setdefault("nodes", []).append(node)
+        self._emit_change()
+        self.render()
+        return node
 
     def _start_link_drag(self, event, node_id):
         self._drag_link_source = node_id

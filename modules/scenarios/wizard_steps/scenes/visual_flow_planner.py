@@ -17,6 +17,7 @@ from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicali
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import normalise_entity_list
 from modules.scenarios.scene_structured_fields import compose_scene_text_from_fields, normalise_structured_scene_items
 from modules.scenarios.wizard_steps.scenes.flow_canvas.view import VisualFlowCanvas
+from modules.scenarios.wizard_steps.scenes.component_library.definitions import COMPONENT_GROUPS
 from modules.scenarios.wizard_steps.scenes.flow_properties_panel_helpers import (
     LINK_KIND_VALUES,
     NODE_KIND_VALUES,
@@ -507,13 +508,44 @@ class FlowPropertiesPanel(ctk.CTkFrame):
 
 
 class ComponentLibraryPanel(ctk.CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, on_item_click=None):
         super().__init__(master)
+        self.on_item_click = on_item_click
         self.search_var = ctk.StringVar(value="")
+        self.search_var.trace_add("write", lambda *_: self._render_items())
         ctk.CTkEntry(self, textvariable=self.search_var, placeholder_text="Search components").pack(fill="x", padx=8, pady=8)
-        self.palette = ctk.CTkTextbox(self, height=200)
-        self.palette.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self.palette.insert("1.0", "Scenes\nChoices\nChecks\nCombat\nClues")
+        self._list = ctk.CTkScrollableFrame(self)
+        self._list.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self._render_items()
+
+    def _render_items(self):
+        for child in self._list.winfo_children():
+            child.destroy()
+        query = self.search_var.get().strip().lower()
+        for group in COMPONENT_GROUPS:
+            visible = []
+            for item in group.get("items", []):
+                text = f"{item.get('label', '')} {item.get('kind', '')}"
+                if query and query not in text.lower():
+                    continue
+                visible.append(item)
+            if not visible:
+                continue
+            ctk.CTkLabel(self._list, text=group.get("name", ""), text_color="#94a3b8").pack(anchor="w", pady=(8, 4))
+            for item in visible:
+                label = f"{item.get('icon', '•')}  {item.get('label', item.get('kind', ''))}"
+                ctk.CTkButton(
+                    self._list,
+                    text=label,
+                    anchor="w",
+                    fg_color=item.get("color", "#334155"),
+                    hover_color="#1e293b",
+                    command=lambda k=item.get("kind"): self._emit_click(k),
+                ).pack(fill="x", pady=2)
+
+    def _emit_click(self, kind):
+        if callable(self.on_item_click):
+            self.on_item_click(kind)
 
 
 class VisualFlowPlanner(ctk.CTkFrame):
@@ -534,9 +566,16 @@ class VisualFlowPlanner(ctk.CTkFrame):
         right.grid(row=0, column=2, sticky="nsew")
         self.properties = FlowPropertiesPanel(right, on_change=self._on_properties_change, entity_selector_callbacks=getattr(self, "entity_selector_callbacks", None))
         self.properties.pack(fill="x")
-        self.library = ComponentLibraryPanel(right)
+        self.library = ComponentLibraryPanel(right, on_item_click=self._create_node_from_library)
         self.library.pack(fill="both", expand=True)
 
+
+    def _create_node_from_library(self, kind):
+        node = self.canvas.create_node_at_viewport_center(kind)
+        if node:
+            self.mark_dirty()
+            self.hierarchy.render(self.canvas.model.payload.get("nodes") or [], self.canvas.model.payload.get("links") or [], self._scenario_title)
+            self._on_select(node.get("id"), source="canvas")
 
     def set_entity_selector_callbacks(self, callbacks):
         self.entity_selector_callbacks = callbacks or {}
