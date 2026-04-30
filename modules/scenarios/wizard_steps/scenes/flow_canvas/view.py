@@ -10,6 +10,18 @@ import customtkinter as ctk
 from modules.scenarios.scene_flow_rendering import apply_scene_flow_canvas_styling
 from modules.scenarios.wizard_steps.scenes.component_library.node_factory import build_default_node
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
+from modules.scenarios.wizard_steps.scenes.visual_flow.commands import (
+    make_create_link_command,
+    make_delete_node_command,
+    make_update_link_command,
+)
+from modules.scenarios.wizard_steps.scenes.visual_flow.interactions import (
+    normalise_link_selection,
+    normalise_single_selection,
+    now,
+    resolve_link_target,
+    should_open_context_menu,
+)
 def _slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-") or "scene"
 
@@ -53,6 +65,7 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self._pan_state = None
         self._space_held = False
         self._drag_link_source = None
+        self._context_press_ts = 0.0
         self._zoom = 1.0
         self._offset_x = 0
         self._offset_y = 0
@@ -62,7 +75,9 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self.canvas.bind("<Button-2>", self._start_pan)
         self.canvas.bind("<B2-Motion>", self._pan)
         self.canvas.bind("<ButtonRelease-2>", self._end_pan)
-        self.canvas.bind("<Button-3>", self._canvas_menu)
+        self.canvas.bind("<Button-3>", self._on_context_press)
+        self.canvas.bind("<ButtonRelease-3>", self._canvas_menu)
+        self.canvas.bind("<ButtonRelease-1>", self._complete_link_drag, add="+")
         self.canvas.bind("<Double-1>", self._double_click)
         self.canvas.bind("<Control-0>", lambda _e: self.reset_zoom())
         self.canvas.bind_all("<Delete>", lambda _e: self.delete_selected())
@@ -205,7 +220,12 @@ class VisualFlowCanvas(ctk.CTkFrame):
             link["label"] = text
             self._emit_change(); self.render()
 
+    def _on_context_press(self, _event):
+        self._context_press_ts = now()
+
     def _canvas_menu(self, event):
+        if not should_open_context_menu(3, self._context_press_ts, now()):
+            return
         menu = tk.Menu(self, tearoff=False)
         menu.add_command(label="Add scene", command=lambda: self._add_node_at(event.x, event.y, "scene"))
         menu.add_command(label="Add condition", command=lambda: self._add_node_at(event.x, event.y, "condition"))
@@ -214,6 +234,8 @@ class VisualFlowCanvas(ctk.CTkFrame):
         menu.tk_popup(event.x_root, event.y_root)
 
     def _link_menu(self, event, link_id):
+        if not should_open_context_menu(3, self._context_press_ts, now()):
+            return
         self.select_link(link_id)
         menu = tk.Menu(self, tearoff=False)
         menu.add_command(label="Edit link", command=lambda: self._edit_link(link_id))
@@ -245,28 +267,56 @@ class VisualFlowCanvas(ctk.CTkFrame):
         return node
 
     def _start_link_drag(self, event, node_id):
-        self._drag_link_source = node_id
+        self._drag_link_source = str(node_id or "").strip() or None
+
+    def _complete_link_drag(self, event):
+        if not self._drag_link_source:
+            return
+        source_id = self._drag_link_source
+        self._drag_link_source = None
+        item = self.canvas.find_withtag("current")
+        target_id = None
+        if item:
+            tags = self.canvas.gettags(item[0])
+            if "node" in tags and len(tags) > 1:
+                target_id = tags[-1]
+        target_id = resolve_link_target(source_id, [target_id])
+        if not target_id:
+            return
+        existing = self.model.payload.setdefault("links", [])
+        link = {"id": normalise_flow_node_id(f"{source_id}-{target_id}", [l.get("id") for l in existing]), "source": source_id, "target": target_id, "label": "", "kind": "scene_link"}
+        existing.append(link)
+        cmd = make_create_link_command(source_id=source_id, target_id=target_id, link_payload=link)
+        if cmd.changed:
+            self._emit_change(); self.render()
 
     def _emit_change(self):
         if self.on_change:
             self.on_change()
 
     def select_node(self, node_id, emit=False):
-        self._selected_link_id = None
-        self._selected_node_id = str(node_id or "")
+        self._selected_node_id, self._selected_link_id = normalise_single_selection(node_id)
+        self._selected_node_id = self._selected_node_id or ""
         if emit and self.on_select:
             self.on_select(self._selected_node_id, source="canvas")
 
     def select_link(self, link_id):
-        self._selected_node_id = None
-        self._selected_link_id = str(link_id or "")
+        self._selected_node_id, self._selected_link_id = normalise_link_selection(link_id)
+        self._selected_link_id = self._selected_link_id or ""
 
     def delete_selected(self):
+        changed = False
         if self._selected_node_id:
-            self.model.remove_node(self._selected_node_id)
+            node = self.model.get_node(self._selected_node_id)
+            links = [l for l in (self.model.payload.get("links") or []) if l.get("source") == self._selected_node_id or l.get("target") == self._selected_node_id]
+            cmd = make_delete_node_command(node_id=self._selected_node_id, removed_node=node, removed_links=links)
+            changed = self.model.remove_node(self._selected_node_id) and cmd.changed
         elif self._selected_link_id:
-            self.model.remove_link(self._selected_link_id)
-        self._emit_change(); self.render()
+            link = self.model.get_link(self._selected_link_id)
+            changed = self.model.remove_link(self._selected_link_id)
+            _ = make_update_link_command(link_id=self._selected_link_id, before=link or {}, after={})
+        if changed:
+            self._emit_change(); self.render()
 
     def duplicate_selected(self):
         if not self._selected_node_id:
