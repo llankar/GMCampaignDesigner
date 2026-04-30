@@ -8,7 +8,9 @@ import tkinter as tk
 from typing import Any
 
 import customtkinter as ctk
-from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicalise_scene
+from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicalise_scene, normalise_scene_links
+from modules.scenarios.wizard_steps.scenes.scene_entity_fields import normalise_entity_list
+from modules.scenarios.scene_structured_fields import compose_scene_text_from_fields, normalise_structured_scene_items
 
 _VISUAL_FLOW_VERSION = 1
 _NODE_KNOWN_KEYS = {
@@ -24,6 +26,17 @@ _NODE_KNOWN_KEYS = {
 _LINK_KNOWN_KEYS = {"id", "source", "target", "label", "kind", "_extra_fields"}
 _SCENE_RECOGNISED_KEYS = {"Title", "Summary", "SceneType", "NextScenes", "LinkData", "_extra_fields"}
 _SCENE_TYPE_OVERRIDES = {}
+_PLAYABLE_NODE_KIND_TO_SCENE_TYPE = {
+    "scene": "Scene",
+    "objective": "Objective",
+    "side_objective": "Side Objective",
+    "interaction": "Interaction",
+    "condition": "Condition",
+    "action": "Action",
+    "note": "Note",
+}
+_SCENE_ENTITY_FIELDS = ("NPCs", "Creatures", "Places", "Clues", "Bases", "Maps")
+_SCENE_STRUCTURED_FIELDS = ("SceneBeats", "SceneClues", "SceneChallenges", "SceneTwists", "SceneRewards")
 
 
 def _slugify(text: str) -> str:
@@ -193,37 +206,63 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
     """Project flow payload back to scenes while preserving unknown fields."""
     existing = [copy.deepcopy(s) if isinstance(s, dict) else {"Title": str(s)} for s in (existing_scenes or [])]
     payload = flow_payload if isinstance(flow_payload, dict) else {}
-    nodes = [node for node in (payload.get("nodes") or []) if isinstance(node, dict)]
+    nodes = [
+        node for node in (payload.get("nodes") or [])
+        if isinstance(node, dict) and str(node.get("kind") or "scene").strip() in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE
+    ]
     links = normalise_flow_links(nodes, payload.get("links") or [])
-
-    scene_map = {idx: scene for idx, scene in enumerate(existing)}
+    existing_by_index = {idx: scene for idx, scene in enumerate(existing)}
+    existing_by_title = {
+        str(scene.get("Title") or "").strip().casefold(): scene
+        for scene in existing
+        if str(scene.get("Title") or "").strip()
+    }
     result = []
     for node in sorted(nodes, key=lambda n: int(n.get("scene_index", 0))):
         idx = int(node.get("scene_index", 0))
-        scene = copy.deepcopy(scene_map.get(idx, {}))
+        title = str(node.get("title") or "").strip() or f"Scene {idx + 1}"
+        scene = copy.deepcopy(existing_by_index.get(idx) or existing_by_title.get(title.casefold()) or {})
         scene.setdefault("_extra_fields", {})
-        scene["Title"] = str(node.get("title") or scene.get("Title") or f"Scene {idx + 1}")
-        scene["Summary"] = str(scene.get("Summary") or "")
-        scene["SceneType"] = str(scene.get("SceneType") or "")
-        scene.setdefault("LinkData", scene.get("LinkData") or [])
+        scene["Title"] = title
+        scene["Summary"] = str(node.get("summary") or scene.get("Summary") or "")
+        scene_type = _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.get(str(node.get("kind") or "").strip(), "")
+        scene["SceneType"] = scene_type or str(scene.get("SceneType") or "")
+        scene["Type"] = scene_type or str(scene.get("Type") or scene.get("SceneType") or "")
+        scene.setdefault("LinkData", [])
+        scene.setdefault("NextScenes", [])
         scene["_canvas"] = {"x": int(node.get("x", 0)), "y": int(node.get("y", 0))}
         scene_fields = node.get("scene_fields") if isinstance(node.get("scene_fields"), dict) else {}
         for key, value in (scene_fields.get("structured") or {}).items():
             scene[key] = copy.deepcopy(value)
+        for key in _SCENE_ENTITY_FIELDS:
+            scene[key] = normalise_entity_list(scene.get(key))
+        for key in _SCENE_STRUCTURED_FIELDS:
+            scene[key] = normalise_structured_scene_items(scene.get(key))
         if scene_fields.get("SceneType"):
             scene["SceneType"] = str(scene_fields.get("SceneType"))
+            scene["Type"] = str(scene_fields.get("SceneType"))
+        scene["Text"] = compose_scene_text_from_fields(scene)
         result.append(scene)
 
     id_to_title = {str(node.get("id")): str(node.get("title") or "") for node in nodes}
     outgoing = {}
     for link in links:
-        outgoing.setdefault(link["source"], []).append(id_to_title.get(link["target"], ""))
-    for node in nodes:
-        idx = int(node.get("scene_index", 0))
-        if idx < len(result):
-            result[idx]["NextScenes"] = [title for title in outgoing.get(str(node.get("id")), []) if title]
-            for key in _SCENE_RECOGNISED_KEYS:
-                result[idx].setdefault(key, [] if key in {"NextScenes", "LinkData"} else "")
+        source_id = str(link["source"])
+        target_title = id_to_title.get(link["target"], "")
+        if not target_title:
+            continue
+        outgoing.setdefault(source_id, []).append({"target": target_title, "text": str(link.get("label") or target_title)})
+    for index, node in enumerate(sorted(nodes, key=lambda n: int(n.get("scene_index", 0)))):
+        if index >= len(result):
+            continue
+        scene = result[index]
+        scene["LinkData"] = outgoing.get(str(node.get("id")), [])
+        normalised_links = normalise_scene_links(scene)
+        scene["LinkData"] = normalised_links
+        scene["NextScenes"] = [link["target"] for link in normalised_links]
+        for key in _SCENE_RECOGNISED_KEYS:
+            scene.setdefault(key, [] if key in {"NextScenes", "LinkData"} else "")
+        scene["Text"] = compose_scene_text_from_fields(scene)
     return result
 
 
