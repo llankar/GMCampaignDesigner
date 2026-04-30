@@ -7,6 +7,7 @@ from tkinter import simpledialog
 
 import customtkinter as ctk
 
+from modules.scenarios.wizard_steps.scenes.component_library.definitions import COMPONENT_GROUPS
 from modules.scenarios.scene_flow_rendering import apply_scene_flow_canvas_styling
 from modules.scenarios.wizard_steps.scenes.component_library.node_factory import build_default_node
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
@@ -45,6 +46,22 @@ _NODE_STYLES = {
 }
 
 _CONDITION_LABELS = {"yes": "Yes", "no": "No", "success": "Success", "failure": "Failure"}
+
+
+def _menu_node_entries():
+    by_kind = {}
+    for group in COMPONENT_GROUPS:
+        for item in group.get("items") or []:
+            kind = str(item.get("kind") or "").strip()
+            label = str(item.get("label") or "").strip()
+            icon = str(item.get("icon") or "").strip()
+            if kind and label:
+                by_kind[kind] = {"kind": kind, "label": label, "icon": icon}
+    ordered_kinds = ["scene", "objective", "side_objective", "interaction", "condition", "action", "note"]
+    return [by_kind[kind] for kind in ordered_kinds if kind in by_kind]
+
+
+_CANVAS_MENU_NODE_ENTRIES = _menu_node_entries()
 
 
 class VisualFlowCanvas(ctk.CTkFrame):
@@ -248,8 +265,11 @@ class VisualFlowCanvas(ctk.CTkFrame):
         if not should_open_context_menu(3, self._context_press_ts, now()):
             return
         menu = tk.Menu(self, tearoff=False)
-        menu.add_command(label="Add scene", command=lambda: self._add_node_at(event.x, event.y, "scene"))
-        menu.add_command(label="Add condition", command=lambda: self._add_node_at(event.x, event.y, "condition"))
+        for entry in _CANVAS_MENU_NODE_ENTRIES:
+            menu.add_command(
+                label=f"Add {entry['icon']} {entry['label']}",
+                command=lambda node_kind=entry["kind"]: self._add_node_at(event.x, event.y, node_kind),
+            )
         menu.add_command(label="Reset Zoom", command=self.reset_zoom)
         menu.add_command(label="Fit", command=self.fit_view)
         menu.tk_popup(event.x_root, event.y_root)
@@ -265,24 +285,20 @@ class VisualFlowCanvas(ctk.CTkFrame):
 
     def _add_node_at(self, sx, sy, kind):
         wx, wy = self._screen_to_world(sx, sy)
-        existing_nodes = self.model.payload.get("nodes") or []
-        node = build_default_node(kind=kind, x=int(wx), y=int(wy), existing_ids=[n.get("id") for n in existing_nodes], scene_index=len(existing_nodes))
-        self.model.payload.setdefault("nodes", []).append(node)
+        self._create_node(kind=kind, x=int(wx), y=int(wy))
         self._emit_change(); self.render()
+
+    def _create_node(self, kind, x, y):
+        existing_nodes = self.model.payload.get("nodes") or []
+        node = build_default_node(kind=kind, x=int(x), y=int(y), existing_ids=[n.get("id") for n in existing_nodes], scene_index=len(existing_nodes))
+        self.model.payload.setdefault("nodes", []).append(node)
+        return node
 
     def create_node_at_viewport_center(self, kind):
         cx = self.canvas.winfo_width() / 2
         cy = self.canvas.winfo_height() / 2
         wx, wy = self._screen_to_world(cx, cy)
-        existing_nodes = self.model.payload.get("nodes") or []
-        node = build_default_node(
-            kind=kind,
-            x=int(wx),
-            y=int(wy),
-            existing_ids=[n.get("id") for n in existing_nodes],
-            scene_index=len(existing_nodes),
-        )
-        self.model.payload.setdefault("nodes", []).append(node)
+        node = self._create_node(kind=kind, x=int(wx), y=int(wy))
         self._emit_change()
         self.render()
         return node
