@@ -48,6 +48,11 @@ class FlowCanvasModel:
         return len(self._payload["links"]) != before
 
     def reorder_nodes(self, dragged_id: str, target_id: str, *, place_after: bool = False) -> bool:
+        """Reorder visual presentation only.
+
+        `scene_index` is intentionally a UI ordering field and must not be used to infer
+        logical progression between scenes. Progression remains defined by explicit links.
+        """
         nodes = self._payload.get("nodes", [])
         drag_key = str(dragged_id or "")
         target_key = str(target_id or "")

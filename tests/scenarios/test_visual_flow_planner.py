@@ -243,6 +243,46 @@ def test_model_reorder_nodes_is_deterministic_from_same_input():
     assert [node["scene_index"] for node in model_1.payload["nodes"]] == [0, 1, 2, 3]
 
 
+def test_export_progression_uses_explicit_links_not_scene_index_order_after_manual_reorder():
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "a", "scene_index": 2, "title": "Start", "summary": "", "kind": "scene", "x": 0, "y": 0},
+            {"id": "b", "scene_index": 0, "title": "Middle", "summary": "", "kind": "scene", "x": 0, "y": 0},
+            {"id": "c", "scene_index": 1, "title": "End", "summary": "", "kind": "scene", "x": 0, "y": 0},
+        ],
+        "links": [
+            {"id": "a-b", "source": "a", "target": "b", "label": "to middle", "kind": "scene_link"},
+            {"id": "b-c", "source": "b", "target": "c", "label": "to end", "kind": "scene_link"},
+        ],
+    }
+
+    exported = export_visual_flow_to_scenes(flow_payload)
+    by_title = {scene["Title"]: scene for scene in exported}
+    assert by_title["Start"]["NextScenes"] == ["Middle"]
+    assert by_title["Middle"]["NextScenes"] == ["End"]
+    assert by_title["End"]["NextScenes"] == []
+
+
+def test_disconnected_nodes_get_deterministic_isolated_marker_on_export_and_import():
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "a", "scene_index": 0, "title": "Connected A", "summary": "", "kind": "scene", "x": 0, "y": 0},
+            {"id": "b", "scene_index": 1, "title": "Connected B", "summary": "", "kind": "scene", "x": 0, "y": 0},
+            {"id": "c", "scene_index": 2, "title": "Isolated", "summary": "", "kind": "scene", "x": 0, "y": 0},
+        ],
+        "links": [{"id": "a-b", "source": "a", "target": "b", "label": "", "kind": "scene_link"}],
+    }
+    exported = export_visual_flow_to_scenes(flow_payload)
+    isolated_scene = next(scene for scene in exported if scene["Title"] == "Isolated")
+    assert isolated_scene["_extra_fields"]["visual_flow_isolated"] == "no_incoming_or_outgoing_links"
+
+    rebuilt = build_visual_flow_from_scenes(exported)
+    rebuilt_isolated = next(node for node in rebuilt["nodes"] if node["title"] == "Isolated")
+    assert rebuilt_isolated["_extra_fields"]["visual_flow_isolated"] == "no_incoming_or_outgoing_links"
+
+
 def test_invalid_reorder_target_detects_descendant():
     model = FlowCanvasModel(
         {
