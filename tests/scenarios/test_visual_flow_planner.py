@@ -101,6 +101,59 @@ def test_visual_flow_round_trip_preserves_scene_fields():
     assert by_title["Dockside"]["NextScenes"] == ["Ambush"]
 
 
+def test_visual_flow_round_trip_mixed_known_unknown_scene_fields():
+    scenes = [
+        {
+            "Title": "Dockside",
+            "Summary": "Meet contact",
+            "SceneType": "Interaction",
+            "SceneClues": ["Blue wax seal"],
+            "NPCs": ["Vera"],
+            "CustomIntel": ["shadow ledger"],
+            "_extra_fields": {"legacyHint": "retain me"},
+            "NextScenes": ["Ambush"],
+        },
+        {"Title": "Ambush", "Summary": "Fight breaks out", "SceneType": "Action", "NextScenes": []},
+    ]
+
+    payload = build_visual_flow_from_scenes(scenes)
+    node = payload["nodes"][0]
+    assert node["scene_fields"]["structured"]["SceneClues"] == ["Blue wax seal"]
+    assert node["scene_fields"]["entities"]["NPCs"] == ["Vera"]
+    assert "CustomIntel" not in node["scene_fields"]["structured"]
+
+    node["scene_fields"]["structured"]["UnknownStructured"] = ["should persist"]
+    node["scene_fields"]["entities"]["UnknownEntityBucket"] = ["should persist too"]
+
+    exported = export_visual_flow_to_scenes(payload, existing_scenes=scenes)
+    by_title = {scene["Title"]: scene for scene in exported}
+    dockside = by_title["Dockside"]
+    assert dockside["SceneClues"] == ["Blue wax seal"]
+    assert dockside["NPCs"] == ["Vera"]
+    assert dockside["_extra_fields"]["UnknownStructured"] == ["should persist"]
+    assert dockside["_extra_fields"]["UnknownEntityBucket"] == ["should persist too"]
+    assert dockside["_extra_fields"]["legacyHint"] == "retain me"
+    assert "CustomIntel" not in dockside
+    for key in (
+        "SceneBeats",
+        "SceneClues",
+        "SceneChallenges",
+        "SceneTwists",
+        "SceneRewards",
+        "NPCs",
+        "Creatures",
+        "Places",
+        "Clues",
+        "Bases",
+        "Maps",
+        "LinkData",
+        "NextScenes",
+        "_canvas",
+        "Text",
+    ):
+        assert key in dockside
+
+
 def test_visual_flow_round_trip_preserves_node_kinds_via_extra_metadata():
     flow_payload = {
         "version": 1,
