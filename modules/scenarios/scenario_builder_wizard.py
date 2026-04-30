@@ -29,6 +29,10 @@ from modules.scenarios.scene_structured_fields import (
     compose_scene_text_from_fields,
     normalise_structured_scene_items,
 )
+from modules.scenarios.schema.scenario_root_schema import (
+    SCENARIO_ROOT_KNOWN_FIELDS,
+    ensure_required_scenario_root_keys,
+)
 from modules.scenarios.scenario_character_graph import (
     ScenarioCharacterGraphEditor,
     build_scenario_graph_with_links,
@@ -230,24 +234,7 @@ class BasicInfoStep(WizardStep):
 
 
 class ScenesPlanningStep(WizardStep):
-    ROOT_KNOWN_FIELDS = {
-        "Title",
-        "Summary",
-        "Text",
-        "Secrets",
-        "Secret",
-        "Scenes",
-        "_SceneLayout",
-        "_ScenarioVisualFlow",
-        "NPCs",
-        "Creatures",
-        "Clues",
-        "Bases",
-        "Places",
-        "Maps",
-        "Factions",
-        "Objects",
-    }
+    ROOT_KNOWN_FIELDS = SCENARIO_ROOT_KNOWN_FIELDS
 
     def __init__(self, master, entity_wrappers, *, scenario_wrapper=None, finale_planner_callback=None):
         """Initialize the ScenesPlanningStep instance."""
@@ -584,6 +571,7 @@ class ScenesPlanningStep(WizardStep):
             scenario_title=self.scenario_title_var.get().strip(),
         )
         self.scenes = scenes
+        ensure_required_scenario_root_keys(state)
         self._root_extra_fields = {key: copy.deepcopy(value) for key, value in (state or {}).items() if key not in self.ROOT_KNOWN_FIELDS}
         initial_mode = "visual" if state.get("_ScenarioVisualMode") else "guided"
         self._set_mode(initial_mode, remap=False)
@@ -591,6 +579,7 @@ class ScenesPlanningStep(WizardStep):
 
     def save_state(self, state):
         """Save state."""
+        ensure_required_scenario_root_keys(state)
         self.scenes = self._collect_active_scenes()
         db_indexes = build_campaign_entity_indexes(getattr(self, "entity_wrappers", {}) or {})
         state["Title"] = self.scenario_title_var.get().strip()
@@ -2151,6 +2140,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         if isinstance(scenes, str):
             scenes = [scenes]
 
+        ensure_required_scenario_root_keys(self.wizard_state)
         payload = {
             "Title": title,
             "Summary": self.wizard_state.get("Summary", ""),
@@ -2161,6 +2151,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         }
         for field in SCENARIO_ENTITY_FIELD_NAMES:
             payload[field] = list(dict.fromkeys(self.wizard_state.get(field, [])))
+        ensure_required_scenario_root_keys(payload)
         sync_graph = bool(self.wizard_state.get("ScenarioCharacterGraphSync"))
 
         buttons = {
