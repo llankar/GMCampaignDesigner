@@ -36,6 +36,7 @@ from modules.scenarios.scenario_character_graph import (
 )
 from modules.scenarios.wizard_steps.scenes.canvas_scene_planner import CanvasScenePlanner
 from modules.scenarios.wizard_steps.scenes.guided_scene_planner import GuidedScenePlanner
+from modules.scenarios.wizard_steps.scenes.visual_flow_planner import VisualFlowPlanner
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import (
     SCENE_ENTITY_FIELDS as SCENE_CARD_ENTITY_FIELDS,
     normalise_entity_list,
@@ -237,6 +238,7 @@ class ScenesPlanningStep(WizardStep):
         "Secret",
         "Scenes",
         "_SceneLayout",
+        "_ScenarioVisualFlow",
         "NPCs",
         "Creatures",
         "Clues",
@@ -286,7 +288,7 @@ class ScenesPlanningStep(WizardStep):
         mode_row = ctk.CTkFrame(root, fg_color="transparent")
         mode_row.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 6))
         ctk.CTkLabel(mode_row, text="Planning mode", text_color="#9db4d1").pack(side="left", padx=(2, 8))
-        self.mode_switch = ctk.CTkSegmentedButton(mode_row, values=["guided", "canvas"], variable=self.mode_var, command=self._on_mode_changed)
+        self.mode_switch = ctk.CTkSegmentedButton(mode_row, values=["guided", "canvas", "visual"], variable=self.mode_var, command=self._on_mode_changed)
         self.mode_switch.pack(side="left")
 
         self._planner_holder = ctk.CTkFrame(root, fg_color="transparent")
@@ -294,14 +296,17 @@ class ScenesPlanningStep(WizardStep):
         self._planner_holder.grid_columnconfigure(0, weight=1)
         self._planner_holder.grid_rowconfigure(0, weight=1)
 
+        self._entity_selector_callbacks = self._build_entity_selector_callbacks()
         self.guided_planner = GuidedScenePlanner(
             self._planner_holder,
-            entity_selector_callbacks=self._build_entity_selector_callbacks(),
+            entity_selector_callbacks=self._entity_selector_callbacks,
         )
         self.canvas_planner = CanvasScenePlanner(
             self._planner_holder,
-            entity_selector_callbacks=self._build_entity_selector_callbacks(),
+            entity_selector_callbacks=self._entity_selector_callbacks,
         )
+        self.visual_planner = VisualFlowPlanner(self._planner_holder)
+        self.visual_planner.entity_selector_callbacks = self._entity_selector_callbacks
         self._active_mode = None
         self.scenes = []
         self._set_mode("guided", remap=False)
@@ -411,22 +416,41 @@ class ScenesPlanningStep(WizardStep):
 
     def _set_mode(self, mode, *, remap):
         """Set mode."""
-        mode = "canvas" if str(mode).strip().lower() == "canvas" else "guided"
+        mode = str(mode).strip().lower()
+        if mode not in {"guided", "canvas", "visual"}:
+            mode = "guided"
         if self._active_mode == mode and remap:
             return
         current_scenes = self._collect_active_scenes() if remap else self.scenes
         if mode == "guided":
             self.guided_planner.grid(row=0, column=0, sticky="nsew")
             self.canvas_planner.grid_forget()
+            self.visual_planner.grid_forget()
             cards = scenes_to_guided_cards(current_scenes)
             self.guided_planner.load_cards(cards)
             self.scenes = guided_cards_to_scenes(self.guided_planner.export_cards())
-        else:
+        elif mode == "canvas":
             self.canvas_planner.grid(row=0, column=0, sticky="nsew")
             self.guided_planner.grid_forget()
+            self.visual_planner.grid_forget()
             scenes = guided_cards_to_scenes(self.guided_planner.export_cards()) if self._active_mode == "guided" and remap else current_scenes
             self.canvas_planner.load_scenes(scenes)
             self.scenes = self.canvas_planner.export_scenes()
+        else:
+            self.visual_planner.grid(row=0, column=0, sticky="nsew")
+            self.guided_planner.grid_forget()
+            self.canvas_planner.grid_forget()
+            visual_payload = None
+            if isinstance(self._state_ref, dict):
+                payload = self._state_ref.get("_ScenarioVisualFlow")
+                if isinstance(payload, dict):
+                    visual_payload = copy.deepcopy(payload)
+            self.visual_planner.load_from_state(
+                current_scenes,
+                visual_payload=visual_payload,
+                scenario_title=self.scenario_title_var.get().strip(),
+            )
+            self.scenes = self.visual_planner.export_scenes()
         self._active_mode = mode
         self.mode_var.set(mode)
 
@@ -434,6 +458,8 @@ class ScenesPlanningStep(WizardStep):
         """Collect active scenes."""
         if self._active_mode == "guided":
             return guided_cards_to_scenes(self.guided_planner.export_cards())
+        if getattr(self, "_active_mode", "guided") == "visual":
+            return self.visual_planner.export_scenes()
         return self.canvas_planner.export_scenes()
 
     def _switch_to_epic_finale_planner(self):
@@ -546,14 +572,21 @@ class ScenesPlanningStep(WizardStep):
         self._scenario_summary = state.get("Summary", "")
         self._scenario_secrets = state.get("Secrets") or state.get("Secret") or ""
         scenes = [canonicalise_scene(scene, index=i) for i, scene in enumerate(state.get("Scenes") or [])]
+        visual_payload = state.get("_ScenarioVisualFlow")
         layout = state.get("_SceneLayout")
         if isinstance(layout, list):
             for idx, scene in enumerate(scenes):
                 if idx < len(layout) and isinstance(layout[idx], dict):
                     scene.setdefault("_canvas", {}).update(layout[idx])
+        self.visual_planner.load_from_state(
+            scenes,
+            visual_payload=copy.deepcopy(visual_payload) if isinstance(visual_payload, dict) else None,
+            scenario_title=self.scenario_title_var.get().strip(),
+        )
         self.scenes = scenes
         self._root_extra_fields = {key: copy.deepcopy(value) for key, value in (state or {}).items() if key not in self.ROOT_KNOWN_FIELDS}
-        self._set_mode("guided", remap=False)
+        initial_mode = "visual" if state.get("_ScenarioVisualMode") else "guided"
+        self._set_mode(initial_mode, remap=False)
         self.guided_planner.load_cards(scenes_to_guided_cards(self.scenes))
 
     def save_state(self, state):
@@ -566,41 +599,49 @@ class ScenesPlanningStep(WizardStep):
         state["Secrets"] = secrets
         state["Secret"] = secrets
 
-        payload = []
-        layout = []
-        for scene in self.scenes:
-            # Process each scene from scenes.
-            record = {
-                "Title": scene.get("Title", "Scene"),
-                "Summary": scene.get("Summary", ""),
-            }
-            scene_type = scene.get("SceneType", "")
-            if scene_type:
-                record["SceneType"] = scene_type
-                record["Type"] = scene_type
-            links = normalise_scene_links(scene)
-            if links:
-                record["NextScenes"] = [link["target"] for link in links]
-                record["Links"] = [{"target": link["target"], "text": link.get("text") or link["target"]} for link in links]
-            for field_name in SCENE_CARD_ENTITY_FIELDS:
-                record[field_name] = normalise_entity_list(scene.get(field_name))
-            for field_name in SCENE_STRUCTURED_FIELDS:
-                record[field_name] = normalise_structured_scene_items(scene.get(field_name))
-            resolved_entities = resolve_entities_from_structured(record, db_indexes)
-            for field_name in ("NPCs", "Creatures", "Places", "Clues"):
-                existing = normalise_entity_list(record.get(field_name))
-                resolved = normalise_entity_list(resolved_entities.get(field_name))
-                record[field_name] = list(dict.fromkeys(existing + resolved))
-            record["Text"] = compose_scene_text_from_fields(record)
-            extras = scene.get("_extra_fields")
-            if isinstance(extras, dict):
-                for key, value in extras.items():
-                    if key not in record:
-                        record[key] = copy.deepcopy(value)
-            payload.append(record)
-            layout.append(copy.deepcopy(scene.get("_canvas") or {}))
-        state["Scenes"] = payload
-        state["_SceneLayout"] = layout
+        if getattr(self, "_active_mode", "guided") == "visual":
+            visual_scenes = self.visual_planner.export_scenes()
+            state["Scenes"] = visual_scenes
+            visual_payload = self.visual_planner.export_visual_payload()
+            state["_ScenarioVisualFlow"] = visual_payload
+            state["_SceneLayout"] = [copy.deepcopy((scene or {}).get("_canvas") or {}) for scene in visual_scenes]
+            payload = visual_scenes
+        else:
+            payload = []
+            layout = []
+            for scene in self.scenes:
+                # Process each scene from scenes.
+                record = {
+                    "Title": scene.get("Title", "Scene"),
+                    "Summary": scene.get("Summary", ""),
+                }
+                scene_type = scene.get("SceneType", "")
+                if scene_type:
+                    record["SceneType"] = scene_type
+                    record["Type"] = scene_type
+                links = normalise_scene_links(scene)
+                if links:
+                    record["NextScenes"] = [link["target"] for link in links]
+                    record["Links"] = [{"target": link["target"], "text": link.get("text") or link["target"]} for link in links]
+                for field_name in SCENE_CARD_ENTITY_FIELDS:
+                    record[field_name] = normalise_entity_list(scene.get(field_name))
+                for field_name in SCENE_STRUCTURED_FIELDS:
+                    record[field_name] = normalise_structured_scene_items(scene.get(field_name))
+                resolved_entities = resolve_entities_from_structured(record, db_indexes)
+                for field_name in ("NPCs", "Creatures", "Places", "Clues"):
+                    existing = normalise_entity_list(record.get(field_name))
+                    resolved = normalise_entity_list(resolved_entities.get(field_name))
+                    record[field_name] = list(dict.fromkeys(existing + resolved))
+                record["Text"] = compose_scene_text_from_fields(record)
+                extras = scene.get("_extra_fields")
+                if isinstance(extras, dict):
+                    for key, value in extras.items():
+                        if key not in record:
+                            record[key] = copy.deepcopy(value)
+                payload.append(record)
+                layout.append(copy.deepcopy(scene.get("_canvas") or {}))
+            state["Scenes"] = payload
+            state["_SceneLayout"] = layout
 
         if isinstance(self._root_extra_fields, dict):
             for key, value in self._root_extra_fields.items():
