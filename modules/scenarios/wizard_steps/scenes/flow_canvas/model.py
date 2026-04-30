@@ -67,3 +67,32 @@ class FlowCanvasModel:
         for position, item in enumerate(nodes):
             item["scene_index"] = position
         return True
+
+    @staticmethod
+    def is_invalid_reorder_target(dragged_id: str, target_id: str, links) -> bool:
+        drag_key = str(dragged_id or "")
+        target_key = str(target_id or "")
+        if not drag_key or not target_key or drag_key == target_key:
+            return True
+
+        children = {}
+        for link in links or []:
+            if not isinstance(link, dict):
+                continue
+            source = str(link.get("source") or "")
+            target = str(link.get("target") or "")
+            if source and target:
+                children.setdefault(source, set()).add(target)
+
+        stack = [drag_key]
+        visited = set()
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            for child in children.get(current, ()):
+                if child == target_key:
+                    return True
+                stack.append(child)
+        return False

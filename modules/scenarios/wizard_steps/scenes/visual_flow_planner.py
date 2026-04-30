@@ -17,6 +17,7 @@ from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicali
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import normalise_entity_list
 from modules.scenarios.scene_structured_fields import compose_scene_text_from_fields, normalise_structured_scene_items
 from modules.scenarios.wizard_steps.scenes.flow_canvas.view import VisualFlowCanvas
+from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
 from modules.scenarios.wizard_steps.scenes.component_library.definitions import COMPONENT_GROUPS
 from modules.scenarios.wizard_steps.scenes.flow_properties_panel_helpers import (
     LINK_KIND_VALUES,
@@ -316,6 +317,7 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         self._dragged_item_id = None
         self._drop_target_item_id = None
         self._drop_place_after = False
+        self._drop_marker_base_text = None
 
         if ttk and hasattr(ttk, "Treeview"):
             self._tree = ttk.Treeview(self, show="tree", selectmode="browse")
@@ -352,6 +354,7 @@ class FlowHierarchyPanel(ctk.CTkFrame):
                 self._node_id_to_item[node_id] = item_id
         self._dragged_item_id = None
         self._drop_target_item_id = None
+        self._drop_marker_base_text = None
 
     def select_node(self, node_id):
         if not self._tree:
@@ -454,6 +457,7 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         if item_id and self._item_to_node_id.get(item_id):
             self._dragged_item_id = item_id
             self._drop_target_item_id = None
+            self._clear_drop_marker()
             self._tree.selection_set(item_id)
             self._tree.focus(item_id)
 
@@ -461,12 +465,22 @@ class FlowHierarchyPanel(ctk.CTkFrame):
         if not self._tree or not self._dragged_item_id:
             return
         item_id = self._tree.identify_row(event.y)
-        if not item_id or item_id == self._dragged_item_id or not self._item_to_node_id.get(item_id):
+        if not item_id or not self._item_to_node_id.get(item_id):
+            self._clear_drop_marker()
+            return
+        if item_id == self._dragged_item_id:
+            self._clear_drop_marker()
             return
         bbox = self._tree.bbox(item_id)
         self._drop_place_after = bool(bbox and event.y > (bbox[1] + (bbox[3] // 2)))
+        dragged_id = self._item_to_node_id.get(self._dragged_item_id)
+        target_id = self._item_to_node_id.get(item_id)
+        if FlowCanvasModel.is_invalid_reorder_target(dragged_id, target_id, []):
+            self._clear_drop_marker()
+            self._drop_target_item_id = None
+            return
         self._drop_target_item_id = item_id
-        self._tree.selection_set(item_id)
+        self._set_drop_marker(item_id, self._drop_place_after)
 
     def _on_drag_release(self, _event):
         if not self._tree:
@@ -476,8 +490,31 @@ class FlowHierarchyPanel(ctk.CTkFrame):
             target_id = self._item_to_node_id.get(self._drop_target_item_id)
             if dragged_id and target_id and dragged_id != target_id:
                 self._dispatch_command("reorder", node_id=dragged_id, target_node_id=target_id, place_after=self._drop_place_after)
+        self._clear_drop_marker()
         self._dragged_item_id = None
         self._drop_target_item_id = None
+
+    def _set_drop_marker(self, item_id, place_after):
+        if not self._tree:
+            return
+        if self._drop_target_item_id and self._drop_target_item_id != item_id:
+            self._clear_drop_marker()
+        base_text = self._drop_marker_base_text
+        if self._drop_target_item_id != item_id:
+            base_text = str(self._tree.item(item_id, "text") or "")
+            self._drop_marker_base_text = base_text
+        if base_text is None:
+            base_text = str(self._tree.item(item_id, "text") or "")
+        marker = "⇣ " if place_after else "⇡ "
+        self._tree.item(item_id, text=f"{marker}{base_text}")
+
+    def _clear_drop_marker(self):
+        if not self._tree or not self._drop_target_item_id:
+            self._drop_marker_base_text = None
+            return
+        if self._drop_marker_base_text is not None:
+            self._tree.item(self._drop_target_item_id, text=self._drop_marker_base_text)
+        self._drop_marker_base_text = None
 
     def _on_move_up_shortcut(self, *_):
         if not self._tree:
@@ -758,9 +795,15 @@ class VisualFlowPlanner(ctk.CTkFrame):
             self._on_select(node_id, source="canvas")
 
     def reorder_node_relative(self, node_id, target_node_id, place_after=False):
+        if FlowCanvasModel.is_invalid_reorder_target(str(node_id or ""), str(target_node_id or ""), self.canvas.model.payload.get("links") or []):
+            return
+        selected_id = str(node_id or "")
+        viewport = self.canvas.get_viewport_state() if hasattr(self.canvas, "get_viewport_state") else None
         if self.canvas.model.reorder_nodes(str(node_id or ""), str(target_node_id or ""), place_after=bool(place_after)):
             self._refresh_views()
-            self._on_select(node_id, source="canvas")
+            if isinstance(viewport, dict) and hasattr(self.canvas, "set_viewport_state"):
+                self.canvas.set_viewport_state(viewport)
+            self._on_select(selected_id, source="canvas")
 
     def cut_node(self, node_id):
         self.copy_node(node_id)
