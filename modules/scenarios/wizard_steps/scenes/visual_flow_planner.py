@@ -50,6 +50,8 @@ _PLAYABLE_NODE_KIND_TO_SCENE_TYPE = {
     "action": "Action",
     "note": "Note",
 }
+_VISUAL_NODE_TYPE_FIELD = "_visual_node_type"
+_SCENE_TYPE_TO_NODE_KIND = {value: key for key, value in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.items()}
 
 
 def _slugify(text: str) -> str:
@@ -185,7 +187,7 @@ def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
                 "scene_index": idx,
                 "x": int(canvas.get("x", matched.get("x", 0) or 0)),
                 "y": int(canvas.get("y", matched.get("y", 0) or 0)),
-                "kind": str(matched.get("kind") or _SCENE_TYPE_OVERRIDES.get(str(scene.get("SceneType") or "").strip(), "scene")).strip() or "scene",
+                "kind": _normalise_node_kind(_scene_to_node_kind(scene, matched.get("kind"))),
                 "summary": str(scene.get("Summary") or ""),
                 "scene_fields": {
                     "SceneType": str(scene.get("SceneType") or ""),
@@ -238,9 +240,11 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene.setdefault("_extra_fields", {})
         scene["Title"] = title
         scene["Summary"] = str(node.get("summary") or scene.get("Summary") or "")
-        scene_type = _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.get(str(node.get("kind") or "").strip(), "")
+        node_kind = _normalise_node_kind(node.get("kind"))
+        scene_type = _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.get(node_kind, "")
         scene["SceneType"] = scene_type or str(scene.get("SceneType") or "")
         scene["Type"] = scene_type or str(scene.get("Type") or scene.get("SceneType") or "")
+        scene["_extra_fields"][_VISUAL_NODE_TYPE_FIELD] = node_kind
         scene.setdefault("LinkData", [])
         scene.setdefault("NextScenes", [])
         scene["_canvas"] = {"x": int(node.get("x", 0)), "y": int(node.get("y", 0))}
@@ -659,3 +663,17 @@ class VisualFlowPlanner(ctk.CTkFrame):
         callback = getattr(self, "save_state", None)
         if callable(callback):
             callback()
+def _normalise_node_kind(kind: Any) -> str:
+    value = str(kind or "").strip()
+    return value if value in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE else "scene"
+
+
+def _scene_to_node_kind(scene: dict[str, Any], existing_kind: Any = None) -> str:
+    if str(existing_kind or "").strip() in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE:
+        return str(existing_kind).strip()
+    extras = scene.get("_extra_fields") if isinstance(scene.get("_extra_fields"), dict) else {}
+    stored = str(extras.get(_VISUAL_NODE_TYPE_FIELD) or "").strip()
+    if stored in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE:
+        return stored
+    scene_type = str(scene.get("SceneType") or "").strip()
+    return _SCENE_TYPE_TO_NODE_KIND.get(scene_type, "scene")

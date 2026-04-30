@@ -409,6 +409,8 @@ class ScenesPlanningStep(WizardStep):
         if self._active_mode == mode and remap:
             return
         current_scenes = self._collect_active_scenes() if remap else self.scenes
+        if remap and self._active_mode == "visual" and isinstance(self._state_ref, dict):
+            self._state_ref["_ScenarioVisualFlow"] = self.visual_planner.export_visual_payload()
         if mode == "guided":
             self.guided_planner.grid(row=0, column=0, sticky="nsew")
             self.canvas_planner.grid_forget()
@@ -631,6 +633,7 @@ class ScenesPlanningStep(WizardStep):
                 layout.append(copy.deepcopy(scene.get("_canvas") or {}))
             state["Scenes"] = payload
             state["_SceneLayout"] = layout
+            state["_ScenarioVisualFlow"] = self.visual_planner.export_visual_payload()
 
         if isinstance(self._root_extra_fields, dict):
             for key, value in self._root_extra_fields.items():
