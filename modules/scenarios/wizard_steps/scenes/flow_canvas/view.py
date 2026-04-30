@@ -13,6 +13,12 @@ from modules.scenarios.wizard_steps.scenes.component_library.node_factory import
 from modules.scenarios.wizard_steps.scenes.flow_canvas.minimap import minimap_to_world, world_to_minimap
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
 from modules.scenarios.wizard_steps.scenes.flow_canvas.node_rendering import NODE_STYLES as _NODE_STYLES, resolve_node_visual
+from modules.scenarios.wizard_steps.scenes.flow_canvas.viewport import (
+    ZOOM_MAX,
+    ZOOM_MIN,
+    clamp_zoom,
+    compute_fit_viewport,
+)
 from modules.scenarios.wizard_steps.scenes.visual_flow.commands import (
     make_create_link_command,
     make_delete_node_command,
@@ -68,6 +74,11 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self._tile_cache = {}
         self.canvas = tk.Canvas(self, bg="#0f172a", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
+        self._toolbar = ctk.CTkFrame(self, fg_color="#111827")
+        self._toolbar.place(relx=1.0, x=-12, y=12, anchor="ne")
+        ctk.CTkButton(self._toolbar, text="−", width=28, command=self.zoom_out).pack(side="left", padx=(6, 4), pady=6)
+        ctk.CTkButton(self._toolbar, text="+", width=28, command=self.zoom_in).pack(side="left", padx=4, pady=6)
+        ctk.CTkButton(self._toolbar, text="Fit", width=42, command=self.fit_view).pack(side="left", padx=(4, 6), pady=6)
         self._node_items = {}
         self._link_items = {}
         self._selected_node_id = None
@@ -87,6 +98,8 @@ class VisualFlowCanvas(ctk.CTkFrame):
 
     def _bind_events(self):
         self.canvas.bind("<MouseWheel>", self._zoom_view)
+        self.canvas.bind("<Button-4>", self._zoom_view)
+        self.canvas.bind("<Button-5>", self._zoom_view)
         self.canvas.bind("<Button-2>", self._start_pan)
         self.canvas.bind("<B2-Motion>", self._pan)
         self.canvas.bind("<ButtonRelease-2>", self._end_pan)
@@ -97,6 +110,9 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self.canvas.bind("<Double-1>", self._double_click)
         self.canvas.bind_all("<Escape>", self._cancel_link_drag)
         self.canvas.bind("<Control-0>", lambda _e: self.reset_zoom())
+        self.canvas.bind("<Control-plus>", lambda _e: self.zoom_in())
+        self.canvas.bind("<Control-equal>", lambda _e: self.zoom_in())
+        self.canvas.bind("<Control-minus>", lambda _e: self.zoom_out())
         self.canvas.bind_all("<Delete>", lambda _e: self.delete_selected())
         self.canvas.bind_all("<Control-d>", lambda _e: self.duplicate_selected())
         self.canvas.bind_all("<Control-s>", lambda _e: self.save_state())
@@ -198,15 +214,41 @@ class VisualFlowCanvas(ctk.CTkFrame):
 
 
     def _zoom_view(self, event):
-        factor = 1.1 if event.delta > 0 else 0.9
-        prev_zoom = self._zoom
-        self._zoom = min(3.0, max(0.3, self._zoom * factor))
-        if abs(self._zoom - prev_zoom) < 1e-9:
+        direction = self._event_zoom_direction(event)
+        if direction == 0:
             return
-        wx, wy = self._screen_to_world(event.x, event.y)
-        self._offset_x = int(event.x - wx * self._zoom)
-        self._offset_y = int(event.y - wy * self._zoom)
+        self._zoom_around_screen_point(event.x, event.y, factor=1.1 if direction > 0 else (1.0 / 1.1))
+
+    @staticmethod
+    def _event_zoom_direction(event):
+        delta = getattr(event, "delta", 0)
+        if delta > 0:
+            return 1
+        if delta < 0:
+            return -1
+        num = getattr(event, "num", None)
+        if num == 4:
+            return 1
+        if num == 5:
+            return -1
+        return 0
+
+    def _zoom_around_screen_point(self, sx, sy, *, factor):
+        prev_zoom = self._zoom
+        next_zoom = clamp_zoom(prev_zoom * float(factor), minimum=ZOOM_MIN, maximum=ZOOM_MAX)
+        if abs(next_zoom - prev_zoom) < 1e-9:
+            return
+        wx, wy = self._screen_to_world(sx, sy)
+        self._zoom = next_zoom
+        self._offset_x = int(round(sx - wx * self._zoom))
+        self._offset_y = int(round(sy - wy * self._zoom))
         self.render()
+
+    def zoom_in(self):
+        self._zoom_around_screen_point(self.canvas.winfo_width() / 2, self.canvas.winfo_height() / 2, factor=1.1)
+
+    def zoom_out(self):
+        self._zoom_around_screen_point(self.canvas.winfo_width() / 2, self.canvas.winfo_height() / 2, factor=1.0 / 1.1)
 
     def _compute_world_bounds(self):
         nodes = self.model.payload.get("nodes") or []
@@ -516,4 +558,12 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self.render()
 
     def fit_view(self):
-        self.reset_zoom()
+        viewport = compute_fit_viewport(
+            self.model.payload.get("nodes") or [],
+            canvas_width=self.canvas.winfo_width(),
+            canvas_height=self.canvas.winfo_height(),
+        )
+        self._zoom = viewport["zoom"]
+        self._offset_x = int(round(viewport["offset_x"]))
+        self._offset_y = int(round(viewport["offset_y"]))
+        self.render()
