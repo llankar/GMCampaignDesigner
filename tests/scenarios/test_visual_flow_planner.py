@@ -219,11 +219,50 @@ def _build_headless_planner(payload):
     planner = VisualFlowPlanner.__new__(VisualFlowPlanner)
     planner.canvas = _FakeCanvas(payload)
     planner.hierarchy = _FakeHierarchy()
-    planner.properties = type("P", (), {"bind_item": lambda *args, **kwargs: None})()
+    planner.properties = type(
+        "P",
+        (),
+        {
+            "bind_item": lambda *args, **kwargs: None,
+            "set_feedback": lambda self, message: setattr(self, "feedback", message),
+            "feedback": "",
+        },
+    )()
     planner._scenario_title = "Test"
     planner._dirty = False
     planner._clipboard_node = None
     return planner
+
+
+def test_link_property_edit_rejects_unknown_source_and_keeps_link_stable():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [{"id": "a", "title": "Alpha"}, {"id": "b", "title": "Beta"}],
+            "links": [{"id": "a-b", "source": "a", "target": "b", "label": "", "kind": "scene_link"}],
+        }
+    )
+    link = planner.canvas.model.payload["links"][0]
+    planner._on_properties_change({"source": "missing-node"}, link=link)
+    updated = planner.canvas.model.payload["links"][0]
+    assert updated["id"] == "a-b"
+    assert updated["source"] == "a"
+    assert "Invalid source" in planner.properties.feedback
+
+
+def test_link_property_edit_maps_unique_title_alias_and_keeps_link_id():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [{"id": "a", "title": "Alpha"}, {"id": "b", "title": "Beta"}, {"id": "c", "title": "Gamma"}],
+            "links": [{"id": "a-b", "source": "a", "target": "b", "label": "", "kind": "scene_link"}],
+        }
+    )
+    link = planner.canvas.model.payload["links"][0]
+    planner._on_properties_change({"target": "Gamma"}, link=link)
+    updated = planner.canvas.model.payload["links"][0]
+    assert updated["id"] == "a-b"
+    assert updated["target"] == "c"
 
 
 def test_planner_context_commands_delete_reorder_and_copy_paste():

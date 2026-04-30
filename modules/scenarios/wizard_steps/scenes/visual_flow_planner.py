@@ -506,8 +506,10 @@ class FlowPropertiesPanel(ctk.CTkFrame):
         self._node = None
         self._link = None
         self._id_edit_enabled = False
+        self._feedback_var = ctk.StringVar(value="")
 
         ctk.CTkLabel(self, text="Properties").pack(anchor="w", padx=8, pady=(8, 4))
+        ctk.CTkLabel(self, textvariable=self._feedback_var, text_color="#fca5a5").pack(anchor="w", padx=8, pady=(0, 4))
         self._body = ctk.CTkFrame(self, fg_color="transparent")
         self._body.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self._render_empty()
@@ -516,6 +518,7 @@ class FlowPropertiesPanel(ctk.CTkFrame):
         self._node = node if isinstance(node, dict) else None
         self._link = link if isinstance(link, dict) else None
         self._id_edit_enabled = False
+        self.set_feedback("")
         for child in self._body.winfo_children():
             child.destroy()
         if self._node:
@@ -611,6 +614,9 @@ class FlowPropertiesPanel(ctk.CTkFrame):
     def _emit(self, changes):
         if callable(self.on_change):
             self.on_change(changes, node=self._node, link=self._link)
+
+    def set_feedback(self, message):
+        self._feedback_var.set(str(message or ""))
 
 
 class ComponentLibraryPanel(ctk.CTkFrame):
@@ -823,9 +829,19 @@ class VisualFlowPlanner(ctk.CTkFrame):
         target = node if isinstance(node, dict) else link
         if not isinstance(target, dict):
             return
+        self._set_property_feedback("")
         if changes.get("_delete") and link is target:
             self.canvas.model.remove_link(str(link.get("id") or ""))
         else:
+            node_ids = {str(item.get("id") or "").strip() for item in (payload.get("nodes") or []) if isinstance(item, dict)}
+            title_aliases = {}
+            for item in payload.get("nodes") or []:
+                if not isinstance(item, dict):
+                    continue
+                item_id = str(item.get("id") or "").strip()
+                title_key = str(item.get("title") or "").strip().casefold()
+                if item_id and title_key:
+                    title_aliases.setdefault(title_key, set()).add(item_id)
             scene_fields = target.setdefault("scene_fields", {}) if target is node else None
             for key, value in changes.items():
                 if isinstance(key, tuple) and key and key[0] == "scene_fields" and node is target:
@@ -847,10 +863,33 @@ class VisualFlowPlanner(ctk.CTkFrame):
                             if str(lk.get("target") or "") == old_id:
                                 lk["target"] = new_id
                 else:
+                    if link is target and key in {"source", "target"}:
+                        raw = str(value or "").strip()
+                        if not raw:
+                            self._set_property_feedback(f"Invalid {key}: value is required.")
+                            continue
+                        resolved = raw
+                        if resolved not in node_ids:
+                            alias_candidates = title_aliases.get(raw.casefold(), set())
+                            if len(alias_candidates) == 1:
+                                resolved = next(iter(alias_candidates))
+                            else:
+                                self._set_property_feedback(f"Invalid {key}: '{raw}' does not match a node id/title.")
+                                continue
+                        value = resolved
                     target[key] = value
+            if link is target:
+                existing_id = str(link.get("id") or "").strip()
+                payload["links"] = normalise_flow_links(payload.get("nodes") or [], payload.get("links") or [])
+                if existing_id and not any(str(item.get("id") or "") == existing_id for item in payload["links"]):
+                    self._set_property_feedback("Link edit was rejected because it produced an invalid connection.")
         self.mark_dirty()
         self.hierarchy.render(payload.get("nodes") or [], payload.get("links") or [], self._scenario_title)
         self.canvas.render()
+
+    def _set_property_feedback(self, message):
+        if hasattr(self, "properties") and hasattr(self.properties, "set_feedback"):
+            self.properties.set_feedback(message)
 
     def _safe_save(self):
         callback = getattr(self, "save_state", None)
