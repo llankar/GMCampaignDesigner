@@ -174,9 +174,18 @@ class _FakeCanvas:
         self.render_calls = 0
         self.created = 0
         self.selected = None
+        self.viewport = {"x": 0, "y": 0, "zoom": 1.0}
+        self.viewport_set_calls = 0
 
     def render(self):
         self.render_calls += 1
+
+    def set_payload(self, payload):
+        self.model.set_payload(payload)
+        self.render()
+
+    def export_payload(self):
+        return self.model.payload
 
     def create_node_at_viewport_center(self, kind):
         self.created += 1
@@ -186,6 +195,13 @@ class _FakeCanvas:
 
     def select_node(self, node_id, emit=False):
         self.selected = (node_id, emit)
+
+    def get_viewport_state(self):
+        return dict(self.viewport)
+
+    def set_viewport_state(self, viewport_dict):
+        self.viewport_set_calls += 1
+        self.viewport = dict(viewport_dict)
 
 
 class _FakeHierarchy:
@@ -265,3 +281,33 @@ def test_planner_reorder_command_keeps_selection_and_export_order_deterministic(
     assert [node["id"] for node in planner.canvas.model.payload["nodes"]] == ["c", "a", "b"]
     exported = export_visual_flow_to_scenes(planner.canvas.model.payload)
     assert [scene["Title"] for scene in exported] == ["C", "A", "B"]
+
+
+def test_planner_visual_payload_round_trip_preserves_viewport():
+    planner = _build_headless_planner({"version": 1, "nodes": [], "links": []})
+    planner.canvas.viewport = {"x": 120, "y": -35, "zoom": 1.25}
+
+    payload = planner.export_visual_payload()
+
+    assert payload["viewport"] == {"x": 120, "y": -35, "zoom": 1.25}
+
+
+def test_planner_load_from_state_applies_viewport_when_present():
+    planner = _build_headless_planner({"version": 1, "nodes": [], "links": []})
+    scenes = [{"Title": "Start", "Summary": "", "SceneType": ""}]
+    visual_payload = {"nodes": [], "links": [], "viewport": {"x": 80, "y": 40, "zoom": 0.85}}
+
+    planner.load_from_state(scenes, visual_payload=visual_payload, scenario_title="Campaign")
+
+    assert planner.canvas.viewport_set_calls == 1
+    assert planner.canvas.viewport == {"x": 80, "y": 40, "zoom": 0.85}
+
+
+def test_planner_load_from_state_keeps_backward_compat_without_viewport():
+    planner = _build_headless_planner({"version": 1, "nodes": [], "links": []})
+    scenes = [{"Title": "Start", "Summary": "", "SceneType": ""}]
+    visual_payload = {"nodes": [], "links": []}
+
+    planner.load_from_state(scenes, visual_payload=visual_payload, scenario_title="Campaign")
+
+    assert planner.canvas.viewport_set_calls == 0
