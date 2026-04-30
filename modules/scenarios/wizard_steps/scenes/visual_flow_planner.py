@@ -16,6 +16,7 @@ import customtkinter as ctk
 from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicalise_scene, normalise_scene_links
 from modules.scenarios.wizard_steps.scenes.scene_entity_fields import normalise_entity_list
 from modules.scenarios.scene_structured_fields import compose_scene_text_from_fields, normalise_structured_scene_items
+from modules.scenarios.wizard_steps.scenes.flow_canvas.view import VisualFlowCanvas
 
 _VISUAL_FLOW_VERSION = 1
 _NODE_KNOWN_KEYS = {
@@ -384,36 +385,6 @@ class FlowHierarchyPanel(ctk.CTkFrame):
             self.on_open(node_id)
 
 
-class VisualFlowCanvas(ctk.CTkFrame):
-    def __init__(self, master, on_select=None):
-        super().__init__(master)
-        self.on_select = on_select
-        self.canvas = tk.Canvas(self, bg="#0f172a", highlightthickness=0)
-        self.canvas.pack(fill="both", expand=True)
-        self._node_items = {}
-        self._selected_node_id = None
-
-    def render(self, payload):
-        self.canvas.delete("all")
-        self._node_items.clear()
-        for node in payload.get("nodes") or []:
-            x, y = int(node.get("x", 0)), int(node.get("y", 0))
-            node_id = str(node.get("id") or "")
-            rect = self.canvas.create_rectangle(x, y, x + 180, y + 80, fill="#1e293b", outline="#64748b", width=2)
-            self.canvas.create_text(x + 8, y + 8, text=node.get("title") or "Untitled", anchor="nw", fill="#f8fafc")
-            self._node_items[node_id] = rect
-            self.canvas.tag_bind(rect, "<Button-1>", lambda _evt, nid=node_id: self.select_node(nid, emit=True))
-
-    def select_node(self, node_id, emit=False):
-        if self._selected_node_id and self._selected_node_id in self._node_items:
-            self.canvas.itemconfigure(self._node_items[self._selected_node_id], outline="#64748b")
-        self._selected_node_id = str(node_id or "")
-        if self._selected_node_id in self._node_items:
-            self.canvas.itemconfigure(self._node_items[self._selected_node_id], outline="#f59e0b")
-        if emit and self.on_select:
-            self.on_select(self._selected_node_id, source="canvas")
-
-
 class FlowPropertiesPanel(ctk.CTkFrame):
     def __init__(self, master):
         super().__init__(master)
@@ -444,7 +415,7 @@ class VisualFlowPlanner(ctk.CTkFrame):
 
         self.hierarchy = FlowHierarchyPanel(self, on_select=self._on_select, on_open=self._open_node_properties)
         self.hierarchy.grid(row=0, column=0, sticky="nsew")
-        self.canvas = VisualFlowCanvas(self, on_select=self._on_select)
+        self.canvas = VisualFlowCanvas(self, on_select=self._on_select, on_change=self.mark_dirty, on_save=self._safe_save)
         self.canvas.grid(row=0, column=1, sticky="nsew")
         right = ctk.CTkFrame(self)
         right.grid(row=0, column=2, sticky="nsew")
@@ -458,20 +429,22 @@ class VisualFlowPlanner(ctk.CTkFrame):
         self._scenes = [copy.deepcopy(scene) for scene in (scenes or [])]
         self._flow_payload = build_visual_flow_from_scenes(self._scenes, existing_visual_payload=visual_payload)
         self.hierarchy.render(self._flow_payload.get("nodes") or [], self._flow_payload.get("links") or [], self._scenario_title)
-        self.canvas.render(self._flow_payload)
+        self.canvas.set_payload(self._flow_payload)
         self._dirty = False
 
     def export_visual_payload(self):
+        self._flow_payload = self.canvas.export_payload()
         return copy.deepcopy(self._flow_payload)
 
     def export_scenes(self):
+        self._flow_payload = self.canvas.export_payload()
         return export_visual_flow_to_scenes(self._flow_payload, existing_scenes=self._scenes)
 
     def delete_selected(self):
-        self.mark_dirty()
+        self.canvas.delete_selected()
 
     def duplicate_selected(self):
-        self.mark_dirty()
+        self.canvas.duplicate_selected()
 
     def mark_dirty(self):
         self._dirty = True
@@ -485,6 +458,11 @@ class VisualFlowPlanner(ctk.CTkFrame):
             self.canvas.select_node(node_id, emit=False)
 
     def _open_node_properties(self, node_id):
-        node = next((n for n in (self._flow_payload.get("nodes") or []) if str(n.get("id") or "") == str(node_id or "")), None)
+        node = next((n for n in (self.canvas.export_payload().get("nodes") or []) if str(n.get("id") or "") == str(node_id or "")), None)
         if node:
             self.properties.title_var.set(str(node.get("title") or ""))
+
+    def _safe_save(self):
+        callback = getattr(self, "save_state", None)
+        if callable(callback):
+            callback()
