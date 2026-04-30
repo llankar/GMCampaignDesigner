@@ -90,6 +90,16 @@ def _slugify(text: str) -> str:
     return base or "scene"
 
 
+def _resolve_scene_type(*, scene_fields, mapped_scene_type, existing_scene):
+    explicit_scene_type = str((scene_fields or {}).get("SceneType") or "").strip()
+    if explicit_scene_type:
+        return explicit_scene_type
+    mapped_type = str(mapped_scene_type or "").strip()
+    if mapped_type:
+        return mapped_type
+    return str((existing_scene or {}).get("SceneType") or (existing_scene or {}).get("Type") or "").strip()
+
+
 def normalise_flow_node_id(title, existing_ids):
     """Build a stable unique node id from a title and existing ids."""
     used = {str(value).strip() for value in (existing_ids or []) if str(value).strip()}
@@ -391,9 +401,7 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene["Title"] = title
         scene["Summary"] = str(node.get("summary") or scene.get("Summary") or "")
         node_kind = _normalise_node_kind(node.get("kind"))
-        scene_type = _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.get(node_kind, "")
-        scene["SceneType"] = scene_type or str(scene.get("SceneType") or "")
-        scene["Type"] = scene_type or str(scene.get("Type") or scene.get("SceneType") or "")
+        mapped_scene_type = _PLAYABLE_NODE_KIND_TO_SCENE_TYPE.get(node_kind, "")
         scene["_extra_fields"][_VISUAL_NODE_TYPE_FIELD] = node_kind
         scene.setdefault("LinkData", [])
         scene.setdefault("NextScenes", [])
@@ -413,9 +421,13 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
             scene[key] = normalise_entity_list(scene.get(key))
         for key in SCENE_STRUCTURED_FIELDS:
             scene[key] = normalise_structured_scene_items(scene.get(key))
-        if scene_fields.get("SceneType"):
-            scene["SceneType"] = str(scene_fields.get("SceneType"))
-            scene["Type"] = str(scene_fields.get("SceneType"))
+        resolved_scene_type = _resolve_scene_type(
+            scene_fields=scene_fields,
+            mapped_scene_type=mapped_scene_type,
+            existing_scene=scene,
+        )
+        scene["SceneType"] = resolved_scene_type
+        scene["Type"] = resolved_scene_type
         scene["Text"] = compose_scene_text_from_fields(scene)
         result.append(scene)
         node_id_to_exported_scene[str(node.get("id") or "")] = scene
