@@ -1,3 +1,5 @@
+import copy
+
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
 from modules.scenarios.wizard_steps.scenes.visual_flow_planner import (
     VisualFlowPlanner,
@@ -217,7 +219,7 @@ class _FakeCanvas:
         self.render()
 
     def export_payload(self):
-        return self.model.payload
+        return copy.deepcopy(self.model.payload)
 
     def create_node_at_viewport_center(self, kind):
         self.created += 1
@@ -400,3 +402,81 @@ def test_planner_reorder_rejects_drop_on_descendant():
     planner.reorder_node_relative("a", "c", place_after=False)
     assert [node["id"] for node in planner.canvas.model.payload["nodes"]] == before
     assert planner.canvas.render_calls == 0
+
+
+def test_context_commands_mutating_actions_refresh_and_mark_dirty():
+    commands = [
+        ("add", {"node_id": "a", "node_type": "scene"}),
+        ("delete", {"node_id": "b"}),
+        ("move_up", {"node_id": "b"}),
+        ("move_down", {"node_id": "a"}),
+        ("reorder", {"node_id": "b", "target_node_id": "a", "place_after": False}),
+        ("cut", {"node_id": "b"}),
+        ("paste", {"node_id": "a"}),
+    ]
+
+    for command, context in commands:
+        planner = _build_headless_planner(
+            {
+                "version": 1,
+                "nodes": [
+                    {"id": "a", "title": "A", "kind": "scene", "scene_index": 0, "x": 0, "y": 0},
+                    {"id": "b", "title": "B", "kind": "scene", "scene_index": 1, "x": 10, "y": 20},
+                ],
+                "links": [{"id": "a-b", "source": "a", "target": "b", "label": "", "kind": "scene_link"}],
+            }
+        )
+        if command == "paste":
+            planner._handle_hierarchy_command("copy", {"node_id": "b"})
+        start_hierarchy = planner.hierarchy.calls
+        start_render = planner.canvas.render_calls
+        assert planner._dirty is False
+
+        planner._handle_hierarchy_command(command, context)
+
+        assert planner._dirty is True
+        assert planner.hierarchy.calls > start_hierarchy
+        assert planner.canvas.render_calls > start_render
+
+
+def test_copy_command_is_non_mutating_for_context_menu():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [{"id": "a", "title": "A", "kind": "scene", "scene_index": 0, "x": 0, "y": 0}],
+            "links": [],
+        }
+    )
+    payload_before = planner.canvas.export_payload()
+    planner._handle_hierarchy_command("copy", {"node_id": "a"})
+    assert planner.canvas.export_payload() == payload_before
+    assert planner._dirty is False
+
+
+def test_paste_generates_unique_id_skips_link_cloning_and_applies_position_offset():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [
+                {"id": "a", "title": "A", "kind": "scene", "scene_index": 0, "x": 0, "y": 0},
+                {"id": "b", "title": "B", "kind": "scene", "scene_index": 1, "x": 10, "y": 20},
+                {"id": "b-2", "title": "B", "kind": "scene", "scene_index": 2, "x": 20, "y": 30},
+                {"id": "c", "title": "C", "kind": "scene", "scene_index": 3, "x": 50, "y": 60},
+            ],
+            "links": [
+                {"id": "a-b", "source": "a", "target": "b", "label": "", "kind": "scene_link"},
+                {"id": "b-c", "source": "b", "target": "c", "label": "", "kind": "scene_link"},
+            ],
+        }
+    )
+    planner._handle_hierarchy_command("copy", {"node_id": "b"})
+    planner._handle_hierarchy_command("paste", {"node_id": "a"})
+
+    pasted = planner.canvas.model.payload["nodes"][-1]
+    assert pasted["id"] not in {"b", "b-2"}
+    assert pasted["x"] == 50
+    assert pasted["y"] == 60
+
+    links = planner.canvas.model.payload["links"]
+    assert any(link["source"] == "a" and link["target"] == pasted["id"] for link in links)
+    assert not any(link["source"] == pasted["id"] or link["target"] == pasted["id"] and link["source"] != "a" for link in links)
