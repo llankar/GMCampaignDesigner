@@ -46,3 +46,24 @@ class FlowCanvasModel:
         before = len(self._payload.get("links", []))
         self._payload["links"] = [l for l in self._payload.get("links", []) if str(l.get("id") or "") != str(link_id or "")]
         return len(self._payload["links"]) != before
+
+    def reorder_nodes(self, dragged_id: str, target_id: str, *, place_after: bool = False) -> bool:
+        nodes = self._payload.get("nodes", [])
+        drag_key = str(dragged_id or "")
+        target_key = str(target_id or "")
+        if not drag_key or not target_key or drag_key == target_key:
+            return False
+
+        drag_index = next((idx for idx, node in enumerate(nodes) if str(node.get("id") or "") == drag_key), -1)
+        target_index = next((idx for idx, node in enumerate(nodes) if str(node.get("id") or "") == target_key), -1)
+        if drag_index < 0 or target_index < 0:
+            return False
+
+        node = nodes.pop(drag_index)
+        if drag_index < target_index:
+            target_index -= 1
+        insert_at = target_index + (1 if place_after else 0)
+        nodes.insert(max(0, min(insert_at, len(nodes))), node)
+        for position, item in enumerate(nodes):
+            item["scene_index"] = position
+        return True

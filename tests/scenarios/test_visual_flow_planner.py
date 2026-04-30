@@ -153,6 +153,21 @@ def test_visual_flow_unique_ids():
     assert normalise_flow_node_id("Scene", used) == "scene-3"
 
 
+def test_model_reorder_nodes_updates_order_without_link_mutation():
+    model = FlowCanvasModel(
+        {
+            "version": 1,
+            "nodes": [{"id": "a", "scene_index": 0}, {"id": "b", "scene_index": 1}, {"id": "c", "scene_index": 2}],
+            "links": [{"id": "a-b", "source": "a", "target": "b"}, {"id": "b-c", "source": "b", "target": "c"}],
+        }
+    )
+    original_links = list(model.payload["links"])
+    assert model.reorder_nodes("c", "a", place_after=False) is True
+    assert [node["id"] for node in model.payload["nodes"]] == ["c", "a", "b"]
+    assert [node["scene_index"] for node in model.payload["nodes"]] == [0, 1, 2]
+    assert model.payload["links"] == original_links
+
+
 class _FakeCanvas:
     def __init__(self, payload):
         self.model = FlowCanvasModel(payload)
@@ -232,3 +247,21 @@ def test_planner_add_and_paste_anchor_generate_valid_links():
     planner._handle_hierarchy_command("paste", {"node_id": "root"})
     latest_id = planner.canvas.model.payload["nodes"][-1]["id"]
     assert any(link["source"] == "root" and link["target"] == latest_id for link in planner.canvas.model.payload["links"])
+
+
+def test_planner_reorder_command_keeps_selection_and_export_order_deterministic():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [
+                {"id": "a", "title": "A", "kind": "scene", "scene_index": 0, "x": 0, "y": 0},
+                {"id": "b", "title": "B", "kind": "scene", "scene_index": 1, "x": 0, "y": 0},
+                {"id": "c", "title": "C", "kind": "scene", "scene_index": 2, "x": 0, "y": 0},
+            ],
+            "links": [{"id": "a-c", "source": "a", "target": "c", "label": "", "kind": "scene_link"}],
+        }
+    )
+    planner._handle_hierarchy_command("reorder", {"node_id": "c", "target_node_id": "a", "place_after": False})
+    assert [node["id"] for node in planner.canvas.model.payload["nodes"]] == ["c", "a", "b"]
+    exported = export_visual_flow_to_scenes(planner.canvas.model.payload)
+    assert [scene["Title"] for scene in exported] == ["C", "A", "B"]
