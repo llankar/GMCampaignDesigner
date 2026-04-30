@@ -306,7 +306,7 @@ class ScenesPlanningStep(WizardStep):
             entity_selector_callbacks=self._entity_selector_callbacks,
         )
         self.visual_planner = VisualFlowPlanner(self._planner_holder)
-        self.visual_planner.entity_selector_callbacks = self._entity_selector_callbacks
+        self.visual_planner.set_entity_selector_callbacks(self._entity_selector_callbacks)
         self._active_mode = None
         self.scenes = []
         self._set_mode("guided", remap=False)
