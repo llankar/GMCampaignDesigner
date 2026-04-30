@@ -8,6 +8,7 @@ import tkinter as tk
 from typing import Any
 
 import customtkinter as ctk
+from modules.scenarios.wizard_steps.scenes.scene_mode_adapters import canonicalise_scene
 
 _VISUAL_FLOW_VERSION = 1
 _NODE_KNOWN_KEYS = {
@@ -22,6 +23,7 @@ _NODE_KNOWN_KEYS = {
 }
 _LINK_KNOWN_KEYS = {"id", "source", "target", "label", "kind", "_extra_fields"}
 _SCENE_RECOGNISED_KEYS = {"Title", "Summary", "SceneType", "NextScenes", "LinkData", "_extra_fields"}
+_SCENE_TYPE_OVERRIDES = {}
 
 
 def _slugify(text: str) -> str:
@@ -70,43 +72,116 @@ def normalise_flow_links(nodes, links):
     return out
 
 
+def _link_targets(scene):
+    links = []
+    for link in scene.get("LinkData") or []:
+        if isinstance(link, dict):
+            target = str(link.get("target") or "").strip()
+            if target:
+                links.append(target)
+    if links:
+        return links
+    return [str(target).strip() for target in (scene.get("NextScenes") or []) if str(target).strip()]
+
+
+def _build_layered_positions(nodes, scenes):
+    title_to_index = {str(scene.get("Title") or ""): idx for idx, scene in enumerate(scenes)}
+    edges = {idx: [] for idx in range(len(scenes))}
+    indegree = {idx: 0 for idx in range(len(scenes))}
+    for idx, scene in enumerate(scenes):
+        for target_title in _link_targets(scene):
+            target_idx = title_to_index.get(target_title)
+            if target_idx is None:
+                continue
+            edges[idx].append(target_idx)
+            indegree[target_idx] += 1
+
+    queue = [idx for idx, degree in indegree.items() if degree == 0]
+    layer = {idx: 0 for idx in queue}
+    while queue:
+        source = queue.pop(0)
+        source_layer = layer.get(source, 0)
+        for target in edges.get(source, []):
+            layer[target] = max(layer.get(target, 0), source_layer + 1)
+            indegree[target] -= 1
+            if indegree[target] == 0:
+                queue.append(target)
+
+    for idx in range(len(scenes)):
+        layer.setdefault(idx, 0)
+    max_layer = max(layer.values()) if layer else 0
+    horizontal = max_layer > 0
+    grouped = {}
+    for idx, depth in layer.items():
+        grouped.setdefault(depth, []).append(idx)
+
+    positions = {}
+    for depth, members in sorted(grouped.items()):
+        for row, idx in enumerate(sorted(members)):
+            if horizontal:
+                x = 140 + depth * 280
+                y = 120 + row * 170
+            else:
+                x = 140 + row * 260
+                y = 120 + depth * 180
+            positions[idx] = {"x": x, "y": y}
+    for idx, node in enumerate(nodes):
+        positions.setdefault(idx, {"x": 120 + (idx % 4) * 260, "y": 120 + (idx // 4) * 180})
+        node["x"] = int(positions[idx]["x"])
+        node["y"] = int(positions[idx]["y"])
+
+
 def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
     """Create deterministic visual flow payload from scenes and optional old payload."""
-    scenes_list = [copy.deepcopy(scene) if isinstance(scene, dict) else {"Title": str(scene)} for scene in (scenes or [])]
+    scenes_list = [canonicalise_scene(scene if isinstance(scene, dict) else {"Title": str(scene)}, index=i) for i, scene in enumerate(scenes or [])]
     old_payload = existing_visual_payload if isinstance(existing_visual_payload, dict) else {}
-    old_nodes_by_index = {
-        int(node.get("scene_index")): node
-        for node in (old_payload.get("nodes") or [])
-        if isinstance(node, dict) and isinstance(node.get("scene_index"), int)
-    }
+    old_nodes = [node for node in (old_payload.get("nodes") or []) if isinstance(node, dict)]
+    old_nodes_by_index = {int(node.get("scene_index")): node for node in old_nodes if isinstance(node.get("scene_index"), int)}
+    old_nodes_by_id = {str(node.get("id") or "").strip(): node for node in old_nodes if str(node.get("id") or "").strip()}
+    old_nodes_by_title = {str(node.get("title") or "").strip().lower(): node for node in old_nodes if str(node.get("title") or "").strip()}
 
     nodes = []
     used_ids = set()
     for idx, scene in enumerate(scenes_list):
         title = str(scene.get("Title") or f"Scene {idx + 1}").strip()
         previous = old_nodes_by_index.get(idx, {})
-        node_id = str(previous.get("id") or "").strip() or normalise_flow_node_id(title, used_ids)
+        reference_id = str(scene.get("_extra_fields", {}).get("id") or "").strip()
+        matched = old_nodes_by_id.get(reference_id) or old_nodes_by_title.get(title.lower()) or previous
+        node_id = str(matched.get("id") or "").strip() or normalise_flow_node_id(title, used_ids)
         if node_id in used_ids:
             node_id = normalise_flow_node_id(node_id, used_ids)
         used_ids.add(node_id)
+        canvas = scene.get("_canvas") if isinstance(scene.get("_canvas"), dict) else {}
         nodes.append(
             {
                 "id": node_id,
                 "title": title,
                 "scene_index": idx,
-                "x": int(previous.get("x", 120 + (idx % 4) * 260)),
-                "y": int(previous.get("y", 120 + (idx // 4) * 180)),
-                "kind": str(previous.get("kind") or "scene").strip() or "scene",
+                "x": int(canvas.get("x", matched.get("x", 0) or 0)),
+                "y": int(canvas.get("y", matched.get("y", 0) or 0)),
+                "kind": str(matched.get("kind") or _SCENE_TYPE_OVERRIDES.get(str(scene.get("SceneType") or "").strip(), "scene")).strip() or "scene",
                 "summary": str(scene.get("Summary") or ""),
-                "_extra_fields": {k: copy.deepcopy(v) for k, v in previous.items() if k not in _NODE_KNOWN_KEYS},
+                "scene_fields": {
+                    "SceneType": str(scene.get("SceneType") or ""),
+                    "structured": {k: copy.deepcopy(v) for k, v in scene.items() if k not in _SCENE_RECOGNISED_KEYS and k != "_extra_fields"},
+                    "entities": copy.deepcopy(scene.get("_extra_fields") or {}),
+                },
+                "_extra_fields": {k: copy.deepcopy(v) for k, v in matched.items() if k not in _NODE_KNOWN_KEYS},
             }
         )
+    if any(int(node.get("x", 0)) == 0 and int(node.get("y", 0)) == 0 for node in nodes):
+        auto_nodes = [{"id": n["id"], "x": n["x"], "y": n["y"]} for n in nodes]
+        _build_layered_positions(auto_nodes, scenes_list)
+        for idx, node in enumerate(nodes):
+            if int(node.get("x", 0)) == 0 and int(node.get("y", 0)) == 0:
+                node["x"] = auto_nodes[idx]["x"]
+                node["y"] = auto_nodes[idx]["y"]
 
     node_by_title = {node["title"]: node["id"] for node in nodes}
     links = []
     for node in nodes:
         source_scene = scenes_list[node["scene_index"]]
-        for nxt in source_scene.get("NextScenes") or []:
+        for nxt in _link_targets(source_scene):
             target_id = node_by_title.get(str(nxt or "").strip())
             if target_id:
                 links.append({"source": node["id"], "target": target_id, "label": "", "kind": "scene_link"})
@@ -132,6 +207,11 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene["SceneType"] = str(scene.get("SceneType") or "")
         scene.setdefault("LinkData", scene.get("LinkData") or [])
         scene["_canvas"] = {"x": int(node.get("x", 0)), "y": int(node.get("y", 0))}
+        scene_fields = node.get("scene_fields") if isinstance(node.get("scene_fields"), dict) else {}
+        for key, value in (scene_fields.get("structured") or {}).items():
+            scene[key] = copy.deepcopy(value)
+        if scene_fields.get("SceneType"):
+            scene["SceneType"] = str(scene_fields.get("SceneType"))
         result.append(scene)
 
     id_to_title = {str(node.get("id")): str(node.get("title") or "") for node in nodes}
