@@ -69,3 +69,26 @@ def test_visual_planner_routes_context_commands_to_expected_operations():
         ("reorder_rel", "n1", "n2", True),
         ("paste", {"node_id": "n1"}),
     ]
+
+
+def test_order_nodes_large_synthetic_graph_microcheck():
+    import time
+
+    panel = FlowHierarchyPanel.__new__(FlowHierarchyPanel)
+    node_count = 700
+    nodes = [
+        {"id": f"n-{idx}", "title": f"Node {idx}", "scene_index": idx, "kind": "scene"}
+        for idx in range(node_count)
+    ]
+    links = []
+    for idx in range(node_count - 1):
+        links.append({"source": f"n-{idx}", "target": f"n-{idx + 1}"})
+        if idx + 10 < node_count:
+            links.append({"source": f"n-{idx}", "target": f"n-{idx + 10}"})
+
+    start = time.perf_counter()
+    ordered = FlowHierarchyPanel._order_nodes(panel, nodes, links)
+    elapsed = time.perf_counter() - start
+
+    assert len(ordered) == node_count
+    assert elapsed < 1.5

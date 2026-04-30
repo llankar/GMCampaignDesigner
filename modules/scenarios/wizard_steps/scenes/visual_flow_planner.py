@@ -584,6 +584,7 @@ class FlowHierarchyPanel(ctk.CTkFrame):
                 incoming[target] = incoming.get(target, 0) + 1
 
         stable_ids = [str(node.get("id") or "") for node in sorted(nodes, key=lambda n: (int(n.get("scene_index", 0)), str(n.get("id") or "")))]
+        rank_by_id = {node_id: rank for rank, node_id in enumerate(stable_ids)}
         roots = [nid for nid in stable_ids if nid and incoming.get(nid, 0) == 0] or stable_ids
 
         ordered = []
@@ -595,7 +596,7 @@ class FlowHierarchyPanel(ctk.CTkFrame):
             seen.add(node_id)
             node = by_id[node_id]
             ordered.append((depth, node))
-            for child in sorted(outgoing.get(node_id, []), key=lambda cid: stable_ids.index(cid) if cid in stable_ids else 10**6):
+            for child in sorted(outgoing.get(node_id, []), key=lambda cid: rank_by_id.get(cid, 10**6)):
                 if child in by_id:
                     by_id[child]["_parent_id"] = node_id
                 walk(child, depth + 1)
