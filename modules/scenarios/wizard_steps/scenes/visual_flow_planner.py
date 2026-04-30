@@ -41,6 +41,32 @@ _NODE_KNOWN_KEYS = {
 }
 _LINK_KNOWN_KEYS = {"id", "source", "target", "label", "kind", "_extra_fields"}
 _SCENE_RECOGNISED_KEYS = {"Title", "Summary", "SceneType", "NextScenes", "LinkData", "_extra_fields"}
+_SCENE_REQUIRED_EXPORT_LIST_FIELDS = {
+    "SceneBeats",
+    "SceneClues",
+    "SceneChallenges",
+    "SceneTwists",
+    "SceneRewards",
+    "NPCs",
+    "Creatures",
+    "Places",
+    "Clues",
+    "Bases",
+    "Maps",
+    "LinkData",
+    "NextScenes",
+}
+_SCENE_REQUIRED_EXPORT_STRING_FIELDS = {"Text"}
+_SCENE_ALLOWED_ROOT_KEYS = {
+    "Title",
+    "Summary",
+    "SceneType",
+    "Type",
+    "_extra_fields",
+    "_canvas",
+    *_SCENE_REQUIRED_EXPORT_LIST_FIELDS,
+    *_SCENE_REQUIRED_EXPORT_STRING_FIELDS,
+}
 _SCENE_TYPE_OVERRIDES = {}
 _PLAYABLE_NODE_KIND_TO_SCENE_TYPE = {
     "scene": "Scene",
@@ -181,6 +207,14 @@ def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
             node_id = normalise_flow_node_id(node_id, used_ids)
         used_ids.add(node_id)
         canvas = scene.get("_canvas") if isinstance(scene.get("_canvas"), dict) else {}
+        structured_fields = {}
+        for key in SCENE_STRUCTURED_FIELDS:
+            if key in scene:
+                structured_fields[key] = copy.deepcopy(scene.get(key))
+        entity_fields = {}
+        for key in SCENE_ENTITY_FIELDS:
+            if key in scene:
+                entity_fields[key] = copy.deepcopy(scene.get(key))
         nodes.append(
             {
                 "id": node_id,
@@ -192,8 +226,8 @@ def build_visual_flow_from_scenes(scenes, existing_visual_payload=None):
                 "summary": str(scene.get("Summary") or ""),
                 "scene_fields": {
                     "SceneType": str(scene.get("SceneType") or ""),
-                    "structured": {k: copy.deepcopy(v) for k, v in scene.items() if k not in _SCENE_RECOGNISED_KEYS and k != "_extra_fields"},
-                    "entities": copy.deepcopy(scene.get("_extra_fields") or {}),
+                    "structured": structured_fields,
+                    "entities": entity_fields,
                 },
                 "_extra_fields": {k: copy.deepcopy(v) for k, v in matched.items() if k not in _NODE_KNOWN_KEYS},
             }
@@ -251,7 +285,15 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene["_canvas"] = {"x": int(node.get("x", 0)), "y": int(node.get("y", 0))}
         scene_fields = node.get("scene_fields") if isinstance(node.get("scene_fields"), dict) else {}
         for key, value in (scene_fields.get("structured") or {}).items():
-            scene[key] = copy.deepcopy(value)
+            if key in SCENE_STRUCTURED_FIELDS:
+                scene[key] = copy.deepcopy(value)
+            else:
+                scene.setdefault("_extra_fields", {})[key] = copy.deepcopy(value)
+        for key, value in (scene_fields.get("entities") or {}).items():
+            if key in SCENE_ENTITY_FIELDS:
+                scene[key] = copy.deepcopy(value)
+            else:
+                scene.setdefault("_extra_fields", {})[key] = copy.deepcopy(value)
         for key in SCENE_ENTITY_FIELDS:
             scene[key] = normalise_entity_list(scene.get(key))
         for key in SCENE_STRUCTURED_FIELDS:
@@ -280,6 +322,13 @@ def export_visual_flow_to_scenes(flow_payload, existing_scenes=None):
         scene["NextScenes"] = [link["target"] for link in normalised_links]
         for key in _SCENE_RECOGNISED_KEYS:
             scene.setdefault(key, [] if key in {"NextScenes", "LinkData"} else "")
+        unknown_root_keys = [key for key in list(scene.keys()) if key not in _SCENE_ALLOWED_ROOT_KEYS]
+        for key in unknown_root_keys:
+            scene.setdefault("_extra_fields", {})[key] = copy.deepcopy(scene.pop(key))
+        for key in _SCENE_REQUIRED_EXPORT_LIST_FIELDS:
+            scene.setdefault(key, [])
+        for key in _SCENE_REQUIRED_EXPORT_STRING_FIELDS:
+            scene.setdefault(key, "")
         scene["Text"] = compose_scene_text_from_fields(scene)
     return result
 
