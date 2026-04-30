@@ -694,10 +694,13 @@ class VisualFlowPlanner(ctk.CTkFrame):
         self._flow_payload = build_visual_flow_from_scenes(self._scenes, existing_visual_payload=visual_payload)
         self.hierarchy.render(self._flow_payload.get("nodes") or [], self._flow_payload.get("links") or [], self._scenario_title)
         self.canvas.set_payload(self._flow_payload)
+        if isinstance(visual_payload, dict) and isinstance(visual_payload.get("viewport"), dict):
+            self.canvas.set_viewport_state(visual_payload["viewport"])
         self._dirty = False
 
     def export_visual_payload(self):
         self._flow_payload = self.canvas.export_payload()
+        self._flow_payload["viewport"] = self.canvas.get_viewport_state()
         return copy.deepcopy(self._flow_payload)
 
     def export_scenes(self):

@@ -96,6 +96,24 @@ class VisualFlowCanvas(ctk.CTkFrame):
     def export_payload(self):
         return copy.deepcopy(self.model.payload)
 
+    def get_viewport_state(self):
+        return {"x": self._offset_x, "y": self._offset_y, "zoom": self._zoom}
+
+    def set_viewport_state(self, viewport_dict):
+        if not isinstance(viewport_dict, dict):
+            return
+        x = viewport_dict.get("x", self._offset_x)
+        y = viewport_dict.get("y", self._offset_y)
+        zoom = viewport_dict.get("zoom", self._zoom)
+        if not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+            return
+        if not isinstance(zoom, (int, float)) or zoom <= 0:
+            return
+        self._offset_x = int(x)
+        self._offset_y = int(y)
+        self._zoom = float(zoom)
+        self.render()
+
     def render(self):
         self.canvas.delete("all")
         self._node_items.clear()
