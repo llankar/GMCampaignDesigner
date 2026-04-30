@@ -98,6 +98,25 @@ def test_visual_flow_round_trip_preserves_scene_fields():
     assert by_title["Dockside"]["NextScenes"] == ["Ambush"]
 
 
+def test_visual_flow_round_trip_preserves_node_kinds_via_extra_metadata():
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "n1", "scene_index": 0, "title": "Objective", "summary": "", "kind": "objective", "x": 0, "y": 0},
+            {"id": "n2", "scene_index": 1, "title": "Condition", "summary": "", "kind": "condition", "x": 0, "y": 0},
+            {"id": "n3", "scene_index": 2, "title": "Fallback", "summary": "", "kind": "scene", "x": 0, "y": 0},
+        ],
+        "links": [],
+    }
+
+    scenes = export_visual_flow_to_scenes(flow_payload)
+    rebuilt = build_visual_flow_from_scenes(scenes)
+    by_title = {node["title"]: node for node in rebuilt["nodes"]}
+    assert by_title["Objective"]["kind"] == "objective"
+    assert by_title["Condition"]["kind"] == "condition"
+    assert by_title["Fallback"]["kind"] == "scene"
+
+
 def test_visual_flow_exports_linkdata_and_nextscenes():
     flow_payload = {
         "version": 1,

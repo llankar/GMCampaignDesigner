@@ -533,6 +533,22 @@ def test_scenes_planning_mode_switch_guided_visual_canvas_preserves_data():
     assert by_title["Market"]["Places"] == ["Grand Bazaar"]
 
 
+def test_visual_types_survive_mode_switch_and_save_reload():
+    scenes = [
+        {"Title": "A", "Summary": "", "SceneType": "Scene", "NextScenes": []},
+        {"Title": "B", "Summary": "", "SceneType": "Scene", "NextScenes": []},
+    ]
+    visual = build_visual_flow_from_scenes(scenes)
+    visual["nodes"][0]["kind"] = "objective"
+    visual["nodes"][1]["kind"] = "interaction"
+
+    exported = export_visual_flow_to_scenes(visual, existing_scenes=scenes)
+    rebuilt = build_visual_flow_from_scenes(exported, existing_visual_payload=visual)
+    by_title = {node["title"]: node["kind"] for node in rebuilt["nodes"]}
+    assert by_title["A"] == "objective"
+    assert by_title["B"] == "interaction"
+
+
 def test_finish_embedded_can_persist_before_callback(monkeypatch):
     """Verify that finish embedded can persist before callback."""
     wizard = scenario_builder_wizard.ScenarioBuilderWizard.__new__(
