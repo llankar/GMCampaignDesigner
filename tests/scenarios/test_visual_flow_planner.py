@@ -5,6 +5,7 @@ from modules.scenarios.wizard_steps.scenes.visual_flow_planner import (
     VisualFlowPlanner,
     build_visual_flow_from_scenes,
     export_visual_flow_to_scenes,
+    normalise_flow_links,
     normalise_flow_node_id,
 )
 
@@ -206,6 +207,47 @@ def test_visual_flow_delete_node_removes_links():
 def test_visual_flow_unique_ids():
     used = {"scene", "scene-2"}
     assert normalise_flow_node_id("Scene", used) == "scene-3"
+
+
+def test_normalise_flow_links_keeps_ids_when_unrelated_links_change():
+    nodes = [{"id": "a"}, {"id": "b"}, {"id": "c"}, {"id": "d"}]
+    original_links = [
+        {"id": "link-ab", "source": "a", "target": "b", "label": "AB"},
+        {"id": "link-bc", "source": "b", "target": "c", "label": "BC"},
+    ]
+    base = normalise_flow_links(nodes, original_links)
+    base_by_pair = {(link["source"], link["target"]): link["id"] for link in base}
+
+    mutated_links = [
+        {"id": "link-ab", "source": "a", "target": "b", "label": "AB"},
+        {"id": "new-unrelated", "source": "c", "target": "d", "label": "CD"},
+    ]
+    mutated = normalise_flow_links(nodes, mutated_links)
+    mutated_by_pair = {(link["source"], link["target"]): link["id"] for link in mutated}
+    assert mutated_by_pair[("a", "b")] == base_by_pair[("a", "b")]
+
+
+def test_visual_flow_selected_link_stays_selectable_after_round_trip():
+    flow_payload = {
+        "version": 1,
+        "nodes": [
+            {"id": "start", "scene_index": 0, "title": "Start", "summary": "", "kind": "scene", "x": 0, "y": 0},
+            {"id": "middle", "scene_index": 1, "title": "Middle", "summary": "", "kind": "scene", "x": 0, "y": 0},
+            {"id": "end", "scene_index": 2, "title": "End", "summary": "", "kind": "scene", "x": 0, "y": 0},
+        ],
+        "links": [
+            {"id": "start-middle", "source": "start", "target": "middle", "label": "go", "kind": "scene_link"},
+            {"id": "middle-end", "source": "middle", "target": "end", "label": "continue", "kind": "scene_link"},
+        ],
+    }
+    selected_link_id = "start-middle"
+
+    scenes = export_visual_flow_to_scenes(flow_payload)
+    rebuilt_payload = build_visual_flow_from_scenes(scenes, existing_visual_payload=flow_payload)
+    rebuilt_links = normalise_flow_links(rebuilt_payload["nodes"], rebuilt_payload["links"])
+    rebuilt_ids = {link["id"] for link in rebuilt_links}
+
+    assert selected_link_id in rebuilt_ids
 
 
 def test_model_reorder_nodes_updates_order_without_link_mutation():
