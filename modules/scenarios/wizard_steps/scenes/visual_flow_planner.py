@@ -478,7 +478,7 @@ class FlowPropertiesPanel(ctk.CTkFrame):
         box.pack(fill="x", pady=(0, 6))
         box.insert("1.0", value)
         if key is not None:
-            box.bind("<KeyRelease>", lambda _e, k=key, b=box: self._emit({k: b.get("1.0", "end-1c")}), add="+")
+            box.bind("<KeyRelease>", lambda _e=None, k=key, b=box: self._emit({k: b.get("1.0", "end-1c")}), add="+")
 
     def _make_checkbox(self, label, value, key=None):
         var = ctk.BooleanVar(value=bool(value))
