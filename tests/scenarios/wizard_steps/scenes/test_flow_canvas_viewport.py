@@ -40,3 +40,11 @@ def test_zoom_around_cursor_keeps_world_anchor_and_clamps():
     assert abs(before_world[0] - after_world[0]) <= 0.1
     assert abs(before_world[1] - after_world[1]) <= 0.2
     assert rendered["count"] == 1
+
+
+def test_compute_fit_viewport_empty_nodes_returns_identity_viewport():
+    assert compute_fit_viewport([], canvas_width=0, canvas_height=0) == {
+        "zoom": 1.0,
+        "offset_x": 0.0,
+        "offset_y": 0.0,
+    }
