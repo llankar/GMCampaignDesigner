@@ -10,6 +10,7 @@ import customtkinter as ctk
 from modules.scenarios.wizard_steps.scenes.component_library.definitions import COMPONENT_GROUPS
 from modules.scenarios.scene_flow_rendering import apply_scene_flow_canvas_styling
 from modules.scenarios.wizard_steps.scenes.component_library.node_factory import build_default_node
+from modules.scenarios.wizard_steps.scenes.flow_canvas.minimap import minimap_to_world, world_to_minimap
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
 from modules.scenarios.wizard_steps.scenes.flow_canvas.node_rendering import NODE_STYLES as _NODE_STYLES, resolve_node_visual
 from modules.scenarios.wizard_steps.scenes.visual_flow.commands import (
@@ -80,9 +81,12 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self._zoom = 1.0
         self._offset_x = 0
         self._offset_y = 0
+        self._minimap_drag_active = False
+        self._minimap_projection = None
         self._bind_events()
 
     def _bind_events(self):
+        self.canvas.bind("<MouseWheel>", self._zoom_view)
         self.canvas.bind("<Button-2>", self._start_pan)
         self.canvas.bind("<B2-Motion>", self._pan)
         self.canvas.bind("<ButtonRelease-2>", self._end_pan)
@@ -192,8 +196,80 @@ class VisualFlowCanvas(ctk.CTkFrame):
             self.canvas.tag_bind(line, "<Button-1>", lambda _e, link_id=lid: self.select_link(link_id))
             self.canvas.tag_bind(line, "<Button-3>", lambda e, link_id=lid: self._link_menu(e, link_id))
 
+
+    def _zoom_view(self, event):
+        factor = 1.1 if event.delta > 0 else 0.9
+        prev_zoom = self._zoom
+        self._zoom = min(3.0, max(0.3, self._zoom * factor))
+        if abs(self._zoom - prev_zoom) < 1e-9:
+            return
+        wx, wy = self._screen_to_world(event.x, event.y)
+        self._offset_x = int(event.x - wx * self._zoom)
+        self._offset_y = int(event.y - wy * self._zoom)
+        self.render()
+
+    def _compute_world_bounds(self):
+        nodes = self.model.payload.get("nodes") or []
+        if not nodes:
+            return (0.0, 0.0, 1000.0, 700.0)
+        left = min(float(n.get("x", 0)) for n in nodes)
+        top = min(float(n.get("y", 0)) for n in nodes)
+        right = max(float(n.get("x", 0)) + 190.0 for n in nodes)
+        bottom = max(float(n.get("y", 0)) + 88.0 for n in nodes)
+        return (left - 80.0, top - 80.0, right + 80.0, bottom + 80.0)
+
+    def _apply_minimap_recenter(self, sx, sy):
+        projection = self._minimap_projection
+        if not projection:
+            return
+        world_x, world_y = minimap_to_world(
+            sx,
+            sy,
+            world_bounds=projection["world_bounds"],
+            minimap_bounds=projection["minimap_bounds"],
+        )
+        self._offset_x = int(self.canvas.winfo_width() / 2 - world_x * self._zoom)
+        self._offset_y = int(self.canvas.winfo_height() / 2 - world_y * self._zoom)
+        self.render()
+
+    def _start_minimap_drag(self, event):
+        self._minimap_drag_active = True
+        self._apply_minimap_recenter(event.x, event.y)
+
+    def _drag_minimap(self, event):
+        if self._minimap_drag_active:
+            self._apply_minimap_recenter(event.x, event.y)
+
+    def _end_minimap_drag(self, _event):
+        self._minimap_drag_active = False
+
     def _draw_minimap(self):
-        self.canvas.create_rectangle(16, self.canvas.winfo_height() - 126, 176, self.canvas.winfo_height() - 16, fill="#111827", outline="#4b5563")
+        mini_left, mini_top = 16, self.canvas.winfo_height() - 126
+        mini_right, mini_bottom = 176, self.canvas.winfo_height() - 16
+        minimap_bounds = (mini_left + 8, mini_top + 8, mini_right - 8, mini_bottom - 8)
+        world_bounds = self._compute_world_bounds()
+        self._minimap_projection = {"world_bounds": world_bounds, "minimap_bounds": minimap_bounds}
+
+        shell = self.canvas.create_rectangle(mini_left, mini_top, mini_right, mini_bottom, fill="#111827", outline="#4b5563", tags=("minimap",))
+        self.canvas.tag_bind(shell, "<Button-1>", self._start_minimap_drag)
+        self.canvas.tag_bind(shell, "<B1-Motion>", self._drag_minimap)
+        self.canvas.tag_bind(shell, "<ButtonRelease-1>", self._end_minimap_drag)
+
+        for node in self.model.payload.get("nodes") or []:
+            wx = float(node.get("x", 0)) + 95.0
+            wy = float(node.get("y", 0)) + 44.0
+            mx, my = world_to_minimap(wx, wy, world_bounds=world_bounds, minimap_bounds=minimap_bounds)
+            dot = self.canvas.create_oval(mx - 2, my - 2, mx + 2, my + 2, fill="#93c5fd", outline="", tags=("minimap",))
+            self.canvas.tag_bind(dot, "<Button-1>", self._start_minimap_drag)
+            self.canvas.tag_bind(dot, "<B1-Motion>", self._drag_minimap)
+            self.canvas.tag_bind(dot, "<ButtonRelease-1>", self._end_minimap_drag)
+
+        vw, vh = max(1, self.canvas.winfo_width()), max(1, self.canvas.winfo_height())
+        top_left_world = self._screen_to_world(0, 0)
+        bottom_right_world = self._screen_to_world(vw, vh)
+        vx1, vy1 = world_to_minimap(top_left_world[0], top_left_world[1], world_bounds=world_bounds, minimap_bounds=minimap_bounds)
+        vx2, vy2 = world_to_minimap(bottom_right_world[0], bottom_right_world[1], world_bounds=world_bounds, minimap_bounds=minimap_bounds)
+        self.canvas.create_rectangle(vx1, vy1, vx2, vy2, outline="#fbbf24", width=1, tags=("minimap",))
 
     def _start_node_drag(self, event, node_id):
         if self._space_held:
