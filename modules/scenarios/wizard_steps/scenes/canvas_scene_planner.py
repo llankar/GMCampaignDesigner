@@ -231,13 +231,13 @@ class CanvasScenePlanner(ctk.CTkFrame):
 
     def _on_canvas_move(self, index, x, y):
         """Handle canvas move."""
-        if index is None or index >= len(self.scenes):
+        if not isinstance(index, int) or index < 0 or index >= len(self.scenes):
             return
         self.scenes[index].setdefault("_canvas", {}).update({"x": x, "y": y})
 
     def _open_inline_scene_editor(self, index):
         """Open inline scene editor."""
-        if index is None or index >= len(self.scenes):
+        if not isinstance(index, int) or index < 0 or index >= len(self.scenes):
             return
         bbox = self.canvas.get_card_bbox(index)
         if not bbox:
@@ -259,6 +259,8 @@ class CanvasScenePlanner(ctk.CTkFrame):
 
     def _apply_inline_scene_update(self, index, data):
         """Apply inline scene update."""
+        if not isinstance(index, int) or index < 0 or index >= len(self.scenes):
+            return
         scene = self.scenes[index]
         scene["Title"] = data.get("Title") or scene.get("Title") or f"Scene {index + 1}"
         scene["Summary"] = data.get("Summary", "")
@@ -292,9 +294,14 @@ class CanvasScenePlanner(ctk.CTkFrame):
 
     def _link_scenes_via_drag(self, source_index, target_index):
         """Internal helper for link scenes via drag."""
-        if source_index is None or target_index is None:
-            return
-        if source_index >= len(self.scenes) or target_index >= len(self.scenes):
+        if (
+            not isinstance(source_index, int)
+            or source_index < 0
+            or source_index >= len(self.scenes)
+            or not isinstance(target_index, int)
+            or target_index < 0
+            or target_index >= len(self.scenes)
+        ):
             return
         source = self.scenes[source_index]
         target_title = self.scenes[target_index].get("Title") or f"Scene {target_index + 1}"
@@ -308,7 +315,7 @@ class CanvasScenePlanner(ctk.CTkFrame):
 
     def _on_add_entity_to_scene(self, index, entity_type):
         """Handle add entity to scene."""
-        if index is None or index >= len(self.scenes):
+        if not isinstance(index, int) or index < 0 or index >= len(self.scenes):
             return
         selector = self.entity_selector_callbacks.get(entity_type)
         if not callable(selector):
