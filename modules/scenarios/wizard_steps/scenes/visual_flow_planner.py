@@ -855,12 +855,15 @@ class VisualFlowPlanner(ctk.CTkFrame):
             callback()
 def _normalise_node_kind(kind: Any) -> str:
     value = str(kind or "").strip()
-    return value if value in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE else "scene"
+    if not value:
+        return "scene"
+    return value
 
 
 def _scene_to_node_kind(scene: dict[str, Any], existing_kind: Any = None) -> str:
-    if str(existing_kind or "").strip() in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE:
-        return str(existing_kind).strip()
+    existing = str(existing_kind or "").strip()
+    if existing:
+        return existing
     extras = scene.get("_extra_fields") if isinstance(scene.get("_extra_fields"), dict) else {}
     stored = str(extras.get(_VISUAL_NODE_TYPE_FIELD) or "").strip()
     if stored in _PLAYABLE_NODE_KIND_TO_SCENE_TYPE:
