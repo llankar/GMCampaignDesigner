@@ -65,6 +65,7 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self._pan_state = None
         self._space_held = False
         self._drag_link_source = None
+        self._drag_link_preview_item = None
         self._context_press_ts = 0.0
         self._zoom = 1.0
         self._offset_x = 0
@@ -78,7 +79,9 @@ class VisualFlowCanvas(ctk.CTkFrame):
         self.canvas.bind("<Button-3>", self._on_context_press)
         self.canvas.bind("<ButtonRelease-3>", self._canvas_menu)
         self.canvas.bind("<ButtonRelease-1>", self._complete_link_drag, add="+")
+        self.canvas.bind("<B1-Motion>", self._drag_link_motion, add="+")
         self.canvas.bind("<Double-1>", self._double_click)
+        self.canvas.bind_all("<Escape>", self._cancel_link_drag)
         self.canvas.bind("<Control-0>", lambda _e: self.reset_zoom())
         self.canvas.bind_all("<Delete>", lambda _e: self.delete_selected())
         self.canvas.bind_all("<Control-d>", lambda _e: self.duplicate_selected())
@@ -286,18 +289,73 @@ class VisualFlowCanvas(ctk.CTkFrame):
 
     def _start_link_drag(self, event, node_id):
         self._drag_link_source = str(node_id or "").strip() or None
+        self._update_link_preview(event.x, event.y)
+
+    def _drag_link_motion(self, event):
+        if not self._drag_link_source:
+            return
+        self._update_link_preview(event.x, event.y)
+
+    def _update_link_preview(self, sx, sy):
+        if not self._drag_link_source:
+            self._clear_link_preview()
+            return
+        source_node = self.model.get_node(self._drag_link_source)
+        if not source_node:
+            self._clear_link_preview()
+            return
+        from_x, from_y = self._world_to_screen(int(source_node.get("x", 0)) + 190, int(source_node.get("y", 0)) + 44)
+        if self._drag_link_preview_item:
+            self.canvas.coords(self._drag_link_preview_item, from_x, from_y, sx, sy)
+        else:
+            self._drag_link_preview_item = self.canvas.create_line(
+                from_x, from_y, sx, sy, fill="#7dd3fc", width=2, dash=(6, 4), tags=("link_preview",)
+            )
+
+    def _clear_link_preview(self):
+        if self._drag_link_preview_item:
+            self.canvas.delete(self._drag_link_preview_item)
+            self._drag_link_preview_item = None
+
+    def _cancel_link_drag(self, _event=None):
+        self._drag_link_source = None
+        self._clear_link_preview()
+
+    def _resolve_link_target_from_geometry(self, source_id, sx, sy):
+        wx, wy = self._screen_to_world(sx, sy)
+        best_target = None
+        best_distance = None
+        for node in self.model.payload.get("nodes") or []:
+            node_id = str(node.get("id") or "")
+            if not node_id or node_id == source_id:
+                continue
+            nx, ny = int(node.get("x", 0)), int(node.get("y", 0))
+            left, top, right, bottom = nx, ny, nx + 190, ny + 88
+            if left <= wx <= right and top <= wy <= bottom:
+                return node_id
+            cx, cy = nx + 95, ny + 44
+            dist = ((wx - cx) ** 2 + (wy - cy) ** 2) ** 0.5
+            if best_distance is None or dist < best_distance:
+                best_target = node_id
+                best_distance = dist
+        if best_distance is not None and best_distance <= 120:
+            return best_target
+        return None
 
     def _complete_link_drag(self, event):
         if not self._drag_link_source:
             return
         source_id = self._drag_link_source
         self._drag_link_source = None
+        self._clear_link_preview()
         item = self.canvas.find_withtag("current")
         target_id = None
         if item:
             tags = self.canvas.gettags(item[0])
             if "node" in tags and len(tags) > 1:
                 target_id = tags[-1]
+        if not target_id:
+            target_id = self._resolve_link_target_from_geometry(source_id, event.x, event.y)
         target_id = resolve_link_target(source_id, [target_id])
         if not target_id:
             return
@@ -306,7 +364,10 @@ class VisualFlowCanvas(ctk.CTkFrame):
         existing.append(link)
         cmd = make_create_link_command(source_id=source_id, target_id=target_id, link_payload=link)
         if cmd.changed:
-            self._emit_change(); self.render()
+            self.select_link(link["id"])
+            self._emit_change()
+            self.render()
+            self._edit_link(link["id"])
 
     def _emit_change(self):
         if self.on_change:
