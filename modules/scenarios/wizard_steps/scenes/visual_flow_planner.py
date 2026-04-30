@@ -107,26 +107,55 @@ def normalise_flow_links(nodes, links):
     node_ids = {str(node.get("id") or "").strip() for node in (nodes or []) if isinstance(node, dict)}
     out = []
     used_ids = set()
-    for link in links or []:
+    identity_to_existing_ids = {}
+
+    candidates = []
+    for index, link in enumerate(links or []):
         if not isinstance(link, dict):
             continue
         source = str(link.get("source") or "").strip()
         target = str(link.get("target") or "").strip()
         if source not in node_ids or target not in node_ids:
             continue
+        extra_fields = {k: copy.deepcopy(v) for k, v in link.items() if k not in _LINK_KNOWN_KEYS}
+        order_token = extra_fields.get("_order_token", index)
+        existing_id = str(link.get("id") or "").strip()
+        identity = (source, target)
+        if existing_id:
+            identity_to_existing_ids.setdefault(identity, []).append((order_token, index, existing_id))
+        label = str(link.get("label") or "").strip()
+        kind = str(link.get("kind") or "scene_link").strip() or "scene_link"
+        candidates.append((index, source, target, existing_id, extra_fields, order_token, label, kind))
+
+    for identity in identity_to_existing_ids:
+        identity_to_existing_ids[identity].sort(key=lambda item: (str(item[0]), item[1], item[2]))
+
+    for index, source, target, existing_id, extra_fields, order_token, label, kind in candidates:
+        identity = (source, target)
+        preserved_id = ""
+        if existing_id and existing_id not in used_ids:
+            preserved_id = existing_id
+        elif identity_to_existing_ids.get(identity):
+            for _, _, candidate_id in identity_to_existing_ids[identity]:
+                if candidate_id not in used_ids:
+                    preserved_id = candidate_id
+                    break
+
         record = {
-            "id": str(link.get("id") or "").strip(),
+            "id": preserved_id,
             "source": source,
             "target": target,
-            "label": str(link.get("label") or "").strip(),
-            "kind": str(link.get("kind") or "scene_link").strip() or "scene_link",
+            "label": label,
+            "kind": kind,
+            "_extra_fields": extra_fields,
         }
+
         if not record["id"]:
             record["id"] = normalise_flow_node_id(f"{source}-{target}", used_ids)
         if record["id"] in used_ids:
-            record["id"] = normalise_flow_node_id(record["id"], used_ids)
+            tie_seed = extra_fields.get("_order_token", order_token)
+            record["id"] = normalise_flow_node_id(f"{record['id']}-{tie_seed}", used_ids)
         used_ids.add(record["id"])
-        record["_extra_fields"] = {k: copy.deepcopy(v) for k, v in link.items() if k not in _LINK_KNOWN_KEYS}
         out.append(record)
     return out
 
