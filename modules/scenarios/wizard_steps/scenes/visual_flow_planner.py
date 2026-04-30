@@ -751,10 +751,19 @@ class VisualFlowPlanner(ctk.CTkFrame):
         return export_visual_flow_to_scenes(self._flow_payload, existing_scenes=self._scenes)
 
     def delete_selected(self):
+        before = self.canvas.export_payload()
         self.canvas.delete_selected()
+        after = self.canvas.export_payload()
+        if before != after:
+            self._refresh_views()
+            self._on_select(None, source="canvas")
 
     def duplicate_selected(self):
+        before = self.canvas.export_payload()
         self.canvas.duplicate_selected()
+        after = self.canvas.export_payload()
+        if before != after:
+            self._refresh_views()
 
     def mark_dirty(self):
         self._dirty = True
