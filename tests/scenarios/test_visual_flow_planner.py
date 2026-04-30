@@ -1,5 +1,6 @@
 from modules.scenarios.wizard_steps.scenes.flow_canvas.model import FlowCanvasModel
 from modules.scenarios.wizard_steps.scenes.visual_flow_planner import (
+    VisualFlowPlanner,
     build_visual_flow_from_scenes,
     export_visual_flow_to_scenes,
     normalise_flow_node_id,
@@ -150,3 +151,84 @@ def test_visual_flow_delete_node_removes_links():
 def test_visual_flow_unique_ids():
     used = {"scene", "scene-2"}
     assert normalise_flow_node_id("Scene", used) == "scene-3"
+
+
+class _FakeCanvas:
+    def __init__(self, payload):
+        self.model = FlowCanvasModel(payload)
+        self.render_calls = 0
+        self.created = 0
+        self.selected = None
+
+    def render(self):
+        self.render_calls += 1
+
+    def create_node_at_viewport_center(self, kind):
+        self.created += 1
+        node = {"id": f"new-{self.created}", "title": f"{kind} node", "kind": kind, "scene_index": len(self.model.payload.get("nodes") or []), "x": 10, "y": 20}
+        self.model.payload.setdefault("nodes", []).append(node)
+        return node
+
+    def select_node(self, node_id, emit=False):
+        self.selected = (node_id, emit)
+
+
+class _FakeHierarchy:
+    def __init__(self):
+        self.calls = 0
+
+    def render(self, *_args, **_kwargs):
+        self.calls += 1
+
+    def select_node(self, *_args, **_kwargs):
+        return None
+
+
+def _build_headless_planner(payload):
+    planner = VisualFlowPlanner.__new__(VisualFlowPlanner)
+    planner.canvas = _FakeCanvas(payload)
+    planner.hierarchy = _FakeHierarchy()
+    planner.properties = type("P", (), {"bind_item": lambda *args, **kwargs: None})()
+    planner._scenario_title = "Test"
+    planner._dirty = False
+    planner._clipboard_node = None
+    return planner
+
+
+def test_planner_context_commands_delete_reorder_and_copy_paste():
+    planner = _build_headless_planner(
+        {
+            "version": 1,
+            "nodes": [
+                {"id": "a", "title": "A", "kind": "scene", "scene_index": 0, "x": 0, "y": 0},
+                {"id": "b", "title": "B", "kind": "scene", "scene_index": 1, "x": 0, "y": 0},
+            ],
+            "links": [{"id": "a-b", "source": "a", "target": "b", "label": "", "kind": "scene_link"}],
+        }
+    )
+    planner._handle_hierarchy_command("move_down", {"node_id": "a"})
+    nodes = planner.canvas.model.payload["nodes"]
+    assert [node["id"] for node in nodes] == ["b", "a"]
+    assert [node["scene_index"] for node in nodes] == [0, 1]
+
+    planner._handle_hierarchy_command("copy", {"node_id": "a"})
+    planner._handle_hierarchy_command("paste", {"node_id": None})
+    ids = [node["id"] for node in planner.canvas.model.payload["nodes"]]
+    assert len(ids) == 3
+    assert len(set(ids)) == 3
+
+    planner._handle_hierarchy_command("cut", {"node_id": "b"})
+    assert planner.canvas.model.get_node("b") is None
+
+
+def test_planner_add_and_paste_anchor_generate_valid_links():
+    planner = _build_headless_planner({"version": 1, "nodes": [{"id": "root", "title": "Root", "kind": "scene", "scene_index": 0, "x": 0, "y": 0}], "links": []})
+    planner._handle_hierarchy_command("add", {"node_id": "root", "node_type": "objective"})
+    added = [node for node in planner.canvas.model.payload["nodes"] if node["id"] != "root"][0]
+    assert added["kind"] == "objective"
+    assert any(link["source"] == "root" and link["target"] == added["id"] for link in planner.canvas.model.payload["links"])
+
+    planner._handle_hierarchy_command("copy", {"node_id": added["id"]})
+    planner._handle_hierarchy_command("paste", {"node_id": "root"})
+    latest_id = planner.canvas.model.payload["nodes"][-1]["id"]
+    assert any(link["source"] == "root" and link["target"] == latest_id for link in planner.canvas.model.payload["links"])
