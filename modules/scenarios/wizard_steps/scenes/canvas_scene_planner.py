@@ -262,12 +262,25 @@ class CanvasScenePlanner(ctk.CTkFrame):
         if not isinstance(index, int) or index < 0 or index >= len(self.scenes):
             return
         scene = self.scenes[index]
-        scene["Title"] = data.get("Title") or scene.get("Title") or f"Scene {index + 1}"
+        old_title = str(scene.get("Title") or "").strip()
+        new_title = str(data.get("Title") or old_title or f"Scene {index + 1}").strip()
+        scene["Title"] = new_title
         scene["Summary"] = data.get("Summary", "")
         scene["SceneType"] = data.get("SceneType", "")
         for field_name in SCENE_STRUCTURED_FIELDS:
             scene[field_name] = parse_multiline_items(data.get(field_name))
         scene["_structured_prefilled"] = bool(data.get("_structured_prefilled"))
+
+        if new_title != old_title:
+            for linked_scene in self.scenes:
+                links = []
+                for link in normalise_scene_links(linked_scene):
+                    if link.get("target") == old_title:
+                        link["target"] = new_title
+                    links.append(link)
+                linked_scene["LinkData"] = links
+                linked_scene["NextScenes"] = [link["target"] for link in links]
+
         self._close_inline_scene_editor()
         self.canvas.set_scenes(self.scenes, self.selected_index)
 
