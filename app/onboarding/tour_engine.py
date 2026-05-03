@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 from .tour_models import TourStep
 from .tour_overlay import TourOverlay
 from .tour_popover import TourPopover
 from .tour_state import TourStateStore
+from .widget_locator import WidgetLocator
 
 logger = logging.getLogger(__name__)
 
@@ -19,14 +20,21 @@ class TourEngine:
         widget_resolver: Callable[[str, str], Any],
         screen_resolver: Callable[[], str],
         state_store: TourStateStore | None = None,
+        user_notifier: Callable[[str], None] | None = None,
+        resolution_timeout_seconds: float = 1.5,
     ) -> None:
         self._root = root
         self._tours = tours
-        self._widget_resolver = widget_resolver
         self._screen_resolver = screen_resolver
         self._state_store = state_store or TourStateStore()
         self._overlay = TourOverlay(root)
         self._popover = TourPopover(root, self.next_step, self.prev_step, self.stop)
+        self._widget_locator = WidgetLocator(
+            widget_resolver,
+            root=root,
+            timeout_seconds=resolution_timeout_seconds,
+        )
+        self._user_notifier = user_notifier or (lambda _: None)
         self._tour_id: str | None = None
         self._steps: list[TourStep] = []
         self._step_index = -1
@@ -83,25 +91,23 @@ class TourEngine:
 
     def _try_show_step(self, step: TourStep) -> bool:
         if self._screen_resolver() != step.screen:
-            logger.info(
-                "Skipping step '%s': screen '%s' is not active.",
-                step.id,
-                step.screen,
-            )
-            return False
-
-        target_widget = self._widget_resolver(step.screen, step.target_widget_key)
-        if target_widget is None:
-            logger.info(
-                "Skipping step '%s': target widget '%s' was not found.",
-                step.id,
-                step.target_widget_key,
-            )
+            self._log_skipped_step(step, f"screen '{step.screen}' is not active")
             return False
 
         if step.before_hook:
             step.before_hook(step)
 
+        resolved = self._widget_locator.resolve(step.screen, step.target_widget_key)
+        target_widget = resolved.widget
+        if target_widget is None:
+            self._log_skipped_step(step, f"widget '{step.target_widget_key}' not visible")
+            if resolved.message:
+                self._user_notifier(resolved.message)
+            return False
+
         self._overlay.show_highlight(target_widget)
         self._popover.show(step, target_widget)
         return True
+
+    def _log_skipped_step(self, step: TourStep, reason: str) -> None:
+        logger.info("Skipping step '%s': %s.", step.id, reason)
