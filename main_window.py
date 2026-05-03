@@ -3688,8 +3688,10 @@ class MainWindow(ctk.CTk):
                 self,
                 campaign_wrapper=campaign_wrapper,
                 scenario_wrapper=scenario_wrapper,
-                modal=not guided_tour_active,
+                modal=False,
             )
+            if not guided_tour_active:
+                wizard.grab_set()
             wizard.focus_force()
         except Exception as exc:
             log_exception(
