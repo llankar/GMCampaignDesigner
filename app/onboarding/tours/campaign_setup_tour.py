@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.onboarding.tour_models import TourPlacement, TourStep
 
-from .tour_i18n_fr import CAMPAIGN_SETUP_TEXTS
+from .tour_i18n_en import CAMPAIGN_SETUP_TEXTS
 
 
 def build_campaign_setup_steps() -> list[TourStep]:
