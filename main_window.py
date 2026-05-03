@@ -327,6 +327,7 @@ class MainWindow(ctk.CTk):
 
     def launch_guided_tour(self):
         """Launch guided onboarding tour."""
+        self.open_campaign_builder(guided_tour_active=True)
         launch_guided_tour(
             self,
             self._tour_widget_registry.resolver(),
@@ -3671,7 +3672,7 @@ class MainWindow(ctk.CTk):
             )
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
 
-    def open_campaign_builder(self):
+    def open_campaign_builder(self, guided_tour_active: bool = False):
         """Open campaign builder."""
         try:
             # Keep campaign builder resilient if this step fails.
@@ -3687,8 +3688,8 @@ class MainWindow(ctk.CTk):
                 self,
                 campaign_wrapper=campaign_wrapper,
                 scenario_wrapper=scenario_wrapper,
+                modal=not guided_tour_active,
             )
-            wizard.grab_set()
             wizard.focus_force()
         except Exception as exc:
             log_exception(
