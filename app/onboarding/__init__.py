@@ -3,6 +3,7 @@
 from .tour_engine import TourEngine
 from .tour_models import TourHook, TourPlacement, TourStep
 from .tour_state import TourStateStore
+from .tours import build_tour_registry
 
 __all__ = [
     "TourEngine",
@@ -10,4 +11,5 @@ __all__ = [
     "TourPlacement",
     "TourStateStore",
     "TourStep",
+    "build_tour_registry",
 ]
