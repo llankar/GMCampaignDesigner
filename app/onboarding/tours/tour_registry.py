@@ -7,11 +7,17 @@ from collections.abc import Callable
 from app.onboarding.tour_models import TourStep
 
 from .campaign_setup_tour import build_campaign_setup_steps
+from .new_gm_quickstart_tour import (
+    build_new_gm_advanced_steps,
+    build_new_gm_mvp_steps,
+)
 
 TourBuilder = Callable[[], list[TourStep]]
 
 TOUR_BUILDERS: dict[str, TourBuilder] = {
     "campaign_setup": build_campaign_setup_steps,
+    "new_gm_mvp": build_new_gm_mvp_steps,
+    "new_gm_advanced": build_new_gm_advanced_steps,
 }
 
 
