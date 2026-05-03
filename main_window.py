@@ -74,6 +74,7 @@ from modules.ui.ambiance.importer.dialog import AmbianceWallpaperImporterDialog
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
 from app.ui.help.guided_tour_entry import launch_guided_tour
+from app.ui.help.tour_widget_registry import TourWidgetRegistry
 from modules.events.ui.dock import CalendarDock
 from modules.events.models.event_types import get_event_type
 from modules.events.services.timeline_simulator import CampaignTimelineSimulator
@@ -211,7 +212,8 @@ class MainWindow(ctk.CTk):
         root.bind_all("<Control-i>", self._on_ctrl_i)
         root.bind_all("<Control-I>", self._on_ctrl_i)
         self._bind_global_shortcuts()
-        self._tour_widget_registry = {"btn_new_campaign": self}
+        self._tour_widget_registry = TourWidgetRegistry()
+        self.register_tour_widget("main_window", "btn_new_campaign", self)
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
         # Rebuild colorized UI bits when theme changes
@@ -315,13 +317,32 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(btns, text="Defaults", command=reset_defaults).pack(side="right", padx=6)
         ctk.CTkButton(btns, text="Close", command=top.destroy).pack(side="right", padx=6)
 
+    def register_tour_widget(self, screen: str, key: str, widget):
+        """Register a guided-tour target widget by stable key."""
+        self._tour_widget_registry.register(screen, key, widget)
+
+    def unregister_tour_widget(self, screen: str, key: str):
+        """Unregister a guided-tour target widget."""
+        self._tour_widget_registry.unregister(screen, key)
+
     def launch_guided_tour(self):
         """Launch guided onboarding tour."""
         launch_guided_tour(
             self,
-            self._tour_widget_registry,
-            current_screen_getter=lambda: "main_window",
+            self._tour_widget_registry.resolver(),
+            current_screen_getter=self._resolve_tour_screen,
         )
+
+    def _resolve_tour_screen(self) -> str:
+        """Resolve which UI screen is currently active for guided tours."""
+        for child in reversed(self.winfo_children()):
+            try:
+                if child.winfo_exists() and child.winfo_viewable() and child.wm_state() != "withdrawn":
+                    if child.__class__.__name__ == "CampaignBuilderWizard":
+                        return "campaign_builder"
+            except Exception:
+                continue
+        return "main_window"
 
     # ---------------------------
     # Setup and Layout Methods

@@ -77,9 +77,12 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._interactive_controls: list[ctk.CTkBaseClass] = []
         self._generation_defaults_service = CampaignGenerationDefaultsService()
         self.generation_defaults = self._generation_defaults_service.load()
+        self._tour_keys_registered = False
 
         self._build_layout()
         self._show_step(0)
+        self._register_tour_widgets()
+        self.bind("<Destroy>", self._on_destroy, add="+")
 
         self.transient(master)
         self.grab_set()
@@ -193,7 +196,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         row1 = ctk.CTkFrame(form_body, fg_color="transparent")
         row1.pack(fill="x", pady=4)
-        self._labeled_entry(row1, "Campaign Name", "name", 0)
+        self.campaign_name_entry = self._labeled_entry(row1, "Campaign Name", "name", 0)
         self._labeled_entry(row1, "Genre", "genre", 1)
 
         row2 = ctk.CTkFrame(form_body, fg_color="transparent")
@@ -465,6 +468,32 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         return frame
 
+    def _register_tour_widgets(self):
+        """Register guided-tour widgets in the shared host registry."""
+        if self._tour_keys_registered:
+            return
+        register = getattr(self.master, "register_tour_widget", None)
+        if not callable(register):
+            return
+        register("campaign_builder", "input_campaign_name", getattr(self, "campaign_name_entry", None))
+        register("campaign_builder", "btn_create_campaign", self.next_btn)
+        self._tour_keys_registered = True
+
+    def _unregister_tour_widgets(self):
+        """Unregister guided-tour widgets from the shared host registry."""
+        if not self._tour_keys_registered:
+            return
+        unregister = getattr(self.master, "unregister_tour_widget", None)
+        if callable(unregister):
+            unregister("campaign_builder", "input_campaign_name")
+            unregister("campaign_builder", "btn_create_campaign")
+        self._tour_keys_registered = False
+
+    def _on_destroy(self, event):
+        """Cleanup shared guided-tour registrations when dialog is destroyed."""
+        if event.widget is self:
+            self._unregister_tour_widgets()
+
     def _build_review_step(self, parent):
         """Build review step."""
         frame = ctk.CTkFrame(parent, **section_style())
@@ -477,8 +506,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
     def _labeled_entry(self, parent, label: str, key: str, col: int):
         """Internal helper for labeled entry."""
         ctk.CTkLabel(parent, text=label, text_color=EDITOR_PALETTE["text"]).grid(row=0, column=col, sticky="w", padx=(8 if col else 0, 4))
-        ctk.CTkEntry(parent, textvariable=self.form_vars[key], **toolbar_entry_style()).grid(row=1, column=col, sticky="ew", padx=(8 if col else 0, 4))
+        entry = ctk.CTkEntry(parent, textvariable=self.form_vars[key], **toolbar_entry_style())
+        entry.grid(row=1, column=col, sticky="ew", padx=(8 if col else 0, 4))
         parent.grid_columnconfigure(col, weight=1)
+        return entry
 
     def _labeled_box(self, parent, label: str, height: int):
         """Internal helper for labeled box."""
