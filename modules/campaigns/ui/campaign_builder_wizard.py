@@ -53,7 +53,7 @@ from modules.generic.editor.styles import (
 class CampaignBuilderWizard(ctk.CTkToplevel):
     """Three-step wizard helping GMs structure campaigns and internal arcs."""
 
-    def __init__(self, master, campaign_wrapper, scenario_wrapper):
+    def __init__(self, master, campaign_wrapper, scenario_wrapper, *, modal: bool = True):
         """Initialize the CampaignBuilderWizard instance."""
         super().__init__(master)
         self.title("Campaign Builder Wizard")
@@ -85,7 +85,8 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.bind("<Destroy>", self._on_destroy, add="+")
 
         self.transient(master)
-        self.grab_set()
+        if modal:
+            self.grab_set()
         self.focus_force()
         position_window_at_top(self)
 
