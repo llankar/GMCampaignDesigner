@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.onboarding.tour_models import TourPlacement, TourStep
 
-from .tour_i18n_fr import NEW_GM_ADVANCED_TEXTS, NEW_GM_MVP_TEXTS
+from .tour_i18n_en import NEW_GM_ADVANCED_TEXTS, NEW_GM_MVP_TEXTS
 
 
 def build_new_gm_mvp_steps() -> list[TourStep]:
