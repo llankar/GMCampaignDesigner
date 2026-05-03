@@ -85,8 +85,6 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.bind("<Destroy>", self._on_destroy, add="+")
 
         self.transient(master)
-        if modal:
-            self.grab_set()
         self.focus_force()
         position_window_at_top(self)
 
