@@ -73,6 +73,7 @@ from modules.ui.ambiance.control_window import AmbianceControlWindow
 from modules.ui.ambiance.importer.dialog import AmbianceWallpaperImporterDialog
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
+from app.ui.help.guided_tour_entry import launch_guided_tour
 from modules.events.ui.dock import CalendarDock
 from modules.events.models.event_types import get_event_type
 from modules.events.services.timeline_simulator import CampaignTimelineSimulator
@@ -210,6 +211,7 @@ class MainWindow(ctk.CTk):
         root.bind_all("<Control-i>", self._on_ctrl_i)
         root.bind_all("<Control-I>", self._on_ctrl_i)
         self._bind_global_shortcuts()
+        self._tour_widget_registry = {"btn_new_campaign": self}
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
         # Rebuild colorized UI bits when theme changes
@@ -312,6 +314,14 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(btns, text="Save", command=save).pack(side="right", padx=6)
         ctk.CTkButton(btns, text="Defaults", command=reset_defaults).pack(side="right", padx=6)
         ctk.CTkButton(btns, text="Close", command=top.destroy).pack(side="right", padx=6)
+
+    def launch_guided_tour(self):
+        """Launch guided onboarding tour."""
+        launch_guided_tour(
+            self,
+            self._tour_widget_registry,
+            current_screen_getter=lambda: "main_window",
+        )
 
     # ---------------------------
     # Setup and Layout Methods
@@ -1001,6 +1011,7 @@ class MainWindow(ctk.CTk):
             SidebarItemSpec("world_map", "Open World Map", self.open_world_map),
         ]
         utilities = [
+            SidebarItemSpec("campaign_builder", "Start Guided Tour", self.launch_guided_tour),
             SidebarItemSpec("generate_scenario", "Generate Scenario", self.open_scenario_generator),
             SidebarItemSpec("scenario_builder", "Scenario Builder Wizard", self.open_scenario_builder),
             SidebarItemSpec("campaign_builder", "Campaign Builder Wizard", self.open_campaign_builder),

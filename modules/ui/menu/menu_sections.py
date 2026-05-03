@@ -200,6 +200,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                     title="Reference",
                     helper="keyboard shortcuts and guidance",
                     items=[
+                        _command("Guided Tour", app.launch_guided_tour, icon_key="campaign_builder"),
                         _command(
                             "Shortcuts",
                             lambda: messagebox.showinfo(
