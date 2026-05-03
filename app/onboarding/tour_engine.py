@@ -91,7 +91,9 @@ class TourEngine:
 
     def _try_show_step(self, step: TourStep) -> bool:
         if self._screen_resolver() != step.screen:
-            self._log_skipped_step(step, f"screen '{step.screen}' is not active")
+            reason = f"screen '{step.screen}' is not active"
+            self._log_skipped_step(step, reason)
+            self._notify_unresolved_target(step, reason)
             return False
 
         if step.before_hook:
@@ -100,14 +102,19 @@ class TourEngine:
         resolved = self._widget_locator.resolve(step.screen, step.target_widget_key)
         target_widget = resolved.widget
         if target_widget is None:
-            self._log_skipped_step(step, f"widget '{step.target_widget_key}' not visible")
-            if resolved.message:
-                self._user_notifier(resolved.message)
+            reason = f"widget '{step.target_widget_key}' not visible"
+            self._log_skipped_step(step, reason)
+            self._notify_unresolved_target(step, reason, resolved.message)
             return False
 
         self._overlay.show_highlight(target_widget)
         self._popover.show(step, target_widget)
         return True
+
+
+    def _notify_unresolved_target(self, step: TourStep, reason: str, resolver_message: str | None = None) -> None:
+        message = resolver_message or f"Unable to show guided tour step '{step.id}': {reason}."
+        self._user_notifier(message)
 
     def _log_skipped_step(self, step: TourStep, reason: str) -> None:
         logger.info("Skipping step '%s': %s.", step.id, reason)

@@ -36,6 +36,7 @@ class GuidedTourLauncher:
             widget_resolver,
             screen_resolver=current_screen_getter,
             state_store=TourStateStore(),
+            user_notifier=lambda message: messagebox.showinfo("Guided Tour", message),
         )
         self._engine.start(tour_id)
         return True
