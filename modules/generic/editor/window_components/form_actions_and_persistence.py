@@ -15,8 +15,10 @@ class GenericEditorWindowFormActionsAndPersistence:
         )
         action_bar.pack(fill="x", pady=5)
 
-        ctk.CTkButton(action_bar, text="Cancel", command=self.destroy, **primary_button_style()).pack(side="right", padx=8, pady=8)
-        ctk.CTkButton(action_bar, text="Save", command=self.save, **primary_button_style()).pack(side="right", padx=8, pady=8)
+        self.cancel_button = ctk.CTkButton(action_bar, text="Cancel", command=self.destroy, **primary_button_style())
+        self.cancel_button.pack(side="right", padx=8, pady=8)
+        self.save_button = ctk.CTkButton(action_bar, text="Save", command=self.save, **primary_button_style())
+        self.save_button.pack(side="right", padx=8, pady=8)
         if self.model_wrapper.entity_type== 'scenarios':
             ctk.CTkButton(action_bar, text='Generate Scenario', command=self.generate_scenario, **primary_button_style()).pack(side='left', padx=8, pady=8)
             ctk.CTkButton(action_bar, text='AI Generate Scenario', command=self.ai_generate_full_scenario, **primary_button_style()).pack(side='left', padx=8, pady=8)

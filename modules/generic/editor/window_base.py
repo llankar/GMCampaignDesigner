@@ -80,6 +80,8 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
                 
 
         self.create_action_bar()
+        self._register_tour_widgets()
+        self.bind("<Destroy>", self._on_tour_destroy, add="+")
 
         self.update_idletasks()
         self.geometry("1920x1080+0+0")
@@ -88,6 +90,47 @@ class GenericEditorWindowBase(ctk.CTkToplevel):
         self.bind("<KeyRelease>", self._mark_dirty, add="+")
         # Lazy AI client init
         self._ai_client = None
+
+    def _register_tour_widget_key(self, key: str, widget: object) -> None:
+        """Register editor controls used by guided tours."""
+        if not key or widget is None:
+            return
+        host = self.master
+        while host is not None:
+            register = getattr(host, "register_tour_widget", None)
+            if callable(register):
+                register(f"editor_{self.model_wrapper.entity_type}", key, widget)
+                return
+            host = getattr(host, "master", None)
+
+    def _register_tour_widgets(self) -> None:
+        """Register stable editor targets for onboarding."""
+        self._register_tour_widget_key("input_name", self.field_widgets.get("Name") or self.field_widgets.get("Title"))
+        self._register_tour_widget_key("btn_save", getattr(self, "save_button", None))
+        self._register_tour_widget_key("btn_portrait_add", getattr(self, "portrait_add_button", None))
+        self._register_tour_widget_key("btn_portrait_library", getattr(self, "portrait_library_button", None))
+        self._register_tour_widget_key("btn_portrait_create", getattr(self, "portrait_create_button", None))
+        self._register_tour_widget_key("btn_image_select", getattr(self, "image_select_button", None))
+
+    def _on_tour_destroy(self, event) -> None:
+        """Cleanup editor tour targets when this editor closes."""
+        if event.widget is not self:
+            return
+        host = self.master
+        while host is not None:
+            unregister = getattr(host, "unregister_tour_widget", None)
+            if callable(unregister):
+                for key in (
+                    "input_name",
+                    "btn_save",
+                    "btn_portrait_add",
+                    "btn_portrait_library",
+                    "btn_portrait_create",
+                    "btn_image_select",
+                ):
+                    unregister(f"editor_{self.model_wrapper.entity_type}", key)
+                return
+            host = getattr(host, "master", None)
 
     def _build_edit_title(self, item_type: str) -> str:
         """Display the entity name in the title bar to save vertical UI space."""

@@ -26,8 +26,8 @@ class TourPopover:
         self._step: TourStep | None = None
 
         self._window: tk.Toplevel | None = None
-        self._title_var = tk.StringVar(value="")
-        self._description_var = tk.StringVar(value="")
+        self._title_var: tk.StringVar | None = None
+        self._description_var: tk.StringVar | None = None
 
         self._configure_bind = self._root.bind("<Configure>", self._on_configure, add="+")
 
@@ -36,8 +36,10 @@ class TourPopover:
         self._visible = True
         self._step = step
         self._target_widget = target_widget
-        self._title_var.set(step.title)
-        self._description_var.set(step.description)
+        if self._title_var is not None:
+            self._title_var.set(step.title)
+        if self._description_var is not None:
+            self._description_var.set(step.description)
 
         if self._window is not None:
             self._window.deiconify()
@@ -101,11 +103,15 @@ class TourPopover:
     def _ensure_window(self) -> None:
         if self._window is not None:
             return
+        if getattr(self._root, "tk", None) is None:
+            return
 
         self._window = tk.Toplevel(self._root)
         self._window.withdraw()
         self._window.overrideredirect(True)
         self._window.attributes("-topmost", True)
+        self._title_var = tk.StringVar(master=self._window, value="")
+        self._description_var = tk.StringVar(master=self._window, value="")
 
         card = ttk.Frame(self._window, padding=12, relief="solid", borderwidth=1)
         card.grid(row=0, column=0, sticky="nsew")

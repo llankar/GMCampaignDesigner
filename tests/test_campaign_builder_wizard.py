@@ -249,6 +249,75 @@ def test_double_click_on_arc_preview_opens_selected_arc_editor():
     assert edit_calls["count"] == 1
 
 
+def _make_create_scenario_wizard_stub():
+    wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(
+        campaign_builder_wizard.CampaignBuilderWizard
+    )
+    wizard.arcs = [{"name": "Arc One", "summary": "Arc summary", "objective": "Arc goal"}]
+    wizard.form_vars = {"name": _FakeVar("Stormfront")}
+    wizard.logline_box = _FakeTextBox("A city on the edge.")
+    wizard._get_selected_arc_index = lambda: 0
+    wizard._on_embedded_scenario_created = lambda _payload, _selected_index: None
+    return wizard
+
+
+def test_create_scenario_for_selected_arc_keeps_grab_for_normal_launch(monkeypatch):
+    """Verify normal embedded scenario creation remains modal."""
+    wizard = _make_create_scenario_wizard_stub()
+    created = {}
+
+    class _FakeScenarioBuilderWizard:
+        def __init__(self, master, **kwargs):
+            created["master"] = master
+            created["kwargs"] = kwargs
+            created["grabbed"] = False
+            created["focused"] = False
+
+        def grab_set(self):
+            created["grabbed"] = True
+
+        def focus_force(self):
+            created["focused"] = True
+
+    monkeypatch.setattr(campaign_builder_wizard, "ScenarioBuilderWizard", _FakeScenarioBuilderWizard)
+
+    wizard._create_scenario_for_selected_arc()
+
+    assert created["master"] is wizard
+    assert created["grabbed"] is True
+    assert created["focused"] is True
+    assert created["kwargs"]["mode"] == "embedded"
+
+
+def test_create_scenario_for_selected_arc_does_not_grab_during_guided_tour(monkeypatch):
+    """Verify the guided tour popover remains clickable after opening the scenario wizard."""
+    wizard = _make_create_scenario_wizard_stub()
+    wizard._guided_tour_active = True
+    created = {}
+
+    class _FakeScenarioBuilderWizard:
+        def __init__(self, master, **kwargs):
+            created["master"] = master
+            created["kwargs"] = kwargs
+            created["grabbed"] = False
+            created["focused"] = False
+
+        def grab_set(self):
+            created["grabbed"] = True
+
+        def focus_force(self):
+            created["focused"] = True
+
+    monkeypatch.setattr(campaign_builder_wizard, "ScenarioBuilderWizard", _FakeScenarioBuilderWizard)
+
+    wizard._create_scenario_for_selected_arc()
+
+    assert created["master"] is wizard
+    assert created["grabbed"] is False
+    assert created["focused"] is True
+    assert created["kwargs"]["arc_context"] is wizard.arcs[0]
+
+
 def test_apply_generated_arcs_replaces_existing_arcs_after_ai_success():
     """Verify that apply generated arcs replaces existing arcs after AI success."""
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(

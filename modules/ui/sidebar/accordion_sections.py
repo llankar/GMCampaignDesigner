@@ -28,11 +28,19 @@ class SidebarSectionSpec:
 class SidebarAccordion:
     """Build and manage interactive sidebar sections."""
 
-    def __init__(self, parent, icons, create_icon_button: Callable, tokens: dict | None = None):
+    def __init__(
+        self,
+        parent,
+        icons,
+        create_icon_button: Callable,
+        tokens: dict | None = None,
+        on_item_button_created: Callable[[SidebarItemSpec, object], None] | None = None,
+    ):
         self.parent = parent
         self.icons = icons
         self._create_icon_button = create_icon_button
         self.tokens = tokens or {}
+        self._on_item_button_created = on_item_button_created
         self._sections: list[dict] = []
         self._header_order: list[ctk.CTkButton] = []
         self._active_section = None
@@ -200,6 +208,8 @@ class SidebarAccordion:
                 row, col = divmod(idx, cols)
                 icon = self.icons.get(item.icon_key)
                 btn = self._create_icon_button(group_body, icon, item.tooltip, item.command)
+                if self._on_item_button_created is not None:
+                    self._on_item_button_created(item, btn)
                 btn.grid(row=row, column=col, padx=2, pady=2, sticky="ew")
 
     def _toggle(self, target_meta: dict) -> None:

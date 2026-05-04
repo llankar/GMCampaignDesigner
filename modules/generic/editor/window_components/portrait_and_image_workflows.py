@@ -114,13 +114,20 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         button_frame = ctk.CTkFrame(frame, fg_color="transparent")
         button_frame.pack(pady=2)
 
-        ctk.CTkButton(button_frame, text="Add", **primary_button_style(), command=self.select_portrait).pack(side="left", padx=2)
-        ctk.CTkButton(button_frame, text="Search", **primary_button_style(), command=self.open_portrait_image_browser).pack(side="left", padx=2)
-        ctk.CTkButton(button_frame, text="Image Library", **primary_button_style(), command=self.open_portrait_image_library).pack(side="left", padx=2)
-        ctk.CTkButton(button_frame, text="Paste", **primary_button_style(), command=self.paste_portrait_from_clipboard).pack(side="left", padx=2)
-        ctk.CTkButton(button_frame, text="Create Portrait", **primary_button_style(), command=self.create_portrait_with_swarmui).pack(side="left", padx=2)
-        ctk.CTkButton(button_frame, text="Primary", **primary_button_style(), command=self.set_primary_portrait).pack(side="left", padx=2)
-        ctk.CTkButton(button_frame, text="Remove", **primary_button_style(), command=self.remove_selected_portrait).pack(side="left", padx=2)
+        self.portrait_add_button = ctk.CTkButton(button_frame, text="Add", **primary_button_style(), command=self.select_portrait)
+        self.portrait_add_button.pack(side="left", padx=2)
+        self.portrait_search_button = ctk.CTkButton(button_frame, text="Search", **primary_button_style(), command=self.open_portrait_image_browser)
+        self.portrait_search_button.pack(side="left", padx=2)
+        self.portrait_library_button = ctk.CTkButton(button_frame, text="Image Library", **primary_button_style(), command=self.open_portrait_image_library)
+        self.portrait_library_button.pack(side="left", padx=2)
+        self.portrait_paste_button = ctk.CTkButton(button_frame, text="Paste", **primary_button_style(), command=self.paste_portrait_from_clipboard)
+        self.portrait_paste_button.pack(side="left", padx=2)
+        self.portrait_create_button = ctk.CTkButton(button_frame, text="Create Portrait", **primary_button_style(), command=self.create_portrait_with_swarmui)
+        self.portrait_create_button.pack(side="left", padx=2)
+        self.portrait_primary_button = ctk.CTkButton(button_frame, text="Primary", **primary_button_style(), command=self.set_primary_portrait)
+        self.portrait_primary_button.pack(side="left", padx=2)
+        self.portrait_remove_button = ctk.CTkButton(button_frame, text="Remove", **primary_button_style(), command=self.remove_selected_portrait)
+        self.portrait_remove_button.pack(side="left", padx=2)
 
         helper_label = ctk.CTkLabel(
             frame,
@@ -285,9 +292,12 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         button_frame = ctk.CTkFrame(frame, fg_color="transparent")
         button_frame.pack(pady=5)
 
-        ctk.CTkButton(button_frame, text="Select Image", command=self.select_image, **primary_button_style()).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Use Image Library", command=self.open_image_image_library, **primary_button_style()).pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Paste Image", command=self.paste_image_from_clipboard, **primary_button_style()).pack(side="left", padx=5)
+        self.image_select_button = ctk.CTkButton(button_frame, text="Select Image", command=self.select_image, **primary_button_style())
+        self.image_select_button.pack(side="left", padx=5)
+        self.image_library_button = ctk.CTkButton(button_frame, text="Use Image Library", command=self.open_image_image_library, **primary_button_style())
+        self.image_library_button.pack(side="left", padx=5)
+        self.image_paste_button = ctk.CTkButton(button_frame, text="Paste Image", command=self.paste_image_from_clipboard, **primary_button_style())
+        self.image_paste_button.pack(side="left", padx=5)
         self.field_widgets[field["name"]] = self.image_path
     def open_image_image_library(self):
         """Open internal image library to attach image field."""

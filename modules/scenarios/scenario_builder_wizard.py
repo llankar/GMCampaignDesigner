@@ -1634,6 +1634,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.on_embedded_result = on_embedded_result
         self.persist_on_finish = bool(persist_on_finish)
         self.story_forge = StoryForgeOrchestrator()
+        self._tour_registered_keys: set[tuple[str, str]] = set()
 
         # NOTE: Avoid shadowing the inherited ``state()`` method from Tk by
         # storing wizard data on a dedicated attribute.
@@ -1668,6 +1669,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         self._build_layout()
         self._create_steps()
+        self._register_tour_widgets()
         if initial_scenario:
             try:
                 self.load_existing_scenario(initial_scenario)
@@ -1710,6 +1712,7 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
     def destroy(self):  # pragma: no cover - UI teardown
         """Handle destroy."""
+        self._unregister_tour_widgets()
         self._schedule_safe_destroy()
 
     def focus_set(self):  # pragma: no cover - UI focus handling
@@ -1776,6 +1779,44 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
         self.cancel_btn.grid(row=0, column=3, padx=10, pady=10, sticky="ew")
         self.story_forge_btn = ctk.CTkButton(nav, text="Story Forge Draft", command=self._run_story_forge)
         self.story_forge_btn.grid(row=0, column=4, padx=10, pady=10, sticky="ew")
+
+    def _register_tour_widget_key(self, key: str, widget: object, *, screen: str = "scenario_builder") -> None:
+        """Register a guided-tour target with the nearest host registry."""
+        if not key or widget is None:
+            return
+        host = self.master
+        while host is not None:
+            register = getattr(host, "register_tour_widget", None)
+            if callable(register):
+                register(screen, key, widget)
+                self._tour_registered_keys.add((screen, key))
+                return
+            host = getattr(host, "master", None)
+
+    def _register_tour_widgets(self) -> None:
+        """Register stable controls used by the first-use guided tour."""
+        self._register_tour_widget_key("btn_scenario_next", getattr(self, "next_btn", None))
+        self._register_tour_widget_key("btn_scenario_finish", getattr(self, "finish_btn", None))
+        self._register_tour_widget_key("btn_story_forge", getattr(self, "story_forge_btn", None))
+        planning_step = self.steps[0][1] if getattr(self, "steps", None) else None
+        self._register_tour_widget_key(
+            "input_scenario_title",
+            getattr(planning_step, "scenario_title_entry", None),
+        )
+        self._register_tour_widget_key("btn_scenario_notes", getattr(planning_step, "notes_btn", None))
+        self._register_tour_widget_key("scenario_planning_mode", getattr(planning_step, "mode_switch", None))
+
+    def _unregister_tour_widgets(self) -> None:
+        """Remove guided-tour targets owned by this wizard."""
+        host = self.master
+        while host is not None:
+            unregister = getattr(host, "unregister_tour_widget", None)
+            if callable(unregister):
+                for screen, key in tuple(self._tour_registered_keys):
+                    unregister(screen, key)
+                self._tour_registered_keys.clear()
+                return
+            host = getattr(host, "master", None)
 
     def _create_steps(self):  # pragma: no cover - UI layout
         """Create steps."""

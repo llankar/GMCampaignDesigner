@@ -205,6 +205,7 @@ class MainWindow(ctk.CTk):
         self._busy_modal = None
         self._system_selector_dialog = None
         self._database_manager_dialog = None
+        self._campaign_builder_wizard = None
         self._update_thread = None
         self.whiteboard_controller = None
         root = self.winfo_toplevel()
@@ -214,6 +215,9 @@ class MainWindow(ctk.CTk):
         self._bind_global_shortcuts()
         self._tour_widget_registry = TourWidgetRegistry()
         self.register_tour_widget("main_window", "btn_new_campaign", self)
+        self.register_tour_widget("main_window", "btn_open_npcs", self)
+        self.register_tour_widget("main_window", "btn_open_places", self)
+        self.register_tour_widget("main_window", "btn_open_scenario_builder", self)
 
         self._system_listener_unsub = register_system_change_listener(self._on_system_changed)
         # Rebuild colorized UI bits when theme changes
@@ -327,23 +331,104 @@ class MainWindow(ctk.CTk):
 
     def launch_guided_tour(self):
         """Launch guided onboarding tour."""
-        self.open_campaign_builder(guided_tour_active=True)
-        launch_guided_tour(
+        wizard = self.open_campaign_builder(guided_tour_active=True)
+        if wizard is None:
+            return False
+        setattr(wizard, "_guided_tour_active", True)
+        self._activate_tour_window(wizard)
+        self._flush_tour_host()
+        started = launch_guided_tour(
             self,
             self._tour_widget_registry.resolver(),
             current_screen_getter=self._resolve_tour_screen,
+            on_stop=self._clear_guided_tour_campaign_builder_state,
         )
+        if not started:
+            self._clear_guided_tour_campaign_builder_state()
+        return started
+
+    def _clear_guided_tour_campaign_builder_state(self) -> None:
+        """Clear transient Campaign Builder tour state after the tour ends."""
+        wizard = getattr(self, "_campaign_builder_wizard", None)
+        if wizard is not None and getattr(wizard, "_guided_tour_active", False):
+            setattr(wizard, "_guided_tour_active", False)
 
     def _resolve_tour_screen(self) -> str:
         """Resolve which UI screen is currently active for guided tours."""
-        for child in reversed(self.winfo_children()):
+        def _iter_visible_toplevels(widget):
             try:
-                if child.winfo_exists() and child.winfo_viewable() and child.wm_state() != "withdrawn":
-                    if child.__class__.__name__ == "CampaignBuilderWizard":
-                        return "campaign_builder"
+                children = widget.winfo_children()
+            except Exception:
+                return
+            for child in reversed(children):
+                try:
+                    if child.winfo_exists() and child.winfo_viewable():
+                        yield from _iter_visible_toplevels(child)
+                        yield child
+                except Exception:
+                    continue
+
+        for child in _iter_visible_toplevels(self):
+            try:
+                if hasattr(child, "wm_state") and child.wm_state() == "withdrawn":
+                    continue
+                if child.__class__.__name__ == "ScenarioBuilderWizard":
+                    return "scenario_builder"
+                if child.__class__.__name__ == "GenericEditorWindow":
+                    entity_type = getattr(getattr(child, "model_wrapper", None), "entity_type", "")
+                    if entity_type:
+                        return f"editor_{entity_type}"
+                if child.__class__.__name__ == "CampaignBuilderWizard":
+                    return "campaign_builder"
             except Exception:
                 continue
+        campaign_builder = getattr(self, "_campaign_builder_wizard", None)
+        if self._is_tour_window_available(campaign_builder):
+            return "campaign_builder"
+        current_entity = getattr(self, "current_open_entity", None)
+        if current_entity:
+            return f"entity_{current_entity}"
         return "main_window"
+
+    @staticmethod
+    def _is_tour_window_available(window) -> bool:
+        """Return whether a tour-owned toplevel exists and is not hidden."""
+        if window is None:
+            return False
+        try:
+            exists = getattr(window, "winfo_exists", None)
+            if callable(exists) and not exists():
+                return False
+            viewable = getattr(window, "winfo_viewable", None)
+            if callable(viewable) and viewable():
+                return True
+            state = getattr(window, "wm_state", None)
+            if callable(state) and state() in {"withdrawn", "iconic"}:
+                return False
+        except Exception:
+            return False
+        return True
+
+    @staticmethod
+    def _activate_tour_window(window) -> None:
+        """Make a tour-owned toplevel visible before resolving tour targets."""
+        for method_name in ("deiconify", "lift", "focus_force", "update_idletasks", "update"):
+            method = getattr(window, method_name, None)
+            if callable(method):
+                try:
+                    method()
+                except Exception:
+                    continue
+
+    def _flush_tour_host(self) -> None:
+        """Flush pending Tk work before resolving the first guided-tour step."""
+        for method_name in ("update_idletasks", "update"):
+            method = getattr(self, method_name, None)
+            if callable(method):
+                try:
+                    method()
+                except Exception:
+                    continue
 
     # ---------------------------
     # Setup and Layout Methods
@@ -1068,8 +1153,20 @@ class MainWindow(ctk.CTk):
             icons=self.icons,
             create_icon_button=create_icon_button,
             tokens=theme_manager.get_tokens(),
+            on_item_button_created=self._register_sidebar_tour_button,
         )
         self._sidebar_accordion.build(specs, default_title=default_title)
+
+    def _register_sidebar_tour_button(self, item, button) -> None:
+        """Register sidebar buttons that are stable guided-tour targets."""
+        tour_key_by_icon = {
+            "entity::npcs": "btn_open_npcs",
+            "entity::places": "btn_open_places",
+            "scenario_builder": "btn_open_scenario_builder",
+        }
+        tour_key = tour_key_by_icon.get(getattr(item, "icon_key", ""))
+        if tour_key:
+            self.register_tour_widget("main_window", tour_key, button)
 
     def _campaign_db_mtime(self) -> float | None:
         """Return campaign database modification time when available."""
@@ -3678,6 +3775,12 @@ class MainWindow(ctk.CTk):
             # Keep campaign builder resilient if this step fails.
             from modules.campaigns.ui.campaign_builder_wizard import CampaignBuilderWizard
 
+            existing_wizard = getattr(self, "_campaign_builder_wizard", None)
+            if guided_tour_active and self._is_tour_window_available(existing_wizard):
+                setattr(existing_wizard, "_guided_tour_active", True)
+                self._activate_tour_window(existing_wizard)
+                return existing_wizard
+
             campaign_wrapper = self.entity_wrappers.get("campaigns") or GenericModelWrapper("campaigns")
             self.entity_wrappers.setdefault("campaigns", campaign_wrapper)
 
@@ -3690,15 +3793,28 @@ class MainWindow(ctk.CTk):
                 scenario_wrapper=scenario_wrapper,
                 modal=False,
             )
+            self._campaign_builder_wizard = wizard
+            wizard.bind(
+                "<Destroy>",
+                lambda event, tracked=wizard: self._forget_campaign_builder_wizard(event, tracked),
+                add="+",
+            )
             if not guided_tour_active:
                 wizard.grab_set()
-            wizard.focus_force()
+            self._activate_tour_window(wizard)
+            return wizard
         except Exception as exc:
             log_exception(
                 f"Failed to open Campaign Builder Wizard: {exc}",
                 func_name="main_window.MainWindow.open_campaign_builder",
             )
             messagebox.showerror("Error", f"Failed to open Campaign Builder:\n{exc}")
+            return None
+
+    def _forget_campaign_builder_wizard(self, event, tracked_wizard) -> None:
+        """Clear the tracked Campaign Builder window after it closes."""
+        if event.widget is tracked_wizard and getattr(self, "_campaign_builder_wizard", None) is tracked_wizard:
+            self._campaign_builder_wizard = None
 
     def _build_hidden_main_content(self, host_parent, content_factory):
         """Build a heavy content view off-screen, then let the caller display it once ready."""

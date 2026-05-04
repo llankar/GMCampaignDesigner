@@ -36,6 +36,7 @@ def test_menu_sections_expose_image_library_commands() -> None:
         open_scenario_generator=lambda: None,
         open_scenario_builder=lambda: None,
         open_campaign_builder=lambda: None,
+        launch_guided_tour=lambda: None,
         preview_and_export_scenarios=lambda: None,
         open_campaign_dossier_exporter=lambda: None,
         open_scenario_importer=lambda: None,

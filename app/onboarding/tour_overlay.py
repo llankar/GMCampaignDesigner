@@ -70,6 +70,8 @@ class TourOverlay:
     def _ensure_overlay(self) -> None:
         if self._overlay_window is not None and self._canvas is not None:
             return
+        if getattr(self._root, "tk", None) is None:
+            return
 
         self._overlay_window = tk.Toplevel(self._root)
         self._overlay_window.overrideredirect(True)

@@ -515,9 +515,10 @@ class GenericListView(ctk.CTkFrame):
         ctk.CTkButton(self.search_frame, text="Filter",
             command=lambda: self.filter_items(self.search_var.get()))\
         .pack(side="left", padx=5)
-        ctk.CTkButton(self.search_frame, text="Add",
-            command=self.add_item)\
-        .pack(side="left", padx=5)
+        self.add_button = ctk.CTkButton(self.search_frame, text="Add",
+            command=self.add_item)
+        self.add_button.pack(side="left", padx=5)
+        self._register_tour_widget_key("btn_add_entity", self.add_button)
         ctk.CTkButton(self.search_frame, text="Merge Duplicates",
             command=self.merge_duplicate_entities)\
         .pack(side="left", padx=5)
@@ -3389,6 +3390,15 @@ class GenericListView(ctk.CTkFrame):
             layout_manager=layout_manager,
         )
         view.pack(fill="both", expand=True)
+
+    def _register_tour_widget_key(self, key: str, widget: object) -> None:
+        """Register list-view controls for guided tours when a host is available."""
+        if not key or widget is None:
+            return
+        host = self.winfo_toplevel()
+        register = getattr(host, "register_tour_widget", None)
+        if callable(register):
+            register(f"entity_{self.model_wrapper.entity_type}", key, widget)
 
     def add_item(self):
         """Handle add item."""

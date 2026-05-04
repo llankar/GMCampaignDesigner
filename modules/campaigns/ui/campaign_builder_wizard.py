@@ -227,8 +227,10 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         row3.grid_columnconfigure(1, weight=1)
 
         self.logline_box = self._labeled_box(form_body, "Logline", 90)
+        self._register_tour_widget_key("input_campaign_logline", self.logline_box)
         self.setting_box = self._labeled_box(form_body, "Setting", 100)
         self.objective_box = self._labeled_box(form_body, "Main Objective", 90)
+        self._register_tour_widget_key("input_campaign_objective", self.objective_box)
         self.stakes_box = self._labeled_box(form_body, "Stakes", 90)
         self.themes_box = self._labeled_box(form_body, "Themes (one per line)", 80)
         self.notes_box = self._labeled_box(form_body, "Notes", 90)
@@ -434,6 +436,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             command=self._create_scenario_for_selected_arc,
             **primary_button_style(),
         )
+        self._register_tour_widget_key("btn_create_scenario_for_arc", self.create_scenario_btn)
         self.move_up_btn = ctk.CTkButton(tools_buttons, text="Move Up", command=self._move_arc_up, **primary_button_style())
         self.move_down_btn = ctk.CTkButton(tools_buttons, text="Move Down", command=self._move_arc_down, **primary_button_style())
         self.duplicate_arc_btn = ctk.CTkButton(tools_buttons, text="Duplicate", command=self._duplicate_selected_arc, **primary_button_style())
@@ -485,9 +488,16 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         if self._tour_keys_registered:
             return
         self._register_tour_widget_key("input_campaign_name", getattr(self, "campaign_name_entry", None))
+        self._register_tour_widget_key("input_campaign_logline", getattr(self, "logline_box", None))
+        self._register_tour_widget_key("input_campaign_objective", getattr(self, "objective_box", None))
         self._register_tour_widget_key("btn_wizard_next", getattr(self, "next_btn", None))
         self._register_tour_widget_key("btn_finalize_campaign", getattr(self, "next_btn", None))
         self._register_tour_widget_key("btn_add_arc", getattr(self, "add_arc_btn", None))
+        self._register_tour_widget_key("btn_create_scenario_for_arc", getattr(self, "create_scenario_btn", None))
+        arc_form = getattr(self, "arc_detail_form", None)
+        self._register_tour_widget_key("input_arc_name", getattr(arc_form, "name_entry", None))
+        self._register_tour_widget_key("input_arc_summary", getattr(arc_form, "summary_box", None))
+        self._register_tour_widget_key("input_arc_objective", getattr(arc_form, "objective_box", None))
         self._tour_keys_registered = True
 
     def _unregister_tour_widgets(self):
@@ -505,6 +515,18 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         """Cleanup shared guided-tour registrations when dialog is destroyed."""
         if event.widget is self:
             self._unregister_tour_widgets()
+
+    def register_tour_widget(self, screen: str, key: str, widget):
+        """Forward guided-tour registrations from child dialogs to the app host."""
+        register = getattr(self.master, "register_tour_widget", None)
+        if callable(register):
+            register(screen, key, widget)
+
+    def unregister_tour_widget(self, screen: str, key: str):
+        """Forward guided-tour unregistrations from child dialogs to the app host."""
+        unregister = getattr(self.master, "unregister_tour_widget", None)
+        if callable(unregister):
+            unregister(screen, key)
 
     def _build_review_step(self, parent):
         """Build review step."""
@@ -611,8 +633,13 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             persist_on_finish=True,
             on_embedded_result=_on_embedded_result,
         )
-        wizard.grab_set()
+        if not self._is_guided_tour_active():
+            wizard.grab_set()
         wizard.focus_force()
+
+    def _is_guided_tour_active(self) -> bool:
+        """Return whether this campaign builder is hosting the guided tour."""
+        return bool(getattr(self, "_guided_tour_active", False))
 
     def _on_embedded_scenario_created(self, payload: dict, arc_index: int):
         """Handle embedded scenario created."""

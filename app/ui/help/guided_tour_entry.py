@@ -22,7 +22,15 @@ class GuidedTourLauncher:
             return lambda _screen, key: widget_registry.get(key)
         raise TypeError("widget_registry must be callable or mapping-like")
 
-    def launch_guided_tour(self, root_window, widget_registry, current_screen_getter, *, tour_id: str = DEFAULT_TOUR_ID) -> bool:
+    def launch_guided_tour(
+        self,
+        root_window,
+        widget_registry,
+        current_screen_getter,
+        *,
+        tour_id: str = DEFAULT_TOUR_ID,
+        on_stop=None,
+    ) -> bool:
         if self._engine is not None and getattr(self._engine, "_tour_id", None):
             return False
         tours = build_tour_registry()
@@ -37,6 +45,7 @@ class GuidedTourLauncher:
             screen_resolver=current_screen_getter,
             state_store=TourStateStore(),
             user_notifier=lambda message: messagebox.showinfo("Guided Tour", message),
+            on_stop=on_stop,
         )
         self._engine.start(tour_id)
         return True
@@ -45,5 +54,5 @@ class GuidedTourLauncher:
 _launcher = GuidedTourLauncher()
 
 
-def launch_guided_tour(root_window, widget_registry, current_screen_getter):
-    return _launcher.launch_guided_tour(root_window, widget_registry, current_screen_getter)
+def launch_guided_tour(root_window, widget_registry, current_screen_getter, *, on_stop=None):
+    return _launcher.launch_guided_tour(root_window, widget_registry, current_screen_getter, on_stop=on_stop)
