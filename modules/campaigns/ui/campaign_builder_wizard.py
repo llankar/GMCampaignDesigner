@@ -78,6 +78,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self._generation_defaults_service = CampaignGenerationDefaultsService()
         self.generation_defaults = self._generation_defaults_service.load()
         self._tour_keys_registered = False
+        self._tour_registered_keys: set[str] = set()
 
         self._build_layout()
         self._show_step(0)
@@ -130,6 +131,8 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         self.back_btn = ctk.CTkButton(nav, text="Back", command=self._go_back, **primary_button_style())
         self.back_btn.pack(side="left")
         self.next_btn = ctk.CTkButton(nav, text="Next", command=self._go_next, **primary_button_style())
+        self._register_tour_widget_key("btn_wizard_next", self.next_btn)
+        self._register_tour_widget_key("btn_finalize_campaign", self.next_btn)
         self.next_btn.pack(side="right", padx=6)
         self.cancel_btn = ctk.CTkButton(
             nav,
@@ -196,6 +199,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         row1 = ctk.CTkFrame(form_body, fg_color="transparent")
         row1.pack(fill="x", pady=4)
         self.campaign_name_entry = self._labeled_entry(row1, "Campaign Name", "name", 0)
+        self._register_tour_widget_key("input_campaign_name", self.campaign_name_entry)
         self._labeled_entry(row1, "Genre", "genre", 1)
 
         row2 = ctk.CTkFrame(form_body, fg_color="transparent")
@@ -375,6 +379,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         left_header.grid(row=0, column=0, sticky="ew", padx=(0, 8), pady=(0, 6))
         ctk.CTkLabel(left_header, text="Arc Library", font=("Arial", 14, "bold")).pack(side="left")
         self.add_arc_btn = ctk.CTkButton(left_header, text="+ New Arc", width=120, command=self._add_arc, **primary_button_style())
+        self._register_tour_widget_key("btn_add_arc", self.add_arc_btn)
         self.add_arc_btn.pack(side="right")
 
         self.arc_search_var = ctk.StringVar()
@@ -467,17 +472,22 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
         return frame
 
+    def _register_tour_widget_key(self, key: str, widget: object) -> None:
+        """Register a single guided-tour key for this wizard when widget exists."""
+        register = getattr(self.master, "register_tour_widget", None)
+        if not callable(register) or not key or widget is None:
+            return
+        register("campaign_builder", key, widget)
+        self._tour_registered_keys.add(key)
+
     def _register_tour_widgets(self):
         """Register guided-tour widgets in the shared host registry."""
         if self._tour_keys_registered:
             return
-        register = getattr(self.master, "register_tour_widget", None)
-        if not callable(register):
-            return
-        register("campaign_builder", "input_campaign_name", getattr(self, "campaign_name_entry", None))
-        register("campaign_builder", "btn_wizard_next", self.next_btn)
-        register("campaign_builder", "btn_add_arc", getattr(self, "add_arc_btn", None))
-        register("campaign_builder", "btn_save_campaign", self.next_btn)
+        self._register_tour_widget_key("input_campaign_name", getattr(self, "campaign_name_entry", None))
+        self._register_tour_widget_key("btn_wizard_next", getattr(self, "next_btn", None))
+        self._register_tour_widget_key("btn_finalize_campaign", getattr(self, "next_btn", None))
+        self._register_tour_widget_key("btn_add_arc", getattr(self, "add_arc_btn", None))
         self._tour_keys_registered = True
 
     def _unregister_tour_widgets(self):
@@ -486,10 +496,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             return
         unregister = getattr(self.master, "unregister_tour_widget", None)
         if callable(unregister):
-            unregister("campaign_builder", "input_campaign_name")
-            unregister("campaign_builder", "btn_wizard_next")
-            unregister("campaign_builder", "btn_add_arc")
-            unregister("campaign_builder", "btn_save_campaign")
+            for key in tuple(self._tour_registered_keys):
+                unregister("campaign_builder", key)
+        self._tour_registered_keys.clear()
         self._tour_keys_registered = False
 
     def _on_destroy(self, event):
