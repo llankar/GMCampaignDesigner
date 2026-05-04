@@ -4,56 +4,65 @@ from __future__ import annotations
 
 from app.onboarding.tour_models import TourPlacement, TourStep
 
+from .campaign_creation_contract import (
+    ENTER_CAMPAIGN_NAME,
+    FINALIZE_CAMPAIGN,
+    GO_TO_ARCS,
+    GO_TO_REVIEW,
+    MANAGE_ARCS_OPTIONAL,
+    OPEN_WIZARD,
+)
+
 
 def build_campaign_setup_steps() -> list[TourStep]:
     """Return an immutable definition of steps for the campaign setup tour."""
     return [
         TourStep(
             id="campaign_setup.open_wizard",
-            screen="main_window",
-            target_widget_key="btn_new_campaign",
+            screen=OPEN_WIZARD.screen,
+            target_widget_key=OPEN_WIZARD.widget_key,
             title="Open Campaign Builder",
-            description="Click \"New campaign\" to open the Campaign Builder Wizard.",
+            description=OPEN_WIZARD.expected_user_action,
             placement=TourPlacement.RIGHT,
         ),
         TourStep(
             id="campaign_setup.foundation_name",
-            screen="campaign_builder",
-            target_widget_key="input_campaign_name",
+            screen=ENTER_CAMPAIGN_NAME.screen,
+            target_widget_key=ENTER_CAMPAIGN_NAME.widget_key,
             title="Step 1: Campaign Name",
-            description="In \"Campaign Foundation\", enter a value in \"Campaign Name\" (required).",
+            description=ENTER_CAMPAIGN_NAME.expected_user_action,
             placement=TourPlacement.BOTTOM,
         ),
         TourStep(
             id="campaign_setup.foundation_next",
-            screen="campaign_builder",
-            target_widget_key="btn_wizard_next",
+            screen=GO_TO_ARCS.screen,
+            target_widget_key=GO_TO_ARCS.widget_key,
             title="Go to step 2",
-            description="Click \"Next\" to continue to the arcs step.",
+            description=GO_TO_ARCS.expected_user_action,
             placement=TourPlacement.LEFT,
         ),
         TourStep(
             id="campaign_setup.arcs_manage",
-            screen="campaign_builder",
-            target_widget_key="btn_add_arc",
+            screen=MANAGE_ARCS_OPTIONAL.screen,
+            target_widget_key=MANAGE_ARCS_OPTIONAL.widget_key,
             title="Step 2: Manage arcs (optional)",
-            description="Use \"+ New Arc\" only if you want to add or edit arcs. This is optional for saving the campaign.",
+            description=MANAGE_ARCS_OPTIONAL.expected_user_action,
             placement=TourPlacement.LEFT,
         ),
         TourStep(
             id="campaign_setup.arcs_next",
-            screen="campaign_builder",
-            target_widget_key="btn_wizard_next",
+            screen=GO_TO_REVIEW.screen,
+            target_widget_key=GO_TO_REVIEW.widget_key,
             title="Go to review",
-            description="Click \"Next\" to open step 3 (Review).",
+            description=GO_TO_REVIEW.expected_user_action,
             placement=TourPlacement.LEFT,
         ),
         TourStep(
             id="campaign_setup.review_finalize",
-            screen="campaign_builder",
-            target_widget_key="btn_save_campaign",
+            screen=FINALIZE_CAMPAIGN.screen,
+            target_widget_key=FINALIZE_CAMPAIGN.widget_key,
             title="Step 3: Final action",
-            description="On the Review step, click \"Save Campaign\" to finalize.",
+            description=FINALIZE_CAMPAIGN.expected_user_action,
             placement=TourPlacement.LEFT,
         ),
     ]
