@@ -475,7 +475,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         if not callable(register):
             return
         register("campaign_builder", "input_campaign_name", getattr(self, "campaign_name_entry", None))
-        register("campaign_builder", "btn_create_campaign", self.next_btn)
+        register("campaign_builder", "btn_wizard_next", self.next_btn)
+        register("campaign_builder", "btn_add_arc", getattr(self, "add_arc_btn", None))
+        register("campaign_builder", "btn_save_campaign", self.next_btn)
         self._tour_keys_registered = True
 
     def _unregister_tour_widgets(self):
@@ -485,7 +487,9 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
         unregister = getattr(self.master, "unregister_tour_widget", None)
         if callable(unregister):
             unregister("campaign_builder", "input_campaign_name")
-            unregister("campaign_builder", "btn_create_campaign")
+            unregister("campaign_builder", "btn_wizard_next")
+            unregister("campaign_builder", "btn_add_arc")
+            unregister("campaign_builder", "btn_save_campaign")
         self._tour_keys_registered = False
 
     def _on_destroy(self, event):
