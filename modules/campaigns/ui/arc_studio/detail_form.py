@@ -34,6 +34,7 @@ class ArcDetailForm(ctk.CTkFrame):
 
         self.name_entry = ctk.CTkEntry(row, textvariable=self.name_var, **toolbar_entry_style())
         self.name_entry.grid(row=1, column=0, sticky="ew", pady=(2, 8))
+        self.name_entry.bind("<space>", self._allow_space_character, add="+")
         self.status_menu = ctk.CTkOptionMenu(
             row,
             variable=self.status_var,
@@ -176,6 +177,13 @@ class ArcDetailForm(ctk.CTkFrame):
             "status": canonicalize_arc_status(self.status_var.get()),
             "scenarios": list(self._scenario_items),
         }
+
+
+    def _allow_space_character(self, _event):
+        """Allow typing spaces even if parent-level bindings consume them."""
+        self.name_entry.insert(tk.INSERT, " ")
+        self._notify_change()
+        return "break"
 
     def _notify_change(self):
         """Notify change."""
