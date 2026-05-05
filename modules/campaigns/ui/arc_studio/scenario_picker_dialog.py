@@ -30,6 +30,7 @@ class ScenarioPickerDialog(ctk.CTkToplevel):
         self.transient(master)
         self.grab_set()
         self.focus_force()
+        self.after(0, self._focus_search_entry)
         position_window_at_top(self)
 
     def _build_ui(self) -> None:
@@ -88,6 +89,14 @@ class ScenarioPickerDialog(ctk.CTkToplevel):
         ).grid(row=0, column=1, padx=(8, 0))
         self.add_button = ctk.CTkButton(button_row, text="Add", command=self._confirm_selection, **primary_button_style())
         self.add_button.grid(row=0, column=2, padx=(8, 0))
+
+    def _focus_search_entry(self) -> None:
+        """Place keyboard focus in the search field when dialog opens."""
+        try:
+            self.search_entry.focus_set()
+            self.search_entry.icursor("end")
+        except Exception:
+            return
 
     def _refresh_list(self) -> None:
         """Refresh list."""
