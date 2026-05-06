@@ -20,7 +20,9 @@ from src.ui.validation.dialogs.missing_reference_dialog import (
     MissingReferenceDialogConfig,
     open_missing_reference_dialog,
 )
-from src.ui.validation.dialogs.validation_summary_dialog import open_validation_summary_dialog
+from src.ui.validation.dialogs.validation_summary_dialog import (
+    open_validation_summary_dialog,
+)
 from src.ui.validation.progress import ValidationScanProgress
 from src.ui.validation.validation_wizard_controller import (
     ValidationWizardAction,
@@ -58,7 +60,9 @@ class CampaignValidationRun:
 class CampaignHierarchyValidationLauncher:
     """Instantiate the hierarchy validator and drive the validation wizard UI."""
 
-    def __init__(self, app: Any, *, campaign_selector: CampaignSelector | None = None) -> None:
+    def __init__(
+        self, app: Any, *, campaign_selector: CampaignSelector | None = None
+    ) -> None:
         self.app = app
         self._campaign_selector = campaign_selector or open_campaign_selector_dialog
         self._active_run: CampaignValidationRun | None = None
@@ -94,7 +98,9 @@ class CampaignHierarchyValidationLauncher:
                 self._handle_step(None, step)
                 return None
 
-            selected_campaign = self._resolve_campaign_selection(campaign, entity_wrappers)
+            selected_campaign = self._resolve_campaign_selection(
+                campaign, entity_wrappers
+            )
             if selected_campaign is None:
                 step = validation_setup_failed_step(
                     "Campagne requise",
@@ -115,7 +121,6 @@ class CampaignHierarchyValidationLauncher:
             )
             progress.set_phase("Checking references…")
             graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
-            diagnostics = graph.diagnostics
             controller = ValidationWizardController(
                 _wizard_items(graph),
                 campaign=selected_campaign.item,
@@ -128,10 +133,7 @@ class CampaignHierarchyValidationLauncher:
                 ),
                 started_at=started_at,
             )
-            log_info(
-                f"Campaign validation traversal metrics: {diagnostics.debug_summary}",
-                func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
-            )
+            _log_validation_diagnostics(graph)
             first_step = controller.start()
             run = CampaignValidationRun(
                 campaign=selected_campaign,
@@ -192,7 +194,11 @@ class CampaignHierarchyValidationLauncher:
         if step.status == ValidationWizardStatus.SETUP_FAILED:
             from tkinter import messagebox
 
-            title = step.setup_failure.title if step.setup_failure else "Validation impossible"
+            title = (
+                step.setup_failure.title
+                if step.setup_failure
+                else "Validation impossible"
+            )
             messagebox.showerror(title, step.message)
             return
 
@@ -244,11 +250,15 @@ class CampaignHierarchyValidationLauncher:
             "Cohérence hiérarchique",
             f"{step.message}\n\nIgnorer cette anomalie pour cette session ?",
         ):
-            next_step = run.controller.submit_action(ValidationWizardAction.SKIP_SESSION)
+            next_step = run.controller.submit_action(
+                ValidationWizardAction.SKIP_SESSION
+            )
             self._handle_step(run, next_step)
 
 
-def load_campaign_options(entity_wrappers: Mapping[str, Any]) -> tuple[CampaignSelectorOption, ...]:
+def load_campaign_options(
+    entity_wrappers: Mapping[str, Any],
+) -> tuple[CampaignSelectorOption, ...]:
     """Load selectable campaigns from the explicit campaigns wrapper."""
 
     wrapper = entity_wrappers.get("campaigns")
@@ -314,7 +324,34 @@ def build_campaign_validation_hierarchy(
     return root
 
 
-def _wizard_items(graph: ReferenceValidationResult) -> tuple[ValidationWizardIssue, ...]:
+def _log_validation_diagnostics(graph: ReferenceValidationResult) -> None:
+    """Log validator-owned traversal diagnostics for QA and troubleshooting."""
+
+    diagnostics = graph.diagnostics
+    log_info(
+        (
+            "Campaign validation graph diagnostics: "
+            f"{graph.debug_summary}; "
+            f"entities_visited={len(graph.entities)}; "
+            f"references_checked={len(graph.references)}"
+        ),
+        func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
+    )
+    log_info(
+        (
+            "Campaign validation visited nodes: "
+            f"campaigns={diagnostics.visited_campaigns}; "
+            f"arcs={diagnostics.visited_arcs}; "
+            f"scenarios={diagnostics.visited_scenarios}; "
+            f"references={diagnostics.visited_references}"
+        ),
+        func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
+    )
+
+
+def _wizard_items(
+    graph: ReferenceValidationResult,
+) -> tuple[ValidationWizardIssue, ...]:
     return tuple(
         ValidationWizardIssue(
             issue=issue,
@@ -349,7 +386,9 @@ def _safe_load_items(wrapper: Any) -> Sequence[Any]:
     return ()
 
 
-def _normalize_entity_node(slug: str, item: Mapping[str, Any], index: int) -> dict[str, Any]:
+def _normalize_entity_node(
+    slug: str, item: Mapping[str, Any], index: int
+) -> dict[str, Any]:
     entity_type = _singular_entity_type(slug)
     node = normalize_validator_reference_fields(entity_type, item)
     identifier = _identifier_for(node, slug, index)

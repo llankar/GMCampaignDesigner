@@ -154,7 +154,9 @@ def test_launcher_opens_selector_for_global_action_and_passes_campaign(monkeypat
         selector_options.extend(campaigns)
         return campaigns[0]
 
-    launcher = CampaignHierarchyValidationLauncher(FakeApp(wrappers), campaign_selector=selector)
+    launcher = CampaignHierarchyValidationLauncher(
+        FakeApp(wrappers), campaign_selector=selector
+    )
 
     run = launcher.launch()
 
@@ -230,7 +232,9 @@ def test_launcher_aborts_when_no_campaigns_exist(monkeypatch):
         "tkinter.messagebox.showerror",
         lambda title, message: messages.append((title, message)),
     )
-    launcher = CampaignHierarchyValidationLauncher(FakeApp({"campaigns": FakeWrapper([])}))
+    launcher = CampaignHierarchyValidationLauncher(
+        FakeApp({"campaigns": FakeWrapper([])})
+    )
 
     assert launcher.launch() is None
     assert launcher.active_run is None
@@ -315,9 +319,14 @@ def test_launcher_reports_bootstrap_exception_without_summary(monkeypatch):
 
 def test_launcher_summary_includes_scan_metrics(monkeypatch):
     summaries = []
+    log_messages = []
     monkeypatch.setattr(
         "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
         lambda _master, summary: summaries.append(summary),
+    )
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.log_info",
+        lambda message, **_kwargs: log_messages.append(message),
     )
     launcher = CampaignHierarchyValidationLauncher(
         FakeApp(
@@ -338,6 +347,19 @@ def test_launcher_summary_includes_scan_metrics(monkeypatch):
     assert summary.metrics.entities_visited == len(run.graph.entities) == 4
     assert summary.metrics.references_checked == len(run.graph.references) == 1
     assert summary.metrics.elapsed_seconds >= 0
+    assert any(run.graph.debug_summary in message for message in log_messages)
+    assert any(
+        "entities_visited=4" in message and "references_checked=1" in message
+        for message in log_messages
+    )
+    diagnostics = run.graph.diagnostics
+    assert any(
+        f"campaigns={diagnostics.visited_campaigns}" in message
+        and f"arcs={diagnostics.visited_arcs}" in message
+        and f"scenarios={diagnostics.visited_scenarios}" in message
+        and f"references={diagnostics.visited_references}" in message
+        for message in log_messages
+    )
 
 
 def test_build_campaign_validation_hierarchy_reports_lightweight_phases():
