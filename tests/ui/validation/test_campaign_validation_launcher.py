@@ -211,10 +211,10 @@ def test_launcher_aborts_cleanly_when_user_cancels_selection(monkeypatch):
     assert summaries == []
     assert messages == [
         (
-            "Campagne requise",
+            "Campaign required",
             (
-                "Aucune campagne n’a été sélectionnée pour la validation. "
-                "Sélectionnez une campagne active, puis relancez la validation."
+                "No campaign was selected for validation. "
+                "Select an active campaign, then run validation again."
             ),
         )
     ]
@@ -241,10 +241,10 @@ def test_launcher_aborts_when_no_campaigns_exist(monkeypatch):
     assert summaries == []
     assert messages == [
         (
-            "Campagne requise",
+            "Campaign required",
             (
-                "Aucune campagne n’a été sélectionnée pour la validation. "
-                "Sélectionnez une campagne active, puis relancez la validation."
+                "No campaign was selected for validation. "
+                "Select an active campaign, then run validation again."
             ),
         )
     ]
@@ -269,10 +269,10 @@ def test_launcher_reports_unresolved_repository_for_explicit_campaign(monkeypatc
     assert summaries == []
     assert messages == [
         (
-            "Données de campagne indisponibles",
+            "Campaign data unavailable",
             (
-                "Le dépôt de données ou les services d’entités sont introuvables. "
-                "Ouvrez ou rechargez un projet de campagne avant de relancer la validation."
+                "The data store or entity services could not be found. "
+                "Open or reload a campaign project before running validation again."
             ),
         )
     ]
@@ -307,11 +307,11 @@ def test_launcher_reports_bootstrap_exception_without_summary(monkeypatch):
     assert summaries == []
     assert messages == [
         (
-            "Validation indisponible",
+            "Validation unavailable",
             (
-                "La validation n’a pas pu démarrer à cause d’une erreur d’initialisation. "
-                "Vérifiez que le projet est chargé, puis relancez la validation.\n\n"
-                "Détail technique : validator offline"
+                "Validation could not start because of an initialization error. "
+                "Verify that the project is loaded, then run validation again.\n\n"
+                "Technical detail: validator offline"
             ),
         )
     ]

@@ -35,7 +35,7 @@ EXPECTED_DECISION_SUMMARY = {
         "Référence remappée vers « L2 ».",
         "Référence remappée vers « S-valid ».",
         "Nouvelle entité « S-created » reliée.",
-        "Issue ignorée pour cette session : Scenario To Ignore",
+        "Issue ignored for this session: Scenario To Ignore",
     ),
 }
 

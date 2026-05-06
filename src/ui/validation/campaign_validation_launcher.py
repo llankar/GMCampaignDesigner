@@ -23,6 +23,18 @@ from src.ui.validation.dialogs.missing_reference_dialog import (
 from src.ui.validation.dialogs.validation_summary_dialog import (
     open_validation_summary_dialog,
 )
+from src.ui.validation.labels import (
+    CAMPAIGN_DATA_UNAVAILABLE_MESSAGE,
+    CAMPAIGN_DATA_UNAVAILABLE_TITLE,
+    CAMPAIGN_REQUIRED_MESSAGE,
+    CAMPAIGN_REQUIRED_TITLE,
+    HIERARCHY_CONSISTENCY_TITLE,
+    IGNORE_ISSUE_PROMPT,
+    TECHNICAL_DETAIL_LABEL,
+    VALIDATION_IMPOSSIBLE_TITLE,
+    VALIDATION_UNAVAILABLE_MESSAGE,
+    VALIDATION_UNAVAILABLE_TITLE,
+)
 from src.ui.validation.progress import ValidationScanProgress
 from src.ui.validation.validation_wizard_controller import (
     ValidationWizardAction,
@@ -89,11 +101,8 @@ class CampaignHierarchyValidationLauncher:
             entity_wrappers = self._resolve_entity_wrappers()
             if entity_wrappers is None:
                 step = validation_setup_failed_step(
-                    "Données de campagne indisponibles",
-                    (
-                        "Le dépôt de données ou les services d’entités sont introuvables. "
-                        "Ouvrez ou rechargez un projet de campagne avant de relancer la validation."
-                    ),
+                    CAMPAIGN_DATA_UNAVAILABLE_TITLE,
+                    CAMPAIGN_DATA_UNAVAILABLE_MESSAGE,
                 )
                 self._handle_step(None, step)
                 return None
@@ -103,11 +112,8 @@ class CampaignHierarchyValidationLauncher:
             )
             if selected_campaign is None:
                 step = validation_setup_failed_step(
-                    "Campagne requise",
-                    (
-                        "Aucune campagne n’a été sélectionnée pour la validation. "
-                        "Sélectionnez une campagne active, puis relancez la validation."
-                    ),
+                    CAMPAIGN_REQUIRED_TITLE,
+                    CAMPAIGN_REQUIRED_MESSAGE,
                 )
                 self._handle_step(None, step)
                 return None
@@ -155,12 +161,8 @@ class CampaignHierarchyValidationLauncher:
                 func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
             )
             step = validation_setup_failed_step(
-                "Validation indisponible",
-                (
-                    "La validation n’a pas pu démarrer à cause d’une erreur d’initialisation. "
-                    "Vérifiez que le projet est chargé, puis relancez la validation.\n\n"
-                    f"Détail technique : {exc}"
-                ),
+                VALIDATION_UNAVAILABLE_TITLE,
+                f"{VALIDATION_UNAVAILABLE_MESSAGE}\n\n{TECHNICAL_DETAIL_LABEL}: {exc}",
             )
             self._handle_step(None, step)
             return None
@@ -197,7 +199,7 @@ class CampaignHierarchyValidationLauncher:
             title = (
                 step.setup_failure.title
                 if step.setup_failure
-                else "Validation impossible"
+                else VALIDATION_IMPOSSIBLE_TITLE
             )
             messagebox.showerror(title, step.message)
             return
@@ -247,8 +249,8 @@ class CampaignHierarchyValidationLauncher:
         from tkinter import messagebox
 
         if messagebox.askyesno(
-            "Cohérence hiérarchique",
-            f"{step.message}\n\nIgnorer cette anomalie pour cette session ?",
+            HIERARCHY_CONSISTENCY_TITLE,
+            f"{step.message}\n\n{IGNORE_ISSUE_PROMPT}",
         ):
             next_step = run.controller.submit_action(
                 ValidationWizardAction.SKIP_SESSION

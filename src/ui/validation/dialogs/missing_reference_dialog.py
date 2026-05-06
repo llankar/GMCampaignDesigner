@@ -5,6 +5,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
+from src.ui.validation.labels import (
+    CREATE_LABEL,
+    IGNORE_LABEL,
+    MISSING_REFERENCE_MESSAGE,
+    MISSING_REFERENCE_TITLE,
+    NO_REMAP_TARGET_SELECTOR_MESSAGE,
+    REMAP_LABEL,
+    REMAPPING_UNAVAILABLE_TITLE,
+    REMOVE_LABEL,
+)
 from src.ui.validation.validation_wizard_controller import (
     ValidationWizardAction,
     ValidationWizardActionRequest,
@@ -46,7 +56,7 @@ class MissingReferenceDialog:
     """Resolve a missing reference with create, remap, remove, or ignore actions.
 
     The dialog delegates mutations to ``ValidationWizardController``.  The
-    ``Créer`` action opens the Generic Editor for the issue expected type with
+    ``Create`` action opens the Generic Editor for the issue expected type with
     the referenced value pre-filled as the entity name.  When the editor saves,
     the created entity is returned to the controller so it can auto-link the
     original reference.
@@ -83,7 +93,7 @@ class MissingReferenceDialog:
 
         window = ctk.CTkToplevel(self.master)
         self.window = window
-        window.title("Référence manquante")
+        window.title(MISSING_REFERENCE_TITLE)
         window.transient(self.master)
         window.grab_set()
         window.geometry("560x320")
@@ -92,14 +102,15 @@ class MissingReferenceDialog:
         payload = self.issue.payload
         ctk.CTkLabel(
             window,
-            text="Référence manquante",
+            text=MISSING_REFERENCE_TITLE,
             font=ctk.CTkFont(size=18, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 8))
         ctk.CTkLabel(
             window,
-            text=(
-                f"« {payload.referenced_name} » est attendu comme "
-                f"{payload.expected_type} depuis {payload.source_entity}."
+            text=MISSING_REFERENCE_MESSAGE.format(
+                referenced_name=payload.referenced_name,
+                expected_type=payload.expected_type,
+                source_entity=payload.source_entity,
             ),
             wraplength=500,
             justify="left",
@@ -110,16 +121,18 @@ class MissingReferenceDialog:
         for index in range(4):
             actions.grid_columnconfigure(index, weight=1)
 
-        ctk.CTkButton(actions, text="Créer", command=self.create_via_generic_editor).grid(
+        ctk.CTkButton(
+            actions, text=CREATE_LABEL, command=self.create_via_generic_editor
+        ).grid(
             row=0, column=0, sticky="ew", padx=4, pady=4
         )
-        ctk.CTkButton(actions, text="Remapper", command=self.remap).grid(
+        ctk.CTkButton(actions, text=REMAP_LABEL, command=self.remap).grid(
             row=0, column=1, sticky="ew", padx=4, pady=4
         )
-        ctk.CTkButton(actions, text="Supprimer", command=self.remove_reference).grid(
+        ctk.CTkButton(actions, text=REMOVE_LABEL, command=self.remove_reference).grid(
             row=0, column=2, sticky="ew", padx=4, pady=4
         )
-        ctk.CTkButton(actions, text="Ignorer", command=self.ignore).grid(
+        ctk.CTkButton(actions, text=IGNORE_LABEL, command=self.ignore).grid(
             row=0, column=3, sticky="ew", padx=4, pady=4
         )
         return self
@@ -141,7 +154,7 @@ class MissingReferenceDialog:
         """Ask the host for a target and remap the missing reference to it."""
 
         if self.config.remap_target_provider is None:
-            self._publish_error("Aucun sélecteur de cible n’est configuré pour le remapping.")
+            self._publish_error(NO_REMAP_TARGET_SELECTOR_MESSAGE)
             return None
 
         target = self.config.remap_target_provider(self.issue)
@@ -190,7 +203,7 @@ class MissingReferenceDialog:
 
         from tkinter import messagebox
 
-        messagebox.showwarning("Remapping indisponible", message)
+        messagebox.showwarning(REMAPPING_UNAVAILABLE_TITLE, message)
 
     def close(self) -> None:
         """Close the dialog window if it has been displayed."""

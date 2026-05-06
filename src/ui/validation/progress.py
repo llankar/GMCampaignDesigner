@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.ui.validation.labels import VALIDATION_CAMPAIGN_TITLE, VALIDATION_TITLE
+
 
 class ValidationScanProgress:
     """Tiny, best-effort progress dialog that reports validation phases.
@@ -14,7 +16,7 @@ class ValidationScanProgress:
     no-op object when the master is not a Tk widget.
     """
 
-    def __init__(self, master: Any, *, title: str = "Validation") -> None:
+    def __init__(self, master: Any, *, title: str = VALIDATION_TITLE) -> None:
         self.master = master
         self.title = title
         self.window: Any | None = None
@@ -38,7 +40,7 @@ class ValidationScanProgress:
         frame.grid(row=0, column=0, sticky="nsew")
         tk.Label(
             frame,
-            text="Validation de campagne",
+            text=VALIDATION_CAMPAIGN_TITLE,
             font=("TkDefaultFont", 12, "bold"),
         ).grid(row=0, column=0, sticky="w", pady=(0, 8))
         self._phase_label = tk.Label(frame, text=phase, anchor="w")

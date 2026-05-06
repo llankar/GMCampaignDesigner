@@ -5,6 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.ui.validation.labels import (
+    CLOSE_LABEL,
+    CORRECTED_LABEL,
+    ELAPSED_TIME_LABEL,
+    ENTITIES_VISITED_LABEL,
+    IGNORED_LABEL,
+    NO_ENTITIES_FOUND_MESSAGE,
+    REFERENCES_CHECKED_LABEL,
+    REMAINING_LABEL,
+    VALIDATION_SUMMARY_MESSAGE,
+    VALIDATION_SUMMARY_TITLE,
+)
 from src.ui.validation.validation_wizard_controller import ValidationWizardSummary
 
 
@@ -48,8 +60,8 @@ class ValidationSummaryDialog:
         master: Any,
         counts: ValidationSummaryCounts,
         *,
-        title: str = "Résumé de validation",
-        message: str = "Vérification de cohérence hiérarchique terminée.",
+        title: str = VALIDATION_SUMMARY_TITLE,
+        message: str = VALIDATION_SUMMARY_MESSAGE,
     ) -> None:
         self.master = master
         self.counts = counts
@@ -88,11 +100,11 @@ class ValidationSummaryDialog:
             issue_counters.grid_columnconfigure(column, weight=1)
 
         self._render_counter(
-            ctk, issue_counters, 0, "Corrigés", self.counts.corrected
+            ctk, issue_counters, 0, CORRECTED_LABEL, self.counts.corrected
         )
-        self._render_counter(ctk, issue_counters, 1, "Ignorés", self.counts.ignored)
+        self._render_counter(ctk, issue_counters, 1, IGNORED_LABEL, self.counts.ignored)
         self._render_counter(
-            ctk, issue_counters, 2, "Restants", self.counts.remaining
+            ctk, issue_counters, 2, REMAINING_LABEL, self.counts.remaining
         )
 
         metrics = ctk.CTkFrame(window)
@@ -101,16 +113,16 @@ class ValidationSummaryDialog:
             metrics.grid_columnconfigure(column, weight=1)
 
         self._render_counter(
-            ctk, metrics, 0, "Entités visitées", self.counts.entities_visited
+            ctk, metrics, 0, ENTITIES_VISITED_LABEL, self.counts.entities_visited
         )
         self._render_counter(
-            ctk, metrics, 1, "Références vérifiées", self.counts.references_checked
+            ctk, metrics, 1, REFERENCES_CHECKED_LABEL, self.counts.references_checked
         )
         self._render_counter(
-            ctk, metrics, 2, "Temps écoulé", _format_elapsed(self.counts.elapsed_seconds)
+            ctk, metrics, 2, ELAPSED_TIME_LABEL, _format_elapsed(self.counts.elapsed_seconds)
         )
 
-        ctk.CTkButton(window, text="Fermer", command=self.close).grid(
+        ctk.CTkButton(window, text=CLOSE_LABEL, command=self.close).grid(
             row=4, column=0, sticky="e", padx=20, pady=(18, 20)
         )
         return self
@@ -124,7 +136,7 @@ class ValidationSummaryDialog:
 
     def _status_message(self) -> str:
         if self.counts.no_entities_found:
-            return f"{self.message}\n\n⚠️ No entities found under selected campaign."
+            return f"{self.message}\n\n⚠️ {NO_ENTITIES_FOUND_MESSAGE}"
         return self.message
 
     @staticmethod
@@ -150,8 +162,8 @@ def open_validation_summary_dialog(
     master: Any,
     summary: ValidationWizardSummary,
     *,
-    title: str = "Résumé de validation",
-    message: str = "Vérification de cohérence hiérarchique terminée.",
+    title: str = VALIDATION_SUMMARY_TITLE,
+    message: str = VALIDATION_SUMMARY_MESSAGE,
 ) -> ValidationSummaryDialog:
     """Open a validation summary dialog from a wizard summary."""
 

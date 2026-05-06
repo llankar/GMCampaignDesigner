@@ -5,6 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Sequence
 
+from src.ui.validation.labels import (
+    CANCEL_LABEL,
+    CHOOSE_CAMPAIGN_MESSAGE,
+    CHOOSE_CAMPAIGN_TITLE,
+    NO_CAMPAIGNS_MESSAGE,
+    RUN_LABEL,
+)
+
 
 @dataclass(frozen=True)
 class CampaignSelectorOption:
@@ -33,7 +41,9 @@ class CampaignSelectorDialog:
         self.window: Any | None = None
         self._selected_text: Any | None = None
         self._run_button: Any | None = None
-        self._display_to_option = {campaign.display_text: campaign for campaign in self.campaigns}
+        self._display_to_option = {
+            campaign.display_text: campaign for campaign in self.campaigns
+        }
 
     def show(self) -> CampaignSelectorOption | None:
         """Open the modal selector and return the chosen campaign, or ``None``."""
@@ -42,7 +52,7 @@ class CampaignSelectorDialog:
 
         window = ctk.CTkToplevel(self.master)
         self.window = window
-        window.title("Choisir une campagne")
+        window.title(CHOOSE_CAMPAIGN_TITLE)
         window.transient(self.master)
         window.grab_set()
         window.geometry("480x260")
@@ -51,17 +61,14 @@ class CampaignSelectorDialog:
 
         ctk.CTkLabel(
             window,
-            text="Choisir une campagne",
+            text=CHOOSE_CAMPAIGN_TITLE,
             font=ctk.CTkFont(size=18, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 8))
 
         if self.campaigns:
             ctk.CTkLabel(
                 window,
-                text=(
-                    "Sélectionnez la campagne à vérifier. La validation ne "
-                    "démarrera qu’après ce choix."
-                ),
+                text=CHOOSE_CAMPAIGN_MESSAGE,
                 wraplength=420,
                 justify="left",
             ).grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 14))
@@ -76,19 +83,20 @@ class CampaignSelectorDialog:
         else:
             ctk.CTkLabel(
                 window,
-                text=(
-                    "Aucune campagne n’existe encore. Créez ou importez une campagne "
-                    "avant de lancer la validation."
-                ),
+                text=NO_CAMPAIGNS_MESSAGE,
                 wraplength=420,
                 justify="left",
             ).grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 14))
 
         actions = ctk.CTkFrame(window)
         actions.grid(row=3, column=0, sticky="e", padx=20, pady=(22, 20))
-        self._run_button = ctk.CTkButton(actions, text="Run", command=self.run, state="disabled")
+        self._run_button = ctk.CTkButton(
+            actions, text=RUN_LABEL, command=self.run, state="disabled"
+        )
         self._run_button.grid(row=0, column=0, padx=(0, 8))
-        ctk.CTkButton(actions, text="Annuler", command=self.cancel).grid(row=0, column=1)
+        ctk.CTkButton(actions, text=CANCEL_LABEL, command=self.cancel).grid(
+            row=0, column=1
+        )
 
         window.wait_window()
         return self.selected_campaign
@@ -101,7 +109,9 @@ class CampaignSelectorDialog:
     def run(self) -> None:
         """Accept the current selection and close the dialog."""
 
-        selected_text = self._selected_text.get() if self._selected_text is not None else ""
+        selected_text = (
+            self._selected_text.get() if self._selected_text is not None else ""
+        )
         selected_campaign = self._display_to_option.get(selected_text)
         if selected_campaign is None:
             return

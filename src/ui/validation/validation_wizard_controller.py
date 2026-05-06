@@ -14,6 +14,18 @@ from time import monotonic
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 from src.services import ReferenceActionResult, ReferenceFixService, SessionIgnoreStore
+from src.ui.validation.labels import (
+    ENTITY_CREATION_PENDING_MESSAGE,
+    ENTITY_CREATION_REQUESTED_MESSAGE,
+    ISSUE_IGNORED_MESSAGE,
+    ISSUE_REFERENCE_MESSAGE,
+    REFERENCE_NOT_FOUND_ACTION_MESSAGE,
+    REFERENCE_NOT_FOUND_RESUME_MESSAGE,
+    RESUME_NO_ENTITY_MESSAGE,
+    UNKNOWN_ACTION_MESSAGE,
+    VALIDATION_CANCELED_MESSAGE,
+    VALIDATION_COMPLETED_MESSAGE,
+)
 from src.validation import ValidationIssue
 from src.validation.reference_validator import EntityRecord, ReferenceRecord
 
@@ -231,7 +243,7 @@ class ValidationWizardController:
         if self._awaiting_entity_creation:
             if action != ValidationWizardAction.LINK_CREATED:
                 return self._action_failed(
-                    "Création d’entité en attente : reliez l’entité créée ou annulez."
+                    ENTITY_CREATION_PENDING_MESSAGE
                 )
             return self.resume_after_entity_creation(
                 action_request.created_entity or action_request.target,
@@ -246,7 +258,9 @@ class ValidationWizardController:
             self._ignore_store.ignore(current_item.issue)
             self._summary = _summary_with_skip(
                 self._summary,
-                f"Issue ignorée pour cette session : {current_item.issue.payload.referenced_name}",
+                ISSUE_IGNORED_MESSAGE.format(
+                    referenced_name=current_item.issue.payload.referenced_name
+                ),
             )
             return self._advance_to_next_issue()
 
@@ -256,7 +270,7 @@ class ValidationWizardController:
                 status=ValidationWizardStatus.AWAITING_ENTITY_CREATION,
                 issue=current_item.issue,
                 progress=self._progress_for_cursor(),
-                message="Création d’entité demandée. Reprise prévue après sauvegarde.",
+                message=ENTITY_CREATION_REQUESTED_MESSAGE,
             )
             self._active_step = step
             return step
@@ -264,7 +278,7 @@ class ValidationWizardController:
         reference = self._resolve_reference(current_item)
         if reference is None:
             return self._action_failed(
-                "Impossible d’appliquer l’action : référence de validation introuvable."
+                REFERENCE_NOT_FOUND_ACTION_MESSAGE
             )
 
         if action == ValidationWizardAction.REMAP:
@@ -281,7 +295,7 @@ class ValidationWizardController:
                 attach_to_source=action_request.attach_to_source,
             )
         else:
-            return self._action_failed(f"Action inconnue : {action.value}")
+            return self._action_failed(UNKNOWN_ACTION_MESSAGE.format(action=action.value))
 
         return self._handle_action_result(result)
 
@@ -297,12 +311,12 @@ class ValidationWizardController:
         if current_item is None:
             return self._complete()
         if created_entity is None:
-            return self._action_failed("Impossible de reprendre : aucune entité créée fournie.")
+            return self._action_failed(RESUME_NO_ENTITY_MESSAGE)
 
         reference = self._resolve_reference(current_item)
         if reference is None:
             return self._action_failed(
-                "Impossible de reprendre : référence de validation introuvable."
+                REFERENCE_NOT_FOUND_RESUME_MESSAGE
             )
 
         result = self._reference_fix_service.link_created_entity(
@@ -322,7 +336,7 @@ class ValidationWizardController:
         step = ValidationWizardStep(
             status=ValidationWizardStatus.CANCELED,
             summary=self._summary,
-            message="Validation annulée par le GM.",
+            message=VALIDATION_CANCELED_MESSAGE,
         )
         self._active_step = step
         self._notify_summary(step)
@@ -351,7 +365,7 @@ class ValidationWizardController:
         step = ValidationWizardStep(
             status=ValidationWizardStatus.COMPLETED,
             summary=self._final_summary(),
-            message="Validation terminée.",
+            message=VALIDATION_COMPLETED_MESSAGE,
         )
         self._summary = step.summary or self._summary
         self._active_step = step
@@ -520,13 +534,16 @@ def _summary_canceled(summary: ValidationWizardSummary) -> ValidationWizardSumma
         canceled=True,
         metrics=summary.metrics,
         changes_applied=summary.changes_applied,
-        messages=summary.messages + ("Validation annulée par le GM.",),
+        messages=summary.messages + (VALIDATION_CANCELED_MESSAGE,),
     )
 
 
 def _format_issue_message(issue: ValidationIssue) -> str:
     payload = issue.payload
-    return (
-        f"{issue.issue_type.value}: {payload.source_entity}.{payload.field} "
-        f"référence « {payload.referenced_name} » ({payload.expected_type})."
+    return ISSUE_REFERENCE_MESSAGE.format(
+        issue_type=issue.issue_type.value,
+        source_entity=payload.source_entity,
+        field=payload.field,
+        referenced_name=payload.referenced_name,
+        expected_type=payload.expected_type,
     )
