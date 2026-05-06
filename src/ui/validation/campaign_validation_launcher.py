@@ -26,6 +26,7 @@ from src.ui.validation.validation_wizard_controller import (
     ValidationWizardStatus,
     ValidationWizardStep,
     resolve_reference_for_issue,
+    validation_setup_failed_step,
 )
 from src.validation import IssueType, ReferenceValidationResult, validate_reference_graph
 
@@ -71,12 +72,32 @@ class CampaignHierarchyValidationLauncher:
         """
 
         try:
-            selected_campaign = self._resolve_campaign_selection(campaign)
+            entity_wrappers = self._resolve_entity_wrappers()
+            if entity_wrappers is None:
+                step = validation_setup_failed_step(
+                    "Données de campagne indisponibles",
+                    (
+                        "Le dépôt de données ou les services d’entités sont introuvables. "
+                        "Ouvrez ou rechargez un projet de campagne avant de relancer la validation."
+                    ),
+                )
+                self._handle_step(None, step)
+                return None
+
+            selected_campaign = self._resolve_campaign_selection(campaign, entity_wrappers)
             if selected_campaign is None:
+                step = validation_setup_failed_step(
+                    "Campagne requise",
+                    (
+                        "Aucune campagne n’a été sélectionnée pour la validation. "
+                        "Sélectionnez une campagne active, puis relancez la validation."
+                    ),
+                )
+                self._handle_step(None, step)
                 return None
 
             hierarchy = build_campaign_validation_hierarchy(
-                getattr(self.app, "entity_wrappers", {}) or {},
+                entity_wrappers,
                 selected_campaign,
             )
             graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
@@ -102,39 +123,56 @@ class CampaignHierarchyValidationLauncher:
                 f"Failed to run hierarchy validation: {exc}",
                 func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
             )
-            from tkinter import messagebox
-
-            messagebox.showerror(
+            step = validation_setup_failed_step(
                 "Validation indisponible",
-                f"Impossible de vérifier la cohérence hiérarchique :\n{exc}",
+                (
+                    "La validation n’a pas pu démarrer à cause d’une erreur d’initialisation. "
+                    "Vérifiez que le projet est chargé, puis relancez la validation.\n\n"
+                    f"Détail technique : {exc}"
+                ),
             )
+            self._handle_step(None, step)
             return None
+
+    def _resolve_entity_wrappers(self) -> Mapping[str, Any] | None:
+        wrappers = getattr(self.app, "entity_wrappers", None)
+        if not isinstance(wrappers, Mapping) or not wrappers:
+            return None
+        return wrappers
 
     def _resolve_campaign_selection(
         self,
         campaign: Mapping[str, Any] | CampaignSelectorOption | None,
+        entity_wrappers: Mapping[str, Any],
     ) -> CampaignSelectorOption | None:
         if isinstance(campaign, CampaignSelectorOption):
             return campaign
         if campaign is not None:
             return campaign_option_from_item(campaign)
 
-        campaigns = load_campaign_options(getattr(self.app, "entity_wrappers", {}) or {})
+        campaigns = load_campaign_options(entity_wrappers)
         if not campaigns:
-            from tkinter import messagebox
-
-            messagebox.showinfo(
-                "Aucune campagne",
-                (
-                    "Aucune campagne n’existe encore. Créez ou importez une campagne "
-                    "avant de lancer la validation."
-                ),
-            )
             return None
         return self._campaign_selector(self.app, campaigns)
 
-    def _handle_step(self, run: CampaignValidationRun, step: ValidationWizardStep) -> None:
-        if step.status in {ValidationWizardStatus.COMPLETED, ValidationWizardStatus.CANCELED}:
+    def _handle_step(
+        self,
+        run: CampaignValidationRun | None,
+        step: ValidationWizardStep,
+    ) -> None:
+        if step.status == ValidationWizardStatus.SETUP_FAILED:
+            from tkinter import messagebox
+
+            title = step.setup_failure.title if step.setup_failure else "Validation impossible"
+            messagebox.showerror(title, step.message)
+            return
+
+        if step.status == ValidationWizardStatus.COMPLETED:
+            if step.summary is not None:
+                open_validation_summary_dialog(self.app, step.summary)
+            return
+
+        if step.status == ValidationWizardStatus.CANCELED:
             if step.summary is not None:
                 open_validation_summary_dialog(self.app, step.summary)
             return
@@ -145,7 +183,7 @@ class CampaignHierarchyValidationLauncher:
             messagebox.showwarning("Validation", step.message)
             return
 
-        if step.issue is None:
+        if step.issue is None or run is None:
             return
 
         if step.issue.issue_type == IssueType.MISSING_REFERENCE:

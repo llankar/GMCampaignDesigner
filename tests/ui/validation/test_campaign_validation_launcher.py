@@ -112,9 +112,16 @@ def test_launcher_accepts_campaign_screen_selection_without_global_dialog(monkey
 
 
 def test_launcher_aborts_cleanly_when_user_cancels_selection(monkeypatch):
+    messages = []
+    summaries = []
+
     monkeypatch.setattr(
         "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
-        lambda *_args, **_kwargs: None,
+        lambda *_args, **_kwargs: summaries.append(_args),
+    )
+    monkeypatch.setattr(
+        "tkinter.messagebox.showerror",
+        lambda title, message: messages.append((title, message)),
     )
     launcher = CampaignHierarchyValidationLauncher(
         FakeApp({"campaigns": FakeWrapper([_campaign()])}),
@@ -123,25 +130,108 @@ def test_launcher_aborts_cleanly_when_user_cancels_selection(monkeypatch):
 
     assert launcher.launch() is None
     assert launcher.active_run is None
+    assert summaries == []
+    assert messages == [
+        (
+            "Campagne requise",
+            (
+                "Aucune campagne n’a été sélectionnée pour la validation. "
+                "Sélectionnez une campagne active, puis relancez la validation."
+            ),
+        )
+    ]
 
 
 def test_launcher_aborts_when_no_campaigns_exist(monkeypatch):
     messages = []
+    summaries = []
 
     monkeypatch.setattr(
-        "tkinter.messagebox.showinfo",
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda *_args, **_kwargs: summaries.append(_args),
+    )
+    monkeypatch.setattr(
+        "tkinter.messagebox.showerror",
+        lambda title, message: messages.append((title, message)),
+    )
+    launcher = CampaignHierarchyValidationLauncher(FakeApp({"campaigns": FakeWrapper([])}))
+
+    assert launcher.launch() is None
+    assert launcher.active_run is None
+    assert summaries == []
+    assert messages == [
+        (
+            "Campagne requise",
+            (
+                "Aucune campagne n’a été sélectionnée pour la validation. "
+                "Sélectionnez une campagne active, puis relancez la validation."
+            ),
+        )
+    ]
+
+
+def test_launcher_reports_unresolved_repository_for_explicit_campaign(monkeypatch):
+    messages = []
+    summaries = []
+
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda *_args, **_kwargs: summaries.append(_args),
+    )
+    monkeypatch.setattr(
+        "tkinter.messagebox.showerror",
         lambda title, message: messages.append((title, message)),
     )
     launcher = CampaignHierarchyValidationLauncher(FakeApp({}))
 
-    assert launcher.launch() is None
+    assert launcher.launch(_campaign()) is None
     assert launcher.active_run is None
+    assert summaries == []
     assert messages == [
         (
-            "Aucune campagne",
+            "Données de campagne indisponibles",
             (
-                "Aucune campagne n’existe encore. Créez ou importez une campagne "
-                "avant de lancer la validation."
+                "Le dépôt de données ou les services d’entités sont introuvables. "
+                "Ouvrez ou rechargez un projet de campagne avant de relancer la validation."
+            ),
+        )
+    ]
+
+
+def test_launcher_reports_bootstrap_exception_without_summary(monkeypatch):
+    messages = []
+    summaries = []
+
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda *_args, **_kwargs: summaries.append(_args),
+    )
+    monkeypatch.setattr(
+        "tkinter.messagebox.showerror",
+        lambda title, message: messages.append((title, message)),
+    )
+
+    def fail_validation(*_args, **_kwargs):
+        raise RuntimeError("validator offline")
+
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.validate_reference_graph",
+        fail_validation,
+    )
+    launcher = CampaignHierarchyValidationLauncher(
+        FakeApp({"campaigns": FakeWrapper([_campaign()])})
+    )
+
+    assert launcher.launch(_campaign()) is None
+    assert launcher.active_run is None
+    assert summaries == []
+    assert messages == [
+        (
+            "Validation indisponible",
+            (
+                "La validation n’a pas pu démarrer à cause d’une erreur d’initialisation. "
+                "Vérifiez que le projet est chargé, puis relancez la validation.\n\n"
+                "Détail technique : validator offline"
             ),
         )
     ]

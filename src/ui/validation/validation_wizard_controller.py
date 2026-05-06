@@ -39,6 +39,7 @@ class ValidationWizardStatus(str, Enum):
     COMPLETED = "completed"
     CANCELED = "canceled"
     ACTION_FAILED = "action_failed"
+    SETUP_FAILED = "setup_failed"
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,14 @@ class ValidationWizardSummary:
 
 
 @dataclass(frozen=True)
+class ValidationWizardSetupFailure:
+    """Actionable setup error that prevents a validation scan from running."""
+
+    title: str
+    message: str
+
+
+@dataclass(frozen=True)
 class ValidationWizardStep:
     """Current step returned to the UI after a controller transition."""
 
@@ -90,7 +99,19 @@ class ValidationWizardStep:
     progress: ValidationWizardProgress | None = None
     summary: ValidationWizardSummary | None = None
     action_result: ReferenceActionResult | None = None
+    setup_failure: ValidationWizardSetupFailure | None = None
     message: str = ""
+
+
+def validation_setup_failed_step(title: str, message: str) -> ValidationWizardStep:
+    """Return a terminal step for invalid setup/input before a scan is executed."""
+
+    failure = ValidationWizardSetupFailure(title=title, message=message)
+    return ValidationWizardStep(
+        status=ValidationWizardStatus.SETUP_FAILED,
+        setup_failure=failure,
+        message=message,
+    )
 
 
 @dataclass(frozen=True)
