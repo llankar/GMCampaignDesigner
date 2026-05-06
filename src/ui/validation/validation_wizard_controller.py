@@ -26,7 +26,8 @@ from src.ui.validation.labels import (
     VALIDATION_CANCELED_MESSAGE,
     VALIDATION_COMPLETED_MESSAGE,
 )
-from src.validation import ValidationIssue
+from src.ui.validation.messages import format_hierarchy_issue_message
+from src.validation import IssueType, ValidationIssue
 from src.validation.reference_validator import EntityRecord, ReferenceRecord
 
 ReferenceResolver = Callable[[ValidationIssue], ReferenceRecord | None]
@@ -539,6 +540,9 @@ def _summary_canceled(summary: ValidationWizardSummary) -> ValidationWizardSumma
 
 
 def _format_issue_message(issue: ValidationIssue) -> str:
+    if issue.issue_type == IssueType.INVALID_HIERARCHY:
+        return format_hierarchy_issue_message(issue)
+
     payload = issue.payload
     return ISSUE_REFERENCE_MESSAGE.format(
         issue_type=issue.issue_type.value,
