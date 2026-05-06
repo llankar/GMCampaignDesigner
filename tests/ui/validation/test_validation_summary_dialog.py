@@ -20,3 +20,31 @@ def test_validation_summary_remaining_never_goes_negative():
     counts = ValidationSummaryCounts.from_summary(summary)
 
     assert counts.remaining == 0
+
+
+def test_validation_summary_counts_include_non_issue_metrics():
+    from src.ui.validation import ValidationWizardMetrics
+
+    summary = ValidationWizardSummary(
+        total_issues=0,
+        metrics=ValidationWizardMetrics(
+            entities_visited=7,
+            references_checked=12,
+            elapsed_seconds=1.25,
+        ),
+    )
+
+    counts = ValidationSummaryCounts.from_summary(summary)
+
+    assert counts.entities_visited == 7
+    assert counts.references_checked == 12
+    assert counts.elapsed_seconds == 1.25
+    assert counts.no_entities_found is False
+
+
+def test_validation_summary_counts_warn_when_scan_found_nothing():
+    summary = ValidationWizardSummary(total_issues=0)
+
+    counts = ValidationSummaryCounts.from_summary(summary)
+
+    assert counts.no_entities_found is True

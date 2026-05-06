@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import monotonic
 from typing import Any, Callable, Mapping, Sequence
 
 from modules.helpers.logging_helper import log_exception, log_info
@@ -19,16 +20,19 @@ from src.ui.validation.dialogs.missing_reference_dialog import (
     open_missing_reference_dialog,
 )
 from src.ui.validation.dialogs.validation_summary_dialog import open_validation_summary_dialog
+from src.ui.validation.progress import ValidationScanProgress
 from src.ui.validation.validation_wizard_controller import (
     ValidationWizardAction,
     ValidationWizardController,
     ValidationWizardIssue,
+    ValidationWizardMetrics,
     ValidationWizardStatus,
     ValidationWizardStep,
     resolve_reference_for_issue,
     validation_setup_failed_step,
 )
 from src.validation import IssueType, ReferenceValidationResult, validate_reference_graph
+from src.validation.hierarchy_rules import FIELD_EXPECTED_TYPES
 
 CampaignSelector = Callable[
     [Any, Sequence[CampaignSelectorOption]],
@@ -71,6 +75,7 @@ class CampaignHierarchyValidationLauncher:
         campaign explicitly.
         """
 
+        progress: ValidationScanProgress | None = None
         try:
             entity_wrappers = self._resolve_entity_wrappers()
             if entity_wrappers is None:
@@ -96,10 +101,14 @@ class CampaignHierarchyValidationLauncher:
                 self._handle_step(None, step)
                 return None
 
+            started_at = monotonic()
+            progress = ValidationScanProgress(self.app).show("Scanning arcs…")
             hierarchy = build_campaign_validation_hierarchy(
                 entity_wrappers,
                 selected_campaign,
+                progress=progress,
             )
+            progress.set_phase("Checking references…")
             graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
             controller = ValidationWizardController(
                 _wizard_items(graph),
@@ -107,6 +116,11 @@ class CampaignHierarchyValidationLauncher:
                 reference_resolver=lambda issue: resolve_reference_for_issue(
                     issue, graph.references
                 ),
+                metrics=ValidationWizardMetrics(
+                    entities_visited=_count_flat_entities(hierarchy),
+                    references_checked=_count_flat_references(hierarchy),
+                ),
+                started_at=started_at,
             )
             first_step = controller.start()
             run = CampaignValidationRun(
@@ -116,9 +130,14 @@ class CampaignHierarchyValidationLauncher:
                 first_step=first_step,
             )
             self._active_run = run
+            if progress is not None:
+                progress.close()
+                progress = None
             self._handle_step(run, first_step)
             return run
         except Exception as exc:
+            if progress is not None:
+                progress.close()
             log_exception(
                 f"Failed to run hierarchy validation: {exc}",
                 func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
@@ -243,6 +262,8 @@ def campaign_option_from_item(item: Mapping[str, Any]) -> CampaignSelectorOption
 def build_campaign_validation_hierarchy(
     entity_wrappers: Mapping[str, Any],
     campaign: Mapping[str, Any] | CampaignSelectorOption,
+    *,
+    progress: ValidationScanProgress | None = None,
 ) -> dict[str, Any]:
     """Build a validator-friendly hierarchy for one explicitly selected campaign."""
 
@@ -262,6 +283,8 @@ def build_campaign_validation_hierarchy(
     for slug in sorted(entity_wrappers):
         if slug == "campaigns":
             continue
+        if progress is not None:
+            progress.set_phase(_scan_phase_for_slug(slug))
         wrapper = entity_wrappers[slug]
         for index, item in enumerate(_safe_load_items(wrapper)):
             if not isinstance(item, Mapping):
@@ -278,6 +301,53 @@ def build_campaign_validation_hierarchy(
     return root
 
 
+def _count_flat_entities(hierarchy: Mapping[str, Any]) -> int:
+    entities = _flat_entities(hierarchy)
+    return len(entities)
+
+
+def _count_flat_references(hierarchy: Mapping[str, Any]) -> int:
+    total = 0
+    fields_by_type = _reference_fields_by_entity_type()
+    for entity in _flat_entities(hierarchy):
+        entity_type = (
+            str(entity.get("entity_type") or entity.get("type") or "")
+            .strip()
+            .lower()
+        )
+        for field in fields_by_type.get(entity_type, ()):
+            if field in entity:
+                total += _reference_value_count(entity[field])
+    return total
+
+
+def _flat_entities(hierarchy: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
+    entities = hierarchy.get("entities", ())
+    if not isinstance(entities, Sequence) or isinstance(
+        entities, (str, bytes, bytearray)
+    ):
+        return ()
+    return tuple(entity for entity in entities if isinstance(entity, Mapping))
+
+
+def _reference_fields_by_entity_type() -> dict[str, tuple[str, ...]]:
+    by_type: dict[str, list[str]] = {}
+    for field_path in FIELD_EXPECTED_TYPES:
+        entity_type, field = field_path.split(".", 1)
+        by_type.setdefault(entity_type, []).append(field)
+    return {entity_type: tuple(fields) for entity_type, fields in by_type.items()}
+
+
+def _reference_value_count(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, Mapping):
+        return 1
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return sum(1 for item in value if item is not None and str(item).strip())
+    return 1 if str(value).strip() else 0
+
+
 def _wizard_items(graph: ReferenceValidationResult) -> tuple[ValidationWizardIssue, ...]:
     return tuple(
         ValidationWizardIssue(
@@ -286,6 +356,14 @@ def _wizard_items(graph: ReferenceValidationResult) -> tuple[ValidationWizardIss
         )
         for issue in graph.issues
     )
+
+
+def _scan_phase_for_slug(slug: str) -> str:
+    if slug == "arcs":
+        return "Scanning arcs…"
+    if slug == "scenarios":
+        return "Scanning scenarios…"
+    return f"Scanning {slug.replace('_', ' ')}…"
 
 
 def _safe_load_items(wrapper: Any) -> Sequence[Any]:
