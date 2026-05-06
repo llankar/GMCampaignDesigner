@@ -3769,6 +3769,15 @@ class MainWindow(ctk.CTk):
             )
             messagebox.showerror("Error", f"Failed to open Scenario Builder:\n{exc}")
 
+    def open_hierarchy_validation(self):
+        """Open the campaign hierarchy consistency validation workflow."""
+        from src.ui.validation.campaign_validation_launcher import (
+            CampaignHierarchyValidationLauncher,
+        )
+
+        launcher = CampaignHierarchyValidationLauncher(self)
+        return launcher.launch()
+
     def open_campaign_builder(self, guided_tour_active: bool = False):
         """Open campaign builder."""
         try:
