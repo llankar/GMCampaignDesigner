@@ -7,6 +7,7 @@ from time import monotonic
 from typing import Any, Callable, Mapping, Sequence
 
 from modules.helpers.logging_helper import log_exception, log_info
+from src.ui.validation.campaign_arc_hierarchy import build_campaign_arc_nodes
 from src.ui.validation.dialogs.ambiguous_reference_dialog import (
     AmbiguousReferenceDialogConfig,
     open_ambiguous_reference_dialog,
@@ -281,6 +282,7 @@ def build_campaign_validation_hierarchy(
     root["entity_type"] = "campaign"
     root["id"] = selected.campaign_id
     root["name"] = selected.label
+    root["arcs"] = build_campaign_arc_nodes(selected.item.get("Arcs"))
     root["entities"] = []
     entities = root["entities"]
 
@@ -298,7 +300,7 @@ def build_campaign_validation_hierarchy(
     log_info(
         (
             f"Built validation hierarchy for campaign {selected.campaign_id} "
-            f"with {len(entities)} entities"
+            f"with {len(root['arcs'])} arcs and {len(entities)} entities"
         ),
         func_name="src.ui.validation.campaign_validation_launcher.build_campaign_validation_hierarchy",
     )
