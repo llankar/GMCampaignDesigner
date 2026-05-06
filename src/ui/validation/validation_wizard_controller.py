@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Iterable, Protocol, Sequence
+from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 from src.services import ReferenceActionResult, ReferenceFixService, SessionIgnoreStore
 from src.validation import ValidationIssue
@@ -128,12 +128,14 @@ class ValidationWizardController:
         self,
         issues: Iterable[ValidationIssue | ValidationWizardIssue],
         *,
+        campaign: Mapping[str, Any],
         reference_fix_service: ReferenceFixService | None = None,
         ignore_store: SessionIgnoreStore | None = None,
         reference_resolver: ReferenceResolver | None = None,
         presenter: ValidationWizardPresenter | None = None,
     ) -> None:
         self._items = tuple(_coerce_issue_item(issue) for issue in issues)
+        self._campaign = dict(campaign)
         self._reference_fix_service = reference_fix_service or ReferenceFixService()
         self._ignore_store = ignore_store or SessionIgnoreStore()
         self._reference_resolver = reference_resolver
@@ -142,6 +144,12 @@ class ValidationWizardController:
         self._summary = ValidationWizardSummary(total_issues=len(self._items))
         self._awaiting_entity_creation = False
         self._active_step: ValidationWizardStep | None = None
+
+    @property
+    def campaign(self) -> Mapping[str, Any]:
+        """Return the explicit campaign selected for this validation run."""
+
+        return dict(self._campaign)
 
     @property
     def summary(self) -> ValidationWizardSummary:

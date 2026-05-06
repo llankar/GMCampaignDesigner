@@ -5,7 +5,7 @@ from src.validation import validate_reference_graph
 
 
 def _reference_for(hierarchy, value):
-    graph = validate_reference_graph(hierarchy)
+    graph = validate_reference_graph(hierarchy, campaign={"id": "sample"})
     return next(reference for reference in graph.references if reference.reference_value == value)
 
 

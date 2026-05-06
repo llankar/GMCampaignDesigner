@@ -14,6 +14,11 @@ from .ambiguous_reference_dialog import (
     AmbiguousReferenceDialogConfig,
     open_ambiguous_reference_dialog,
 )
+from .campaign_selector_dialog import (
+    CampaignSelectorDialog,
+    CampaignSelectorOption,
+    open_campaign_selector_dialog,
+)
 from .missing_reference_dialog import (
     MissingReferenceDialog,
     MissingReferenceDialogConfig,
@@ -29,6 +34,8 @@ __all__ = [
     "GenericEditorCreationRequest",
     "GenericEditorCreationResult",
     "GenericEditorLauncher",
+    "CampaignSelectorDialog",
+    "CampaignSelectorOption",
     "AmbiguousReferenceCandidate",
     "AmbiguousReferenceDialog",
     "AmbiguousReferenceDialogConfig",
@@ -40,6 +47,7 @@ __all__ = [
     "creation_request_from_issue",
     "entity_slug_for_expected_type",
     "open_ambiguous_reference_dialog",
+    "open_campaign_selector_dialog",
     "open_missing_reference_dialog",
     "open_validation_summary_dialog",
 ]

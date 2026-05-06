@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from modules.helpers.logging_helper import log_exception, log_info
 from src.ui.validation.dialogs.ambiguous_reference_dialog import (
     AmbiguousReferenceDialogConfig,
     open_ambiguous_reference_dialog,
+)
+from src.ui.validation.dialogs.campaign_selector_dialog import (
+    CampaignSelectorOption,
+    open_campaign_selector_dialog,
 )
 from src.ui.validation.dialogs.missing_reference_dialog import (
     MissingReferenceDialogConfig,
@@ -25,11 +29,17 @@ from src.ui.validation.validation_wizard_controller import (
 )
 from src.validation import IssueType, ReferenceValidationResult, validate_reference_graph
 
+CampaignSelector = Callable[
+    [Any, Sequence[CampaignSelectorOption]],
+    CampaignSelectorOption | None,
+]
+
 
 @dataclass(frozen=True)
 class CampaignValidationRun:
     """Objects created for one campaign validation launch."""
 
+    campaign: CampaignSelectorOption
     graph: ReferenceValidationResult
     controller: ValidationWizardController
     first_step: ValidationWizardStep
@@ -38,8 +48,9 @@ class CampaignValidationRun:
 class CampaignHierarchyValidationLauncher:
     """Instantiate the hierarchy validator and drive the validation wizard UI."""
 
-    def __init__(self, app: Any) -> None:
+    def __init__(self, app: Any, *, campaign_selector: CampaignSelector | None = None) -> None:
         self.app = app
+        self._campaign_selector = campaign_selector or open_campaign_selector_dialog
         self._active_run: CampaignValidationRun | None = None
 
     @property
@@ -48,20 +59,41 @@ class CampaignHierarchyValidationLauncher:
 
         return self._active_run
 
-    def launch(self) -> CampaignValidationRun | None:
-        """Validate the current campaign hierarchy and start the wizard controller."""
+    def launch(
+        self,
+        campaign: Mapping[str, Any] | CampaignSelectorOption | None = None,
+    ) -> CampaignValidationRun | None:
+        """Validate a selected campaign hierarchy and start the wizard controller.
+
+        Global launchers call this without a campaign, which opens a blocking
+        selector dialog. Campaign-screen actions should pass the current
+        campaign explicitly.
+        """
 
         try:
+            selected_campaign = self._resolve_campaign_selection(campaign)
+            if selected_campaign is None:
+                return None
+
             hierarchy = build_campaign_validation_hierarchy(
-                getattr(self.app, "entity_wrappers", {}) or {}
+                getattr(self.app, "entity_wrappers", {}) or {},
+                selected_campaign,
             )
-            graph = validate_reference_graph(hierarchy)
+            graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
             controller = ValidationWizardController(
                 _wizard_items(graph),
-                reference_resolver=lambda issue: resolve_reference_for_issue(issue, graph.references),
+                campaign=selected_campaign.item,
+                reference_resolver=lambda issue: resolve_reference_for_issue(
+                    issue, graph.references
+                ),
             )
             first_step = controller.start()
-            run = CampaignValidationRun(graph=graph, controller=controller, first_step=first_step)
+            run = CampaignValidationRun(
+                campaign=selected_campaign,
+                graph=graph,
+                controller=controller,
+                first_step=first_step,
+            )
             self._active_run = run
             self._handle_step(run, first_step)
             return run
@@ -77,6 +109,29 @@ class CampaignHierarchyValidationLauncher:
                 f"Impossible de vérifier la cohérence hiérarchique :\n{exc}",
             )
             return None
+
+    def _resolve_campaign_selection(
+        self,
+        campaign: Mapping[str, Any] | CampaignSelectorOption | None,
+    ) -> CampaignSelectorOption | None:
+        if isinstance(campaign, CampaignSelectorOption):
+            return campaign
+        if campaign is not None:
+            return campaign_option_from_item(campaign)
+
+        campaigns = load_campaign_options(getattr(self.app, "entity_wrappers", {}) or {})
+        if not campaigns:
+            from tkinter import messagebox
+
+            messagebox.showinfo(
+                "Aucune campagne",
+                (
+                    "Aucune campagne n’existe encore. Créez ou importez une campagne "
+                    "avant de lancer la validation."
+                ),
+            )
+            return None
+        return self._campaign_selector(self.app, campaigns)
 
     def _handle_step(self, run: CampaignValidationRun, step: ValidationWizardStep) -> None:
         if step.status in {ValidationWizardStatus.COMPLETED, ValidationWizardStatus.CANCELED}:
@@ -126,18 +181,49 @@ class CampaignHierarchyValidationLauncher:
             self._handle_step(run, next_step)
 
 
-def build_campaign_validation_hierarchy(entity_wrappers: Mapping[str, Any]) -> dict[str, Any]:
-    """Build a validator-friendly hierarchy from the app's model wrappers."""
+def load_campaign_options(entity_wrappers: Mapping[str, Any]) -> tuple[CampaignSelectorOption, ...]:
+    """Load selectable campaigns from the explicit campaigns wrapper."""
 
-    root: dict[str, Any] = {
-        "type": "campaign",
-        "id": "current-campaign",
-        "name": "Current Campaign",
-        "entities": [],
-    }
+    wrapper = entity_wrappers.get("campaigns")
+    if wrapper is None:
+        return ()
+    return tuple(
+        campaign_option_from_item(item)
+        for item in _safe_load_items(wrapper)
+        if isinstance(item, Mapping)
+    )
+
+
+def campaign_option_from_item(item: Mapping[str, Any]) -> CampaignSelectorOption:
+    """Create a selector option preserving the selected campaign object."""
+
+    campaign_id = _identifier_for(item, "campaigns", 0)
+    label = _display_name_for(item, campaign_id)
+    return CampaignSelectorOption(campaign_id=campaign_id, label=label, item=dict(item))
+
+
+def build_campaign_validation_hierarchy(
+    entity_wrappers: Mapping[str, Any],
+    campaign: Mapping[str, Any] | CampaignSelectorOption,
+) -> dict[str, Any]:
+    """Build a validator-friendly hierarchy for one explicitly selected campaign."""
+
+    selected = (
+        campaign
+        if isinstance(campaign, CampaignSelectorOption)
+        else campaign_option_from_item(campaign)
+    )
+    root: dict[str, Any] = dict(selected.item)
+    root["type"] = "campaign"
+    root["entity_type"] = "campaign"
+    root["id"] = selected.campaign_id
+    root["name"] = selected.label
+    root["entities"] = []
     entities = root["entities"]
 
     for slug in sorted(entity_wrappers):
+        if slug == "campaigns":
+            continue
         wrapper = entity_wrappers[slug]
         for index, item in enumerate(_safe_load_items(wrapper)):
             if not isinstance(item, Mapping):
@@ -145,7 +231,10 @@ def build_campaign_validation_hierarchy(entity_wrappers: Mapping[str, Any]) -> d
             entities.append(_normalize_entity_node(slug, item, index))
 
     log_info(
-        f"Built validation hierarchy with {len(entities)} entities",
+        (
+            f"Built validation hierarchy for campaign {selected.campaign_id} "
+            f"with {len(entities)} entities"
+        ),
         func_name="src.ui.validation.campaign_validation_launcher.build_campaign_validation_hierarchy",
     )
     return root
@@ -166,11 +255,16 @@ def _safe_load_items(wrapper: Any) -> Sequence[Any]:
         items = wrapper.load_items()
     except Exception as exc:
         log_exception(
-            f"Unable to load items for validation from {getattr(wrapper, 'entity_type', '?')}: {exc}",
+            (
+                "Unable to load items for validation from "
+                f"{getattr(wrapper, 'entity_type', '?')}: {exc}"
+            ),
             func_name="src.ui.validation.campaign_validation_launcher._safe_load_items",
         )
         return ()
-    return items if isinstance(items, Sequence) and not isinstance(items, (str, bytes, bytearray)) else ()
+    if isinstance(items, Sequence) and not isinstance(items, (str, bytes, bytearray)):
+        return items
+    return ()
 
 
 def _normalize_entity_node(slug: str, item: Mapping[str, Any], index: int) -> dict[str, Any]:

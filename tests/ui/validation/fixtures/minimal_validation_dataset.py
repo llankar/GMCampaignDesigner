@@ -91,7 +91,7 @@ def build_minimal_validation_wizard(
     campaign_hierarchy = (
         hierarchy if hierarchy is not None else build_minimal_validation_hierarchy()
     )
-    graph = validate_reference_graph(campaign_hierarchy)
+    graph = validate_reference_graph(campaign_hierarchy, campaign={"id": "sample"})
     controller = ValidationWizardController(
         tuple(
             ValidationWizardIssue(
@@ -100,6 +100,7 @@ def build_minimal_validation_wizard(
             )
             for issue in graph.issues
         ),
+        campaign=graph.campaign,
         reference_resolver=lambda issue: resolve_reference_for_issue(
             issue, graph.references
         ),
