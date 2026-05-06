@@ -17,7 +17,7 @@ ENTITY_TYPE_KEYS = ("entity_type", "type", "kind", "category", "EntityType", "Ty
 ENTITY_ID_KEYS = ("id", "uuid", "slug", "key", "Id", "ID", "Uuid", "Slug", "Key")
 ENTITY_NAME_KEYS = ("name", "Name", "title", "Title", "label", "Label")
 MODEL_CHILD_COLLECTIONS: Mapping[str, tuple[str, ...]] = {
-    "campaign": ("arcs",),
+    "campaign": ("arcs", "entities"),
     "arc": ("scenarios", "locations"),
     "scenario": ("encounters", "npcs"),
 }

@@ -32,7 +32,6 @@ from src.ui.validation.validation_wizard_controller import (
     validation_setup_failed_step,
 )
 from src.validation import IssueType, ReferenceValidationResult, validate_reference_graph
-from src.validation.hierarchy_rules import FIELD_EXPECTED_TYPES
 
 CampaignSelector = Callable[
     [Any, Sequence[CampaignSelectorOption]],
@@ -110,6 +109,7 @@ class CampaignHierarchyValidationLauncher:
             )
             progress.set_phase("Checking references…")
             graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
+            diagnostics = graph.diagnostics
             controller = ValidationWizardController(
                 _wizard_items(graph),
                 campaign=selected_campaign.item,
@@ -117,10 +117,14 @@ class CampaignHierarchyValidationLauncher:
                     issue, graph.references
                 ),
                 metrics=ValidationWizardMetrics(
-                    entities_visited=_count_flat_entities(hierarchy),
-                    references_checked=_count_flat_references(hierarchy),
+                    entities_visited=len(graph.entities),
+                    references_checked=len(graph.references),
                 ),
                 started_at=started_at,
+            )
+            log_info(
+                f"Campaign validation traversal metrics: {diagnostics.debug_summary}",
+                func_name="src.ui.validation.campaign_validation_launcher.CampaignHierarchyValidationLauncher.launch",
             )
             first_step = controller.start()
             run = CampaignValidationRun(
@@ -299,53 +303,6 @@ def build_campaign_validation_hierarchy(
         func_name="src.ui.validation.campaign_validation_launcher.build_campaign_validation_hierarchy",
     )
     return root
-
-
-def _count_flat_entities(hierarchy: Mapping[str, Any]) -> int:
-    entities = _flat_entities(hierarchy)
-    return len(entities)
-
-
-def _count_flat_references(hierarchy: Mapping[str, Any]) -> int:
-    total = 0
-    fields_by_type = _reference_fields_by_entity_type()
-    for entity in _flat_entities(hierarchy):
-        entity_type = (
-            str(entity.get("entity_type") or entity.get("type") or "")
-            .strip()
-            .lower()
-        )
-        for field in fields_by_type.get(entity_type, ()):
-            if field in entity:
-                total += _reference_value_count(entity[field])
-    return total
-
-
-def _flat_entities(hierarchy: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
-    entities = hierarchy.get("entities", ())
-    if not isinstance(entities, Sequence) or isinstance(
-        entities, (str, bytes, bytearray)
-    ):
-        return ()
-    return tuple(entity for entity in entities if isinstance(entity, Mapping))
-
-
-def _reference_fields_by_entity_type() -> dict[str, tuple[str, ...]]:
-    by_type: dict[str, list[str]] = {}
-    for field_path in FIELD_EXPECTED_TYPES:
-        entity_type, field = field_path.split(".", 1)
-        by_type.setdefault(entity_type, []).append(field)
-    return {entity_type: tuple(fields) for entity_type, fields in by_type.items()}
-
-
-def _reference_value_count(value: Any) -> int:
-    if value is None:
-        return 0
-    if isinstance(value, Mapping):
-        return 1
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return sum(1 for item in value if item is not None and str(item).strip())
-    return 1 if str(value).strip() else 0
 
 
 def _wizard_items(graph: ReferenceValidationResult) -> tuple[ValidationWizardIssue, ...]:
