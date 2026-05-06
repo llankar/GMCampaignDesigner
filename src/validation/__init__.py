@@ -22,6 +22,7 @@ from .similarity_matcher import (
 from .reference_validator import (
     EntityRecord,
     ReferenceRecord,
+    ReferenceTraversalDiagnostics,
     ReferenceValidationResult,
     ReferenceValidatorConfig,
     validate_reference_graph,
@@ -35,6 +36,7 @@ __all__ = [
     "IssuePayload",
     "IssueType",
     "ReferenceRecord",
+    "ReferenceTraversalDiagnostics",
     "ReferenceValidationResult",
     "ReferenceValidatorConfig",
     "score_similarity",

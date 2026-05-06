@@ -6,6 +6,7 @@ hierarchy and leaves correction choices to the interactive layer.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -15,6 +16,15 @@ from .issue_models import IssuePayload, IssueType, ValidationIssue
 ENTITY_TYPE_KEYS = ("entity_type", "type", "kind", "category", "EntityType", "Type")
 ENTITY_ID_KEYS = ("id", "uuid", "slug", "key", "Id", "ID", "Uuid", "Slug", "Key")
 ENTITY_NAME_KEYS = ("name", "Name", "title", "Title", "label", "Label")
+MODEL_CHILD_COLLECTIONS: Mapping[str, tuple[str, ...]] = {
+    "campaign": ("arcs",),
+    "arc": ("scenarios", "locations"),
+    "scenario": ("encounters", "npcs"),
+}
+FALLBACK_CHILD_COLLECTIONS = ("children", "items")
+SUPPORTED_ENTITY_TYPES = frozenset(
+    {"campaign", "arc", "scenario", "location", "encounter", "npc"}
+)
 STRUCTURAL_KEYS = frozenset(
     {
         "children",
@@ -80,6 +90,36 @@ class ReferenceRecord:
 
 
 @dataclass(frozen=True)
+class ReferenceTraversalDiagnostics:
+    """Internal counters captured during validation traversal."""
+
+    visited_campaigns: int = 0
+    visited_arcs: int = 0
+    visited_scenarios: int = 0
+    visited_references: int = 0
+    root_path: tuple[str, ...] = ()
+
+    @property
+    def debug_summary_path(self) -> tuple[str, ...]:
+        """Return a compact path QA can inspect to confirm traversal work."""
+
+        return (
+            "reference-validator",
+            f"root={' > '.join(self.root_path) if self.root_path else '<none>'}",
+            f"campaigns={self.visited_campaigns}",
+            f"arcs={self.visited_arcs}",
+            f"scenarios={self.visited_scenarios}",
+            f"references={self.visited_references}",
+        )
+
+    @property
+    def debug_summary(self) -> str:
+        """Return a human-readable traversal counter summary."""
+
+        return " | ".join(self.debug_summary_path)
+
+
+@dataclass(frozen=True)
 class ReferenceValidationResult:
     """Full validation result for interactive tools."""
 
@@ -87,6 +127,21 @@ class ReferenceValidationResult:
     entities: tuple[EntityRecord, ...]
     references: tuple[ReferenceRecord, ...]
     campaign: Mapping[str, Any]
+    diagnostics: ReferenceTraversalDiagnostics = field(
+        default_factory=ReferenceTraversalDiagnostics
+    )
+
+    @property
+    def debug_summary_path(self) -> tuple[str, ...]:
+        """Expose traversal diagnostics in a stable path-like form for QA."""
+
+        return self.diagnostics.debug_summary_path
+
+    @property
+    def debug_summary(self) -> str:
+        """Expose traversal diagnostics as a readable debug summary."""
+
+        return self.diagnostics.debug_summary
 
 
 def validate_references(
@@ -107,7 +162,9 @@ def validate_references(
         reference order inside each source entity.
     """
 
-    return list(validate_reference_graph(hierarchy, campaign=campaign, config=config).issues)
+    return list(
+        validate_reference_graph(hierarchy, campaign=campaign, config=config).issues
+    )
 
 
 def validate_reference_graph(
@@ -119,17 +176,24 @@ def validate_reference_graph(
     """Validate references for an explicit campaign and return traversal metadata."""
 
     active_config = config or ReferenceValidatorConfig()
-    entities = tuple(_walk_entities(hierarchy))
+    traversal_root = _resolve_traversal_root(hierarchy, campaign)
+    entities = tuple(_walk_entities(traversal_root))
     entity_index = _build_entity_index(entities)
     references = tuple(_walk_references(entities, active_config.field_expected_types))
+    diagnostics = _build_traversal_diagnostics(entities, references)
     issues: list[ValidationIssue] = []
 
     for reference in references:
-        if reference.declared_type and reference.declared_type != reference.expected_type:
+        if (
+            reference.declared_type
+            and reference.declared_type != reference.expected_type
+        ):
             issues.append(_build_type_issue(reference))
             continue
 
-        candidates = entity_index.get((reference.expected_type, reference.reference_value), ())
+        candidates = entity_index.get(
+            (reference.expected_type, reference.reference_value), ()
+        )
         if not candidates:
             issues.append(_build_missing_issue(reference))
             continue
@@ -150,20 +214,132 @@ def validate_reference_graph(
         entities=entities,
         references=references,
         campaign=dict(campaign),
+        diagnostics=diagnostics,
+    )
+
+
+def _resolve_traversal_root(hierarchy: Any, campaign: Mapping[str, Any]) -> Any:
+    """Return the selected campaign node instead of a global registry container."""
+
+    if _mapping_is_campaign(hierarchy):
+        if _campaign_matches(hierarchy, campaign) or not _mapping_is_campaign(campaign):
+            return hierarchy
+        return _campaign_with_defaults(campaign)
+
+    selected_campaign = _find_selected_campaign(hierarchy, campaign)
+    if selected_campaign is not None:
+        return selected_campaign
+
+    if _mapping_has_supported_entity_record(hierarchy):
+        return hierarchy
+
+    if isinstance(campaign, Mapping):
+        return _campaign_with_defaults(campaign)
+
+    return hierarchy
+
+
+def _find_selected_campaign(
+    hierarchy: Any,
+    campaign: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    """Find the matching selected campaign within a registry-shaped hierarchy."""
+
+    for candidate in _iter_mapping_nodes(hierarchy):
+        if _mapping_is_campaign(candidate) and _campaign_matches(candidate, campaign):
+            return candidate
+    return None
+
+
+def _iter_mapping_nodes(value: Any) -> Iterable[Mapping[str, Any]]:
+    if isinstance(value, Mapping):
+        yield value
+        for key in _stable_mapping_keys(value):
+            child = value.get(key)
+            if isinstance(child, (Mapping, list, tuple)):
+                yield from _iter_mapping_nodes(child)
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        for item in value:
+            yield from _iter_mapping_nodes(item)
+
+
+def _campaign_with_defaults(campaign: Mapping[str, Any]) -> Mapping[str, Any]:
+    root = dict(campaign)
+    root.setdefault("type", "campaign")
+    root.setdefault("entity_type", "campaign")
+    identifier = _extract_identifier(root)
+    if identifier:
+        root.setdefault("id", identifier)
+    label = _extract_label(root)
+    if label:
+        root.setdefault("name", label)
+    return root
+
+
+def _mapping_is_campaign(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and _normalize_text(_first_present(value, ENTITY_TYPE_KEYS)) == "campaign"
+    )
+
+
+def _mapping_has_supported_entity_record(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    entity_type = _normalize_text(_first_present(value, ENTITY_TYPE_KEYS))
+    return entity_type in SUPPORTED_ENTITY_TYPES and bool(_extract_identifier(value))
+
+
+def _campaign_matches(
+    candidate: Mapping[str, Any], campaign: Mapping[str, Any]
+) -> bool:
+    campaign_identifiers = _identity_values(campaign)
+    if not campaign_identifiers:
+        return True
+    return bool(_identity_values(candidate) & campaign_identifiers)
+
+
+def _identity_values(value: Mapping[str, Any]) -> set[str]:
+    return {
+        normalized
+        for key in ENTITY_ID_KEYS + ENTITY_NAME_KEYS
+        if key in value
+        for normalized in (_normalize_text(value.get(key)),)
+        if normalized
+    }
+
+
+def _build_traversal_diagnostics(
+    entities: Sequence[EntityRecord],
+    references: Sequence[ReferenceRecord],
+) -> ReferenceTraversalDiagnostics:
+    counts = Counter(entity.entity_type for entity in entities)
+    return ReferenceTraversalDiagnostics(
+        visited_campaigns=counts.get("campaign", 0),
+        visited_arcs=counts.get("arc", 0),
+        visited_scenarios=counts.get("scenario", 0),
+        visited_references=len(references),
+        root_path=entities[0].path if entities else (),
     )
 
 
 def _walk_entities(root: Any) -> Iterable[EntityRecord]:
-    """Yield entities in stable hierarchy order."""
+    """Yield selected-campaign entities in explicit model hierarchy order."""
 
     counter = 0
 
-    def visit(value: Any, path: tuple[str, ...], parent: EntityRecord | None) -> Iterable[EntityRecord]:
+    def visit(
+        value: Any,
+        path: tuple[str, ...],
+        parent: EntityRecord | None,
+    ) -> Iterable[EntityRecord]:
         nonlocal counter
-        current_parent = parent
         if isinstance(value, Mapping):
             entity_type = _normalize_text(_first_present(value, ENTITY_TYPE_KEYS))
             identifier = _extract_identifier(value)
+            current = parent
+            child_base_path = path
+
             if entity_type and identifier:
                 label = _extract_label(value) or identifier
                 current = EntityRecord(
@@ -179,17 +355,19 @@ def _walk_entities(root: Any) -> Iterable[EntityRecord]:
                 )
                 counter += 1
                 yield current
-                current_parent = current
                 child_base_path = current.path
-            else:
-                child_base_path = path
 
-            for key in _stable_mapping_keys(value):
-                if _should_descend_into_key(key, value.get(key)):
-                    yield from visit(value[key], child_base_path + (str(key),), current_parent)
-        elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-            for index, item in enumerate(value):
-                yield from visit(item, path + (f"[{index}]",), current_parent)
+            for key in _child_collection_keys(entity_type, value):
+                child_value = value.get(key, ())
+                for child_segment, child in _ordered_collection_items(child_value):
+                    yield from visit(
+                        child, child_base_path + (key, child_segment), current
+                    )
+        elif isinstance(value, Sequence) and not isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            for segment, item in _ordered_collection_items(value):
+                yield from visit(item, path + (segment,), parent)
 
     yield from visit(root, (), None)
 
@@ -207,7 +385,9 @@ def _walk_references(
             source_type, field_name = _split_field_path(field_path)
             if source_type != entity.entity_type or field_name not in entity.node:
                 continue
-            for ref_index, raw_reference in enumerate(_coerce_reference_values(entity.node[field_name])):
+            for ref_index, raw_reference in enumerate(
+                _coerce_reference_values(entity.node[field_name])
+            ):
                 reference_value = _extract_reference_value(raw_reference)
                 if not reference_value:
                     continue
@@ -303,7 +483,9 @@ def _build_ambiguous_issue(
     )
 
 
-def _build_hierarchy_issue(reference: ReferenceRecord, target: EntityRecord) -> ValidationIssue:
+def _build_hierarchy_issue(
+    reference: ReferenceRecord, target: EntityRecord
+) -> ValidationIssue:
     return ValidationIssue(
         issue_type=IssueType.INVALID_HIERARCHY,
         payload=IssuePayload(
@@ -332,12 +514,55 @@ def _is_valid_hierarchy_position(
     allowed_children = allowed_hierarchy_children.get(source.entity_type, set())
     if target.entity_type not in allowed_children:
         return False
-    return target.parent_type == source.entity_type and target.parent_identifier == source.identifier
+    return (
+        target.parent_type == source.entity_type
+        and target.parent_identifier == source.identifier
+    )
 
 
 def _split_field_path(field_path: str) -> tuple[str, str]:
     source_type, _, field_name = field_path.partition(".")
     return source_type, field_name
+
+
+def _child_collection_keys(
+    entity_type: str,
+    value: Mapping[str, Any],
+) -> tuple[str, ...]:
+    """Return explicit child collections for the current model entity."""
+
+    explicit_keys = MODEL_CHILD_COLLECTIONS.get(entity_type, ())
+    fallback_keys = tuple(key for key in FALLBACK_CHILD_COLLECTIONS if key in value)
+    if entity_type:
+        return tuple(dict.fromkeys(explicit_keys + fallback_keys))
+    return tuple(
+        key
+        for key in _stable_mapping_keys(value)
+        if _should_descend_into_key(key, value.get(key))
+    )
+
+
+def _ordered_collection_items(value: Any) -> tuple[tuple[str, Any], ...]:
+    """Return collection items in deterministic entity order with stable path segments."""
+
+    if isinstance(value, Mapping):
+        items = tuple((str(key), item) for key, item in value.items())
+    elif isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        items = tuple((f"[{index}]", item) for index, item in enumerate(value))
+    else:
+        return ()
+    return tuple(
+        sorted(items, key=lambda item: _collection_item_sort_key(item[1], item[0]))
+    )
+
+
+def _collection_item_sort_key(value: Any, segment: str) -> tuple[str, str, str, str]:
+    if isinstance(value, Mapping):
+        entity_type = _normalize_text(_first_present(value, ENTITY_TYPE_KEYS))
+        identifier = _extract_identifier(value)
+        label = _extract_label(value)
+        return (entity_type, identifier, label, segment)
+    return (type(value).__name__, _normalize_text(value), "", segment)
 
 
 def _stable_mapping_keys(value: Mapping[str, Any]) -> list[str]:
@@ -362,7 +587,9 @@ def _coerce_reference_values(value: Any) -> Iterable[Any]:
 
 
 def _extract_identifier(value: Mapping[str, Any]) -> str:
-    return _normalize_text(_first_present(value, ENTITY_ID_KEYS)) or _extract_label(value)
+    return _normalize_text(_first_present(value, ENTITY_ID_KEYS)) or _extract_label(
+        value
+    )
 
 
 def _extract_label(value: Mapping[str, Any]) -> str:
@@ -371,7 +598,9 @@ def _extract_label(value: Mapping[str, Any]) -> str:
 
 def _extract_reference_value(value: Any) -> str:
     if isinstance(value, Mapping):
-        reference_keys = ENTITY_ID_KEYS + ENTITY_NAME_KEYS + ("ref", "reference", "target")
+        reference_keys = (
+            ENTITY_ID_KEYS + ENTITY_NAME_KEYS + ("ref", "reference", "target")
+        )
         return _normalize_text(_first_present(value, reference_keys))
     return _normalize_text(value)
 
