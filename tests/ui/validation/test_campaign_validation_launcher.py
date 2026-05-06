@@ -46,12 +46,15 @@ def test_build_campaign_validation_hierarchy_normalizes_wrapper_items():
     assert hierarchy["type"] == "campaign"
     assert hierarchy["id"] == "c1"
     assert hierarchy["name"] == "Dragonfall"
-    assert entities[0]["type"] == "npc"
-    assert entities[0]["id"] == "Asha"
-    assert entities[1]["type"] == "scenario"
-    assert entities[1]["id"] == "Opening Scene"
-    assert entities[1]["npc_refs"] == ["Asha"]
-    assert "NPCs" not in entities[1]
+    assert entities == [
+        {
+            "Name": "Asha",
+            "type": "npc",
+            "entity_type": "npc",
+            "id": "Asha",
+            "name": "Asha",
+        }
+    ]
 
 
 def test_build_campaign_validation_hierarchy_normalizes_campaign_linked_scenarios():
@@ -108,7 +111,16 @@ def test_build_campaign_validation_hierarchy_builds_selected_campaign_arc_nodes(
             "type": "arc",
             "entity_type": "arc",
             "id": "Opening Arc",
-            "scenario_refs": ["Opening Scene", "Hidden Shrine"],
+            "scenario_refs": ["Hidden Shrine"],
+            "scenarios": [
+                {
+                    "Title": "Opening Scene",
+                    "type": "scenario",
+                    "entity_type": "scenario",
+                    "id": "Opening Scene",
+                    "name": "Opening Scene",
+                }
+            ],
         },
         {
             "id": "arc-final",
@@ -119,7 +131,46 @@ def test_build_campaign_validation_hierarchy_builds_selected_campaign_arc_nodes(
             "scenario_refs": ["Boss Fight"],
         },
     ]
-    assert hierarchy["entities"][0]["entity_type"] == "scenario"
+    assert hierarchy["entities"] == []
+
+
+def test_build_campaign_validation_hierarchy_attaches_only_referenced_scenarios():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {
+            "arcs": [
+                {"name": "Opening Arc", "scenarios": ["s1", "Missing Scene"]},
+                {"name": "Finale", "scenarios": ["Boss Fight"]},
+                {"name": "Downtime", "scenarios": []},
+            ]
+        },
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper(
+                [
+                    {"id": "s1", "Title": "Opening Scene", "NPCs": ["Asha"]},
+                    {"id": "boss", "Title": "Boss Fight"},
+                    {"id": "unused", "Title": "Unrelated Scene"},
+                ]
+            ),
+        },
+        campaign,
+    )
+
+    opening_arc, finale_arc, downtime_arc = hierarchy["arcs"]
+    assert opening_arc["scenario_refs"] == ["Missing Scene"]
+    assert [scenario["id"] for scenario in opening_arc["scenarios"]] == ["s1"]
+    assert opening_arc["scenarios"][0]["npc_refs"] == ["Asha"]
+    assert "NPCs" not in opening_arc["scenarios"][0]
+    assert finale_arc["scenario_refs"] == []
+    assert [scenario["id"] for scenario in finale_arc["scenarios"]] == ["boss"]
+    assert downtime_arc["scenario_refs"] == []
+    assert "scenarios" not in downtime_arc
+    assert hierarchy["entities"] == []
 
 
 def test_load_campaign_options_reads_campaigns_wrapper_only():
@@ -344,12 +395,12 @@ def test_launcher_summary_includes_scan_metrics(monkeypatch):
     assert run is not None
     assert run.graph.diagnostics.visited_references == len(run.graph.references)
     summary = summaries[0]
-    assert summary.metrics.entities_visited == len(run.graph.entities) == 4
+    assert summary.metrics.entities_visited == len(run.graph.entities) == 3
     assert summary.metrics.references_checked == len(run.graph.references) == 1
     assert summary.metrics.elapsed_seconds >= 0
     assert any(run.graph.debug_summary in message for message in log_messages)
     assert any(
-        "entities_visited=4" in message and "references_checked=1" in message
+        "entities_visited=3" in message and "references_checked=1" in message
         for message in log_messages
     )
     diagnostics = run.graph.diagnostics
