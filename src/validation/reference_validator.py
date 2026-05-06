@@ -526,14 +526,41 @@ def _is_valid_hierarchy_position(
 def _is_valid_arc_scenario_ref_membership(
     reference: ReferenceRecord, target: EntityRecord
 ) -> bool:
-    """Accept graph-level scenarios that an arc explicitly lists by name or ID."""
+    """Accept graph-level scenarios only when the source arc proves membership."""
 
-    return (
-        reference.field_path == "arc.scenario_refs"
-        and reference.source.entity_type == "arc"
-        and target.entity_type == "scenario"
-        and reference.reference_value in _entity_reference_values(target)
+    if (
+        reference.field_path != "arc.scenario_refs"
+        or reference.source.entity_type != "arc"
+        or target.entity_type != "scenario"
+    ):
+        return False
+
+    return _arc_scenario_ref_matches_target(reference, target)
+
+
+def _arc_scenario_ref_matches_target(
+    reference: ReferenceRecord, target: EntityRecord
+) -> bool:
+    """Return whether this arc reference explicitly identifies the target scenario."""
+
+    target_values = _entity_reference_values(target)
+    if reference.reference_value not in target_values:
+        return False
+
+    raw_scenario_refs = reference.source.node.get(reference.field_name, ())
+    return any(
+        _raw_reference_matches_target(reference, raw_reference, target_values)
+        for raw_reference in _coerce_reference_values(raw_scenario_refs)
     )
+
+
+def _raw_reference_matches_target(
+    reference: ReferenceRecord,
+    raw_reference: Any,
+    target_values: frozenset[str],
+) -> bool:
+    raw_values = _reference_identity_values(raw_reference)
+    return reference.reference_value in raw_values and bool(target_values & raw_values)
 
 
 def _entity_reference_values(entity: EntityRecord) -> frozenset[str]:
@@ -544,6 +571,24 @@ def _entity_reference_values(entity: EntityRecord) -> frozenset[str]:
         if key in entity.node
     )
     return frozenset(value for value in values if value)
+
+
+def _reference_identity_values(value: Any) -> frozenset[str]:
+    if isinstance(value, Mapping):
+        reference_keys = ENTITY_ID_KEYS + ENTITY_NAME_KEYS + (
+            "ref",
+            "reference",
+            "target",
+        )
+        return frozenset(
+            normalized
+            for key in reference_keys
+            if key in value
+            for normalized in (_normalize_text(value.get(key)),)
+            if normalized
+        )
+    normalized = _normalize_text(value)
+    return frozenset((normalized,)) if normalized else frozenset()
 
 
 def _split_field_path(field_path: str) -> tuple[str, str]:

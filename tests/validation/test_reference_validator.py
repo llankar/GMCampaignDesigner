@@ -169,6 +169,31 @@ def test_validate_references_accepts_arc_scenario_refs_to_graph_scenarios():
     assert result.issues == ()
 
 
+def test_validate_references_accepts_arc_scenario_refs_by_scenario_title():
+    """Verify arc scenario_refs can prove graph membership with scenario Title."""
+    hierarchy = {
+        "type": "campaign",
+        "id": "C1",
+        "arcs": [
+            {
+                "type": "arc",
+                "id": "A1",
+                "scenario_refs": [{"Title": "Hidden Shrine"}],
+            }
+        ],
+        "entities": [
+            {"type": "scenario", "id": "S1", "Title": "Hidden Shrine"},
+        ],
+    }
+
+    result = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+
+    assert [reference.reference_value for reference in result.references] == [
+        "Hidden Shrine",
+    ]
+    assert result.issues == ()
+
+
 def test_validate_references_keeps_non_arc_scenario_refs_strict():
     """Verify graph-membership hierarchy relief is limited to arc scenario refs."""
     hierarchy = _sample_hierarchy()
