@@ -32,7 +32,12 @@ from src.ui.validation.validation_wizard_controller import (
     resolve_reference_for_issue,
     validation_setup_failed_step,
 )
-from src.validation import IssueType, ReferenceValidationResult, validate_reference_graph
+from src.validation import (
+    IssueType,
+    ReferenceValidationResult,
+    normalize_validator_reference_fields,
+    validate_reference_graph,
+)
 
 CampaignSelector = Callable[
     [Any, Sequence[CampaignSelectorOption]],
@@ -277,7 +282,9 @@ def build_campaign_validation_hierarchy(
         if isinstance(campaign, CampaignSelectorOption)
         else campaign_option_from_item(campaign)
     )
-    root: dict[str, Any] = dict(selected.item)
+    root: dict[str, Any] = normalize_validator_reference_fields(
+        "campaign", selected.item
+    )
     root["type"] = "campaign"
     root["entity_type"] = "campaign"
     root["id"] = selected.campaign_id
@@ -343,8 +350,8 @@ def _safe_load_items(wrapper: Any) -> Sequence[Any]:
 
 
 def _normalize_entity_node(slug: str, item: Mapping[str, Any], index: int) -> dict[str, Any]:
-    node = dict(item)
     entity_type = _singular_entity_type(slug)
+    node = normalize_validator_reference_fields(entity_type, item)
     identifier = _identifier_for(node, slug, index)
     node.setdefault("type", entity_type)
     node.setdefault("entity_type", entity_type)
