@@ -5,6 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
+from src.ui.validation.labels import (
+    AMBIGUOUS_REFERENCE_MESSAGE,
+    AMBIGUOUS_REFERENCE_TITLE,
+    CANDIDATE_UNAVAILABLE_MESSAGE,
+    CHOOSE_LEFT_LABEL,
+    CHOOSE_RIGHT_LABEL,
+    IGNORE_LABEL,
+    NO_KEY_INFO_MESSAGE,
+    NO_OTHER_CANDIDATE_SELECTOR_MESSAGE,
+    PATH_LABEL,
+    TAGS_LABEL,
+    TYPE_LABEL,
+    VIEW_OTHER_CANDIDATES_LABEL,
+)
 from src.ui.validation.validation_wizard_controller import (
     ValidationWizardAction,
     ValidationWizardActionRequest,
@@ -62,7 +76,7 @@ class AmbiguousReferenceCandidate:
         if self.description:
             infos.append(self.description)
         if self.tags:
-            infos.append(f"Tags : {', '.join(self.tags)}")
+            infos.append(f"{TAGS_LABEL}: {', '.join(self.tags)}")
         return tuple(infos)
 
     @property
@@ -133,7 +147,7 @@ class AmbiguousReferenceDialog:
 
         window = ctk.CTkToplevel(self.master)
         self.window = window
-        window.title("Référence ambiguë")
+        window.title(AMBIGUOUS_REFERENCE_TITLE)
         window.transient(self.master)
         window.grab_set()
         window.geometry("760x460")
@@ -142,14 +156,14 @@ class AmbiguousReferenceDialog:
         payload = self.issue.payload
         ctk.CTkLabel(
             window,
-            text="Référence ambiguë",
+            text=AMBIGUOUS_REFERENCE_TITLE,
             font=ctk.CTkFont(size=18, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 8))
         ctk.CTkLabel(
             window,
-            text=(
-                f"« {payload.referenced_name} » correspond à plusieurs "
-                f"{payload.expected_type}. Choisissez la cible à remapper."
+            text=AMBIGUOUS_REFERENCE_MESSAGE.format(
+                referenced_name=payload.referenced_name,
+                expected_type=payload.expected_type,
             ),
             wraplength=700,
             justify="left",
@@ -167,18 +181,18 @@ class AmbiguousReferenceDialog:
         for index in range(4):
             actions.grid_columnconfigure(index, weight=1)
 
-        ctk.CTkButton(actions, text="Choisir gauche", command=self.choose_left).grid(
+        ctk.CTkButton(actions, text=CHOOSE_LEFT_LABEL, command=self.choose_left).grid(
             row=0, column=0, sticky="ew", padx=4, pady=4
         )
-        ctk.CTkButton(actions, text="Choisir droite", command=self.choose_right).grid(
+        ctk.CTkButton(actions, text=CHOOSE_RIGHT_LABEL, command=self.choose_right).grid(
             row=0, column=1, sticky="ew", padx=4, pady=4
         )
         ctk.CTkButton(
             actions,
-            text="Voir autres candidats",
+            text=VIEW_OTHER_CANDIDATES_LABEL,
             command=self.show_other_candidates,
         ).grid(row=0, column=2, sticky="ew", padx=4, pady=4)
-        ctk.CTkButton(actions, text="Ignorer", command=self.ignore).grid(
+        ctk.CTkButton(actions, text=IGNORE_LABEL, command=self.ignore).grid(
             row=0, column=3, sticky="ew", padx=4, pady=4
         )
         return self
@@ -197,7 +211,7 @@ class AmbiguousReferenceDialog:
         """Submit the selected candidate identifier to the controller."""
 
         if index < 0 or index >= len(self.displayed_candidates):
-            self._publish_error("Candidat indisponible pour cette référence ambiguë.")
+            self._publish_error(CANDIDATE_UNAVAILABLE_MESSAGE)
             return None
 
         candidate = self.displayed_candidates[index]
@@ -213,7 +227,7 @@ class AmbiguousReferenceDialog:
         """Notify the host that a broader candidate picker should be shown."""
 
         if self.config.on_show_other_candidates is None:
-            self._publish_error("Aucun sélecteur d’autres candidats n’est configuré.")
+            self._publish_error(NO_OTHER_CANDIDATE_SELECTOR_MESSAGE)
             return
         self.config.on_show_other_candidates(self.issue, self.candidates)
 
@@ -247,17 +261,17 @@ class AmbiguousReferenceDialog:
             font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
-        ctk.CTkLabel(card, text=f"Type : {candidate.entity_type or '—'}", anchor="w").grid(
+        ctk.CTkLabel(card, text=f"{TYPE_LABEL}: {candidate.entity_type or '—'}", anchor="w").grid(
             row=1, column=0, sticky="ew", padx=12, pady=2
         )
         ctk.CTkLabel(
             card,
-            text=f"Chemin : {candidate.display_path}",
+            text=f"{PATH_LABEL}: {candidate.display_path}",
             wraplength=320,
             justify="left",
             anchor="w",
         ).grid(row=2, column=0, sticky="ew", padx=12, pady=2)
-        infos = candidate.key_infos or ("Aucune info clé disponible.",)
+        infos = candidate.key_infos or (NO_KEY_INFO_MESSAGE,)
         ctk.CTkLabel(
             card,
             text="\n".join(infos),

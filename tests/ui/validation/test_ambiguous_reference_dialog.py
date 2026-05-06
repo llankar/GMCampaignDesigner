@@ -65,7 +65,7 @@ def test_dialog_normalizes_candidates_and_displays_two_side_by_side():
     assert dialog.displayed_candidates[0].display_path.endswith("scenario:S1")
     assert dialog.displayed_candidates[0].key_infos == (
         "Première piste",
-        "Tags : politique, intro",
+        "Tags: politique, intro",
     )
     assert hierarchy["scenario_refs"] == ["Duplicate"]
 
