@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from time import monotonic
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
 from src.services import ReferenceActionResult, ReferenceFixService, SessionIgnoreStore
@@ -65,6 +66,15 @@ class ValidationWizardProgress:
 
 
 @dataclass(frozen=True)
+class ValidationWizardMetrics:
+    """Non-issue counters captured during a validation run."""
+
+    entities_visited: int = 0
+    references_checked: int = 0
+    elapsed_seconds: float = 0.0
+
+
+@dataclass(frozen=True)
 class ValidationWizardSummary:
     """Deterministic summary emitted when the wizard finishes or is canceled."""
 
@@ -72,6 +82,7 @@ class ValidationWizardSummary:
     resolved: int = 0
     skipped_session: int = 0
     canceled: bool = False
+    metrics: ValidationWizardMetrics = field(default_factory=ValidationWizardMetrics)
     changes_applied: tuple[str, ...] = field(default_factory=tuple)
     messages: tuple[str, ...] = field(default_factory=tuple)
 
@@ -154,6 +165,8 @@ class ValidationWizardController:
         ignore_store: SessionIgnoreStore | None = None,
         reference_resolver: ReferenceResolver | None = None,
         presenter: ValidationWizardPresenter | None = None,
+        metrics: ValidationWizardMetrics | None = None,
+        started_at: float | None = None,
     ) -> None:
         self._items = tuple(_coerce_issue_item(issue) for issue in issues)
         self._campaign = dict(campaign)
@@ -161,8 +174,12 @@ class ValidationWizardController:
         self._ignore_store = ignore_store or SessionIgnoreStore()
         self._reference_resolver = reference_resolver
         self._presenter = presenter
+        self._started_at = started_at if started_at is not None else monotonic()
         self._cursor = -1
-        self._summary = ValidationWizardSummary(total_issues=len(self._items))
+        self._summary = ValidationWizardSummary(
+            total_issues=len(self._items),
+            metrics=metrics or ValidationWizardMetrics(),
+        )
         self._awaiting_entity_creation = False
         self._active_step: ValidationWizardStep | None = None
 
@@ -301,7 +318,7 @@ class ValidationWizardController:
         """Cancel the wizard and return a final canceled summary."""
 
         self._awaiting_entity_creation = False
-        self._summary = _summary_canceled(self._summary)
+        self._summary = _summary_canceled(self._final_summary())
         step = ValidationWizardStep(
             status=ValidationWizardStatus.CANCELED,
             summary=self._summary,
@@ -333,12 +350,27 @@ class ValidationWizardController:
     def _complete(self) -> ValidationWizardStep:
         step = ValidationWizardStep(
             status=ValidationWizardStatus.COMPLETED,
-            summary=self._summary,
+            summary=self._final_summary(),
             message="Validation terminée.",
         )
+        self._summary = step.summary or self._summary
         self._active_step = step
         self._notify_summary(step)
         return step
+
+    def _final_summary(self) -> ValidationWizardSummary:
+        elapsed = max(
+            monotonic() - self._started_at,
+            self._summary.metrics.elapsed_seconds,
+        )
+        return _summary_with_metrics(
+            self._summary,
+            ValidationWizardMetrics(
+                entities_visited=self._summary.metrics.entities_visited,
+                references_checked=self._summary.metrics.references_checked,
+                elapsed_seconds=elapsed,
+            ),
+        )
 
     def _handle_action_result(self, result: ReferenceActionResult) -> ValidationWizardStep:
         if not result.success:
@@ -438,6 +470,21 @@ def _coerce_action_request(
     )
 
 
+def _summary_with_metrics(
+    summary: ValidationWizardSummary,
+    metrics: ValidationWizardMetrics,
+) -> ValidationWizardSummary:
+    return ValidationWizardSummary(
+        total_issues=summary.total_issues,
+        resolved=summary.resolved,
+        skipped_session=summary.skipped_session,
+        canceled=summary.canceled,
+        metrics=metrics,
+        changes_applied=summary.changes_applied,
+        messages=summary.messages,
+    )
+
+
 def _summary_with_result(
     summary: ValidationWizardSummary,
     result: ReferenceActionResult,
@@ -447,6 +494,7 @@ def _summary_with_result(
         resolved=summary.resolved + 1,
         skipped_session=summary.skipped_session,
         canceled=summary.canceled,
+        metrics=summary.metrics,
         changes_applied=summary.changes_applied + result.changes_applied,
         messages=summary.messages + ((result.ui_message,) if result.ui_message else ()),
     )
@@ -458,6 +506,7 @@ def _summary_with_skip(summary: ValidationWizardSummary, message: str) -> Valida
         resolved=summary.resolved,
         skipped_session=summary.skipped_session + 1,
         canceled=summary.canceled,
+        metrics=summary.metrics,
         changes_applied=summary.changes_applied,
         messages=summary.messages + (message,),
     )
@@ -469,6 +518,7 @@ def _summary_canceled(summary: ValidationWizardSummary) -> ValidationWizardSumma
         resolved=summary.resolved,
         skipped_session=summary.skipped_session,
         canceled=True,
+        metrics=summary.metrics,
         changes_applied=summary.changes_applied,
         messages=summary.messages + ("Validation annulée par le GM.",),
     )

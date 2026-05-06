@@ -235,3 +235,50 @@ def test_launcher_reports_bootstrap_exception_without_summary(monkeypatch):
             ),
         )
     ]
+
+
+def test_launcher_summary_includes_scan_metrics(monkeypatch):
+    summaries = []
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda _master, summary: summaries.append(summary),
+    )
+    launcher = CampaignHierarchyValidationLauncher(
+        FakeApp(
+            {
+                "campaigns": FakeWrapper([_campaign()]),
+                "arcs": FakeWrapper([{"Name": "Arc One"}]),
+                "scenarios": FakeWrapper([{"Name": "Opening", "npc_refs": ["Asha"]}]),
+                "npcs": FakeWrapper([{"Name": "Asha"}]),
+            }
+        )
+    )
+
+    run = launcher.launch(_campaign())
+
+    assert run is not None
+    summary = summaries[0]
+    assert summary.metrics.entities_visited == 3
+    assert summary.metrics.references_checked == 1
+    assert summary.metrics.elapsed_seconds >= 0
+
+
+def test_build_campaign_validation_hierarchy_reports_lightweight_phases():
+    phases = []
+
+    class FakeProgress:
+        def set_phase(self, phase):
+            phases.append(phase)
+
+    build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([_campaign()]),
+            "arcs": FakeWrapper([]),
+            "scenarios": FakeWrapper([]),
+        },
+        _campaign(),
+        progress=FakeProgress(),
+    )
+
+    assert "Scanning arcs…" in phases
+    assert "Scanning scenarios…" in phases
