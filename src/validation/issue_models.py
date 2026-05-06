@@ -12,6 +12,7 @@ class IssueType(str, Enum):
 
     MISSING_REFERENCE = "MISSING_REFERENCE"
     AMBIGUOUS_REFERENCE = "AMBIGUOUS_REFERENCE"
+    INVALID_REFERENCE_TYPE = "INVALID_REFERENCE_TYPE"
     INVALID_HIERARCHY = "INVALID_HIERARCHY"
 
 
@@ -25,6 +26,11 @@ class IssuePayload:
     expected_type: str
     candidates: Sequence[str] = field(default_factory=tuple)
     hierarchy_path: Sequence[str] = field(default_factory=tuple)
+    source_type: str = ""
+    actual_type: str = ""
+    source_path: Sequence[str] = field(default_factory=tuple)
+    target_path: Sequence[str] = field(default_factory=tuple)
+    resolution_hint: str = ""
 
 
 @dataclass(frozen=True)
