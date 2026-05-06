@@ -133,7 +133,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                         _command("Scenario Graph", app.open_scenario_graph_editor, icon_key="scenario_graph"),
                         _command("Scene Flow Viewer", app.open_scene_flow_viewer, icon_key="scene_flow_viewer"),
                         _command("Create Random Table", app.open_random_table_editor, icon_key="create_random_table"),
-                        _command("Vérifier cohérence hiérarchie", app.open_hierarchy_validation, icon_key="campaign_graph"),
+                        _command("Verify Campaign ", app.open_hierarchy_validation, icon_key="campaign_graph"),
                     ],
                 ),
             ],
