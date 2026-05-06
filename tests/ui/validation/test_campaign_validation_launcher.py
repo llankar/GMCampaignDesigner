@@ -25,6 +25,12 @@ def _campaign():
     return {"id": "c1", "Name": "Dragonfall"}
 
 
+def _campaign_with_arc_reference():
+    campaign = _campaign()
+    campaign["arc_refs"] = ["Arc One"]
+    return campaign
+
+
 def test_build_campaign_validation_hierarchy_normalizes_wrapper_items():
     hierarchy = build_campaign_validation_hierarchy(
         {
@@ -246,20 +252,21 @@ def test_launcher_summary_includes_scan_metrics(monkeypatch):
     launcher = CampaignHierarchyValidationLauncher(
         FakeApp(
             {
-                "campaigns": FakeWrapper([_campaign()]),
+                "campaigns": FakeWrapper([_campaign_with_arc_reference()]),
                 "arcs": FakeWrapper([{"Name": "Arc One"}]),
-                "scenarios": FakeWrapper([{"Name": "Opening", "npc_refs": ["Asha"]}]),
+                "scenarios": FakeWrapper([{"Name": "Opening"}]),
                 "npcs": FakeWrapper([{"Name": "Asha"}]),
             }
         )
     )
 
-    run = launcher.launch(_campaign())
+    run = launcher.launch(_campaign_with_arc_reference())
 
     assert run is not None
+    assert run.graph.diagnostics.visited_references == len(run.graph.references)
     summary = summaries[0]
-    assert summary.metrics.entities_visited == 3
-    assert summary.metrics.references_checked == 1
+    assert summary.metrics.entities_visited == len(run.graph.entities) == 4
+    assert summary.metrics.references_checked == len(run.graph.references) == 1
     assert summary.metrics.elapsed_seconds >= 0
 
 

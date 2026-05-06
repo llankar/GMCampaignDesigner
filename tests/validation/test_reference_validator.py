@@ -156,6 +156,27 @@ def test_validate_reference_graph_uses_selected_campaign_root_not_registry_place
     assert "references=1" in result.debug_summary_path[-1]
 
 
+def test_validate_reference_graph_walks_validator_built_entities_collection():
+    """Verify campaign roots descend into flat UI launcher entity collections."""
+    hierarchy = {
+        "type": "campaign",
+        "id": "C1",
+        "arc_refs": ["A1"],
+        "entities": [
+            {"type": "arc", "id": "A1", "name": "Arc One"},
+            {"type": "npc", "id": "N1", "name": "Asha"},
+        ],
+    }
+
+    result = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+
+    assert [entity.identifier for entity in result.entities] == ["C1", "A1", "N1"]
+    assert [reference.reference_value for reference in result.references] == ["A1"]
+    assert result.diagnostics.visited_campaigns == 1
+    assert result.diagnostics.visited_arcs == 1
+    assert result.diagnostics.visited_references == 1
+
+
 def test_validate_reference_graph_walks_explicit_children_without_optional_collections():
     """Verify missing optional collections are treated as empty while siblings scan."""
     hierarchy = {
