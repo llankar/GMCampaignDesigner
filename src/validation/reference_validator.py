@@ -203,7 +203,7 @@ def validate_reference_graph(
 
         target = candidates[0]
         if not _is_valid_hierarchy_position(
-            reference.source,
+            reference,
             target,
             active_config.allowed_hierarchy_children,
         ):
@@ -507,17 +507,43 @@ def _build_hierarchy_issue(
 
 
 def _is_valid_hierarchy_position(
-    source: EntityRecord,
+    reference: ReferenceRecord,
     target: EntityRecord,
     allowed_hierarchy_children: Mapping[str, set[str]],
 ) -> bool:
+    source = reference.source
     allowed_children = allowed_hierarchy_children.get(source.entity_type, set())
     if target.entity_type not in allowed_children:
         return False
-    return (
+    if (
         target.parent_type == source.entity_type
         and target.parent_identifier == source.identifier
+    ):
+        return True
+    return _is_valid_arc_scenario_ref_membership(reference, target)
+
+
+def _is_valid_arc_scenario_ref_membership(
+    reference: ReferenceRecord, target: EntityRecord
+) -> bool:
+    """Accept graph-level scenarios that an arc explicitly lists by name or ID."""
+
+    return (
+        reference.field_path == "arc.scenario_refs"
+        and reference.source.entity_type == "arc"
+        and target.entity_type == "scenario"
+        and reference.reference_value in _entity_reference_values(target)
     )
+
+
+def _entity_reference_values(entity: EntityRecord) -> frozenset[str]:
+    values = {entity.identifier, entity.label}
+    values.update(
+        _normalize_text(entity.node.get(key))
+        for key in ENTITY_ID_KEYS + ENTITY_NAME_KEYS
+        if key in entity.node
+    )
+    return frozenset(value for value in values if value)
 
 
 def _split_field_path(field_path: str) -> tuple[str, str]:

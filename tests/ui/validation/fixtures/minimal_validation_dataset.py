@@ -14,7 +14,7 @@ from src.validation import IssueType, ReferenceValidationResult, validate_refere
 EXPECTED_ISSUE_SEQUENCE = (
     (IssueType.MISSING_REFERENCE, "Arc To Remove"),
     (IssueType.AMBIGUOUS_REFERENCE, "Shared Place"),
-    (IssueType.INVALID_HIERARCHY, "Sibling Scenario"),
+    (IssueType.INVALID_HIERARCHY, "Sibling Place"),
     (IssueType.MISSING_REFERENCE, "Scenario To Create"),
     (IssueType.MISSING_REFERENCE, "Scenario To Ignore"),
 )
@@ -26,14 +26,14 @@ EXPECTED_DECISION_SUMMARY = {
     "changes_applied": (
         "C1.arc_refs: référence supprimée",
         "A1.location_refs: Shared Place → L2",
-        "A1.scenario_refs: Sibling Scenario → S-valid",
+        "A1.location_refs: Sibling Place → L1",
         "scenarios: entité ajoutée",
         "A1.scenario_refs: Scenario To Create → S-created",
     ),
     "messages": (
         "Référence « Arc To Remove » supprimée.",
         "Référence remappée vers « L2 ».",
-        "Référence remappée vers « S-valid ».",
+        "Référence remappée vers « L1 ».",
         "Nouvelle entité « S-created » reliée.",
         "Issue ignored for this session: Scenario To Ignore",
     ),
@@ -53,7 +53,7 @@ def build_minimal_validation_hierarchy() -> dict[str, Any]:
                 "type": "arc",
                 "id": "A1",
                 "name": "Main Arc",
-                "location_refs": ["Shared Place"],
+                "location_refs": ["Shared Place", "Sibling Place"],
                 "scenario_refs": [
                     "Sibling Scenario",
                     "Scenario To Create",
@@ -71,6 +71,9 @@ def build_minimal_validation_hierarchy() -> dict[str, Any]:
                 "type": "arc",
                 "id": "A2",
                 "name": "Sibling Arc",
+                "locations": [
+                    {"type": "location", "id": "L-sibling", "name": "Sibling Place"},
+                ],
                 "scenarios": [
                     {
                         "type": "scenario",

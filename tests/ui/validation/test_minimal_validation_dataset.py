@@ -86,9 +86,9 @@ def test_minimal_dataset_actions_chain_to_next_problem_and_exact_summary():
         ),
     )
     step = ambiguous_dialog.choose_right()
-    _assert_problem(step, IssueType.INVALID_HIERARCHY, "Sibling Scenario")
+    _assert_problem(step, IssueType.INVALID_HIERARCHY, "Sibling Place")
 
-    step = controller.submit_action(ValidationWizardAction.REMAP, target="S-valid")
+    step = controller.submit_action(ValidationWizardAction.REMAP, target="L1")
     observed_steps.append(step)
     _assert_problem(step, IssueType.MISSING_REFERENCE, "Scenario To Create")
 
@@ -124,9 +124,9 @@ def test_minimal_dataset_actions_chain_to_next_problem_and_exact_summary():
     assert step.summary.changes_applied == EXPECTED_DECISION_SUMMARY["changes_applied"]
     assert step.summary.messages == EXPECTED_DECISION_SUMMARY["messages"]
     assert hierarchy["arc_refs"] == []
-    assert hierarchy["arcs"][0]["location_refs"] == ["L2"]
+    assert hierarchy["arcs"][0]["location_refs"] == ["L2", "L1"]
     assert hierarchy["arcs"][0]["scenario_refs"] == [
-        "S-valid",
+        "Sibling Scenario",
         "S-created",
         "Scenario To Ignore",
     ]

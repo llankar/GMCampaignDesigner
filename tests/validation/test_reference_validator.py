@@ -49,7 +49,12 @@ def _sample_hierarchy():
                     "S2",
                 ],
                 "scenarios": [
-                    {"type": "scenario", "id": "S1", "name": "Scenario One"},
+                    {
+                        "type": "scenario",
+                        "id": "S1",
+                        "name": "Scenario One",
+                        "npc_refs": ["N2"],
+                    },
                 ],
             },
             {
@@ -57,7 +62,12 @@ def _sample_hierarchy():
                 "id": "A2",
                 "name": "Arc Two",
                 "scenarios": [
-                    {"type": "scenario", "id": "S2", "name": "Scenario Two"},
+                    {
+                        "type": "scenario",
+                        "id": "S2",
+                        "name": "Scenario Two",
+                        "npcs": [{"type": "npc", "id": "N2"}],
+                    },
                 ],
             },
         ],
@@ -76,12 +86,12 @@ def test_validate_references_reports_missing_type_and_hierarchy_in_traversal_ord
     assert [issue.payload.referenced_name for issue in issues] == [
         "Missing Arc",
         "S1",
-        "S2",
+        "N2",
     ]
     assert issues[1].payload.expected_type == "scenario"
     assert issues[1].payload.actual_type == "location"
-    assert issues[2].payload.source_entity == "A1"
-    assert issues[2].payload.target_path[-1] == "scenario:S2"
+    assert issues[2].payload.source_entity == "S1"
+    assert issues[2].payload.target_path[-1] == "npc:N2"
     assert issues[2].payload.resolution_hint
 
 
@@ -95,12 +105,14 @@ def test_validate_reference_graph_exposes_entities_and_references_for_interactiv
         "S1",
         "A2",
         "S2",
+        "N2",
     ]
     assert [reference.reference_value for reference in result.references] == [
         "A1",
         "Missing Arc",
         "S1",
         "S2",
+        "N2",
     ]
     assert result.references[0].path == ("campaign:C1", "arc_refs", "[0]")
 
@@ -122,6 +134,53 @@ def test_validate_references_returns_empty_list_for_valid_direct_children():
     }
 
     assert validate_references(hierarchy, campaign={"id": "sample"}) == []
+
+
+def test_validate_references_accepts_arc_scenario_refs_to_graph_scenarios():
+    """Verify arc scenario_refs can target scenarios already in the selected graph."""
+    hierarchy = {
+        "type": "campaign",
+        "id": "C1",
+        "arcs": [
+            {
+                "type": "arc",
+                "id": "A1",
+                "scenario_refs": ["S1", "Scenario Two"],
+            }
+        ],
+        "entities": [
+            {"type": "scenario", "id": "S1", "name": "Scenario One"},
+            {"type": "scenario", "id": "S2", "name": "Scenario Two"},
+        ],
+    }
+
+    result = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+
+    assert [entity.identifier for entity in result.entities] == [
+        "C1",
+        "A1",
+        "S1",
+        "S2",
+    ]
+    assert [reference.reference_value for reference in result.references] == [
+        "S1",
+        "Scenario Two",
+    ]
+    assert result.issues == ()
+
+
+def test_validate_references_keeps_non_arc_scenario_refs_strict():
+    """Verify graph-membership hierarchy relief is limited to arc scenario refs."""
+    hierarchy = _sample_hierarchy()
+
+    issues = validate_references(hierarchy, campaign={"id": "sample"})
+
+    assert [issue.issue_type for issue in issues] == [
+        IssueType.MISSING_REFERENCE,
+        IssueType.INVALID_REFERENCE_TYPE,
+        IssueType.INVALID_HIERARCHY,
+    ]
+    assert issues[-1].payload.referenced_name == "N2"
 
 
 def test_validate_reference_graph_uses_selected_campaign_root_not_registry_placeholder():
