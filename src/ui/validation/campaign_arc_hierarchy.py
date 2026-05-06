@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 
 from modules.campaigns.shared.arc_parser import coerce_arc_list
+from src.validation import normalize_validator_reference_fields
 
 _ARC_ID_KEYS = ("id", "uuid", "slug", "key", "Id", "ID", "Uuid", "Slug", "Key")
 _ARC_NAME_KEYS = ("name", "Name", "title", "Title", "label", "Label", "arc_name")
@@ -22,7 +23,7 @@ def build_campaign_arc_nodes(raw_arcs: Any) -> list[dict[str, Any]]:
 
 
 def _build_arc_node(arc: Mapping[str, Any], index: int) -> dict[str, Any]:
-    node = dict(arc)
+    node = normalize_validator_reference_fields("arc", arc, remove_source_fields=False)
     identifier = _identifier_for_arc(node, index)
     node["type"] = "arc"
     node["entity_type"] = "arc"

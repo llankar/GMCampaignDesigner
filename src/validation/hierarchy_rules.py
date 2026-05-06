@@ -6,9 +6,9 @@ from typing import Mapping
 
 # Explicit mapping: field path -> expected referenced entity type.
 #
-# The canonical field names mirror the persisted campaign/scenario templates and
-# editor UI.  Legacy ``*_refs`` aliases are kept temporarily so older tests and
-# saved validation fixtures can migrate without losing coverage.
+# Persisted campaign/scenario template fields are accepted for direct validator
+# callers. UI validation normalizes linked-list fields into canonical ``*_refs``
+# aliases before traversal so reference records use stable validator fields.
 FIELD_EXPECTED_TYPES: Mapping[str, str] = {
     # Campaign fields from modules/campaigns/campaigns_template.json.
     "campaign.Arcs": "arc",
@@ -25,12 +25,23 @@ FIELD_EXPECTED_TYPES: Mapping[str, str] = {
     "scenario.Factions": "faction",
     "scenario.Objects": "object",
     "scenario.Books": "book",
-    # Legacy/test-only aliases retained for safe migration.
+    # Canonical validator aliases populated by field normalization.
     "campaign.arc_refs": "arc",
+    "campaign.scenario_refs": "scenario",
     "arc.scenario_refs": "scenario",
     "arc.location_refs": "location",
+    "scenario.base_refs": "base",
+    "scenario.location_refs": "location",
+    "scenario.map_refs": "map",
     "scenario.encounter_refs": "encounter",
     "scenario.npc_refs": "npc",
+    "scenario.pc_refs": "pc",
+    "scenario.villain_refs": "villain",
+    "scenario.event_refs": "event",
+    "scenario.creature_refs": "creature",
+    "scenario.faction_refs": "faction",
+    "scenario.object_refs": "object",
+    "scenario.book_refs": "book",
 }
 
 # Parent type -> allowed child types

@@ -50,6 +50,27 @@ def test_build_campaign_validation_hierarchy_normalizes_wrapper_items():
     assert entities[0]["id"] == "Asha"
     assert entities[1]["type"] == "scenario"
     assert entities[1]["id"] == "Opening Scene"
+    assert entities[1]["npc_refs"] == ["Asha"]
+    assert "NPCs" not in entities[1]
+
+
+def test_build_campaign_validation_hierarchy_normalizes_campaign_linked_scenarios():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "LinkedScenarios": ["Opening Scene", {"Title": "Hidden Shrine"}],
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper([{"Title": "Opening Scene"}]),
+        },
+        campaign,
+    )
+
+    assert hierarchy["scenario_refs"] == ["Opening Scene", {"Title": "Hidden Shrine"}]
+    assert "LinkedScenarios" not in hierarchy
 
 
 def test_build_campaign_validation_hierarchy_builds_selected_campaign_arc_nodes():

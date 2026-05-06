@@ -1,5 +1,10 @@
 """Validation package for cross-entity consistency checks."""
 
+from .field_normalization import (
+    FIELD_NORMALIZATION_RULES,
+    FieldNormalizationRule,
+    normalize_validator_reference_fields,
+)
 from .hierarchy_rules import (
     ALLOWED_HIERARCHY_CHILDREN,
     FIELD_EXPECTED_TYPES,
@@ -31,8 +36,10 @@ from .reference_validator import (
 
 __all__ = [
     "ALLOWED_HIERARCHY_CHILDREN",
+    "FIELD_NORMALIZATION_RULES",
     "FIELD_EXPECTED_TYPES",
     "EntityRecord",
+    "FieldNormalizationRule",
     "IssuePayload",
     "IssueType",
     "ReferenceRecord",
@@ -50,6 +57,7 @@ __all__ = [
     "SimilarityDecision",
     "SimilarityCandidate",
     "ValidationIssue",
+    "normalize_validator_reference_fields",
     "format_hierarchy_context",
     "format_parent_child_context",
     "validate_reference_graph",
