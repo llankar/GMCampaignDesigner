@@ -5,23 +5,10 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
-from src.validation import normalize_validator_reference_fields
 
 _SCENARIO_ID_KEYS = ("id", "uuid", "slug", "key", "Id", "ID", "Uuid", "Slug", "Key")
 _SCENARIO_NAME_KEYS = ("name", "Name", "title", "Title", "label", "Label")
 ScenarioReferenceIndex = Mapping[str, Sequence[tuple[int, Mapping[str, Any]]]]
-
-
-def normalize_scenario_node(item: Mapping[str, Any], index: int) -> dict[str, Any]:
-    """Return a validator-ready scenario node loaded from the scenarios wrapper."""
-
-    node = normalize_validator_reference_fields("scenario", item)
-    identifier = _identifier_for(node, "scenarios", index)
-    node.setdefault("type", "scenario")
-    node.setdefault("entity_type", "scenario")
-    node.setdefault("id", identifier)
-    node.setdefault("name", _display_name_for(node, identifier))
-    return node
 
 
 def build_scenario_reference_index(
@@ -112,14 +99,6 @@ def _reference_text(value: Any) -> str:
                 return reference
         return ""
     return _clean_text(value)
-
-
-def _identifier_for(item: Mapping[str, Any], slug: str, index: int) -> str:
-    for key in _SCENARIO_ID_KEYS + _SCENARIO_NAME_KEYS:
-        value = _clean_text(item.get(key))
-        if value:
-            return value
-    return f"{slug}-{index}"
 
 
 def _display_name_for(item: Mapping[str, Any], fallback: str) -> str:

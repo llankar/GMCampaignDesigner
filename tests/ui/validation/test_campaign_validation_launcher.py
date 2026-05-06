@@ -1,6 +1,7 @@
 """Tests for the campaign validation UI launcher helpers."""
 
 from src.ui.validation import ValidationWizardStatus
+from src.validation import validate_reference_graph
 from src.ui.validation.campaign_validation_launcher import (
     CampaignHierarchyValidationLauncher,
     build_campaign_validation_hierarchy,
@@ -171,6 +172,75 @@ def test_build_campaign_validation_hierarchy_attaches_only_referenced_scenarios(
     assert downtime_arc["scenario_refs"] == []
     assert "scenarios" not in downtime_arc
     assert hierarchy["entities"] == []
+
+
+def test_build_campaign_validation_hierarchy_resolves_arc_scenario_refs_by_key_fields():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {
+            "arcs": [
+                {
+                    "name": "Keyed Arc",
+                    "scenarios": [
+                        "scenario-key",
+                        {"slug": "scenario-slug"},
+                        {"title": "Lower Title"},
+                        {"Title": "Missing Scene"},
+                    ],
+                }
+            ]
+        },
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper(
+                [
+                    {"key": "scenario-key", "Title": "Key Match"},
+                    {"slug": "scenario-slug", "Title": "Slug Match"},
+                    {"title": "Lower Title"},
+                ]
+            ),
+        },
+        campaign,
+    )
+
+    arc = hierarchy["arcs"][0]
+
+    assert [scenario["id"] for scenario in arc["scenarios"]] == [
+        "scenario-key",
+        "scenario-slug",
+        "Lower Title",
+    ]
+    assert arc["scenario_refs"] == ["Missing Scene"]
+    assert hierarchy["entities"] == []
+
+
+def test_attached_arc_scenarios_are_not_duplicated_in_flat_entity_catalog():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {"arcs": [{"name": "Opening Arc", "scenarios": ["s1"]}]},
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper([{"id": "s1", "Title": "Opening Scene"}]),
+        },
+        campaign,
+    )
+    graph = validate_reference_graph(hierarchy, campaign=campaign)
+
+    assert [entity.identifier for entity in graph.entities] == [
+        "c1",
+        "Opening Arc",
+        "s1",
+    ]
+    assert hierarchy["entities"] == []
+    assert graph.issues == ()
 
 
 def test_load_campaign_options_reads_campaigns_wrapper_only():
