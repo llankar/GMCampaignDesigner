@@ -43,7 +43,11 @@ def test_validate_references_reports_missing_type_and_hierarchy_in_traversal_ord
         IssueType.INVALID_REFERENCE_TYPE,
         IssueType.INVALID_HIERARCHY,
     ]
-    assert [issue.payload.referenced_name for issue in issues] == ["Missing Arc", "S1", "S2"]
+    assert [issue.payload.referenced_name for issue in issues] == [
+        "Missing Arc",
+        "S1",
+        "S2",
+    ]
     assert issues[1].payload.expected_type == "scenario"
     assert issues[1].payload.actual_type == "location"
     assert issues[2].payload.source_entity == "A1"
@@ -55,8 +59,19 @@ def test_validate_reference_graph_exposes_entities_and_references_for_interactiv
     """Verify traversal metadata is available to interactive resolution UIs."""
     result = validate_reference_graph(_sample_hierarchy(), campaign={"id": "sample"})
 
-    assert [entity.identifier for entity in result.entities] == ["C1", "A1", "S1", "A2", "S2"]
-    assert [reference.reference_value for reference in result.references] == ["A1", "Missing Arc", "S1", "S2"]
+    assert [entity.identifier for entity in result.entities] == [
+        "C1",
+        "A1",
+        "S1",
+        "A2",
+        "S2",
+    ]
+    assert [reference.reference_value for reference in result.references] == [
+        "A1",
+        "Missing Arc",
+        "S1",
+        "S2",
+    ]
     assert result.references[0].path == ("campaign:C1", "arc_refs", "[0]")
 
 
@@ -77,3 +92,86 @@ def test_validate_references_returns_empty_list_for_valid_direct_children():
     }
 
     assert validate_references(hierarchy, campaign={"id": "sample"}) == []
+
+
+def test_validate_reference_graph_uses_selected_campaign_root_not_registry_placeholder():
+    """Verify global registry siblings are not scanned as selected campaign children."""
+    hierarchy = {
+        "type": "registry",
+        "id": "global",
+        "campaigns": [
+            {"type": "campaign", "id": "C1", "name": "Selected", "arc_refs": ["A1"]},
+        ],
+        "arcs": [
+            {
+                "type": "arc",
+                "id": "A1",
+                "scenario_refs": ["Global Scenario Should Not Be Visited"],
+                "scenarios": [
+                    {"type": "scenario", "id": "S1", "name": "Registry Scenario"},
+                ],
+            }
+        ],
+    }
+
+    result = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+
+    assert [entity.identifier for entity in result.entities] == ["C1"]
+    assert [reference.reference_value for reference in result.references] == ["A1"]
+    assert result.diagnostics.visited_campaigns == 1
+    assert result.diagnostics.visited_arcs == 0
+    assert result.diagnostics.visited_scenarios == 0
+    assert result.diagnostics.visited_references == 1
+    assert "campaigns=1" in result.debug_summary
+    assert "references=1" in result.debug_summary_path[-1]
+
+
+def test_validate_reference_graph_walks_explicit_children_without_optional_collections():
+    """Verify missing optional collections are treated as empty while siblings scan."""
+    hierarchy = {
+        "type": "campaign",
+        "id": "C1",
+        "arcs": [
+            {
+                "type": "arc",
+                "id": "A2",
+                "name": "Second Arc",
+                "location_refs": ["L2"],
+                "locations": [{"type": "location", "id": "L2"}],
+            },
+            {
+                "type": "arc",
+                "id": "A1",
+                "name": "First Arc",
+                "scenario_refs": ["S1"],
+                "scenarios": [
+                    {
+                        "type": "scenario",
+                        "id": "S1",
+                        "npc_refs": ["N1"],
+                        "npcs": [{"type": "npc", "id": "N1"}],
+                    }
+                ],
+            },
+        ],
+    }
+
+    result = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+
+    assert [entity.identifier for entity in result.entities] == [
+        "C1",
+        "A1",
+        "S1",
+        "N1",
+        "A2",
+        "L2",
+    ]
+    assert [reference.reference_value for reference in result.references] == [
+        "S1",
+        "N1",
+        "L2",
+    ]
+    assert result.issues == ()
+    assert result.diagnostics.visited_arcs == 2
+    assert result.diagnostics.visited_scenarios == 1
+    assert result.diagnostics.visited_references == 3
