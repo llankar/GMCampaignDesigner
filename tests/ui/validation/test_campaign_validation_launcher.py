@@ -52,6 +52,55 @@ def test_build_campaign_validation_hierarchy_normalizes_wrapper_items():
     assert entities[1]["id"] == "Opening Scene"
 
 
+def test_build_campaign_validation_hierarchy_builds_selected_campaign_arc_nodes():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {
+            "arcs": [
+                {
+                    "name": "Opening Arc",
+                    "status": "Running",
+                    "scenarios": ["Opening Scene", {"Title": "Hidden Shrine"}],
+                },
+                {
+                    "id": "arc-final",
+                    "name": "Finale",
+                    "scenarios": "Boss Fight",
+                },
+            ]
+        },
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper([{"Title": "Opening Scene"}]),
+        },
+        campaign,
+    )
+
+    assert hierarchy["arcs"] == [
+        {
+            "name": "Opening Arc",
+            "status": "In Progress",
+            "type": "arc",
+            "entity_type": "arc",
+            "id": "Opening Arc",
+            "scenario_refs": ["Opening Scene", "Hidden Shrine"],
+        },
+        {
+            "id": "arc-final",
+            "name": "Finale",
+            "status": "Planned",
+            "type": "arc",
+            "entity_type": "arc",
+            "scenario_refs": ["Boss Fight"],
+        },
+    ]
+    assert hierarchy["entities"][0]["entity_type"] == "scenario"
+
+
 def test_load_campaign_options_reads_campaigns_wrapper_only():
     options = load_campaign_options(
         {
