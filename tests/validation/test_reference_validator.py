@@ -1,6 +1,36 @@
 """Regression tests for deterministic reference validation."""
 
-from src.validation import IssueType, validate_reference_graph, validate_references
+from src.validation import (
+    FIELD_EXPECTED_TYPES,
+    IssueType,
+    validate_reference_graph,
+    validate_references,
+)
+
+
+def test_field_expected_types_include_real_template_and_ui_fields_with_legacy_aliases():
+    """Verify reference rules track persisted model fields while aliases migrate."""
+    expected = {
+        "campaign.Arcs": "arc",
+        "campaign.LinkedScenarios": "scenario",
+        "scenario.NPCs": "npc",
+        "scenario.Places": "location",
+        "scenario.Creatures": "creature",
+        "scenario.Factions": "faction",
+        "scenario.Objects": "object",
+        "scenario.Events": "event",
+        "scenario.Books": "book",
+        "scenario.Maps": "map",
+        "scenario.Bases": "base",
+        "scenario.Villains": "villain",
+        "scenario.PCs": "pc",
+        "campaign.arc_refs": "arc",
+        "arc.scenario_refs": "scenario",
+        "scenario.npc_refs": "npc",
+    }
+
+    for field_path, expected_type in expected.items():
+        assert FIELD_EXPECTED_TYPES[field_path] == expected_type
 
 
 def _sample_hierarchy():
