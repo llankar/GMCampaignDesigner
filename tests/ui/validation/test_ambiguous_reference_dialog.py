@@ -36,10 +36,11 @@ def _ambiguous_wizard():
             {"type": "scenario", "id": "S3", "name": "Duplicate"},
         ],
     }
-    graph = validate_reference_graph(hierarchy)
+    graph = validate_reference_graph(hierarchy, campaign={"id": "sample"})
     reference = resolve_reference_for_issue(graph.issues[0], graph.references)
     controller = ValidationWizardController(
-        [ValidationWizardIssue(issue=graph.issues[0], reference=reference)]
+        [ValidationWizardIssue(issue=graph.issues[0], reference=reference)],
+        campaign=graph.campaign,
     )
     controller.start()
     return hierarchy, graph, controller

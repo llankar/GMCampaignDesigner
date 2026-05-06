@@ -36,7 +36,7 @@ def _sample_hierarchy():
 
 def test_validate_references_reports_missing_type_and_hierarchy_in_traversal_order():
     """Verify missing, typed and misplaced references are reported deterministically."""
-    issues = validate_references(_sample_hierarchy())
+    issues = validate_references(_sample_hierarchy(), campaign={"id": "sample"})
 
     assert [issue.issue_type for issue in issues] == [
         IssueType.MISSING_REFERENCE,
@@ -53,7 +53,7 @@ def test_validate_references_reports_missing_type_and_hierarchy_in_traversal_ord
 
 def test_validate_reference_graph_exposes_entities_and_references_for_interactive_resolution():
     """Verify traversal metadata is available to interactive resolution UIs."""
-    result = validate_reference_graph(_sample_hierarchy())
+    result = validate_reference_graph(_sample_hierarchy(), campaign={"id": "sample"})
 
     assert [entity.identifier for entity in result.entities] == ["C1", "A1", "S1", "A2", "S2"]
     assert [reference.reference_value for reference in result.references] == ["A1", "Missing Arc", "S1", "S2"]
@@ -76,4 +76,4 @@ def test_validate_references_returns_empty_list_for_valid_direct_children():
         ],
     }
 
-    assert validate_references(hierarchy) == []
+    assert validate_references(hierarchy, campaign={"id": "sample"}) == []

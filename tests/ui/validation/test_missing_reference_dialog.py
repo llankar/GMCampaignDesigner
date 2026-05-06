@@ -18,10 +18,11 @@ from src.validation import validate_reference_graph
 
 
 def _wizard_for(hierarchy):
-    graph = validate_reference_graph(hierarchy)
+    graph = validate_reference_graph(hierarchy, campaign={"id": "sample"})
     reference = resolve_reference_for_issue(graph.issues[0], graph.references)
     controller = ValidationWizardController(
-        [ValidationWizardIssue(issue=graph.issues[0], reference=reference)]
+        [ValidationWizardIssue(issue=graph.issues[0], reference=reference)],
+        campaign=graph.campaign,
     )
     controller.start()
     return graph, reference, controller
@@ -52,7 +53,8 @@ def test_entity_slug_for_expected_type_maps_validator_types_to_generic_slugs():
 def test_build_prefilled_entity_sets_referenced_name_parent_and_metadata():
     request = creation_request_from_issue(
         validate_reference_graph(
-            {"type": "arc", "id": "A1", "scenario_refs": ["Missing Scenario"]}
+            {"type": "arc", "id": "A1", "scenario_refs": ["Missing Scenario"]},
+            campaign={"id": "sample"},
         ).issues[0]
     )
     template = {
@@ -92,7 +94,8 @@ def test_generic_editor_launcher_returns_saved_entity_and_persists_it():
         wait_for_editor=False,
     )
     graph = validate_reference_graph(
-        {"type": "campaign", "id": "C1", "arc_refs": ["Missing Arc"]}
+        {"type": "campaign", "id": "C1", "arc_refs": ["Missing Arc"]},
+        campaign={"id": "sample"},
     )
     request = creation_request_from_issue(graph.issues[0])
 

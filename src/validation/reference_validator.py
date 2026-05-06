@@ -86,17 +86,20 @@ class ReferenceValidationResult:
     issues: tuple[ValidationIssue, ...]
     entities: tuple[EntityRecord, ...]
     references: tuple[ReferenceRecord, ...]
+    campaign: Mapping[str, Any]
 
 
 def validate_references(
     hierarchy: Any,
     *,
+    campaign: Mapping[str, Any],
     config: ReferenceValidatorConfig | None = None,
 ) -> list[ValidationIssue]:
     """Validate references found during a deterministic hierarchy traversal.
 
     Args:
         hierarchy: Nested campaign data made of mappings/sequences/scalars.
+        campaign: Explicit campaign object selected by the user for this run.
         config: Optional validation rules override.
 
     Returns:
@@ -104,15 +107,16 @@ def validate_references(
         reference order inside each source entity.
     """
 
-    return list(validate_reference_graph(hierarchy, config=config).issues)
+    return list(validate_reference_graph(hierarchy, campaign=campaign, config=config).issues)
 
 
 def validate_reference_graph(
     hierarchy: Any,
     *,
+    campaign: Mapping[str, Any],
     config: ReferenceValidatorConfig | None = None,
 ) -> ReferenceValidationResult:
-    """Validate references and return issues plus traversal metadata."""
+    """Validate references for an explicit campaign and return traversal metadata."""
 
     active_config = config or ReferenceValidatorConfig()
     entities = tuple(_walk_entities(hierarchy))
@@ -141,7 +145,12 @@ def validate_reference_graph(
         ):
             issues.append(_build_hierarchy_issue(reference, target))
 
-    return ReferenceValidationResult(issues=tuple(issues), entities=entities, references=references)
+    return ReferenceValidationResult(
+        issues=tuple(issues),
+        entities=entities,
+        references=references,
+        campaign=dict(campaign),
+    )
 
 
 def _walk_entities(root: Any) -> Iterable[EntityRecord]:

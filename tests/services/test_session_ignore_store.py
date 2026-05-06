@@ -6,7 +6,7 @@ from src.validation import validate_references
 
 def _missing_issue():
     hierarchy = {"type": "campaign", "id": "C1", "arc_refs": ["Missing Arc"]}
-    return validate_references(hierarchy)[0]
+    return validate_references(hierarchy, campaign={"id": "sample"})[0]
 
 
 def test_session_ignore_store_filters_ignored_issues_without_persistence_contract():
