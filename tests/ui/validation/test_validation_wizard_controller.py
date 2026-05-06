@@ -141,3 +141,17 @@ def test_wizard_can_use_reference_resolver_for_plain_issue_lists():
 
     assert step.status == ValidationWizardStatus.COMPLETED
     assert hierarchy["arc_refs"] == []
+
+
+def test_setup_failed_step_marks_scan_as_not_executed():
+    from src.ui.validation import validation_setup_failed_step
+
+    step = validation_setup_failed_step(
+        "Campagne requise",
+        "Sélectionnez une campagne active, puis relancez la validation.",
+    )
+
+    assert step.status == ValidationWizardStatus.SETUP_FAILED
+    assert step.summary is None
+    assert step.setup_failure.title == "Campagne requise"
+    assert step.message == "Sélectionnez une campagne active, puis relancez la validation."

@@ -7,9 +7,11 @@ from .validation_wizard_controller import (
     ValidationWizardIssue,
     ValidationWizardPresenter,
     ValidationWizardProgress,
+    ValidationWizardSetupFailure,
     ValidationWizardStatus,
     ValidationWizardStep,
     ValidationWizardSummary,
+    validation_setup_failed_step,
     resolve_reference_for_issue,
 )
 
@@ -20,8 +22,10 @@ __all__ = [
     "ValidationWizardIssue",
     "ValidationWizardPresenter",
     "ValidationWizardProgress",
+    "ValidationWizardSetupFailure",
     "ValidationWizardStatus",
     "ValidationWizardStep",
     "ValidationWizardSummary",
+    "validation_setup_failed_step",
     "resolve_reference_for_issue",
 ]
