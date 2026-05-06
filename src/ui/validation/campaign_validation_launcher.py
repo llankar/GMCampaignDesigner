@@ -8,6 +8,11 @@ from typing import Any, Callable, Mapping, Sequence
 
 from modules.helpers.logging_helper import log_exception, log_info
 from src.ui.validation.campaign_arc_hierarchy import build_campaign_arc_nodes
+from src.ui.validation.campaign_scenario_hierarchy import (
+    attach_referenced_scenarios_to_arcs,
+    build_scenario_reference_index,
+    normalize_scenario_node,
+)
 from src.ui.validation.dialogs.ambiguous_reference_dialog import (
     AmbiguousReferenceDialogConfig,
     open_ambiguous_reference_dialog,
@@ -302,11 +307,15 @@ def build_campaign_validation_hierarchy(
     root["id"] = selected.campaign_id
     root["name"] = selected.label
     root["arcs"] = build_campaign_arc_nodes(selected.item.get("Arcs"))
+    scenario_nodes = _load_scenario_nodes(entity_wrappers, progress=progress)
+    attach_referenced_scenarios_to_arcs(
+        root["arcs"], build_scenario_reference_index(scenario_nodes)
+    )
     root["entities"] = []
     entities = root["entities"]
 
     for slug in sorted(entity_wrappers):
-        if slug == "campaigns":
+        if slug in {"campaigns", "scenarios"}:
             continue
         if progress is not None:
             progress.set_phase(_scan_phase_for_slug(slug))
@@ -319,11 +328,32 @@ def build_campaign_validation_hierarchy(
     log_info(
         (
             f"Built validation hierarchy for campaign {selected.campaign_id} "
-            f"with {len(root['arcs'])} arcs and {len(entities)} entities"
+            f"with {len(root['arcs'])} arcs, "
+            f"{sum(len(arc.get('scenarios', ())) for arc in root['arcs'])} "
+            f"arc scenarios, and {len(entities)} entities"
         ),
         func_name="src.ui.validation.campaign_validation_launcher.build_campaign_validation_hierarchy",
     )
     return root
+
+
+def _load_scenario_nodes(
+    entity_wrappers: Mapping[str, Any],
+    *,
+    progress: ValidationScanProgress | None = None,
+) -> tuple[dict[str, Any], ...]:
+    """Load and normalize all scenarios for arc-local hierarchy attachment."""
+
+    wrapper = entity_wrappers.get("scenarios")
+    if wrapper is None:
+        return ()
+    if progress is not None:
+        progress.set_phase(_scan_phase_for_slug("scenarios"))
+    return tuple(
+        normalize_scenario_node(item, index)
+        for index, item in enumerate(_safe_load_items(wrapper))
+        if isinstance(item, Mapping)
+    )
 
 
 def _log_validation_diagnostics(graph: ReferenceValidationResult) -> None:
