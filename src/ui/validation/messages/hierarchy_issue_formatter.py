@@ -35,7 +35,8 @@ def format_hierarchy_issue_message(issue: ValidationIssue) -> str:
     """
 
     payload = issue.payload
-    expected_parent = _entity_label(payload.source_type, payload.source_entity)
+    source_type = _source_entity_type(payload.source_type, payload.source_path)
+    expected_parent = _entity_label(source_type, payload.source_entity)
     target_label = _entity_label(payload.expected_type, payload.referenced_name)
     placement = _target_placement(payload.target_path, payload.candidates)
 
@@ -45,7 +46,13 @@ def format_hierarchy_issue_message(issue: ValidationIssue) -> str:
             "in the validation hierarchy."
         )
 
-    if _is_other_parent(placement.parent, payload.source_type, payload.source_entity):
+    if _is_arc_scenario_reference(source_type, payload.field, payload.expected_type):
+        return (
+            f'{target_label} is listed in arc "{payload.source_entity}", but the '
+            "validator did not attach the scenario object under that arc."
+        )
+
+    if _is_other_parent(placement.parent, source_type, payload.source_entity):
         actual_parent = _entity_label(
             placement.parent.entity_type,
             placement.parent.identifier,
@@ -91,6 +98,28 @@ def _parse_entity_segment(segment: str) -> EntityPathSegment | None:
     return EntityPathSegment(
         entity_type=entity_type.strip(),
         identifier=identifier.strip(),
+    )
+
+
+def _source_entity_type(source_type: str, source_path: Sequence[str]) -> str:
+    normalized_source_type = source_type.strip()
+    if normalized_source_type:
+        return normalized_source_type
+
+    for segment in reversed(tuple(source_path)):
+        parsed = _parse_entity_segment(str(segment))
+        if parsed is not None:
+            return parsed.entity_type
+    return ""
+
+
+def _is_arc_scenario_reference(
+    source_type: str, field: str, expected_type: str
+) -> bool:
+    return (
+        source_type.strip() == "arc"
+        and field.strip() == "scenario_refs"
+        and expected_type.strip() == "scenario"
     )
 
 

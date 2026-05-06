@@ -36,34 +36,50 @@ def test_hierarchy_message_distinguishes_missing_target() -> None:
     )
 
 
-def test_hierarchy_message_distinguishes_global_target_not_under_expected_parent() -> None:
+def test_hierarchy_message_explains_unattached_arc_scenario_ref() -> None:
     issue = _hierarchy_issue(
         referenced_name="Final Scene",
         target_path=("campaign:C1", "entities", "[0]", "scenario:S-final"),
     )
 
     assert format_hierarchy_issue_message(issue) == (
-        'Scenario "Final Scene" exists, but it is not attached under '
+        'Scenario "Final Scene" is listed in arc "This is the end", but the '
+        "validator did not attach the scenario object under that arc."
+    )
+
+
+def test_hierarchy_message_uses_arc_label_from_source_type() -> None:
+    issue = _hierarchy_issue(
+        field="location_refs",
+        expected_type="location",
+        referenced_name="Final Place",
+        target_path=("campaign:C1", "entities", "[0]", "location:L-final"),
+    )
+
+    assert format_hierarchy_issue_message(issue) == (
+        'Location "Final Place" exists, but it is not attached under '
         'Arc "This is the end" in the validation hierarchy.'
     )
 
 
 def test_hierarchy_message_distinguishes_target_under_another_parent() -> None:
     issue = _hierarchy_issue(
-        referenced_name="Final Scene",
+        field="location_refs",
+        expected_type="location",
+        referenced_name="Final Place",
         target_path=(
             "campaign:C1",
             "arcs",
             "[1]",
             "arc:Sibling Arc",
-            "scenarios",
+            "locations",
             "[0]",
-            "scenario:S-final",
+            "location:L-final",
         ),
     )
 
     assert format_hierarchy_issue_message(issue) == (
-        'Scenario "Final Scene" is attached under Arc "Sibling Arc", not '
+        'Location "Final Place" is attached under Arc "Sibling Arc", not '
         'Arc "This is the end", in the validation hierarchy.'
     )
 
