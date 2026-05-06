@@ -8,6 +8,12 @@ from .generic_editor_launcher import (
     creation_request_from_issue,
     entity_slug_for_expected_type,
 )
+from .ambiguous_reference_dialog import (
+    AmbiguousReferenceCandidate,
+    AmbiguousReferenceDialog,
+    AmbiguousReferenceDialogConfig,
+    open_ambiguous_reference_dialog,
+)
 from .missing_reference_dialog import (
     MissingReferenceDialog,
     MissingReferenceDialogConfig,
@@ -18,10 +24,14 @@ __all__ = [
     "GenericEditorCreationRequest",
     "GenericEditorCreationResult",
     "GenericEditorLauncher",
+    "AmbiguousReferenceCandidate",
+    "AmbiguousReferenceDialog",
+    "AmbiguousReferenceDialogConfig",
     "MissingReferenceDialog",
     "MissingReferenceDialogConfig",
     "build_prefilled_entity",
     "creation_request_from_issue",
     "entity_slug_for_expected_type",
+    "open_ambiguous_reference_dialog",
     "open_missing_reference_dialog",
 ]
