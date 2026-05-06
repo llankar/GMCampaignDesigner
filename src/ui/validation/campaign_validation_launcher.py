@@ -11,7 +11,6 @@ from src.ui.validation.campaign_arc_hierarchy import build_campaign_arc_nodes
 from src.ui.validation.campaign_scenario_hierarchy import (
     attach_referenced_scenarios_to_arcs,
     build_scenario_reference_index,
-    normalize_scenario_node,
 )
 from src.ui.validation.dialogs.ambiguous_reference_dialog import (
     AmbiguousReferenceDialogConfig,
@@ -350,7 +349,7 @@ def _load_scenario_nodes(
     if progress is not None:
         progress.set_phase(_scan_phase_for_slug("scenarios"))
     return tuple(
-        normalize_scenario_node(item, index)
+        _normalize_entity_node("scenarios", item, index)
         for index, item in enumerate(_safe_load_items(wrapper))
         if isinstance(item, Mapping)
     )
