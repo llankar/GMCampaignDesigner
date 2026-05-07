@@ -6,7 +6,6 @@ PALETTE_BG = "#151515"
 SECTION_BG = "#1f1f1f"
 BORDER = "#3f3f3f"
 TEXT_MUTED = "#cfcfcf"
-DROPDOWN_WIDTH = 76
 SLIDER_WIDTH = 76
 CONTROL_FONT_SIZE = 11
 
@@ -36,8 +35,8 @@ def add_small_label(parent, text):
 
 
 def add_stacked_control(parent, label, widget, *, pady=(0, 4)):
-    """Place a label and a widget in the toolbar's single column."""
+    """Place a label and a naturally-sized widget in the toolbar column."""
     row = create_row(parent)
     add_small_label(row, label)
-    widget.pack(side="top", fill="x", padx=0, pady=pady)
+    widget.pack(side="top", anchor="w", padx=0, pady=pady)
     return row

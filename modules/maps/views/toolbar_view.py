@@ -231,8 +231,9 @@ def _on_brush_size_change(self, val): # This is for FOG brush
 
 def _on_brush_shape_change(self, val): # This is for FOG brush
     """Handle brush shape change."""
-    # normalize to lowercase for comparisons
-    self.brush_shape = val.lower()
+    # normalize to lowercase for comparisons; the compact floating toolbar labels
+    # the circular brush as Oval to match the drawing tool wording.
+    self.brush_shape = "circle" if str(val).lower() == "oval" else str(val).lower()
 
 def _change_brush(self, delta): # This is for FOG brush
     """Internal helper for change brush."""
