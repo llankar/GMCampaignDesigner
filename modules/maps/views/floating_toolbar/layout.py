@@ -6,8 +6,9 @@ PALETTE_BG = "#151515"
 SECTION_BG = "#1f1f1f"
 BORDER = "#3f3f3f"
 TEXT_MUTED = "#cfcfcf"
-DROPDOWN_WIDTH = 88
-SLIDER_WIDTH = 88
+DROPDOWN_WIDTH = 76
+SLIDER_WIDTH = 76
+CONTROL_FONT_SIZE = 11
 
 
 def create_section(parent, title):
