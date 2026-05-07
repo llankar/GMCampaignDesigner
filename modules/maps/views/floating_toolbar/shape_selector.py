@@ -44,10 +44,10 @@ class ShapeIconSelector(ctk.CTkFrame):
             button = ctk.CTkButton(
                 self,
                 text=icon,
-                width=28,
-                height=26,
+                width=40,
+                height=40,
                 corner_radius=8,
-                font=ctk.CTkFont(size=15, weight="bold"),
+                font=ctk.CTkFont(size=32, weight="bold"),
                 command=lambda selected=value: self.set(selected),
                 **self._DEFAULT_STYLE,
             )
