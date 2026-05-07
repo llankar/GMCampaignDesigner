@@ -6,6 +6,7 @@ import customtkinter as ctk
 from modules.helpers.logging_helper import log_module_import
 from modules.ui.icon_dropdown import IconDropdown
 from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
+from modules.maps.views.floating_toolbar.slim_option_menu import create_slim_option_menu
 from modules.maps.views.floating_toolbar.layout import (
     BORDER,
     DROPDOWN_WIDTH,
@@ -143,12 +144,12 @@ def _build_floating_drawing_toolbar(self):
         {"key": "reset", "icon": icons["reset"], "tooltip": "Reset Fog", "command": self.reset_fog},
     ]
     fog_row = _row(fog_body)
-    fog_dropdown = IconDropdown(fog_row, fog_actions, default_key="add", button_size=(24, 24))
+    fog_dropdown = IconDropdown(fog_row, fog_actions, default_key="add", button_size=(24, 24), show_arrow=False)
     fog_dropdown.pack(side="top", anchor="w", padx=0, pady=3)
     self._fog_buttons.update(fog_dropdown.option_buttons)
     self._fog_dropdown = fog_dropdown
 
-    self.shape_menu = ctk.CTkOptionMenu(
+    self.shape_menu = create_slim_option_menu(
         fog_body,
         values=["Rectangle", "Circle"],
         command=self._on_brush_shape_change,
@@ -163,7 +164,7 @@ def _build_floating_drawing_toolbar(self):
         brush_size_options.append(current_brush_size)
         brush_size_options = sorted(set(brush_size_options))
     self.brush_size_options = list(brush_size_options)
-    self.brush_size_menu = ctk.CTkOptionMenu(
+    self.brush_size_menu = create_slim_option_menu(
         fog_body,
         values=[str(size) for size in self.brush_size_options],
         command=self._on_brush_size_change,
@@ -174,7 +175,7 @@ def _build_floating_drawing_toolbar(self):
 
     tools_body = _section("Tools")
     drawing_tools = ["Token", "Rectangle", "Oval", "Text", "Whiteboard", "Eraser"]
-    self.drawing_tool_menu = ctk.CTkOptionMenu(
+    self.drawing_tool_menu = create_slim_option_menu(
         tools_body,
         values=drawing_tools,
         command=self._on_drawing_tool_change,
@@ -224,7 +225,7 @@ def _build_floating_drawing_toolbar(self):
     if current_text_size not in text_sizes:
         text_sizes = sorted(set(list(text_sizes) + [current_text_size]))
     self.text_size_options = list(text_sizes)
-    self.text_size_menu = ctk.CTkOptionMenu(
+    self.text_size_menu = create_slim_option_menu(
         text_controls,
         values=[str(size) for size in self.text_size_options],
         command=getattr(self, "_on_text_size_change", None) or (lambda _v: None),
@@ -275,7 +276,7 @@ def _build_floating_drawing_toolbar(self):
         {"key": "pc", "icon": icons["pc"], "tooltip": "Add PC", "command": lambda: self.open_entity_picker("PC")},
         {"key": "marker", "icon": icons["marker"], "tooltip": "Add Marker", "command": self.add_marker},
     ]
-    token_dropdown = IconDropdown(tokens_body, token_actions, default_key="npc", button_size=(24, 24))
+    token_dropdown = IconDropdown(tokens_body, token_actions, default_key="npc", button_size=(24, 24), show_arrow=False)
     token_dropdown.pack(side="top", anchor="w", padx=0, pady=3)
 
     token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
@@ -284,7 +285,7 @@ def _build_floating_drawing_toolbar(self):
         token_size_options.append(current_token_size)
         token_size_options = sorted(set(token_size_options))
     self.token_size_options = list(token_size_options)
-    self.token_size_menu = ctk.CTkOptionMenu(
+    self.token_size_menu = create_slim_option_menu(
         tokens_body,
         values=[str(size) for size in self.token_size_options],
         command=self._on_token_size_change,
@@ -293,7 +294,7 @@ def _build_floating_drawing_toolbar(self):
     self.token_size_menu.set(str(current_token_size))
     _stacked_control(tokens_body, "Size", self.token_size_menu)
 
-    self.marker_type_filter_menu = ctk.CTkOptionMenu(
+    self.marker_type_filter_menu = create_slim_option_menu(
         tokens_body,
         values=MARKER_TYPE_FILTER_LABELS,
         command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
@@ -305,7 +306,7 @@ def _build_floating_drawing_toolbar(self):
     shape_controls_row = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.shape_controls_row = shape_controls_row
     self.shape_fill_label = ctk.CTkLabel(shape_controls_row, text="Shape Fill", text_color=TEXT_MUTED)
-    self.shape_fill_mode_menu = ctk.CTkOptionMenu(
+    self.shape_fill_mode_menu = create_slim_option_menu(
         shape_controls_row,
         values=["Filled", "Border Only"],
         command=self._on_shape_fill_mode_change,
@@ -331,7 +332,7 @@ def _build_floating_drawing_toolbar(self):
         toolbar_height = 0
     if toolbar_height <= 1:
         toolbar_height = 72
-    palette.place(relx=0.5, y=toolbar_height + 12, anchor="n")
+    palette.place(relx=0, x=8, y=toolbar_height + 12, anchor="nw")
     try:
         palette.lift()
     except tk.TclError:

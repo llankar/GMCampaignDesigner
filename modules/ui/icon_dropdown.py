@@ -19,8 +19,16 @@ class IconDropdown(ctk.CTkFrame):
     buttons for state updates.
     """
 
-    def __init__(self, parent, items, default_key=None, button_size=(32, 32)):
-        """Initialize the IconDropdown instance."""
+    def __init__(self, parent, items, default_key=None, button_size=(32, 32), show_arrow=True):
+        """Initialize the IconDropdown instance.
+
+        Args:
+            parent: Parent widget.
+            items: Dropdown actions with key, icon, tooltip, and command entries.
+            default_key: Initially selected action key.
+            button_size: Base icon button size.
+            show_arrow: Whether the collapsed button reserves space for a down arrow.
+        """
         super().__init__(parent, fg_color="transparent")
 
         if not items:
@@ -32,6 +40,7 @@ class IconDropdown(ctk.CTkFrame):
         self._button_size = button_size
         self._default_key = default_key or self._order[0]
         self._selected_key = self._default_key
+        self._show_arrow = show_arrow
 
         self._menu = tk.Toplevel(self)
         self._menu.withdraw()
@@ -46,10 +55,10 @@ class IconDropdown(ctk.CTkFrame):
         initial = self._items[self._selected_key]
         self._display_button = ctk.CTkButton(
             self,
-            text="▼",
+            text="▼" if self._show_arrow else "",
             image=initial["icon"],
-            compound="right",
-            width=self._button_size[0] + 18,
+            compound="right" if self._show_arrow else "left",
+            width=self._button_size[0] + (18 if self._show_arrow else 10),
             height=self._button_size[1] + 10,
             corner_radius=12,
             fg_color=self._tokens.get("button_fg"),
