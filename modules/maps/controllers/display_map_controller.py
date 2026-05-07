@@ -6245,10 +6245,10 @@ class DisplayMapController:
                     shape_controls_row.pack(side="top", fill="x", anchor="w", padx=(6, 2), pady=4)
 
                 # Repack in desired order without 'before'
-                if shape_fill_label: shape_fill_label.pack(side="left", padx=(10,2), pady=8)
-                if shape_fill_mode_menu: shape_fill_mode_menu.pack(side="left", padx=5, pady=8)
-                if shape_fill_color_button: shape_fill_color_button.pack(side="left", padx=(10,2), pady=8)
-                if shape_border_color_button: shape_border_color_button.pack(side="left", padx=2, pady=8)
+                if shape_fill_label: shape_fill_label.pack(side="top", anchor="w", padx=0, pady=(2, 1))
+                if shape_fill_mode_menu: shape_fill_mode_menu.pack(side="top", fill="x", padx=0, pady=(0, 4))
+                if shape_fill_color_button: shape_fill_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
+                if shape_border_color_button: shape_border_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
             elif whiteboard_active:
                 # Continue with this path when whiteboard active is set.
                 shape_controls_row = getattr(self, "shape_controls_row", None)
@@ -6267,10 +6267,10 @@ class DisplayMapController:
                         pass
                 if whiteboard_controls_frame:
                     whiteboard_controls_frame.pack(side="top", fill="x", anchor="w", padx=(8, 2), pady=4)
-                if whiteboard_color_button: whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
+                if whiteboard_color_button: whiteboard_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
                 if whiteboard_width_slider:
                     try:
-                        whiteboard_width_slider.master.pack(side="left", padx=(0, 6), pady=6)
+                        whiteboard_width_slider.master.pack(side="top", fill="x", padx=0, pady=(0, 4))
                     except Exception:
                         pass
                 if eraser_slider:
@@ -6308,7 +6308,7 @@ class DisplayMapController:
                     eraser_controls_frame.pack(side="top", fill="x", anchor="w", padx=(8, 2), pady=4)
                 if eraser_slider:
                     try:
-                        eraser_slider.master.pack(side="left", padx=(0, 6), pady=6)
+                        eraser_slider.master.pack(side="top", fill="x", padx=0, pady=(0, 4))
                     except Exception:
                         pass
             elif text_active:
@@ -6333,12 +6333,12 @@ class DisplayMapController:
                     text_controls_frame.pack(side="top", fill="x", anchor="w", padx=(8, 2), pady=4)
                 if text_size_menu:
                     try:
-                        text_size_menu.master.pack(side="left", padx=(0, 6), pady=6)
+                        text_size_menu.master.pack(side="top", fill="x", padx=0, pady=(0, 4))
                     except Exception:
                         pass
                 if text_color_button:
                     try:
-                        text_color_button.pack(side="left", padx=(0, 6), pady=6)
+                        text_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
                     except tk.TclError:
                         pass
             else:

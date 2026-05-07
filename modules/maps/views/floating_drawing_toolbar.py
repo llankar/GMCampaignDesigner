@@ -5,14 +5,19 @@ import customtkinter as ctk
 
 from modules.helpers.logging_helper import log_module_import
 from modules.ui.icon_dropdown import IconDropdown
+from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
+from modules.maps.views.floating_toolbar.layout import (
+    BORDER,
+    DROPDOWN_WIDTH,
+    PALETTE_BG,
+    SLIDER_WIDTH,
+    TEXT_MUTED,
+    add_stacked_control,
+    create_row,
+    create_section,
+)
 
 log_module_import(__name__)
-
-_PALETTE_BG = "#151515"
-_SECTION_BG = "#1f1f1f"
-_BORDER = "#3f3f3f"
-_TEXT_MUTED = "#cfcfcf"
-
 
 def _build_floating_drawing_toolbar(self):
     """Build a compact floating palette for fog and drawing controls."""
@@ -28,19 +33,20 @@ def _build_floating_drawing_toolbar(self):
         except tk.TclError:
             pass
 
-    dropdown_width = 112
+    dropdown_width = DROPDOWN_WIDTH
+    slider_width = SLIDER_WIDTH
     palette = ctk.CTkFrame(
         host,
-        fg_color=_PALETTE_BG,
+        fg_color=PALETTE_BG,
         border_width=1,
-        border_color=_BORDER,
+        border_color=BORDER,
         corner_radius=12,
     )
     self.floating_drawing_toolbar = palette
 
     header = ctk.CTkFrame(palette, fg_color="#242424", corner_radius=10)
     header.pack(side="top", fill="x", padx=6, pady=(6, 3))
-    handle = ctk.CTkLabel(header, text="☰ Draw", text_color=_TEXT_MUTED, cursor="fleur")
+    handle = ctk.CTkLabel(header, text="☰ Draw", text_color=TEXT_MUTED, cursor="fleur")
     handle.pack(side="left", padx=(8, 6), pady=4)
 
     content = ctk.CTkFrame(palette, fg_color="transparent")
@@ -94,28 +100,23 @@ def _build_floating_drawing_toolbar(self):
         draggable.bind("<B1-Motion>", _drag_motion)
 
     def _section(title):
-        section = ctk.CTkFrame(content, fg_color=_SECTION_BG, border_width=1, border_color="#303030", corner_radius=9)
-        section.pack(side="top", fill="x", padx=0, pady=(4, 0))
-        ctk.CTkLabel(section, text=title, text_color=_TEXT_MUTED, font=ctk.CTkFont(size=11, weight="bold")).pack(
-            side="top", anchor="w", padx=8, pady=(5, 0)
-        )
-        body = ctk.CTkFrame(section, fg_color="transparent")
-        body.pack(side="top", fill="x", padx=6, pady=(2, 6))
-        return body
+        return create_section(content, title)
 
     def _row(parent):
-        row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(side="top", fill="x", anchor="w", pady=2)
-        return row
+        return create_row(parent)
 
-    def _small_label(parent, text):
-        ctk.CTkLabel(parent, text=text, text_color=_TEXT_MUTED).pack(side="left", padx=(0, 4), pady=3)
+    def _stacked_control(parent, label, widget, *, pady=(0, 4)):
+        return add_stacked_control(parent, label, widget, pady=pady)
 
     icons = {
         "add": self.load_icon("assets/icons/brush.png", (32, 32)),
         "rem": self.load_icon("assets/icons/eraser.png", (32, 32)),
         "clear": self.load_icon("assets/icons/empty.png", (32, 32)),
         "reset": self.load_icon("assets/icons/full.png", (32, 32)),
+        "npc": self.load_icon("assets/icons/npc.png", (32, 32)),
+        "creat": self.load_icon("assets/icons/creature.png", (32, 32)),
+        "pc": self.load_icon("assets/icons/pc.png", (32, 32)),
+        "marker": self.load_icon("assets/icons/marker.png", (32, 32)),
     }
 
     self._fog_button_default_style = {
@@ -143,22 +144,19 @@ def _build_floating_drawing_toolbar(self):
     ]
     fog_row = _row(fog_body)
     fog_dropdown = IconDropdown(fog_row, fog_actions, default_key="add")
-    fog_dropdown.pack(side="left", padx=(0, 6), pady=3)
+    fog_dropdown.pack(side="top", anchor="w", padx=0, pady=3)
     self._fog_buttons.update(fog_dropdown.option_buttons)
     self._fog_dropdown = fog_dropdown
 
-    fog_shape_row = _row(fog_body)
-    _small_label(fog_shape_row, "Shape")
     self.shape_menu = ctk.CTkOptionMenu(
-        fog_shape_row,
+        fog_body,
         values=["Rectangle", "Circle"],
         command=self._on_brush_shape_change,
         width=dropdown_width,
     )
     self.shape_menu.set("Rectangle")
-    self.shape_menu.pack(side="left", padx=(0, 6), pady=3)
+    _stacked_control(fog_body, "Shape", self.shape_menu)
 
-    _small_label(fog_shape_row, "Size")
     brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
     current_brush_size = int(getattr(self, "brush_size", brush_size_options[0] if brush_size_options else 32))
     if current_brush_size not in brush_size_options:
@@ -166,27 +164,25 @@ def _build_floating_drawing_toolbar(self):
         brush_size_options = sorted(set(brush_size_options))
     self.brush_size_options = list(brush_size_options)
     self.brush_size_menu = ctk.CTkOptionMenu(
-        fog_shape_row,
+        fog_body,
         values=[str(size) for size in self.brush_size_options],
         command=self._on_brush_size_change,
-        width=74,
+        width=dropdown_width,
     )
     self.brush_size_menu.set(str(current_brush_size))
-    self.brush_size_menu.pack(side="left", padx=(0, 2), pady=3)
+    _stacked_control(fog_body, "Size", self.brush_size_menu)
 
     tools_body = _section("Tools")
-    tool_row = _row(tools_body)
-    _small_label(tool_row, "Tool")
     drawing_tools = ["Token", "Rectangle", "Oval", "Text", "Whiteboard", "Eraser"]
     self.drawing_tool_menu = ctk.CTkOptionMenu(
-        tool_row,
+        tools_body,
         values=drawing_tools,
         command=self._on_drawing_tool_change,
         width=dropdown_width,
     )
     current_tool = self.drawing_mode.capitalize() if hasattr(self, "drawing_mode") else "Token"
     self.drawing_tool_menu.set(current_tool if current_tool in drawing_tools else "Token")
-    self.drawing_tool_menu.pack(side="left", padx=(0, 4), pady=3)
+    _stacked_control(tools_body, "Tool", self.drawing_tool_menu)
 
     whiteboard_controls = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.whiteboard_controls_frame = whiteboard_controls
@@ -201,28 +197,28 @@ def _build_floating_drawing_toolbar(self):
         self.whiteboard_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.whiteboard_color_button.pack(side="left", padx=(0, 6), pady=4)
+    self.whiteboard_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
 
     width_container = ctk.CTkFrame(whiteboard_controls, fg_color="transparent")
-    width_container.pack(side="left", padx=(0, 4), pady=4)
-    ctk.CTkLabel(width_container, text="Width", text_color=_TEXT_MUTED).pack(side="left", padx=(0, 2))
+    width_container.pack(side="top", fill="x", padx=0, pady=(0, 4))
+    ctk.CTkLabel(width_container, text="Width", text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(0, 2))
     self.whiteboard_width_slider = ctk.CTkSlider(
         width_container,
         from_=1,
         to=20,
         number_of_steps=19,
         command=self._on_whiteboard_width_change,
-        width=105,
+        width=slider_width,
     )
     current_width = float(getattr(self, "whiteboard_width", 4))
     self.whiteboard_width_slider.set(current_width)
-    self.whiteboard_width_slider.pack(side="left", padx=(0, 4))
-    self.whiteboard_width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)), text_color=_TEXT_MUTED)
-    self.whiteboard_width_value_label.pack(side="left", padx=(2, 0))
+    self.whiteboard_width_slider.pack(side="top", fill="x", padx=0)
+    self.whiteboard_width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)), text_color=TEXT_MUTED)
+    self.whiteboard_width_value_label.pack(side="top", anchor="e", padx=0)
 
     text_controls = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.text_controls_frame = text_controls
-    ctk.CTkLabel(text_controls, text="Text Size", text_color=_TEXT_MUTED).pack(side="left", padx=(0, 4), pady=4)
+    ctk.CTkLabel(text_controls, text="Text Size", text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(0, 2))
     text_sizes = getattr(self, "text_size_options", [16, 20, 24, 32, 40])
     current_text_size = int(getattr(self, "text_size", text_sizes[0] if text_sizes else 24))
     if current_text_size not in text_sizes:
@@ -235,7 +231,7 @@ def _build_floating_drawing_toolbar(self):
         width=76,
     )
     self.text_size_menu.set(str(current_text_size))
-    self.text_size_menu.pack(side="left", padx=(0, 6), pady=4)
+    self.text_size_menu.pack(side="top", fill="x", padx=0, pady=(0, 4))
 
     self.text_color_button = ctk.CTkButton(
         text_controls,
@@ -247,34 +243,68 @@ def _build_floating_drawing_toolbar(self):
         self.text_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.text_color_button.pack(side="left", padx=(0, 4), pady=4)
+    self.text_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
 
     eraser_controls = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.eraser_controls_frame = eraser_controls
     eraser_width_container = ctk.CTkFrame(eraser_controls, fg_color="transparent")
-    eraser_width_container.pack(side="left", padx=(0, 6), pady=4)
-    ctk.CTkLabel(eraser_width_container, text="Radius", text_color=_TEXT_MUTED).pack(side="left", padx=(0, 4))
+    eraser_width_container.pack(side="top", fill="x", padx=0, pady=(0, 4))
+    ctk.CTkLabel(eraser_width_container, text="Radius", text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(0, 2))
     self.whiteboard_eraser_slider = ctk.CTkSlider(
         eraser_width_container,
         from_=2,
         to=40,
         number_of_steps=38,
         command=getattr(self, "_on_eraser_radius_change", None) or (lambda _v: None),
-        width=116,
+        width=slider_width,
     )
     current_eraser_radius = float(getattr(self, "whiteboard_eraser_radius", 8))
     self.whiteboard_eraser_slider.set(current_eraser_radius)
-    self.whiteboard_eraser_slider.pack(side="left", padx=(0, 4))
+    self.whiteboard_eraser_slider.pack(side="top", fill="x", padx=0)
     self.eraser_radius_value_label = ctk.CTkLabel(
         eraser_width_container,
         text=str(int(round(current_eraser_radius))),
-        text_color=_TEXT_MUTED,
+        text_color=TEXT_MUTED,
     )
-    self.eraser_radius_value_label.pack(side="left", padx=(2, 0))
+    self.eraser_radius_value_label.pack(side="top", anchor="e", padx=0)
+
+    tokens_body = _section("Tokens")
+    token_actions = [
+        {"key": "creature", "icon": icons["creat"], "tooltip": "Add Creature", "command": lambda: self.open_entity_picker("Creature")},
+        {"key": "npc", "icon": icons["npc"], "tooltip": "Add NPC", "command": lambda: self.open_entity_picker("NPC")},
+        {"key": "pc", "icon": icons["pc"], "tooltip": "Add PC", "command": lambda: self.open_entity_picker("PC")},
+        {"key": "marker", "icon": icons["marker"], "tooltip": "Add Marker", "command": self.add_marker},
+    ]
+    token_dropdown = IconDropdown(tokens_body, token_actions, default_key="npc")
+    token_dropdown.pack(side="top", anchor="w", padx=0, pady=3)
+
+    token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
+    current_token_size = int(getattr(self, "token_size", token_size_options[0] if token_size_options else 48))
+    if current_token_size not in token_size_options:
+        token_size_options.append(current_token_size)
+        token_size_options = sorted(set(token_size_options))
+    self.token_size_options = list(token_size_options)
+    self.token_size_menu = ctk.CTkOptionMenu(
+        tokens_body,
+        values=[str(size) for size in self.token_size_options],
+        command=self._on_token_size_change,
+        width=dropdown_width,
+    )
+    self.token_size_menu.set(str(current_token_size))
+    _stacked_control(tokens_body, "Size", self.token_size_menu)
+
+    self.marker_type_filter_menu = ctk.CTkOptionMenu(
+        tokens_body,
+        values=MARKER_TYPE_FILTER_LABELS,
+        command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
+        width=dropdown_width,
+    )
+    self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
+    _stacked_control(tokens_body, "Marker Type", self.marker_type_filter_menu)
 
     shape_controls_row = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.shape_controls_row = shape_controls_row
-    self.shape_fill_label = ctk.CTkLabel(shape_controls_row, text="Shape Fill", text_color=_TEXT_MUTED)
+    self.shape_fill_label = ctk.CTkLabel(shape_controls_row, text="Shape Fill", text_color=TEXT_MUTED)
     self.shape_fill_mode_menu = ctk.CTkOptionMenu(
         shape_controls_row,
         values=["Filled", "Border Only"],
