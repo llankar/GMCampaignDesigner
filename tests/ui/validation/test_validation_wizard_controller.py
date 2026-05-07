@@ -7,6 +7,7 @@ from src.ui.validation import (
     ValidationWizardIssue,
     ValidationWizardStatus,
     resolve_reference_for_issue,
+    resolve_target_for_issue,
 )
 from src.validation import validate_reference_graph
 
@@ -20,6 +21,7 @@ def _wizard_items(graph):
         ValidationWizardIssue(
             issue=issue,
             reference=resolve_reference_for_issue(issue, graph.references),
+            target=resolve_target_for_issue(issue, graph.entities),
         )
         for issue in graph.issues
     )
@@ -51,7 +53,7 @@ def test_wizard_starts_on_first_non_ignored_issue_and_finishes_with_summary():
     assert hierarchy["arc_refs"] == ["Missing One"]
     assert summary_step.summary.resolved == 1
     assert summary_step.summary.skipped_session == 0
-    assert summary_step.summary.changes_applied == ("C1.arc_refs: référence supprimée",)
+    assert summary_step.summary.changes_applied == ("C1.arc_refs: reference removed",)
 
 
 def test_wizard_skip_session_ignores_current_issue_and_advances():
@@ -102,7 +104,42 @@ def test_wizard_remap_applies_reference_fix_and_advances():
     assert step.status == ValidationWizardStatus.COMPLETED
     assert hierarchy["arc_refs"] == ["A1"]
     assert step.summary.resolved == 1
-    assert step.summary.messages == ("Référence remappée vers « A1 ».",)
+    assert step.summary.messages == ('Reference remapped to "A1".',)
+
+
+def test_wizard_attach_moves_existing_target_and_advances():
+    hierarchy = {
+        "type": "campaign",
+        "id": "C1",
+        "arcs": [
+            {
+                "type": "arc",
+                "id": "A1",
+                "location_refs": ["Sibling Place"],
+            },
+            {
+                "type": "arc",
+                "id": "A2",
+                "locations": [
+                    {"type": "location", "id": "L2", "name": "Sibling Place"}
+                ],
+            },
+        ],
+    }
+    graph = _graph_for(hierarchy)
+    controller = ValidationWizardController(_wizard_items(graph), campaign=graph.campaign)
+
+    controller.start()
+    step = controller.submit_action(ValidationWizardAction.ATTACH)
+
+    assert step.status == ValidationWizardStatus.COMPLETED
+    assert hierarchy["arcs"][0]["location_refs"] == ["Sibling Place"]
+    assert hierarchy["arcs"][0]["locations"] == [
+        {"type": "location", "id": "L2", "name": "Sibling Place"}
+    ]
+    assert hierarchy["arcs"][1]["locations"] == []
+    assert step.summary.resolved == 1
+    assert step.summary.messages == ('Entity "L2" attached under "A1".',)
 
 
 def test_wizard_resumes_after_entity_creation_and_links_created_entity():
@@ -122,8 +159,8 @@ def test_wizard_resumes_after_entity_creation_and_links_created_entity():
     assert hierarchy["arcs"] == [new_entity]
     assert final_step.summary.resolved == 1
     assert final_step.summary.changes_applied == (
-        "arcs: entité ajoutée",
-        "C1.arc_refs: Missing Arc → A1",
+        "arcs: entity added",
+        "C1.arc_refs: Missing Arc -> A1",
     )
 
 

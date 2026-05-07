@@ -136,6 +136,37 @@ def test_validate_references_returns_empty_list_for_valid_direct_children():
     assert validate_references(hierarchy, campaign={"id": "sample"}) == []
 
 
+def test_validate_references_accepts_campaign_scenario_lists_attached_under_arc():
+    """Verify campaign-level scenario lists do not require direct children."""
+    for field_name in ("LinkedScenarios", "scenario_refs"):
+        hierarchy = {
+            "type": "campaign",
+            "id": "C1",
+            field_name: ["Scenario One"],
+            "arcs": [
+                {
+                    "type": "arc",
+                    "id": "A1",
+                    "name": "Arc One",
+                    "scenarios": [
+                        {
+                            "type": "scenario",
+                            "id": "S1",
+                            "name": "Scenario One",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        result = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+
+        assert [reference.field_path for reference in result.references] == [
+            f"campaign.{field_name}"
+        ]
+        assert result.issues == ()
+
+
 def test_validate_references_accepts_arc_scenario_refs_to_graph_scenarios():
     """Verify arc scenario_refs can target scenarios already in the selected graph."""
     hierarchy = {
@@ -194,8 +225,8 @@ def test_validate_references_accepts_arc_scenario_refs_by_scenario_title():
     assert result.issues == ()
 
 
-def test_validate_references_keeps_non_arc_scenario_refs_strict():
-    """Verify graph-membership hierarchy relief is limited to arc scenario refs."""
+def test_validate_references_keeps_unrelated_child_refs_strict():
+    """Verify hierarchy relief is not applied to unrelated reference types."""
     hierarchy = _sample_hierarchy()
 
     issues = validate_references(hierarchy, campaign={"id": "sample"})

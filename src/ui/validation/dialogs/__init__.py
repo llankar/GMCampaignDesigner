@@ -24,6 +24,11 @@ from .missing_reference_dialog import (
     MissingReferenceDialogConfig,
     open_missing_reference_dialog,
 )
+from .invalid_hierarchy_dialog import (
+    InvalidHierarchyDialog,
+    InvalidHierarchyDialogConfig,
+    open_invalid_hierarchy_dialog,
+)
 from .validation_summary_dialog import (
     ValidationSummaryCounts,
     ValidationSummaryDialog,
@@ -39,6 +44,8 @@ __all__ = [
     "AmbiguousReferenceCandidate",
     "AmbiguousReferenceDialog",
     "AmbiguousReferenceDialogConfig",
+    "InvalidHierarchyDialog",
+    "InvalidHierarchyDialogConfig",
     "MissingReferenceDialog",
     "MissingReferenceDialogConfig",
     "ValidationSummaryCounts",
@@ -48,6 +55,7 @@ __all__ = [
     "entity_slug_for_expected_type",
     "open_ambiguous_reference_dialog",
     "open_campaign_selector_dialog",
+    "open_invalid_hierarchy_dialog",
     "open_missing_reference_dialog",
     "open_validation_summary_dialog",
 ]

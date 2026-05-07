@@ -36,6 +36,7 @@ ReferenceResolver = Callable[[ValidationIssue], ReferenceRecord | None]
 class ValidationWizardAction(str, Enum):
     """Actions that can be selected by the GM for the current issue."""
 
+    ATTACH = "attach"
     REMAP = "remap"
     REMOVE = "remove"
     CREATE_ENTITY = "create_entity"
@@ -67,6 +68,7 @@ class ValidationWizardIssue:
 
     issue: ValidationIssue
     reference: ReferenceRecord | None = None
+    target: EntityRecord | None = None
 
 
 @dataclass(frozen=True)
@@ -214,6 +216,24 @@ class ValidationWizardController:
 
         return self._active_step.issue if self._active_step else None
 
+    def can_attach_current_issue(
+        self,
+        target: EntityRecord | None = None,
+    ) -> bool:
+        """Return whether the current issue can attach an existing target."""
+
+        current_item = self._current_item()
+        if current_item is None:
+            return False
+        reference = self._resolve_reference(current_item)
+        if reference is None:
+            return False
+        attach_target = target or current_item.target
+        return self._reference_fix_service.can_attach_existing_entity(
+            reference,
+            attach_target,
+        )
+
     def start(self) -> ValidationWizardStep:
         """Start the wizard at the first non-ignored issue."""
 
@@ -282,7 +302,12 @@ class ValidationWizardController:
                 REFERENCE_NOT_FOUND_ACTION_MESSAGE
             )
 
-        if action == ValidationWizardAction.REMAP:
+        if action == ValidationWizardAction.ATTACH:
+            result = self._reference_fix_service.attach_existing_entity(
+                reference,
+                _attach_target_for_action(current_item, action_request.target),
+            )
+        elif action == ValidationWizardAction.REMAP:
             result = self._reference_fix_service.remap_reference(
                 reference,
                 action_request.target or "",
@@ -462,6 +487,21 @@ def resolve_reference_for_issue(
     return None
 
 
+def resolve_target_for_issue(
+    issue: ValidationIssue,
+    entities: Sequence[EntityRecord],
+) -> EntityRecord | None:
+    """Find the target entity record matching an INVALID_HIERARCHY issue."""
+
+    target_path = tuple(issue.payload.target_path)
+    if not target_path:
+        return None
+    for entity in entities:
+        if entity.path == target_path:
+            return entity
+    return None
+
+
 def _coerce_issue_item(issue: ValidationIssue | ValidationWizardIssue) -> ValidationWizardIssue:
     if isinstance(issue, ValidationWizardIssue):
         return issue
@@ -483,6 +523,15 @@ def _coerce_action_request(
         created_entity=created_entity,
         attach_to_source=attach_to_source,
     )
+
+
+def _attach_target_for_action(
+    current_item: ValidationWizardIssue,
+    target: EntityRecord | dict[str, Any] | str | None,
+) -> EntityRecord | None:
+    if isinstance(target, EntityRecord):
+        return target
+    return current_item.target
 
 
 def _summary_with_metrics(

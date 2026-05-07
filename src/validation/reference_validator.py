@@ -19,23 +19,61 @@ ENTITY_NAME_KEYS = ("name", "Name", "title", "Title", "label", "Label")
 MODEL_CHILD_COLLECTIONS: Mapping[str, tuple[str, ...]] = {
     "campaign": ("arcs", "entities"),
     "arc": ("scenarios", "locations"),
-    "scenario": ("encounters", "npcs"),
+    "scenario": (
+        "bases",
+        "locations",
+        "maps",
+        "encounters",
+        "npcs",
+        "pcs",
+        "villains",
+        "events",
+        "creatures",
+        "factions",
+        "objects",
+        "books",
+    ),
 }
 FALLBACK_CHILD_COLLECTIONS = ("children", "items")
 SUPPORTED_ENTITY_TYPES = frozenset(
-    {"campaign", "arc", "scenario", "location", "encounter", "npc"}
+    {
+        "arc",
+        "base",
+        "book",
+        "campaign",
+        "creature",
+        "encounter",
+        "event",
+        "faction",
+        "location",
+        "map",
+        "npc",
+        "object",
+        "pc",
+        "scenario",
+        "villain",
+    }
 )
 STRUCTURAL_KEYS = frozenset(
     {
+        "bases",
+        "books",
         "children",
+        "creatures",
+        "encounters",
         "items",
+        "events",
         "entities",
+        "factions",
         "campaigns",
         "arcs",
         "scenarios",
         "locations",
-        "encounters",
+        "maps",
         "npcs",
+        "objects",
+        "pcs",
+        "villains",
     }
 )
 
@@ -67,6 +105,9 @@ class EntityRecord:
     parent_type: str | None
     parent_identifier: str | None
     order: int
+    parent_node: Mapping[str, Any] | None = None
+    collection_name: str = ""
+    collection_index: int | None = None
 
     @property
     def signature(self) -> tuple[str, str]:
@@ -352,6 +393,9 @@ def _walk_entities(root: Any) -> Iterable[EntityRecord]:
                     parent_type=parent.entity_type if parent else None,
                     parent_identifier=parent.identifier if parent else None,
                     order=counter,
+                    parent_node=parent.node if parent else None,
+                    collection_name=_parent_collection_name(parent, path),
+                    collection_index=_parent_collection_index(parent, path),
                 )
                 counter += 1
                 yield current
@@ -511,6 +555,9 @@ def _is_valid_hierarchy_position(
     target: EntityRecord,
     allowed_hierarchy_children: Mapping[str, set[str]],
 ) -> bool:
+    if _is_campaign_scenario_catalog_reference(reference, target):
+        return _is_descendant_of_source(reference.source, target)
+
     source = reference.source
     allowed_children = allowed_hierarchy_children.get(source.entity_type, set())
     if target.entity_type not in allowed_children:
@@ -521,6 +568,23 @@ def _is_valid_hierarchy_position(
     ):
         return True
     return _is_valid_arc_scenario_ref_membership(reference, target)
+
+
+def _is_campaign_scenario_catalog_reference(
+    reference: ReferenceRecord, target: EntityRecord
+) -> bool:
+    """Accept campaign scenario lists as references, not containment rules."""
+
+    return (
+        reference.field_path in {"campaign.LinkedScenarios", "campaign.scenario_refs"}
+        and reference.source.entity_type == "campaign"
+        and reference.expected_type == "scenario"
+        and target.entity_type == "scenario"
+    )
+
+
+def _is_descendant_of_source(source: EntityRecord, target: EntityRecord) -> bool:
+    return target.path[: len(source.path)] == source.path
 
 
 def _is_valid_arc_scenario_ref_membership(
@@ -594,6 +658,36 @@ def _reference_identity_values(value: Any) -> frozenset[str]:
 def _split_field_path(field_path: str) -> tuple[str, str]:
     source_type, _, field_name = field_path.partition(".")
     return source_type, field_name
+
+
+def _parent_collection_name(
+    parent: EntityRecord | None,
+    path: tuple[str, ...],
+) -> str:
+    if parent is None:
+        return ""
+    collection_offset = len(parent.path)
+    if len(path) <= collection_offset:
+        return ""
+    return path[collection_offset]
+
+
+def _parent_collection_index(
+    parent: EntityRecord | None,
+    path: tuple[str, ...],
+) -> int | None:
+    if parent is None:
+        return None
+    segment_offset = len(parent.path) + 1
+    if len(path) <= segment_offset:
+        return None
+    segment = path[segment_offset]
+    if not segment.startswith("[") or not segment.endswith("]"):
+        return None
+    try:
+        return int(segment[1:-1])
+    except ValueError:
+        return None
 
 
 def _child_collection_keys(

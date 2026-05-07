@@ -32,7 +32,34 @@ VALIDATION_UNAVAILABLE_MESSAGE = (
 TECHNICAL_DETAIL_LABEL = "Technical detail"
 VALIDATION_IMPOSSIBLE_TITLE = "Validation unavailable"
 HIERARCHY_CONSISTENCY_TITLE = "Hierarchy consistency"
-IGNORE_ISSUE_PROMPT = "Ignore this issue for this session?"
+IGNORE_ISSUE_PROMPT = (
+    "Ignore this issue for this session and continue validation?\n\n"
+    "Choose Yes to ignore it now. Choose No to open resolution options."
+)
+INVALID_HIERARCHY_RESOLUTION_TITLE = "Resolve hierarchy issue"
+INVALID_HIERARCHY_RESOLUTION_MESSAGE = (
+    "Choose how to handle this hierarchy problem. You can remove the invalid "
+    "reference, ignore the issue for this session, or stop validation."
+)
+INVALID_HIERARCHY_ATTACH_RESOLUTION_MESSAGE = (
+    "Choose how to handle this hierarchy problem. You can attach the existing "
+    "target under the source, remove the invalid reference, ignore the issue "
+    "for this session, or stop validation."
+)
+INVALID_HIERARCHY_REMAP_RESOLUTION_MESSAGE = (
+    "Choose how to handle this hierarchy problem. You can remap the reference "
+    "to another target, remove the invalid reference, ignore the issue for "
+    "this session, or stop validation."
+)
+INVALID_HIERARCHY_ATTACH_REMAP_RESOLUTION_MESSAGE = (
+    "Choose how to handle this hierarchy problem. You can attach the existing "
+    "target under the source, remap the reference to another target, remove "
+    "the invalid reference, ignore the issue for this session, or stop validation."
+)
+STOP_VALIDATION_LABEL = "Stop validation"
+NO_HIERARCHY_REMAP_TARGET_SELECTOR_MESSAGE = (
+    "No hierarchy target selector is configured for remapping."
+)
 
 AMBIGUOUS_REFERENCE_TITLE = "Ambiguous reference"
 AMBIGUOUS_REFERENCE_MESSAGE = (
@@ -55,6 +82,7 @@ MISSING_REFERENCE_MESSAGE = (
     "\u201c{referenced_name}\u201d is expected as {expected_type} from {source_entity}."
 )
 CREATE_LABEL = "Create"
+ATTACH_LABEL = "Attach"
 REMAP_LABEL = "Remap"
 REMOVE_LABEL = "Remove"
 NO_REMAP_TARGET_SELECTOR_MESSAGE = "No target selector is configured for remapping."

@@ -14,6 +14,7 @@ from .validation_wizard_controller import (
     ValidationWizardSummary,
     validation_setup_failed_step,
     resolve_reference_for_issue,
+    resolve_target_for_issue,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "ValidationWizardSummary",
     "validation_setup_failed_step",
     "resolve_reference_for_issue",
+    "resolve_target_for_issue",
 ]

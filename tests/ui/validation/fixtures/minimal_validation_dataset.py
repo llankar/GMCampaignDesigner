@@ -8,6 +8,7 @@ from src.ui.validation import (
     ValidationWizardController,
     ValidationWizardIssue,
     resolve_reference_for_issue,
+    resolve_target_for_issue,
 )
 from src.validation import IssueType, ReferenceValidationResult, validate_reference_graph
 
@@ -24,17 +25,17 @@ EXPECTED_DECISION_SUMMARY = {
     "resolved": 4,
     "skipped_session": 1,
     "changes_applied": (
-        "C1.arc_refs: référence supprimée",
-        "A1.location_refs: Shared Place → L2",
-        "A1.location_refs: Sibling Place → L1",
-        "scenarios: entité ajoutée",
-        "A1.scenario_refs: Scenario To Create → S-created",
+        "C1.arc_refs: reference removed",
+        "A1.location_refs: Shared Place -> L2",
+        "A1.location_refs: Sibling Place -> L1",
+        "scenarios: entity added",
+        "A1.scenario_refs: Scenario To Create -> S-created",
     ),
     "messages": (
-        "Référence « Arc To Remove » supprimée.",
-        "Référence remappée vers « L2 ».",
-        "Référence remappée vers « L1 ».",
-        "Nouvelle entité « S-created » reliée.",
+        'Reference "Arc To Remove" removed.',
+        'Reference remapped to "L2".',
+        'Reference remapped to "L1".',
+        'Created entity "S-created" linked.',
         "Issue ignored for this session: Scenario To Ignore",
     ),
 }
@@ -100,6 +101,7 @@ def build_minimal_validation_wizard(
             ValidationWizardIssue(
                 issue=issue,
                 reference=resolve_reference_for_issue(issue, graph.references),
+                target=resolve_target_for_issue(issue, graph.entities),
             )
             for issue in graph.issues
         ),

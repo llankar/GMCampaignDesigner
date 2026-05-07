@@ -24,6 +24,10 @@ from src.ui.validation.dialogs.missing_reference_dialog import (
     MissingReferenceDialogConfig,
     open_missing_reference_dialog,
 )
+from src.ui.validation.dialogs.invalid_hierarchy_dialog import (
+    InvalidHierarchyDialogConfig,
+    open_invalid_hierarchy_dialog,
+)
 from src.ui.validation.dialogs.validation_summary_dialog import (
     open_validation_summary_dialog,
 )
@@ -48,6 +52,7 @@ from src.ui.validation.validation_wizard_controller import (
     ValidationWizardStatus,
     ValidationWizardStep,
     resolve_reference_for_issue,
+    resolve_target_for_issue,
     validation_setup_failed_step,
 )
 from src.validation import (
@@ -123,13 +128,13 @@ class CampaignHierarchyValidationLauncher:
                 return None
 
             started_at = monotonic()
-            progress = ValidationScanProgress(self.app).show("Scanning arcs…")
+            progress = ValidationScanProgress(self.app).show("Scanning arcs...")
             hierarchy = build_campaign_validation_hierarchy(
                 entity_wrappers,
                 selected_campaign,
                 progress=progress,
             )
-            progress.set_phase("Checking references…")
+            progress.set_phase("Checking references...")
             graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
             controller = ValidationWizardController(
                 _wizard_items(graph),
@@ -215,7 +220,11 @@ class CampaignHierarchyValidationLauncher:
 
         if step.status == ValidationWizardStatus.CANCELED:
             if step.summary is not None:
-                open_validation_summary_dialog(self.app, step.summary)
+                open_validation_summary_dialog(
+                    self.app,
+                    step.summary,
+                    message=step.message,
+                )
             return
 
         if step.status == ValidationWizardStatus.ACTION_FAILED:
@@ -250,16 +259,36 @@ class CampaignHierarchyValidationLauncher:
             )
             return
 
+        if step.issue.issue_type == IssueType.INVALID_HIERARCHY:
+            from tkinter import messagebox
+
+            if messagebox.askyesno(
+                HIERARCHY_CONSISTENCY_TITLE,
+                f"{step.message}\n\n{IGNORE_ISSUE_PROMPT}",
+            ):
+                next_step = run.controller.submit_action(
+                    ValidationWizardAction.SKIP_SESSION
+                )
+                self._handle_step(run, next_step)
+                return
+
+            open_invalid_hierarchy_dialog(
+                self.app,
+                run.controller,
+                step,
+                reference=resolve_reference_for_issue(
+                    step.issue, run.graph.references
+                ),
+                target=resolve_target_for_issue(step.issue, run.graph.entities),
+                config=InvalidHierarchyDialogConfig(
+                    on_step=lambda next_step: self._handle_step(run, next_step)
+                ),
+            )
+            return
+
         from tkinter import messagebox
 
-        if messagebox.askyesno(
-            HIERARCHY_CONSISTENCY_TITLE,
-            f"{step.message}\n\n{IGNORE_ISSUE_PROMPT}",
-        ):
-            next_step = run.controller.submit_action(
-                ValidationWizardAction.SKIP_SESSION
-            )
-            self._handle_step(run, next_step)
+        messagebox.showwarning(HIERARCHY_CONSISTENCY_TITLE, step.message)
 
 
 def load_campaign_options(
@@ -387,6 +416,7 @@ def _wizard_items(
         ValidationWizardIssue(
             issue=issue,
             reference=resolve_reference_for_issue(issue, graph.references),
+            target=resolve_target_for_issue(issue, graph.entities),
         )
         for issue in graph.issues
     )
@@ -394,10 +424,10 @@ def _wizard_items(
 
 def _scan_phase_for_slug(slug: str) -> str:
     if slug == "arcs":
-        return "Scanning arcs…"
+        return "Scanning arcs..."
     if slug == "scenarios":
-        return "Scanning scenarios…"
-    return f"Scanning {slug.replace('_', ' ')}…"
+        return "Scanning scenarios..."
+    return f"Scanning {slug.replace('_', ' ')}..."
 
 
 def _safe_load_items(wrapper: Any) -> Sequence[Any]:

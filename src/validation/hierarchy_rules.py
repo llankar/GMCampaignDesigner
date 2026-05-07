@@ -48,7 +48,20 @@ FIELD_EXPECTED_TYPES: Mapping[str, str] = {
 ALLOWED_HIERARCHY_CHILDREN: Mapping[str, set[str]] = {
     "campaign": {"arc"},
     "arc": {"scenario", "location"},
-    "scenario": {"encounter", "npc"},
+    "scenario": {
+        "base",
+        "book",
+        "creature",
+        "encounter",
+        "event",
+        "faction",
+        "location",
+        "map",
+        "npc",
+        "object",
+        "pc",
+        "villain",
+    },
 }
 
 

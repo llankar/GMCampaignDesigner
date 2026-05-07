@@ -1,10 +1,18 @@
 """Tests for the campaign validation UI launcher helpers."""
 
-from src.ui.validation import ValidationWizardStatus
-from src.validation import validate_reference_graph
+from src.ui.validation import (
+    ValidationWizardController,
+    ValidationWizardIssue,
+    ValidationWizardStatus,
+    resolve_reference_for_issue,
+    resolve_target_for_issue,
+)
+from src.validation import IssueType, validate_reference_graph
 from src.ui.validation.campaign_validation_launcher import (
+    CampaignValidationRun,
     CampaignHierarchyValidationLauncher,
     build_campaign_validation_hierarchy,
+    campaign_option_from_item,
     load_campaign_options,
 )
 
@@ -30,6 +38,53 @@ def _campaign_with_arc_reference():
     campaign = _campaign()
     campaign["arc_refs"] = ["Arc One"]
     return campaign
+
+
+def _invalid_hierarchy_run():
+    hierarchy = {
+        "type": "campaign",
+        "id": "C1",
+        "name": "Dragonfall",
+        "arcs": [
+            {
+                "type": "arc",
+                "id": "A1",
+                "name": "Main Arc",
+                "location_refs": ["Sibling Place"],
+            },
+            {
+                "type": "arc",
+                "id": "A2",
+                "name": "Sibling Arc",
+                "locations": [
+                    {"type": "location", "id": "L2", "name": "Sibling Place"}
+                ],
+            },
+        ],
+    }
+    graph = validate_reference_graph(hierarchy, campaign={"id": "C1"})
+    controller = ValidationWizardController(
+        tuple(
+            ValidationWizardIssue(
+                issue=issue,
+                reference=resolve_reference_for_issue(issue, graph.references),
+                target=resolve_target_for_issue(issue, graph.entities),
+            )
+            for issue in graph.issues
+        ),
+        campaign=graph.campaign,
+    )
+    first_step = controller.start()
+
+    assert first_step.issue is not None
+    assert first_step.issue.issue_type == IssueType.INVALID_HIERARCHY
+
+    return CampaignValidationRun(
+        campaign=campaign_option_from_item(_campaign()),
+        graph=graph,
+        controller=controller,
+        first_step=first_step,
+    )
 
 
 def test_build_campaign_validation_hierarchy_normalizes_wrapper_items():
@@ -75,6 +130,34 @@ def test_build_campaign_validation_hierarchy_normalizes_campaign_linked_scenario
 
     assert hierarchy["scenario_refs"] == ["Opening Scene", {"Title": "Hidden Shrine"}]
     assert "LinkedScenarios" not in hierarchy
+
+
+def test_campaign_linked_scenarios_accept_scenarios_attached_under_arcs():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "LinkedScenarios": ["Opening Scene"],
+        "Arcs": {"arcs": [{"name": "Opening Arc", "scenarios": ["Opening Scene"]}]},
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper([{"Title": "Opening Scene"}]),
+        },
+        campaign,
+    )
+    graph = validate_reference_graph(hierarchy, campaign=campaign)
+
+    assert hierarchy["scenario_refs"] == ["Opening Scene"]
+    assert hierarchy["arcs"][0]["scenario_refs"] == []
+    assert [scenario["id"] for scenario in hierarchy["arcs"][0]["scenarios"]] == [
+        "Opening Scene"
+    ]
+    assert [reference.field_path for reference in graph.references] == [
+        "campaign.scenario_refs"
+    ]
+    assert graph.issues == ()
 
 
 def test_build_campaign_validation_hierarchy_builds_selected_campaign_arc_nodes():
@@ -310,6 +393,87 @@ def test_launcher_accepts_campaign_screen_selection_without_global_dialog(monkey
     assert selector_calls == []
 
 
+def test_launcher_hierarchy_prompt_yes_skips_issue_and_shows_summary(monkeypatch):
+    prompts = []
+    summaries = []
+
+    def answer_yes(title, message):
+        prompts.append((title, message))
+        return True
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", answer_yes)
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda _master, summary: summaries.append(summary),
+    )
+
+    launcher = CampaignHierarchyValidationLauncher(FakeApp({}))
+    run = _invalid_hierarchy_run()
+
+    launcher._handle_step(run, run.first_step)
+
+    assert prompts == [
+        (
+            "Hierarchy consistency",
+            (
+                'Location "Sibling Place" is attached under Arc "A2", not '
+                'Arc "A1", in the validation hierarchy.\n\n'
+                "Ignore this issue for this session and continue validation?\n\n"
+                "Choose Yes to ignore it now. Choose No to open resolution options."
+            ),
+        )
+    ]
+    assert summaries == [run.controller.summary]
+    assert summaries[0].completed is True
+    assert summaries[0].skipped_session == 1
+    assert summaries[0].canceled is False
+
+
+def test_launcher_hierarchy_prompt_no_opens_resolution_dialog(monkeypatch):
+    prompts = []
+    summaries = []
+    opened_dialogs = []
+
+    def answer_no(title, message):
+        prompts.append((title, message))
+        return False
+
+    def open_dialog(master, controller, step, **kwargs):
+        opened_dialogs.append((master, controller, step, kwargs))
+        return object()
+
+    monkeypatch.setattr("tkinter.messagebox.askyesno", answer_no)
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda _master, summary, **_kwargs: summaries.append(summary),
+    )
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_invalid_hierarchy_dialog",
+        open_dialog,
+    )
+
+    launcher = CampaignHierarchyValidationLauncher(FakeApp({}))
+    run = _invalid_hierarchy_run()
+
+    launcher._handle_step(run, run.first_step)
+
+    assert len(prompts) == 1
+    assert summaries == []
+    assert len(opened_dialogs) == 1
+    master, controller, step, kwargs = opened_dialogs[0]
+    assert master is launcher.app
+    assert controller is run.controller
+    assert step is run.first_step
+    assert kwargs["reference"] is not None
+    assert kwargs["target"] is not None
+    assert kwargs["config"].on_step is not None
+    assert run.controller.summary.completed is True
+    assert run.controller.summary.canceled is False
+    assert run.controller.summary.skipped_session == 0
+    assert run.controller.summary.resolved == 0
+    assert run.controller.current_issue == run.first_step.issue
+
+
 def test_launcher_aborts_cleanly_when_user_cancels_selection(monkeypatch):
     messages = []
     summaries = []
@@ -500,5 +664,5 @@ def test_build_campaign_validation_hierarchy_reports_lightweight_phases():
         progress=FakeProgress(),
     )
 
-    assert "Scanning arcs…" in phases
-    assert "Scanning scenarios…" in phases
+    assert "Scanning arcs..." in phases
+    assert "Scanning scenarios..." in phases

@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, MutableMapping, MutableSequence
+from typing import Any, Mapping, MutableMapping, MutableSequence
 
+from src.validation.hierarchy_rules import ALLOWED_HIERARCHY_CHILDREN
 from src.validation.reference_validator import EntityRecord, ReferenceRecord
 
 
@@ -49,6 +50,7 @@ class ReferenceActionResult:
 class ReferenceFixAction(str, Enum):
     """Supported interactive reference correction actions."""
 
+    ATTACH = "attach"
     REMAP = "remap"
     REMOVE = "remove"
     LINK_CREATED = "link_created"
@@ -74,17 +76,17 @@ class ReferenceFixService:
 
         target_identifier = _extract_target_identifier(target)
         if not target_identifier:
-            return ReferenceActionResult.error("Impossible de remapper : cible invalide.")
+            return ReferenceActionResult.error("Cannot remap: invalid target.")
 
         target_type = _extract_target_type(target)
         updated = _replace_reference_value(reference, target_identifier, target_type)
         if not updated:
             return ReferenceActionResult.error(
-                "Impossible de remapper : référence introuvable ou non modifiable."
+                "Cannot remap: reference not found or not editable."
             )
 
         return ReferenceActionResult.ok(
-            f"Référence remappée vers « {target_identifier} ».",
+            f'Reference remapped to "{target_identifier}".',
             _format_reference_change(
                 ReferenceFixAction.REMAP,
                 reference,
@@ -98,12 +100,75 @@ class ReferenceFixService:
         removed = _remove_reference_value(reference)
         if not removed:
             return ReferenceActionResult.error(
-                "Impossible de supprimer : référence introuvable ou non modifiable."
+                "Cannot remove: reference not found or not editable."
             )
 
         return ReferenceActionResult.ok(
-            f"Référence « {reference.reference_value} » supprimée.",
+            f'Reference "{reference.reference_value}" removed.',
             _format_reference_change(ReferenceFixAction.REMOVE, reference),
+        )
+
+    def can_attach_existing_entity(
+        self,
+        reference: ReferenceRecord,
+        target: EntityRecord | None,
+    ) -> bool:
+        """Return whether an existing target can be moved under the reference source."""
+
+        return _can_attach_existing_entity(reference, target)
+
+    def attach_existing_entity(
+        self,
+        reference: ReferenceRecord,
+        target: EntityRecord | None,
+    ) -> ReferenceActionResult:
+        """Move an existing target entity under the source's child collection."""
+
+        if not _can_attach_existing_entity(reference, target):
+            return ReferenceActionResult.error(
+                "Cannot attach: target cannot be safely placed under this source."
+            )
+        assert target is not None
+
+        source_node = reference.source.node
+        target_node = target.node
+        if not isinstance(source_node, MutableMapping) or not isinstance(
+            target_node, MutableMapping
+        ):
+            return ReferenceActionResult.error(
+                "Cannot attach: source or target is not editable."
+            )
+
+        collection_name = _child_collection_name(reference.expected_type)
+        source_collection = _editable_collection(source_node, collection_name)
+        origin_collection = _origin_collection(target)
+        if source_collection is None or origin_collection is None:
+            return ReferenceActionResult.error(
+                "Cannot attach: source or target collection is not editable."
+            )
+        if source_collection is origin_collection:
+            return ReferenceActionResult.error(
+                "Cannot attach: target is already in the source collection."
+            )
+        if not _collection_contains_identity(origin_collection, target_node):
+            return ReferenceActionResult.error(
+                "Cannot attach: target was not found in its current collection."
+            )
+        if _collection_contains_equivalent_entity(source_collection, target):
+            return ReferenceActionResult.error(
+                "Cannot attach: equivalent target is already in the source collection."
+            )
+
+        removed = _remove_child_by_identity(origin_collection, target_node)
+        if not removed:
+            return ReferenceActionResult.error(
+                "Cannot attach: target was not found in its current collection."
+            )
+        source_collection.append(target_node)
+
+        return ReferenceActionResult.ok(
+            f'Entity "{target.identifier}" attached under "{reference.source.identifier}".',
+            _format_attach_change(reference, target, collection_name),
         )
 
     def link_created_entity(
@@ -125,7 +190,7 @@ class ReferenceFixService:
 
         target_identifier = _extract_target_identifier(new_entity)
         if not target_identifier:
-            return ReferenceActionResult.error("Impossible de relier : nouvelle entité invalide.")
+            return ReferenceActionResult.error("Cannot link: created entity is invalid.")
 
         changes: list[str] = []
         if attach_to_source and isinstance(new_entity, MutableMapping):
@@ -137,7 +202,7 @@ class ReferenceFixService:
         updated = _replace_reference_value(reference, target_identifier, target_type)
         if not updated:
             return ReferenceActionResult.error(
-                "Impossible de relier : référence introuvable ou non modifiable."
+                "Cannot link: reference not found or not editable."
             )
 
         changes.append(
@@ -148,7 +213,7 @@ class ReferenceFixService:
             )
         )
         return ReferenceActionResult.ok(
-            f"Nouvelle entité « {target_identifier} » reliée.",
+            f'Created entity "{target_identifier}" linked.',
             *changes,
         )
 
@@ -159,10 +224,19 @@ _REFERENCE_KEYS = _IDENTIFIER_KEYS + _NAME_KEYS + ("ref", "reference", "target")
 _TYPE_KEYS = ("entity_type", "type", "kind", "category", "EntityType", "Type")
 _CHILD_COLLECTION_BY_TYPE = {
     "arc": "arcs",
-    "scenario": "scenarios",
-    "location": "locations",
+    "base": "bases",
+    "book": "books",
+    "creature": "creatures",
     "encounter": "encounters",
+    "event": "events",
+    "faction": "factions",
+    "location": "locations",
+    "map": "maps",
     "npc": "npcs",
+    "object": "objects",
+    "pc": "pcs",
+    "scenario": "scenarios",
+    "villain": "villains",
 }
 
 
@@ -241,10 +315,7 @@ def _attach_child_entity(
     if not isinstance(source_node, MutableMapping):
         return ""
 
-    collection_name = _CHILD_COLLECTION_BY_TYPE.get(
-        reference.expected_type,
-        f"{reference.expected_type}s",
-    )
+    collection_name = _child_collection_name(reference.expected_type)
     collection = source_node.setdefault(collection_name, [])
     if not isinstance(collection, MutableSequence):
         return ""
@@ -252,7 +323,137 @@ def _attach_child_entity(
         return ""
 
     collection.append(new_entity)
-    return f"{collection_name}: entité ajoutée"
+    return f"{collection_name}: entity added"
+
+
+def _can_attach_existing_entity(
+    reference: ReferenceRecord,
+    target: EntityRecord | None,
+) -> bool:
+    if target is None:
+        return False
+    if target.entity_type != reference.expected_type:
+        return False
+    if not _source_allows_child_type(reference.source.entity_type, target.entity_type):
+        return False
+    if not isinstance(reference.source.node, MutableMapping):
+        return False
+    if not isinstance(target.node, MutableMapping):
+        return False
+    if target.parent_node is None or not target.collection_name:
+        return False
+
+    collection_name = _child_collection_name(target.entity_type)
+    if not _source_collection_is_editable(reference.source.node, collection_name):
+        return False
+    source_collection = _existing_collection(reference.source.node, collection_name)
+    origin_collection = _origin_collection(target)
+    if origin_collection is None:
+        return False
+    if not _collection_contains_identity(origin_collection, target.node):
+        return False
+    if (
+        source_collection is not None
+        and _collection_contains_equivalent_entity(source_collection, target)
+    ):
+        return False
+    return source_collection is None or source_collection is not origin_collection
+
+
+def _source_allows_child_type(source_type: str, child_type: str) -> bool:
+    return child_type in ALLOWED_HIERARCHY_CHILDREN.get(source_type, set())
+
+
+def _child_collection_name(entity_type: str) -> str:
+    return _CHILD_COLLECTION_BY_TYPE.get(entity_type, f"{entity_type}s")
+
+
+def _editable_collection(
+    source_node: MutableMapping[str, Any],
+    collection_name: str,
+) -> MutableSequence[Any] | None:
+    collection = source_node.setdefault(collection_name, [])
+    if not isinstance(collection, MutableSequence):
+        return None
+    return collection
+
+
+def _source_collection_is_editable(
+    source_node: MutableMapping[str, Any],
+    collection_name: str,
+) -> bool:
+    collection = source_node.get(collection_name)
+    return collection is None or isinstance(collection, MutableSequence)
+
+
+def _existing_collection(
+    source_node: MutableMapping[str, Any],
+    collection_name: str,
+) -> MutableSequence[Any] | None:
+    collection = source_node.get(collection_name)
+    if isinstance(collection, MutableSequence):
+        return collection
+    return None
+
+
+def _origin_collection(target: EntityRecord) -> MutableSequence[Any] | None:
+    parent_node = target.parent_node
+    if not isinstance(parent_node, Mapping) or not target.collection_name:
+        return None
+    collection = parent_node.get(target.collection_name)
+    if not isinstance(collection, MutableSequence):
+        return None
+    return collection
+
+
+def _remove_child_by_identity(
+    collection: MutableSequence[Any],
+    target_node: MutableMapping[str, Any],
+) -> bool:
+    for index, item in enumerate(collection):
+        if item is target_node:
+            del collection[index]
+            return True
+    return False
+
+
+def _collection_contains_identity(
+    collection: MutableSequence[Any],
+    target_node: MutableMapping[str, Any],
+) -> bool:
+    return any(item is target_node for item in collection)
+
+
+def _collection_contains_equivalent_entity(
+    collection: MutableSequence[Any],
+    target: EntityRecord,
+) -> bool:
+    target_values = _entity_identity_values(target.node) | {
+        target.identifier,
+        target.label,
+    }
+    target_values.discard("")
+    for item in collection:
+        if item is target.node:
+            return True
+        if not isinstance(item, Mapping):
+            continue
+        item_type = _extract_target_type(item)
+        if item_type and item_type != target.entity_type:
+            continue
+        if _entity_identity_values(item) & target_values:
+            return True
+    return False
+
+
+def _entity_identity_values(value: Mapping[str, Any]) -> set[str]:
+    return {
+        normalized
+        for key in _IDENTIFIER_KEYS + _NAME_KEYS
+        if key in value
+        for normalized in (_normalize(value.get(key)),)
+        if normalized
+    }
 
 
 def _extract_target_identifier(target: EntityRecord | MutableMapping[str, Any] | str) -> str:
@@ -292,8 +493,19 @@ def _format_reference_change(
 ) -> str:
     location = f"{reference.source.identifier}.{reference.field_name}"
     if action is ReferenceFixAction.REMOVE:
-        return f"{location}: référence supprimée"
-    return f"{location}: {reference.reference_value} → {target_identifier}"
+        return f"{location}: reference removed"
+    return f"{location}: {reference.reference_value} -> {target_identifier}"
+
+
+def _format_attach_change(
+    reference: ReferenceRecord,
+    target: EntityRecord,
+    collection_name: str,
+) -> str:
+    return (
+        f"{reference.source.identifier}.{collection_name}: "
+        f"{target.identifier} attached"
+    )
 
 
 def _first_present(value: MutableMapping[str, Any], keys: tuple[str, ...]) -> Any:
