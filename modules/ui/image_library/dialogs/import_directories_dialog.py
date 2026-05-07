@@ -39,6 +39,7 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
 
         self.recursive_var = ctk.BooleanVar(value=True)
         self.reindex_changed_var = ctk.BooleanVar(value=True)
+        self.update_existing_files_var = ctk.BooleanVar(value=True)
 
         self._build_ui()
         self._refresh_roots()
@@ -57,9 +58,9 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         top.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 8))
         top.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(top, text="Source directories", font=ctk.CTkFont(size=16, weight="bold")).grid(
-            row=0, column=0, sticky="w"
-        )
+        ctk.CTkLabel(
+            top, text="Source directories", font=ctk.CTkFont(size=16, weight="bold")
+        ).grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(
             top,
             text="Choose one or more folders to index images into the shared library.",
@@ -76,28 +77,43 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         side = ctk.CTkFrame(list_frame)
         side.grid(row=0, column=1, sticky="ns", padx=8, pady=8)
 
-        ctk.CTkButton(side, text="Add directory...", command=self._add_directory).pack(fill="x", pady=(0, 6))
-        ctk.CTkButton(side, text="Bulk add...", command=self._bulk_add_directories).pack(fill="x", pady=6)
-        ctk.CTkButton(side, text="Remove selected", command=self._remove_selected).pack(fill="x", pady=6)
+        ctk.CTkButton(side, text="Add directory...", command=self._add_directory).pack(
+            fill="x", pady=(0, 6)
+        )
+        ctk.CTkButton(
+            side, text="Bulk add...", command=self._bulk_add_directories
+        ).pack(fill="x", pady=6)
+        ctk.CTkButton(side, text="Remove selected", command=self._remove_selected).pack(
+            fill="x", pady=6
+        )
         ctk.CTkButton(side, text="Clear", command=self._clear).pack(fill="x", pady=6)
 
         options = ctk.CTkFrame(self)
         options.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
-        ctk.CTkCheckBox(options, text="Scan subdirectories recursively", variable=self.recursive_var).pack(
-            anchor="w", padx=8, pady=(8, 4)
-        )
+        ctk.CTkCheckBox(
+            options, text="Scan subdirectories recursively", variable=self.recursive_var
+        ).pack(anchor="w", padx=8, pady=(8, 4))
         ctk.CTkCheckBox(
             options,
             text="Skip unchanged files (faster incremental import)",
             variable=self.reindex_changed_var,
+        ).pack(anchor="w", padx=8, pady=(0, 4))
+        ctk.CTkCheckBox(
+            options,
+            text="Update existing files",
+            variable=self.update_existing_files_var,
         ).pack(anchor="w", padx=8, pady=(0, 8))
 
         actions = ctk.CTkFrame(self)
         actions.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
         actions.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkButton(actions, text="Cancel", command=self.destroy).grid(row=0, column=1, padx=(8, 4), pady=8)
-        ctk.CTkButton(actions, text="Import", command=self._run_import).grid(row=0, column=2, padx=(4, 8), pady=8)
+        ctk.CTkButton(actions, text="Cancel", command=self.destroy).grid(
+            row=0, column=1, padx=(8, 4), pady=8
+        )
+        ctk.CTkButton(actions, text="Import", command=self._run_import).grid(
+            row=0, column=2, padx=(4, 8), pady=8
+        )
 
     def _add_directory(self) -> None:
         """Prompt and append one directory."""
@@ -108,7 +124,9 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         """Repeatedly prompt the user to add multiple directories in one flow."""
         selected_roots: list[str] = []
         while True:
-            selected = filedialog.askdirectory(parent=self, title="Select image directory")
+            selected = filedialog.askdirectory(
+                parent=self, title="Select image directory"
+            )
             if not selected:
                 break
             selected_roots.append(selected)
@@ -136,7 +154,11 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         if not selection:
             return
         selected_indexes = set(selection)
-        self._roots = [value for idx, value in enumerate(self._roots) if idx not in selected_indexes]
+        self._roots = [
+            value
+            for idx, value in enumerate(self._roots)
+            if idx not in selected_indexes
+        ]
         self._refresh_roots()
 
     def _clear(self) -> None:
@@ -155,7 +177,11 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
         validation = validate_roots(self._roots)
         existing_roots = validation.existing_roots
         if not existing_roots:
-            messagebox.showwarning("No directory", "Add at least one valid directory to import.", parent=self)
+            messagebox.showwarning(
+                "No directory",
+                "Add at least one valid directory to import.",
+                parent=self,
+            )
             return
 
         if validation.missing_roots:
@@ -171,9 +197,12 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
             paths=existing_roots,
             recursive=bool(self.recursive_var.get()),
             reindex_changed_only=bool(self.reindex_changed_var.get()),
+            update_existing_files=bool(self.update_existing_files_var.get()),
         )
         self._recent_roots_store.save(existing_roots)
-        messagebox.showinfo("Import complete", self._format_summary(summary), parent=self)
+        messagebox.showinfo(
+            "Import complete", self._format_summary(summary), parent=self
+        )
 
     def _enable_drag_and_drop_if_available(self) -> None:
         """Enable folder drag-and-drop when supported by the current Tk stack."""
@@ -194,7 +223,9 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
             return "break"
 
         try:
-            candidates = [str(value).strip("{}") for value in self.tk.splitlist(raw_data)]
+            candidates = [
+                str(value).strip("{}") for value in self.tk.splitlist(raw_data)
+            ]
         except tk.TclError:
             candidates = [raw_data.strip("{}")]
 
@@ -224,6 +255,7 @@ class ImageDirectoryImportDialog(ctk.CTkToplevel):
             f"Updated: {summary.updated}",
             f"Skipped unchanged: {summary.skipped_unchanged}",
             f"Skipped duplicates: {summary.skipped_duplicate}",
+            f"Skipped existing: {summary.skipped_existing}",
         ]
         if summary.roots_missing:
             lines.append(f"Missing roots: {len(summary.roots_missing)}")

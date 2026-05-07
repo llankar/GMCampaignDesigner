@@ -10,6 +10,7 @@ from typing import Iterable
 from PIL import Image, UnidentifiedImageError
 
 from modules.image_assets.repository import ImageAssetsRepository
+from modules.image_assets.services.import_options import ImageDirectoryImportOptions
 from modules.image_assets.search.indexing import (
     build_search_tokens,
     build_searchable_blob,
@@ -40,6 +41,7 @@ class ImageAssetsImportSummary:
     updated: int
     skipped_unchanged: int
     skipped_duplicate: int
+    skipped_existing: int
     errors: list[AssetImportError]
 
     def as_dict(self) -> dict[str, object]:
@@ -53,9 +55,9 @@ class ImageAssetsImportSummary:
             "updated": self.updated,
             "skipped_unchanged": self.skipped_unchanged,
             "skipped_duplicate": self.skipped_duplicate,
+            "skipped_existing": self.skipped_existing,
             "errors": [
-                {"path": error.path, "reason": error.reason}
-                for error in self.errors
+                {"path": error.path, "reason": error.reason} for error in self.errors
             ],
         }
 
@@ -71,6 +73,7 @@ class ImageAssetImportService:
         paths: list[str],
         recursive: bool,
         reindex_changed_only: bool,
+        update_existing_files: bool = True,
     ) -> ImageAssetsImportSummary:
         """Import image assets from one or more roots.
 
@@ -78,7 +81,14 @@ class ImageAssetImportService:
             paths: Root directories selected by user.
             recursive: If True, walk subdirectories; otherwise scan direct children only.
             reindex_changed_only: If True, keep unchanged records as-is.
+            update_existing_files: If True, replace matching existing rows with
+                metadata read from the import directories.
         """
+        options = ImageDirectoryImportOptions(
+            recursive=recursive,
+            reindex_changed_only=reindex_changed_only,
+            update_existing_files=update_existing_files,
+        )
         normalized_roots = self._normalize_roots(paths)
         existing_items = self.repository.list_all()
         existing_by_path = {
@@ -94,6 +104,7 @@ class ImageAssetImportService:
         updated = 0
         skipped_unchanged = 0
         skipped_duplicate = 0
+        skipped_existing = 0
         errors: list[AssetImportError] = []
 
         seen_keys: set[str] = {
@@ -108,7 +119,9 @@ class ImageAssetImportService:
                 roots_missing.append(str(root_path))
                 continue
 
-            for file_path in self._iter_image_files(root_path, recursive=recursive):
+            for file_path in self._iter_image_files(
+                root_path, recursive=options.recursive
+            ):
                 scanned_files += 1
                 discovered_candidates += 1
 
@@ -119,12 +132,20 @@ class ImageAssetImportService:
                     file_size = file_path.stat().st_size
                     content_hash = self._compute_sha256(file_path)
                 except OSError as exc:
-                    errors.append(AssetImportError(path=abs_path, reason=f"stat/hash failed: {exc}"))
+                    errors.append(
+                        AssetImportError(
+                            path=abs_path, reason=f"stat/hash failed: {exc}"
+                        )
+                    )
                     continue
 
                 dedupe_key = self._compose_dedupe_key(content_hash, file_size)
                 if existing is None and dedupe_key in seen_keys:
                     skipped_duplicate += 1
+                    continue
+
+                if existing is not None and not options.update_existing_files:
+                    skipped_existing += 1
                     continue
 
                 unchanged = bool(
@@ -133,7 +154,7 @@ class ImageAssetImportService:
                     and int(existing.get("FileSizeBytes") or 0) == file_size
                 )
 
-                if unchanged and reindex_changed_only:
+                if unchanged and options.reindex_changed_only:
                     skipped_unchanged += 1
                     continue
 
@@ -143,20 +164,32 @@ class ImageAssetImportService:
                     try:
                         width, height = self._read_dimensions(file_path)
                     except (OSError, UnidentifiedImageError) as exc:
-                        errors.append(AssetImportError(path=abs_path, reason=f"metadata read failed: {exc}"))
+                        errors.append(
+                            AssetImportError(
+                                path=abs_path, reason=f"metadata read failed: {exc}"
+                            )
+                        )
                         continue
                 else:
-                    width = self._as_optional_int(existing.get("Width") if existing else None)
-                    height = self._as_optional_int(existing.get("Height") if existing else None)
+                    width = self._as_optional_int(
+                        existing.get("Width") if existing else None
+                    )
+                    height = self._as_optional_int(
+                        existing.get("Height") if existing else None
+                    )
 
                 stem = file_path.stem
                 tags: list[str] = []
                 name_normalized = normalize_filename(stem)
-                search_tokens = build_search_tokens(name_normalized=name_normalized, tags=tags)
+                search_tokens = build_search_tokens(
+                    name_normalized=name_normalized, tags=tags
+                )
                 searchable_blob = build_searchable_blob(
                     name=stem,
                     path=abs_path,
-                    relative_path=self._compute_relative(file_path=file_path, root_path=root_path),
+                    relative_path=self._compute_relative(
+                        file_path=file_path, root_path=root_path
+                    ),
                     source_root=str(root_path.resolve()),
                     extension=file_path.suffix.lower().lstrip("."),
                     tags=tags,
@@ -168,7 +201,9 @@ class ImageAssetImportService:
                 payload = {
                     "Name": stem,
                     "Path": abs_path,
-                    "RelativePath": self._compute_relative(file_path=file_path, root_path=root_path),
+                    "RelativePath": self._compute_relative(
+                        file_path=file_path, root_path=root_path
+                    ),
                     "SourceRoot": str(root_path.resolve()),
                     "SourceFolderName": file_path.parent.name,
                     "Extension": file_path.suffix.lower().lstrip("."),
@@ -182,7 +217,11 @@ class ImageAssetImportService:
                     "SearchableBlob": searchable_blob,
                 }
 
-                saved = self.repository.upsert_by_hash_or_path(payload)
+                saved = (
+                    self.repository.replace_by_path(payload)
+                    if existing
+                    else self.repository.upsert_by_hash_or_path(payload)
+                )
                 existing_by_path[abs_path] = saved
                 seen_keys.add(dedupe_key)
 
@@ -200,6 +239,7 @@ class ImageAssetImportService:
             updated=updated,
             skipped_unchanged=skipped_unchanged,
             skipped_duplicate=skipped_duplicate,
+            skipped_existing=skipped_existing,
             errors=errors,
         )
 
