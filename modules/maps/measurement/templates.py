@@ -262,16 +262,18 @@ def render_measurement_on_canvas(
             )
             label_anchor = ((sx + ex_square) / 2.0, (sy + ey_square) / 2.0)
         else:
+            fill = "" if template_type == "circle" else style.fill
+            stipple = "" if template_type == "circle" else style.stipple
             ids.append(
                 canvas.create_oval(
                     sx - radius,
                     sy - radius,
                     sx + radius,
                     sy + radius,
-                    fill=style.fill,
+                    fill=fill,
                     outline=style.outline,
                     width=style.width,
-                    stipple=style.stipple,
+                    stipple=stipple,
                     tags=common_tags,
                 )
             )
