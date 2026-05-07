@@ -5,6 +5,7 @@ import math
 from modules.maps.utils.token_facing import (
     facing_angle_from_points,
     facing_arrow_points,
+    facing_arrowhead_points,
     facing_vector,
     normalize_facing_angle,
     token_center,
@@ -50,3 +51,14 @@ def test_facing_arrow_points_include_pan_zoom_and_offset() -> None:
     assert (start_x, start_y) == (68, 83)
     assert math.isclose(end_x, 114.8)
     assert end_y == 83
+
+
+def test_facing_arrowhead_points_orient_triangle_tip() -> None:
+    """The facing handle is a triangle with its tip in the facing direction."""
+    right = facing_arrowhead_points(100, 50, 0, length=20, width=10)
+    assert right == (100.0, 50.0, 80.0, 55.0, 80.0, 45.0)
+
+    down = facing_arrowhead_points(100, 50, 90, length=20, width=10)
+    assert down[0:2] == (100.0, 50.0)
+    assert math.isclose(down[3], 30.0, abs_tol=1e-9)
+    assert math.isclose(down[5], 30.0, abs_tol=1e-9)
