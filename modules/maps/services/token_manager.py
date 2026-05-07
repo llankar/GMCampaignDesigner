@@ -8,6 +8,7 @@ from tkinter import messagebox, colorchooser
 import os
 import copy
 from modules.helpers.config_helper import ConfigHelper
+from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
 from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
@@ -745,6 +746,7 @@ def _persist_tokens(self):
                 resolved_video = _resolve_campaign_path(video_path)
                 storage_video = _campaign_relative_path(resolved_video) if resolved_video else ""
                 item_data.update({
+                    "marker_type": normalize_marker_type(t.get("marker_type", DEFAULT_MARKER_TYPE)),
                     "text": t.get("text", ""),
                     "description": t.get("description", ""),
                     "entry_width": t.get("entry_width", 180),

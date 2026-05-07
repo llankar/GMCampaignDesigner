@@ -25,6 +25,14 @@ from modules.ui.chatbot_dialog import (
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
 from modules.maps.views.world_map_toolbar_view import build_world_map_toolbar
+from modules.maps.marker_types import (
+    DEFAULT_MARKER_TYPE,
+    MARKER_TYPE_LABELS,
+    MARKER_TYPE_LABEL_TO_KEY,
+    marker_type_icon_path,
+    marker_type_color,
+    normalize_marker_type,
+)
 from modules.maps.views.toolbar_view import (
     _change_brush,
     _on_brush_shape_change,
@@ -140,10 +148,12 @@ class WorldMapPanel(ctk.CTkFrame):
 
         self.tokens: list[dict] = []
         self.selected_token: dict | None = None
+        self.marker_type_filter = "All Types"
         self.base_image = None
         self.base_photo = None
         self.render_params = None
         self.image_cache: dict[str, Image.Image] = {}
+        self._marker_type_image_cache: dict[tuple[str, int], Image.Image] = {}
         self._portrait_photo: ImageTk.PhotoImage | None = None
         self._portrait_placeholder: Image.Image | None = None
         self._inspector_token: dict | None = None
@@ -883,6 +893,18 @@ class WorldMapPanel(ctk.CTkFrame):
         else:
             self._show_entity_synthesis(token)
 
+    def _on_marker_type_filter_change(self, selected: str) -> None:
+        """Handle marker type filter changes."""
+        self.marker_type_filter = selected or "All Types"
+        self._draw_scene()
+
+    def _marker_matches_filter(self, token: dict) -> bool:
+        """Return whether a world map token should render for the active filter."""
+        selected = self.marker_type_filter or "All Types"
+        if selected == "All Types":
+            return True
+        return normalize_marker_type(token.get("marker_type")) == MARKER_TYPE_LABEL_TO_KEY.get(selected)
+
     def _build_token(self, entity_type: str, record: dict) -> dict:
         """Build token."""
         return {
@@ -897,6 +919,7 @@ class WorldMapPanel(ctk.CTkFrame):
             "image_path": self._resolve_map_image(record) if entity_type == "Map" else None,
             "linked_map": record.get("Name") if entity_type == "Map" else None,
             "color": _TOKEN_COLORS.get(entity_type, "#FFFFFF"),
+            "marker_type": DEFAULT_MARKER_TYPE,
             "player_visible": True,
         }
 
@@ -941,6 +964,7 @@ class WorldMapPanel(ctk.CTkFrame):
                     'image_path': value.get('image_path'),
                     'linked_map': value.get('linked_map'),
                     'color': value.get('color', _TOKEN_COLORS.get(entity_type, '#FFFFFF')),
+                    'marker_type': normalize_marker_type(value.get('marker_type', DEFAULT_MARKER_TYPE)),
                     'player_visible': bool(value.get('player_visible', True)),
                 }
             )
@@ -972,6 +996,7 @@ class WorldMapPanel(ctk.CTkFrame):
                     "image_path": token.get("image_path"),
                     "linked_map": token.get("linked_map"),
                     "color": token.get("color"),
+                    "marker_type": normalize_marker_type(token.get("marker_type", DEFAULT_MARKER_TYPE)),
                     "player_visible": bool(token.get("player_visible", True)),
                 }
             )
@@ -1051,6 +1076,8 @@ class WorldMapPanel(ctk.CTkFrame):
         update_world_map_fog_canvas(self, resample=Image.LANCZOS)
 
         for token in self.tokens:
+            if not self._marker_matches_filter(token):
+                continue
             self._draw_token(token)
 
         self._update_player_display()
@@ -1328,7 +1355,7 @@ class WorldMapPanel(ctk.CTkFrame):
             pil = self._load_image(portrait)
             if pil is not None:
                 token["_has_portrait_image"] = True
-                return pil.resize((size, size), Image.LANCZOS)
+                return self._with_marker_type_badge(pil.resize((size, size), Image.LANCZOS), token)
         pin_path = _default_pin_image_path()
         if pin_path:
             # Continue with this path when pin path is set.
@@ -1353,14 +1380,42 @@ class WorldMapPanel(ctk.CTkFrame):
                         anchor="mm",
                         align="center",
                     )
-                return canvas
+                return self._with_marker_type_badge(canvas, token)
         placeholder = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(placeholder)
         color = self._resolve_token_color(token)
         draw.ellipse((0, 0, size, size), fill=color)
         label = (token.get("entity_id") or "?")[:2].upper()
         draw.text((size / 2, size / 2), label, fill="#0B0B0B", anchor="mm", align="center")
-        return placeholder
+        return self._with_marker_type_badge(placeholder, token)
+
+    def _with_marker_type_badge(self, image: Image.Image, token: dict) -> Image.Image:
+        """Add the marker type icon to a token image."""
+        marker_type = normalize_marker_type(token.get("marker_type"))
+        badge_size = max(18, int(image.width * 0.34))
+        badge = self._load_marker_type_image(marker_type, badge_size)
+        canvas = image.convert("RGBA").copy()
+        margin = max(1, int(image.width * 0.04))
+        position = (canvas.width - badge_size - margin, canvas.height - badge_size - margin)
+        canvas.alpha_composite(badge, position)
+        return canvas
+
+    def _load_marker_type_image(self, marker_type: str, size: int) -> Image.Image:
+        """Load a marker type icon as a PIL image."""
+        normalized = normalize_marker_type(marker_type)
+        cache_key = (normalized, size)
+        cached = self._marker_type_image_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        icon_path = os.path.join(project_root, marker_type_icon_path(normalized))
+        image = self._load_image(icon_path)
+        if image is None:
+            image = Image.new("RGBA", (size, size), marker_type_color(normalized))
+        else:
+            image = image.resize((size, size), Image.LANCZOS)
+        self._marker_type_image_cache[cache_key] = image
+        return image
 
     def _resolve_token_image(self, token: dict, size: int) -> ImageTk.PhotoImage:
         """Resolve token image."""
@@ -1508,6 +1563,13 @@ class WorldMapPanel(ctk.CTkFrame):
             return "break"
         menu = tk.Menu(self.canvas, tearoff=0)
         menu.add_command(label="Resize?", command=lambda: self._prompt_resize(token))
+        type_menu = tk.Menu(menu, tearoff=0)
+        for label in MARKER_TYPE_LABELS:
+            type_menu.add_command(
+                label=label,
+                command=lambda selected=label: self._set_token_marker_type(token, selected),
+            )
+        menu.add_cascade(label="Marker Type", menu=type_menu)
         menu.add_command(label="Change Color", command=lambda: self._prompt_token_color(token))
         menu.add_command(
             label=("Hide from Players" if bool(token.get("player_visible", True)) else "Show to Players"),
@@ -1520,6 +1582,16 @@ class WorldMapPanel(ctk.CTkFrame):
             menu.tk_popup(event.x_root, event.y_root)
         finally:
             menu.grab_release()
+
+    def _set_token_marker_type(self, token: dict, marker_type: str) -> None:
+        """Set the marker type for a world map token."""
+        if token not in self.tokens:
+            return
+        token["marker_type"] = normalize_marker_type(marker_type)
+        self._draw_scene()
+        self._persist_tokens()
+        if self._inspector_token is token:
+            self._update_color_swatch(token)
 
     def _on_canvas_press(self, event) -> str | None:
         """Handle canvas press."""

@@ -88,6 +88,16 @@ from modules.ui.chatbot_dialog import (
 from modules.helpers.logging_helper import log_module_import, log_warning, log_info, log_debug
 from modules.helpers.dice_markup import parse_inline_actions
 from modules.maps.exporters.maptools import build_token_macros
+from modules.maps.marker_types import (
+    DEFAULT_MARKER_TYPE,
+    MARKER_TYPES,
+    MARKER_TYPE_LABELS,
+    MARKER_TYPE_LABEL_TO_KEY,
+    marker_type_color,
+    marker_type_icon_path,
+    marker_type_label,
+    normalize_marker_type,
+)
 from modules.dice import dice_engine
 from modules.dice import dice_preferences
 from modules.audio.entity_audio import (
@@ -231,6 +241,8 @@ class DisplayMapController:
         self._marker_min_r    = 6
         self._marker_max_r    = 25
         self._hovered_marker  = None
+        self.marker_type_filter = "All Types"
+        self._marker_type_icon_cache = {}
 
         self._focus_bindings_registered = False
 
@@ -1063,6 +1075,7 @@ class DisplayMapController:
 
         marker = {
             "type": "marker",
+            "marker_type": DEFAULT_MARKER_TYPE,
             "position": (xw_center, yw_center),
             "text": "New Marker",
             "description": "Marker description",
@@ -1081,6 +1094,71 @@ class DisplayMapController:
         self.tokens.append(marker)
         self._update_canvas_images()
         self._persist_tokens()
+
+    def _on_marker_type_filter_change(self, selected):
+        """Handle marker type filter changes from the toolbar."""
+        self.marker_type_filter = selected or "All Types"
+        self._update_canvas_images()
+
+    def _marker_matches_filter(self, marker):
+        """Return whether a marker should be visible for the active type filter."""
+        selected = getattr(self, "marker_type_filter", "All Types") or "All Types"
+        if selected == "All Types":
+            return True
+        return normalize_marker_type(marker.get("marker_type")) == MARKER_TYPE_LABEL_TO_KEY.get(selected)
+
+    def _clear_marker_render_artifacts(self, marker):
+        """Remove canvas/widget artifacts for a marker that is no longer rendered."""
+        for key in ("entry_canvas_id", "handle_canvas_id", "border_canvas_id"):
+            cid = marker.get(key)
+            if cid:
+                try:
+                    self.canvas.delete(cid)
+                except tk.TclError:
+                    pass
+            marker[key] = None
+        for key in ("entry_widget", "handle_widget"):
+            widget = marker.get(key)
+            if widget and widget.winfo_exists():
+                try:
+                    widget.destroy()
+                except tk.TclError:
+                    pass
+            marker[key] = None
+        marker["canvas_ids"] = ()
+        self._hide_marker_description(marker)
+
+    def _get_marker_type_ctk_image(self, marker_type, size=(24, 24)):
+        """Load a marker type icon for embedded marker controls."""
+        normalized = normalize_marker_type(marker_type)
+        cache_key = (normalized, tuple(size))
+        cached = self._marker_type_icon_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        icon_path = marker_type_icon_path(normalized)
+        project_root = Path(__file__).resolve().parents[3]
+        full_path = project_root / icon_path
+        try:
+            image = Image.open(full_path).convert("RGBA")
+        except Exception:
+            image = Image.new("RGBA", size, marker_type_color(normalized))
+        ctk_image = ctk.CTkImage(light_image=image, dark_image=image, size=size)
+        self._marker_type_icon_cache[cache_key] = ctk_image
+        return ctk_image
+
+    def _set_markers_type(self, markers, marker_type):
+        """Set marker type for one or more markers."""
+        normalized = normalize_marker_type(marker_type)
+        changed = False
+        for marker in markers:
+            if not isinstance(marker, dict) or marker.get("type") != "marker":
+                continue
+            if normalize_marker_type(marker.get("marker_type")) != normalized:
+                marker["marker_type"] = normalized
+                changed = True
+        if changed:
+            self._update_canvas_images()
+            self._persist_tokens()
 
     def _on_marker_text_change(self, marker, persist=False):
         """Handle marker text change."""
@@ -1429,6 +1507,14 @@ class DisplayMapController:
             )
 
         plural = "s" if len(valid_markers) != 1 else ""
+        type_menu = tk.Menu(menu, tearoff=0)
+        for marker_type in MARKER_TYPES:
+            type_menu.add_command(
+                label=marker_type.label,
+                command=lambda key=marker_type.key: self._set_markers_type(valid_markers, key),
+            )
+        menu.add_cascade(label=f"Marker Type{plural}", menu=type_menu)
+        menu.add_separator()
         menu.add_command(
             label=f"Change Border Color{plural}",
             command=lambda: self._change_markers_border_color(valid_markers),
@@ -2659,8 +2745,15 @@ class DisplayMapController:
         editor.geometry("420x320")
         marker["description_editor"] = editor
 
+        type_row = ctk.CTkFrame(editor, fg_color="transparent")
+        type_row.pack(fill="x", padx=12, pady=(12, 0))
+        ctk.CTkLabel(type_row, text="Marker Type").pack(side="left", padx=(0, 8))
+        type_menu = ctk.CTkOptionMenu(type_row, values=MARKER_TYPE_LABELS)
+        type_menu.set(marker_type_label(marker.get("marker_type")))
+        type_menu.pack(side="left", fill="x", expand=True)
+
         textbox = ctk.CTkTextbox(editor, wrap="word")
-        textbox.pack(fill="both", expand=True, padx=12, pady=(12, 6))
+        textbox.pack(fill="both", expand=True, padx=12, pady=(8, 6))
         textbox.insert("1.0", marker.get("description", ""))
 
         button_frame = ctk.CTkFrame(editor)
@@ -2669,7 +2762,9 @@ class DisplayMapController:
         def on_save():
             """Handle save."""
             new_text = textbox.get("1.0", "end").rstrip()
+            marker["marker_type"] = normalize_marker_type(type_menu.get())
             self._on_marker_description_change(marker, new_text=new_text, persist=True)
+            self._update_canvas_images()
             marker["description_editor"] = None
             editor.destroy()
 
@@ -3818,11 +3913,15 @@ class DisplayMapController:
                     debug_payload["rendered_items"].append(debug_entry)
             elif item_type == "marker":
                 # Handle the branch where item_type == 'marker'.
+                item["marker_type"] = normalize_marker_type(item.get("marker_type"))
+                if not self._marker_matches_filter(item):
+                    self._clear_marker_render_artifacts(item)
+                    continue
                 item.setdefault("entry_width", 180)
                 item.setdefault("entry_expanded_width", item.get("entry_width", 180))
                 item.setdefault("description_visible", False)
-                item.setdefault("handle_width", 22)
-                item.setdefault("border_color", "#00ff00")
+                item.setdefault("handle_width", 30)
+                item.setdefault("border_color", marker_type_color(item.get("marker_type")))
                 sx, sy = int(xw*self.zoom + self.pan_x), int(yw*self.zoom + self.pan_y)
                 debug_entry = None
                 if debug_payload is not None:
@@ -3870,7 +3969,7 @@ class DisplayMapController:
                 handle_widget = item.get("handle_widget")
                 if not handle_widget or not handle_widget.winfo_exists():
                     # Handle the branch where handle widget is unavailable or not handle_widget.winfo_exists().
-                    handle_widget = ctk.CTkLabel(self.canvas, text="≡", width=handle_width, fg_color="#2f2f2f")
+                    handle_widget = ctk.CTkLabel(self.canvas, text="", width=handle_width, fg_color="#2f2f2f")
                     handle_widget.configure(cursor="fleur")
                     handle_widget.bind("<ButtonPress-1>", lambda e, i=item: self._on_marker_handle_press(e, i))
                     handle_widget.bind("<B1-Motion>", lambda e, i=item: self._on_marker_handle_drag(e, i))
@@ -3878,7 +3977,10 @@ class DisplayMapController:
                     handle_widget.bind("<Double-Button-1>", lambda e, i=item: self._on_marker_double_click(e, i))
                     handle_widget.bind("<Button-3>", lambda e, i=item: self._on_item_right_click(e, i))
                     item["handle_widget"] = handle_widget
-                handle_widget.configure(height=entry_height)
+                handle_widget.configure(
+                    height=entry_height,
+                    image=self._get_marker_type_ctk_image(item.get("marker_type"), (20, 20)),
+                )
                 handle_id = item.get("handle_canvas_id")
                 if handle_id:
                     self.canvas.coords(handle_id, handle_x, sy)
@@ -5246,6 +5348,7 @@ class DisplayMapController:
                 new_item_data.pop("hover_bbox", None)
             elif item_type == "marker":
                 # Handle the branch where item_type == 'marker'.
+                new_item_data.setdefault("marker_type", DEFAULT_MARKER_TYPE)
                 new_item_data.setdefault("text", "New Marker")
                 new_item_data.setdefault("description", "Marker description")
                 new_item_data.setdefault("border_color", "#00ff00")

@@ -5,6 +5,7 @@ import customtkinter as ctk
 from modules.ui.icon_dropdown import IconDropdown
 from modules.helpers.logging_helper import log_module_import
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
+from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 
 log_module_import(__name__)
 
@@ -195,6 +196,17 @@ def _build_toolbar(self):
     )
     self.token_size_menu.set(str(current_token_size))
     _pack_control(self.token_size_menu, trailing=4)
+
+    marker_filter_label = ctk.CTkLabel(token_section, text="Marker Type")
+    _pack_control(marker_filter_label, leading=8, trailing=4)
+    self.marker_type_filter_menu = ctk.CTkOptionMenu(
+        token_section,
+        values=MARKER_TYPE_FILTER_LABELS,
+        command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
+        width=120,
+    )
+    self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
+    _pack_control(self.marker_type_filter_menu, trailing=4)
 
     drawing_section = _create_collapsible_section(toolbar, "Drawings")
 

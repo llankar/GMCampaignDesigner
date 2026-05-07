@@ -5,6 +5,7 @@ import customtkinter as ctk
 from modules.helpers.logging_helper import log_module_import
 from modules.maps.utils.icon_loader import load_icon
 from modules.ui.icon_dropdown import IconDropdown
+from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 
 log_module_import(__name__)
 
@@ -197,6 +198,17 @@ def build_world_map_toolbar(panel) -> None:
         panel.add_map_button,
     ):
         _pack_control(button, trailing=6)
+
+    filter_label = ctk.CTkLabel(entity_section, text="Marker Type")
+    _pack_control(filter_label, leading=8, trailing=4)
+    panel.marker_type_filter_menu = ctk.CTkOptionMenu(
+        entity_section,
+        values=MARKER_TYPE_FILTER_LABELS,
+        command=panel._on_marker_type_filter_change,
+        width=130,
+    )
+    panel.marker_type_filter_menu.set(getattr(panel, "marker_type_filter", "All Types") or "All Types")
+    _pack_control(panel.marker_type_filter_menu, trailing=6)
 
     action_section = _create_collapsible_section(toolbar, "Actions")
     panel.save_button = ctk.CTkButton(action_section, text="Save", width=120, command=panel._persist_tokens)

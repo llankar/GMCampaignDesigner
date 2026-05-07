@@ -15,6 +15,7 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_module_import, log_debug, log_info, log_warning
+from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
 
 log_module_import(__name__)
 
@@ -462,7 +463,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
     expected_items = []
     for rec in token_list:
         # Process each rec from token_list.
-        marker_keys = ("linked_map", "video_path", "entry_width", "description")
+        marker_keys = ("linked_map", "video_path", "entry_width", "description", "marker_type")
         item_type_from_rec = rec.get("type")
         if not item_type_from_rec and any(key in rec for key in marker_keys):
             # Handle the branch where item type from rec is unavailable and any((key in rec for key in marker_keys)).
@@ -621,6 +622,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
         elif item_type_from_rec == "marker":
             # Handle the branch where item_type_from_rec == 'marker'.
             item_data.update({
+                "marker_type": normalize_marker_type(rec.get("marker_type", DEFAULT_MARKER_TYPE)),
                 "text": rec.get("text", "New Marker"),
                 "description": rec.get("description", "Marker description"),
                 "entry_width": rec.get("entry_width", 180),
@@ -636,6 +638,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "focus_pending": False,
             })
             entry_summary.update({
+                "marker_type": item_data["marker_type"],
                 "text": item_data["text"],
                 "linked_map": item_data.get("linked_map", ""),
             })
