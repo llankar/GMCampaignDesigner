@@ -5,7 +5,6 @@ import customtkinter as ctk
 from modules.ui.icon_dropdown import IconDropdown
 from modules.helpers.logging_helper import log_module_import
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
-from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 from modules.maps.measurement.templates import MEASUREMENT_TEMPLATE_LABELS
 
 log_module_import(__name__)
@@ -89,10 +88,6 @@ def _build_toolbar(self):
         "save":  self.load_icon("assets/icons/save.png",     (48,48)),
         "fs":    self.load_icon("assets/icons/expand.png",   (48,48)),
         "rotate":    self.load_icon("assets/icons/turn_background_icon.png",   (48,48)),
-        "npc":   self.load_icon("assets/icons/npc.png",      (48,48)),
-        "creat": self.load_icon("assets/icons/creature.png", (48,48)),
-        "pc":    self.load_icon("assets/icons/pc.png",       (48,48)),
-        "marker":    self.load_icon("assets/icons/marker.png",       (48,48)),
         "chatbot":    self.load_icon("assets/icons/chatbot.png",       (48,48)),
 
     }
@@ -105,46 +100,7 @@ def _build_toolbar(self):
     self.parent.bind("[", lambda e: self._change_brush(-4))
     self.parent.bind("]", lambda e: self._change_brush(+4))
 
-    # Token controls and fullscreen before the brush size
-    token_section = _create_collapsible_section(toolbar, "Tokens")
-    token_actions = [
-        {"key": "creature", "icon": icons["creat"], "tooltip": "Add Creature", "command": lambda: self.open_entity_picker("Creature")},
-        {"key": "npc", "icon": icons["npc"], "tooltip": "Add NPC", "command": lambda: self.open_entity_picker("NPC")},
-        {"key": "pc", "icon": icons["pc"], "tooltip": "Add PC", "command": lambda: self.open_entity_picker("PC")},
-        {"key": "marker", "icon": icons["marker"], "tooltip": "Add Marker", "command": self.add_marker},
-    ]
-    token_dropdown = IconDropdown(token_section, token_actions, default_key="npc")
-    _pack_control(token_dropdown, trailing=4)
-
-    token_size_label = ctk.CTkLabel(token_section, text="Size") # Renamed label variable
-    _pack_control(token_size_label, leading=8, trailing=4)
-
-    token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
-    current_token_size = int(getattr(self, "token_size", token_size_options[0] if token_size_options else 48))
-    if current_token_size not in token_size_options:
-        token_size_options.append(current_token_size)
-        token_size_options = sorted(set(token_size_options))
-    self.token_size_options = list(token_size_options)
-    token_size_values = [str(size) for size in self.token_size_options]
-    self.token_size_menu = ctk.CTkOptionMenu(
-        token_section,
-        values=token_size_values,
-        command=self._on_token_size_change,
-        width=dropdown_width,
-    )
-    self.token_size_menu.set(str(current_token_size))
-    _pack_control(self.token_size_menu, trailing=4)
-
-    marker_filter_label = ctk.CTkLabel(token_section, text="Marker Type")
-    _pack_control(marker_filter_label, leading=8, trailing=4)
-    self.marker_type_filter_menu = ctk.CTkOptionMenu(
-        token_section,
-        values=MARKER_TYPE_FILTER_LABELS,
-        command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
-        width=120,
-    )
-    self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
-    _pack_control(self.marker_type_filter_menu, trailing=4)
+    # Token controls live in the one-column floating drawing palette.
 
     measure_section = _create_collapsible_section(toolbar, "Measure")
     ctk.CTkLabel(measure_section, text="Template").pack(side="left", padx=(8, 4), pady=6)
