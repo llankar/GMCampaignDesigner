@@ -10,6 +10,8 @@ from typing import Callable
 import customtkinter as ctk
 from modules.helpers import theme_manager
 from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
+from modules.scenarios.gm_table.drag_controller import GMTableDragController
+from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
 
 
@@ -1059,10 +1061,12 @@ class GMTableWorkspace(ctk.CTkFrame):
         *,
         on_panel_build: Callable[[ctk.CTkFrame, PanelDefinition], object],
         on_layout_changed: Callable[[], None] | None = None,
+        map_tool_window_provider: Callable[[], object | None] | None = None,
     ) -> None:
         super().__init__(master, fg_color=TABLE_PALETTE["table_bg"], corner_radius=28)
         self._build_panel = on_panel_build
         self._layout_changed_callback = on_layout_changed
+        self._map_tool_window_provider = map_tool_window_provider
         self._panels: dict[str, GMTablePanel] = {}
         self._definitions: dict[str, PanelDefinition] = {}
         self._panel_payloads: dict[str, object] = {}
@@ -1079,6 +1083,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._minimap_projection: dict[str, float] | None = None
         self._surface_pan_binding_target = None
         self._surface_pan_binding_ids: dict[str, str] = {}
+        self._drag_controller = GMTableDragController(
+            should_block_middle_drag=self._pointer_is_inside_map_tool
+        )
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -1317,6 +1324,21 @@ class GMTableWorkspace(ctk.CTkFrame):
                 binding_ids[sequence] = binding_id
         self._surface_pan_binding_target = target
         self._surface_pan_binding_ids = binding_ids
+
+    def _pointer_is_inside_map_tool(self, screen_x: int, screen_y: int) -> bool:
+        """Return whether the screen pointer is inside an open MapTool panel."""
+        map_tool_window = None
+        if self._map_tool_window_provider is not None:
+            try:
+                map_tool_window = self._map_tool_window_provider()
+            except Exception:
+                map_tool_window = None
+        return point_inside_map_tool(
+            screen_x,
+            screen_y,
+            self.list_panels(include_minimized=False),
+            map_tool_window=map_tool_window,
+        )
 
     def _unbind_workspace_middle_pan(self) -> None:
         """Remove any middle-button pan bindings registered on the window."""
@@ -1570,6 +1592,9 @@ class GMTableWorkspace(ctk.CTkFrame):
             if not is_middle_button or not self._widget_is_in_surface_subtree(widget):
                 return
         if is_middle_button:
+            if not self._drag_controller.allows_middle_drag_start(event):
+                self._pan_origin = None
+                return "break"
             self._pin_snapped_panels_to_world()
         self.surface.focus_set()
         self._pan_origin = (

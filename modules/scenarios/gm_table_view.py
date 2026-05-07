@@ -149,10 +149,18 @@ class GMTableView(ctk.CTkFrame):
             self,
             on_panel_build=self._mount_panel_content,
             on_layout_changed=self._persist_layout,
+            map_tool_window_provider=self._get_map_tool_window,
         )
         self.workspace.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
 
         self.after_idle(self._restore_or_seed_layout)
+
+    def _get_map_tool_window(self):
+        """Return the standalone MapTool window if the root app has one open."""
+        root_app = self._root_app
+        if root_app is None:
+            return None
+        return getattr(root_app, "_map_tool_window", None)
 
     def _build_toolbar(self) -> None:
         """Build top controls."""
