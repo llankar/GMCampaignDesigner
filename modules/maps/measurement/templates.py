@@ -13,7 +13,7 @@ MEASUREMENT_LABEL_TO_TYPE = {label: value for label, value in zip(MEASUREMENT_TE
 MEASUREMENT_TYPE_TO_LABEL = {value: label for label, value in MEASUREMENT_LABEL_TO_TYPE.items()}
 DEFAULT_GRID_CELL_PIXELS = 50.0
 DEFAULT_GRID_SCALE = 5.0
-DEFAULT_DISTANCE_UNIT = "ft"
+DEFAULT_DISTANCE_UNIT = "m"
 
 Point = tuple[float, float]
 

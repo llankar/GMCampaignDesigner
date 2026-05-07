@@ -237,7 +237,7 @@ def _build_toolbar(self):
     self.measure_scale_entry = ctk.CTkEntry(measure_section, width=62)
     self.measure_scale_entry.insert(0, str(int(getattr(self, "measure_grid_scale", 5))))
     _pack_control(self.measure_scale_entry, trailing=2, pady=6)
-    self.measure_unit_label = ctk.CTkLabel(measure_section, text=getattr(self, "measure_unit", "ft") + "/cell")
+    self.measure_unit_label = ctk.CTkLabel(measure_section, text=getattr(self, "measure_unit", "m") + "/cell")
     _pack_control(self.measure_unit_label, trailing=6, pady=6)
 
     self.clear_measurements_button = ctk.CTkButton(

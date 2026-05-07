@@ -206,7 +206,7 @@ def build_world_map_toolbar(panel) -> None:
     panel.measure_scale_entry = ctk.CTkEntry(measure_section, width=62)
     panel.measure_scale_entry.insert(0, str(int(getattr(panel, "measure_grid_scale", 5))))
     _pack_control(panel.measure_scale_entry, trailing=2, pady=6)
-    panel.measure_unit_label = ctk.CTkLabel(measure_section, text=getattr(panel, "measure_unit", "ft") + "/cell")
+    panel.measure_unit_label = ctk.CTkLabel(measure_section, text=getattr(panel, "measure_unit", "m") + "/cell")
     _pack_control(panel.measure_unit_label, trailing=6, pady=6)
 
     panel.clear_measurements_button = ctk.CTkButton(
