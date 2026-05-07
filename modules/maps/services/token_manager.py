@@ -9,6 +9,7 @@ import os
 import copy
 from modules.helpers.config_helper import ConfigHelper
 from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
+from modules.maps.utils.token_facing import normalize_facing_angle
 from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
@@ -364,6 +365,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "hover_visible": False,
         "hover_bbox": None,
         "player_visible": True,
+        "facing_angle": 0.0,
     }
 
     self.tokens.append(token)
@@ -388,6 +390,10 @@ def _on_token_move(self, event, token):
     b_id, i_id = token["canvas_ids"]
     self.canvas.move(b_id, dx, dy)
     self.canvas.move(i_id, dx, dy)
+    if token.get("facing_canvas_ids"):
+        for facing_cid in token["facing_canvas_ids"]:
+            if facing_cid:
+                self.canvas.move(facing_cid, dx, dy)
     # move the name label too, if it exists
     name_id = token.get("name_id")
     if name_id:
@@ -463,6 +469,7 @@ def _copy_token(self, event=None):
         "defense_label": t.get("defense_label", ""),
         "entity_record": copy.deepcopy(t.get("entity_record")) if t.get("entity_record") else None,
         "player_visible": bool(t.get("player_visible", True)),
+        "facing_angle": normalize_facing_angle(t.get("facing_angle", 0.0)),
     }
 
 def _paste_token(self, event=None):
@@ -508,6 +515,7 @@ def _paste_token(self, event=None):
         "defense_label": defense_label,
         "entity_record": entity_record,
         "player_visible": bool(c.get("player_visible", True)),
+        "facing_angle": normalize_facing_angle(c.get("facing_angle", 0.0)),
     }
 
     # Add it to your tokens list, then persist & re-draw everything
@@ -599,6 +607,11 @@ def _delete_token(self, token):
         for cid in token["defense_canvas_ids"]:
             self.canvas.delete(cid)
         del token["defense_canvas_ids"]
+
+    if "facing_canvas_ids" in token:
+        for cid in token["facing_canvas_ids"]:
+            self.canvas.delete(cid)
+        del token["facing_canvas_ids"]
 
     # 4) Any inline HP edit entry
     if "hp_entry_widget_id" in token:
@@ -715,6 +728,7 @@ def _persist_tokens(self):
                     "defense_label": t.get("defense_label", ""),
                     "border_color":   t.get("border_color", "#0000ff"),
                     "player_visible": bool(t.get("player_visible", True)),
+                    "facing_angle": normalize_facing_angle(t.get("facing_angle", 0.0)),
                 })
             elif item_type in ["rectangle", "oval"]:
                 item_data.update({

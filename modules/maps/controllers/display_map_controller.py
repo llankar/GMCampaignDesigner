@@ -9,7 +9,7 @@ import webbrowser
 import threading
 import io
 from pathlib import Path
-from tkinter import colorchooser, filedialog, messagebox
+from tkinter import colorchooser, filedialog, messagebox, simpledialog
 import tkinter as tk
 from tkinter import font as tkfont
 from types import SimpleNamespace
@@ -57,6 +57,11 @@ from modules.maps.services.entity_picker_service import (
     on_entities_selected,
 )
 from modules.maps.utils.icon_loader import load_icon
+from modules.maps.utils.token_facing import (
+    facing_angle_from_points,
+    facing_arrow_points,
+    normalize_facing_angle,
+)
 from PIL import Image, ImageTk, ImageDraw
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.template_loader import load_template
@@ -862,6 +867,8 @@ class DisplayMapController:
                 extra.extend([cid for cid in item["hp_canvas_ids"] if cid])
             if item.get("defense_canvas_ids"):
                 extra.extend([cid for cid in item["defense_canvas_ids"] if cid])
+            if item.get("facing_canvas_ids"):
+                extra.extend([cid for cid in item["facing_canvas_ids"] if cid])
             if item.get("name_id"):
                 extra.append(item.get("name_id"))
             preferred_ids.extend(extra)
@@ -3066,6 +3073,10 @@ class DisplayMapController:
                         for def_cid in item["defense_canvas_ids"]:
                             if def_cid:
                                 self.canvas.move(def_cid, dx, dy)
+                    if item.get("facing_canvas_ids"):
+                        for facing_cid in item["facing_canvas_ids"]:
+                            if facing_cid:
+                                self.canvas.move(facing_cid, dx, dy)
                     if item.get("hover_bbox"):
                         x1, y1, x2, y2 = item["hover_bbox"]
                         item["hover_bbox"] = (x1 + dx, y1 + dy, x2 + dx, y2 + dy)
@@ -3838,6 +3849,7 @@ class DisplayMapController:
                         item.pop("defense_canvas_ids", None)
                     name_id = item.get('name_id')
                     if name_id: tx = sx + nw/2; ty = sy + nh + 2; self.canvas.coords(name_id, tx, ty); self.canvas.itemconfig(name_id, text=item.get('entity_id', ''))
+                    self._draw_token_facing_arrow(item, sx, sy, nw)
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                     self._refresh_token_hover_popup(item)
                     if item.get("hover_visible"):
@@ -3892,6 +3904,7 @@ class DisplayMapController:
                         item.pop("defense_canvas_ids", None)
                     item.update({'canvas_ids': (b_id, i_id), 'name_id': name_id})
                     self._bind_item_events(item)
+                    self._draw_token_facing_arrow(item, sx, sy, nw)
                     item['hover_bbox'] = (sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                     self._refresh_token_hover_popup(item)
                 if debug_entry is not None:
@@ -4415,6 +4428,161 @@ class DisplayMapController:
         if getattr(self, '_web_server_thread', None):
             self._update_web_display_map()
 
+    def _draw_token_facing_arrow(self, token, sx, sy, size_px):
+        """Draw or update the GM-facing arrow and draggable rotation handle."""
+        if not token or token.get("type") != "token":
+            return
+        try:
+            angle = normalize_facing_angle(token.get("facing_angle", 0.0))
+            token["facing_angle"] = angle
+            size_world = float(token.get("size", self.token_size))
+            start_x, start_y, end_x, end_y = facing_arrow_points(
+                token.get("position", (0.0, 0.0)),
+                size_world,
+                angle,
+                zoom=float(self.zoom),
+                pan_x=float(self.pan_x),
+                pan_y=float(self.pan_y),
+            )
+        except Exception:
+            return
+
+        line_width = max(2, int(float(size_px) * 0.06))
+        handle_radius = max(5, int(float(size_px) * 0.10))
+        arrow_color = token.get("border_color", "#38bdf8") or "#38bdf8"
+        ids = token.get("facing_canvas_ids") or ()
+        if ids and len(ids) == 2:
+            arrow_id, handle_id = ids
+            try:
+                self.canvas.coords(arrow_id, start_x, start_y, end_x, end_y)
+                self.canvas.itemconfig(arrow_id, fill=arrow_color, width=line_width, arrow=tk.LAST)
+                self.canvas.coords(
+                    handle_id,
+                    end_x - handle_radius,
+                    end_y - handle_radius,
+                    end_x + handle_radius,
+                    end_y + handle_radius,
+                )
+                self.canvas.itemconfig(handle_id, fill=arrow_color)
+            except tk.TclError:
+                token.pop("facing_canvas_ids", None)
+                self._draw_token_facing_arrow(token, sx, sy, size_px)
+            return
+
+        try:
+            arrow_id = self.canvas.create_line(
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                fill=arrow_color,
+                width=line_width,
+                arrow=tk.LAST,
+                arrowshape=(12, 14, 5),
+                tags=("token_facing",),
+            )
+            handle_id = self.canvas.create_oval(
+                end_x - handle_radius,
+                end_y - handle_radius,
+                end_x + handle_radius,
+                end_y + handle_radius,
+                fill=arrow_color,
+                outline="white",
+                width=2,
+                tags=("token_facing_handle",),
+            )
+        except tk.TclError:
+            return
+        token["facing_canvas_ids"] = (arrow_id, handle_id)
+        for canvas_id in (arrow_id, handle_id):
+            self.canvas.tag_bind(canvas_id, "<ButtonPress-1>", lambda e, t=token: self._on_token_facing_press(e, t))
+            self.canvas.tag_bind(canvas_id, "<B1-Motion>", lambda e, t=token: self._on_token_facing_drag(e, t))
+            self.canvas.tag_bind(canvas_id, "<ButtonRelease-1>", lambda e, t=token: self._on_token_facing_release(e, t))
+            self.canvas.tag_bind(canvas_id, "<Button-3>", lambda e, t=token: self._show_token_menu(e, [t]))
+
+    def _on_token_facing_press(self, event, token):
+        """Start dragging a token facing handle."""
+        self.selected_token = token
+        self.selected_items = [token]
+        token["facing_drag_active"] = True
+        self._update_token_facing_from_event(token, event)
+        return "break"
+
+    def _on_token_facing_drag(self, event, token):
+        """Rotate token facing while the handle is dragged."""
+        if not token.get("facing_drag_active"):
+            return "break"
+        self._update_token_facing_from_event(token, event)
+        return "break"
+
+    def _on_token_facing_release(self, event, token):
+        """Finish dragging a token facing handle and persist the new angle."""
+        token.pop("facing_drag_active", None)
+        self._update_token_facing_from_event(token, event)
+        self._persist_tokens()
+        if getattr(self, "fs_canvas", None) and self.fs_canvas.winfo_exists():
+            self._update_fullscreen_map()
+        if getattr(self, "_web_server_thread", None):
+            self._update_web_display_map()
+        return "break"
+
+    def _update_token_facing_from_event(self, token, event):
+        """Set token facing from a canvas event point."""
+        try:
+            xw, yw = token.get("position", (0.0, 0.0))
+            size_world = float(token.get("size", self.token_size))
+            center_x = (float(xw) + size_world / 2.0) * self.zoom + self.pan_x
+            center_y = (float(yw) + size_world / 2.0) * self.zoom + self.pan_y
+            token["facing_angle"] = facing_angle_from_points(center_x, center_y, event.x, event.y)
+        except Exception:
+            return
+        self._update_canvas_images(resample=self._fast_resample)
+
+    def _set_tokens_facing_angle(self, tokens, angle):
+        """Set facing angle for one or more tokens."""
+        changed = False
+        normalized = normalize_facing_angle(angle)
+        for token in tokens:
+            if isinstance(token, dict) and token.get("type") == "token":
+                token["facing_angle"] = normalized
+                changed = True
+        if changed:
+            self._update_canvas_images()
+            if getattr(self, "fs_canvas", None) and self.fs_canvas.winfo_exists():
+                self._update_fullscreen_map()
+            if getattr(self, "_web_server_thread", None):
+                self._update_web_display_map()
+            self._persist_tokens()
+
+    def _rotate_tokens_facing(self, tokens, delta):
+        """Rotate token facing by a relative delta in degrees."""
+        changed = False
+        for token in tokens:
+            if isinstance(token, dict) and token.get("type") == "token":
+                token["facing_angle"] = normalize_facing_angle(token.get("facing_angle", 0.0) + delta)
+                changed = True
+        if changed:
+            self._update_canvas_images()
+            if getattr(self, "fs_canvas", None) and self.fs_canvas.winfo_exists():
+                self._update_fullscreen_map()
+            if getattr(self, "_web_server_thread", None):
+                self._update_web_display_map()
+            self._persist_tokens()
+
+    def _prompt_tokens_facing_angle(self, tokens):
+        """Prompt for an absolute token facing angle."""
+        current = normalize_facing_angle(tokens[0].get("facing_angle", 0.0)) if tokens else 0.0
+        angle = simpledialog.askfloat(
+            "Token Facing",
+            "Facing angle in degrees (0° right, 90° down, 180° left, 270° up):",
+            initialvalue=current,
+            minvalue=0.0,
+            maxvalue=359.99,
+            parent=self.canvas,
+        )
+        if angle is not None:
+            self._set_tokens_facing_angle(tokens, angle)
+
     def _bind_item_events(self, item):
         """Bind item events."""
         if item.get("type") == "whiteboard":
@@ -4557,6 +4725,14 @@ class DisplayMapController:
                         continue
                     try:
                         self.canvas.move(def_cid, dx, dy)
+                    except tk.TclError:
+                        continue
+            if item.get("facing_canvas_ids"):
+                for facing_cid in item["facing_canvas_ids"]:
+                    if not facing_cid:
+                        continue
+                    try:
+                        self.canvas.move(facing_cid, dx, dy)
                     except tk.TclError:
                         continue
             main_id = item.get("canvas_ids", (None,))[0]
@@ -4906,6 +5082,16 @@ class DisplayMapController:
             command=lambda: self._toggle_tokens_player_visibility(valid_tokens),
         )
 
+        facing_menu = tk.Menu(menu, tearoff=0)
+        facing_menu.add_command(label="Set Angle…", command=lambda: self._prompt_tokens_facing_angle(valid_tokens))
+        facing_menu.add_command(label="Rotate Clockwise 45°", command=lambda: self._rotate_tokens_facing(valid_tokens, 45))
+        facing_menu.add_command(label="Rotate Counterclockwise 45°", command=lambda: self._rotate_tokens_facing(valid_tokens, -45))
+        facing_menu.add_command(label="Face Right (0°)", command=lambda: self._set_tokens_facing_angle(valid_tokens, 0))
+        facing_menu.add_command(label="Face Down (90°)", command=lambda: self._set_tokens_facing_angle(valid_tokens, 90))
+        facing_menu.add_command(label="Face Left (180°)", command=lambda: self._set_tokens_facing_angle(valid_tokens, 180))
+        facing_menu.add_command(label="Face Up (270°)", command=lambda: self._set_tokens_facing_angle(valid_tokens, 270))
+        menu.add_cascade(label=f"Facing{plural}", menu=facing_menu)
+
         menu.add_separator()
         menu.add_command(
             label=f"Copy Token{plural}",
@@ -5225,6 +5411,8 @@ class DisplayMapController:
             "canvas_ids",
             "hp_canvas_ids",
             "defense_canvas_ids",
+            "facing_canvas_ids",
+            "facing_drag_active",
             "name_id",
             "hp_entry_widget",
             "hp_entry_widget_id",
@@ -5397,6 +5585,9 @@ class DisplayMapController:
             if item_to_delete.get("defense_canvas_ids"):
                 for def_cid in item_to_delete["defense_canvas_ids"]:
                     if def_cid: self.canvas.delete(def_cid)
+            if item_to_delete.get("facing_canvas_ids"):
+                for facing_cid in item_to_delete["facing_canvas_ids"]:
+                    if facing_cid: self.canvas.delete(facing_cid)
             popup = item_to_delete.get("hover_popup")
             if popup and popup.winfo_exists():
                 popup.destroy()
@@ -5472,6 +5663,9 @@ class DisplayMapController:
                 if item.get('defense_canvas_ids'):
                     for def_cid_lift in item['defense_canvas_ids']:
                         if def_cid_lift: self.canvas.lift(def_cid_lift)
+                if item.get('facing_canvas_ids'):
+                    for facing_cid_lift in item['facing_canvas_ids']:
+                        if facing_cid_lift: self.canvas.lift(facing_cid_lift)
             elif item.get("type") == "marker":
                 # Keep the marker popup above the canvas after the z-order change.
                 popup = item.get("description_popup")
@@ -6230,6 +6424,34 @@ class DisplayMapController:
             raise ValueError("token_id does not reference a PC token")
 
         matched["position"] = (x, y)
+        self._remote_checkpoint()
+        try:
+            self._update_canvas_images()
+        except Exception:
+            pass
+        _update_web_display_map(self)
+        try:
+            self._persist_tokens()
+        except Exception:
+            pass
+
+    def handle_remote_token_facing(self, token_id: str, facing_angle):
+        """Handle remote token facing rotation."""
+        try:
+            angle = normalize_facing_angle(facing_angle)
+        except Exception:
+            raise ValueError("facing_angle must be numeric")
+
+        matched = None
+        for token in self._iter_pc_tokens():
+            remote_id = token.get("remote_id") or token.get("entity_id")
+            if remote_id and str(remote_id) == str(token_id):
+                matched = token
+                break
+        if matched is None:
+            raise ValueError("token_id does not reference a PC token")
+
+        matched["facing_angle"] = angle
         self._remote_checkpoint()
         try:
             self._update_canvas_images()

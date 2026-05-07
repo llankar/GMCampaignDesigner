@@ -16,6 +16,7 @@ from modules.helpers.template_loader import load_template
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_module_import, log_debug, log_info, log_warning
 from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
+from modules.maps.utils.token_facing import normalize_facing_angle
 
 log_module_import(__name__)
 
@@ -578,6 +579,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "hp_entry":     None,                        
                 "hp_entry_id":  None,
                 "player_visible": bool(rec.get("player_visible", True)),
+                "facing_angle": normalize_facing_angle(rec.get("facing_angle", 0.0)),
             })
         elif item_type_from_rec in ["rectangle", "oval"]:
             # Handle the branch where item type from rec is in ['rectangle', 'oval'].
