@@ -2,6 +2,7 @@
 
 import tkinter as tk
 from PIL import ImageTk, Image
+from modules.maps.utils.token_facing import facing_arrow_points, normalize_facing_angle
 from screeninfo import get_monitors
 from modules.helpers.logging_helper import log_module_import
 from modules.maps.utils.text_items import TextFontCache
@@ -137,23 +138,36 @@ def _update_fullscreen_map(self):
             item['fs_tk'] = fsimg # Store the PhotoImage to prevent garbage collection
 
             # Token border, image, and name
+            facing_angle = normalize_facing_angle(item.get('facing_angle', 0.0))
             fs_canvas_ids = item.get('fs_canvas_ids')
-            if fs_canvas_ids and len(fs_canvas_ids) == 3: # Expecting (border_id, image_id, text_id)
+            if fs_canvas_ids and len(fs_canvas_ids) == 5: # Expecting (border_id, image_id, text_id, facing_line_id, facing_handle_id)
                 # Handle the branch where fs canvas ids is set and len(fs_canvas_ids) == 3.
-                b_id, i_id, t_id = fs_canvas_ids
+                b_id, i_id, t_id, f_id, fh_id = fs_canvas_ids
                 self.fs_canvas.coords(b_id, sx - 3, sy - 3, sx + nw + 3, sy + nh + 3)
                 self.fs_canvas.itemconfig(b_id, outline=item.get('border_color', '#0000ff'))
                 self.fs_canvas.coords(i_id, sx, sy)
                 self.fs_canvas.itemconfig(i_id, image=fsimg)
                 self.fs_canvas.coords(t_id, sx + nw // 2, sy + nh + 2)
                 self.fs_canvas.itemconfig(t_id, text=item.get('entity_id', ''))
+                arrow = facing_arrow_points(item.get('position', (0, 0)), size_px, facing_angle, zoom=float(self.zoom), pan_x=float(self.pan_x), pan_y=float(self.pan_y))
+                self.fs_canvas.coords(f_id, *arrow)
+                self.fs_canvas.itemconfig(f_id, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)), arrow='last')
+                end_x, end_y = arrow[2], arrow[3]
+                handle_radius = max(5, int(nw * 0.10))
+                self.fs_canvas.coords(fh_id, end_x - handle_radius, end_y - handle_radius, end_x + handle_radius, end_y + handle_radius)
+                self.fs_canvas.itemconfig(fh_id, fill=item.get('border_color', '#38bdf8'))
             else:
                 b_id = self.fs_canvas.create_rectangle(sx - 3, sy - 3, sx + nw + 3, sy + nh + 3,
                                                        outline=item.get('border_color', '#0000ff'), width=3)
                 i_id = self.fs_canvas.create_image(sx, sy, image=fsimg, anchor='nw')
                 t_id = self.fs_canvas.create_text(sx + nw // 2, sy + nh + 2, text=item.get('entity_id', ''),
                                                   fill='white', anchor='n')
-                item['fs_canvas_ids'] = (b_id, i_id, t_id)
+                arrow = facing_arrow_points(item.get('position', (0, 0)), size_px, facing_angle, zoom=float(self.zoom), pan_x=float(self.pan_x), pan_y=float(self.pan_y))
+                f_id = self.fs_canvas.create_line(*arrow, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)), arrow='last')
+                end_x, end_y = arrow[2], arrow[3]
+                handle_radius = max(5, int(nw * 0.10))
+                fh_id = self.fs_canvas.create_oval(end_x - handle_radius, end_y - handle_radius, end_x + handle_radius, end_y + handle_radius, fill=item.get('border_color', '#38bdf8'), outline='white', width=2)
+                item['fs_canvas_ids'] = (b_id, i_id, t_id, f_id, fh_id)
 
             # HP-related cross for dead tokens
             hp = item.get("hp", 0)

@@ -13,6 +13,7 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import
 from modules.whiteboard.utils.remote_access_guard import RemoteAccessGuard
 from modules.maps.utils.text_items import TextFontCache
+from modules.maps.utils.token_facing import facing_arrow_points, normalize_facing_angle
 from modules.maps.views.web_map_api import register_map_api
 from modules.scenarios.plot_twist_panel import get_latest_plot_twist, roll_plot_twist
 
@@ -242,6 +243,12 @@ def open_web_display(self, port=None):
                     #plotTwistMeta { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
                     #plotTwistButton { background: #38bdf8; border: none; color: #0f172a; padding: 6px 12px; border-radius: 8px; font-weight: 700; cursor: pointer; }
                     #plotTwistButton:active { transform: translateY(1px); }
+                    .token .facingArrow { position: absolute; left: 50%; top: 50%; width: 64%; height: 6px; background: currentColor; transform-origin: left center; border-radius: 999px; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.55)); }
+                    .token .facingArrow::after { content: ''; position: absolute; right: -8px; top: 50%; transform: translateY(-50%); border-left: 12px solid currentColor; border-top: 8px solid transparent; border-bottom: 8px solid transparent; }
+                    .token .facingHandle { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; border: 2px solid #fff; border-radius: 999px; background: currentColor; box-shadow: 0 2px 8px rgba(0,0,0,0.45); touch-action: none; }
+                    .tokenMenu { position: fixed; z-index: 300; display: none; min-width: 180px; padding: 6px; border-radius: 10px; background: rgba(15, 23, 42, 0.96); box-shadow: 0 16px 30px rgba(0,0,0,0.35); }
+                    .tokenMenu button { display: block; width: 100%; border: none; background: transparent; color: #e2e8f0; text-align: left; padding: 8px 10px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+                    .tokenMenu button:hover { background: rgba(56, 189, 248, 0.18); }
                 </style>
             </head>
             <body>
@@ -256,6 +263,7 @@ def open_web_display(self, port=None):
                     <canvas id='drawLayer'></canvas>
                     <div id='tokenLayer'></div>
                     <div id='status'>Connecting…</div>
+                    <div id='tokenMenu' class='tokenMenu' role='menu' aria-hidden='true'></div>
                 </div>
                 <script>
                     window.MAP_REMOTE_TOKEN = {{ token|tojson }};
@@ -435,6 +443,7 @@ def _describe_remote_tokens(self, render_offset=None):
                 'size': size_px,
                 'screen_size': size_px * zoom,
                 'border_color': token.get('border_color', '#0ea5e9'),
+                'facing_angle': normalize_facing_angle(token.get('facing_angle', 0.0)),
             }
         )
     return tokens
@@ -502,6 +511,25 @@ def _render_map_image(self):
 
             img.paste(img_r, (sx, sy), img_r.convert('RGBA'))
             draw.rectangle([sx - 3, sy - 3, sx + nw + 3, sy + nh + 3], outline=item.get('border_color', '#0000ff'), width=3)
+            arrow = facing_arrow_points(
+                item.get('position', (0, 0)),
+                size_px,
+                item.get('facing_angle', 0.0),
+                zoom=float(self.zoom),
+                pan_x=float(self.pan_x),
+                pan_y=float(self.pan_y),
+                offset_x=float(min_x),
+                offset_y=float(min_y),
+            )
+            draw.line(arrow, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)))
+            end_x, end_y = arrow[2], arrow[3]
+            handle_radius = max(4, int(nw * 0.08))
+            draw.ellipse(
+                [end_x - handle_radius, end_y - handle_radius, end_x + handle_radius, end_y + handle_radius],
+                fill=item.get('border_color', '#38bdf8'),
+                outline='white',
+                width=2,
+            )
         elif item_type in ['rectangle', 'oval']:
             # Handle the branch where item type is in ['rectangle', 'oval'].
             shape_w = int(item.get('width', 50) * self.zoom)

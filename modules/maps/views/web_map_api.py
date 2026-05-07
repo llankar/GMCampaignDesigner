@@ -68,6 +68,27 @@ def register_map_api(app, controller, access_guard: RemoteAccessGuard | None):
             return jsonify({"message": f"Unable to move token: {exc}"}), 500
         return jsonify({"status": "ok"})
 
+    @blueprint.route("/api/tokens/facing", methods=["POST"])
+    def api_token_facing():
+        """Handle API token facing updates."""
+        unauthorized = _require_access()
+        if unauthorized:
+            return unauthorized
+        payload = request.get_json(silent=True) or {}
+        token_id = payload.get("token_id")
+        angle = payload.get("facing_angle")
+        if not token_id:
+            return jsonify({"message": "token_id is required"}), 400
+        if angle is None:
+            return jsonify({"message": "facing_angle is required"}), 400
+        try:
+            controller.handle_remote_token_facing(token_id=str(token_id), facing_angle=angle)
+        except ValueError as exc:
+            return jsonify({"message": str(exc)}), 400
+        except Exception as exc:  # noqa: BLE001
+            return jsonify({"message": f"Unable to rotate token: {exc}"}), 500
+        return jsonify({"status": "ok"})
+
     @blueprint.route("/api/strokes", methods=["POST"])
     def api_strokes():
         """Handle API strokes."""

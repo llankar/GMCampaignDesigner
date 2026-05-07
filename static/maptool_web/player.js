@@ -4,6 +4,7 @@
   const tokenLayer = document.getElementById('tokenLayer');
   const drawLayer = document.getElementById('drawLayer');
   const authToken = window.MAP_REMOTE_TOKEN || '';
+  const tokenMenu = document.getElementById('tokenMenu');
 
   let lastStatus = null;
   let drawCtx = null;
@@ -44,6 +45,48 @@
     drawCtx.lineJoin = 'round';
   }
 
+  function normalizeAngle(angle) {
+    const value = Number(angle);
+    return Number.isFinite(value) ? ((value % 360) + 360) % 360 : 0;
+  }
+
+  function hideTokenMenu() {
+    if (!tokenMenu) return;
+    tokenMenu.style.display = 'none';
+    tokenMenu.setAttribute('aria-hidden', 'true');
+    tokenMenu.innerHTML = '';
+  }
+
+  function showTokenMenu(ev, token) {
+    if (!lastStatus?.editing_enabled || !tokenMenu) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const actions = [
+      ['Set Angle…', () => promptTokenFacing(token)],
+      ['Rotate Clockwise 45°', () => rotateTokenFacing(token, 45)],
+      ['Rotate Counterclockwise 45°', () => rotateTokenFacing(token, -45)],
+      ['Face Right (0°)', () => setTokenFacing(token, 0)],
+      ['Face Down (90°)', () => setTokenFacing(token, 90)],
+      ['Face Left (180°)', () => setTokenFacing(token, 180)],
+      ['Face Up (270°)', () => setTokenFacing(token, 270)],
+    ];
+    tokenMenu.innerHTML = '';
+    actions.forEach(([label, action]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.addEventListener('click', () => {
+        hideTokenMenu();
+        action();
+      });
+      tokenMenu.appendChild(button);
+    });
+    tokenMenu.style.left = `${Math.min(ev.clientX, window.innerWidth - 190)}px`;
+    tokenMenu.style.top = `${Math.min(ev.clientY, window.innerHeight - 240)}px`;
+    tokenMenu.style.display = 'block';
+    tokenMenu.setAttribute('aria-hidden', 'false');
+  }
+
   function renderTokens(status) {
     tokenLayer.innerHTML = '';
     if (!status || !Array.isArray(status.tokens)) return;
@@ -53,7 +96,12 @@
     status.tokens.forEach((token) => {
       const el = document.createElement('div');
       el.className = 'token';
-      el.textContent = token.label || 'PC';
+      const label = document.createElement('span');
+      label.textContent = token.label || 'PC';
+      label.style.color = '#0b1220';
+      label.style.position = 'relative';
+      label.style.zIndex = '2';
+      el.appendChild(label);
       el.draggable = false;
       const screenX = (token.screen_position?.[0] || 0) / scaleX;
       const screenY = (token.screen_position?.[1] || 0) / scaleY;
@@ -63,8 +111,23 @@
       el.style.height = `${size}px`;
       if (token.border_color) {
         el.style.borderColor = token.border_color;
+        el.style.color = token.border_color;
       }
-      el.addEventListener('pointerdown', (ev) => startDrag(ev, token));
+      const facingAngle = normalizeAngle(token.facing_angle);
+      const arrow = document.createElement('div');
+      arrow.className = 'facingArrow';
+      arrow.style.transform = `rotate(${facingAngle}deg)`;
+      el.appendChild(arrow);
+      const handle = document.createElement('div');
+      handle.className = 'facingHandle';
+      handle.style.transform = `rotate(${facingAngle}deg) translate(${size * 0.64}px, 0) rotate(${-facingAngle}deg)`;
+      handle.addEventListener('pointerdown', (ev) => startFacingDrag(ev, token, el));
+      el.appendChild(handle);
+      el.addEventListener('contextmenu', (ev) => showTokenMenu(ev, token));
+      el.addEventListener('pointerdown', (ev) => {
+        if (ev.target === handle) return;
+        startDrag(ev, token);
+      });
       tokenLayer.appendChild(el);
     });
   }
@@ -113,6 +176,65 @@
     window.addEventListener('pointermove', moveHandler);
     window.addEventListener('pointerup', upHandler);
     moveToken(token, start);
+  }
+
+  function tokenCenterScreen(token) {
+    const rect = mapImg.getBoundingClientRect();
+    const scaleX = lastStatus.render_size[0] ? lastStatus.render_size[0] / rect.width : 1;
+    const scaleY = lastStatus.render_size[1] ? lastStatus.render_size[1] / rect.height : 1;
+    const screenX = (token.screen_position?.[0] || 0) / scaleX;
+    const screenY = (token.screen_position?.[1] || 0) / scaleY;
+    const size = (token.screen_size || 48) / Math.max(scaleX, scaleY);
+    return { x: screenX + size / 2, y: screenY + size / 2 };
+  }
+
+  function angleFromScreenPoint(token, point) {
+    const center = tokenCenterScreen(token);
+    return normalizeAngle(Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI);
+  }
+
+  function startFacingDrag(ev, token) {
+    if (!lastStatus?.editing_enabled) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    hideTokenMenu();
+    const rect = mapImg.getBoundingClientRect();
+    const apply = (e) => {
+      const point = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const angle = angleFromScreenPoint(token, point);
+      token.facing_angle = angle;
+      setTokenFacing(token, angle);
+    };
+    const upHandler = () => {
+      window.removeEventListener('pointermove', apply);
+      window.removeEventListener('pointerup', upHandler);
+    };
+    window.addEventListener('pointermove', apply);
+    window.addEventListener('pointerup', upHandler);
+    apply(ev);
+  }
+
+  function promptTokenFacing(token) {
+    const current = Math.round(normalizeAngle(token.facing_angle));
+    const value = prompt('Facing angle in degrees (0 right, 90 down, 180 left, 270 up)', `${current}`);
+    if (value === null) return;
+    const angle = Number(value);
+    if (!Number.isFinite(angle)) return;
+    setTokenFacing(token, angle);
+  }
+
+  function rotateTokenFacing(token, delta) {
+    setTokenFacing(token, normalizeAngle(token.facing_angle + delta));
+  }
+
+  function setTokenFacing(token, angle) {
+    const normalized = normalizeAngle(angle);
+    token.facing_angle = normalized;
+    fetch('/api/tokens/facing', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ token_id: token.id, facing_angle: normalized }),
+    }).catch(() => {});
   }
 
   function moveToken(token, screenPoint) {
@@ -181,6 +303,8 @@
   window.addEventListener('resize', ensureCanvasSize);
   mapImg.addEventListener('dragstart', (ev) => ev.preventDefault());
   tokenLayer.addEventListener('dragstart', (ev) => ev.preventDefault());
+  window.addEventListener('click', hideTokenMenu);
+  window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hideTokenMenu(); });
 
   drawLayer.addEventListener('pointerdown', (ev) => {
     if (ev.pointerType === 'pen' || ev.pointerType === 'touch') {
