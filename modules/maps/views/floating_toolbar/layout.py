@@ -6,32 +6,32 @@ PALETTE_BG = "#151515"
 SECTION_BG = "#1f1f1f"
 BORDER = "#3f3f3f"
 TEXT_MUTED = "#cfcfcf"
-DROPDOWN_WIDTH = 112
-SLIDER_WIDTH = 112
+DROPDOWN_WIDTH = 88
+SLIDER_WIDTH = 88
 
 
 def create_section(parent, title):
     """Create a titled toolbar section that stacks controls vertically."""
     section = ctk.CTkFrame(parent, fg_color=SECTION_BG, border_width=1, border_color="#303030", corner_radius=9)
-    section.pack(side="top", fill="x", padx=0, pady=(4, 0))
+    section.pack(side="top", fill="x", padx=0, pady=(3, 0))
     ctk.CTkLabel(section, text=title, text_color=TEXT_MUTED, font=ctk.CTkFont(size=11, weight="bold")).pack(
-        side="top", anchor="w", padx=8, pady=(5, 0)
+        side="top", anchor="w", padx=5, pady=(4, 0)
     )
     body = ctk.CTkFrame(section, fg_color="transparent")
-    body.pack(side="top", fill="x", padx=6, pady=(2, 6))
+    body.pack(side="top", fill="x", padx=4, pady=(1, 5))
     return body
 
 
 def create_row(parent):
     """Create a full-width row in the toolbar's single column."""
     row = ctk.CTkFrame(parent, fg_color="transparent")
-    row.pack(side="top", fill="x", anchor="w", pady=2)
+    row.pack(side="top", fill="x", anchor="w", pady=1)
     return row
 
 
 def add_small_label(parent, text):
     """Add a muted label above a control."""
-    ctk.CTkLabel(parent, text=text, text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(3, 1))
+    ctk.CTkLabel(parent, text=text, text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(2, 0))
 
 
 def add_stacked_control(parent, label, widget, *, pady=(0, 4)):
