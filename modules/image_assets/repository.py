@@ -33,7 +33,31 @@ class ImageAssetsRepository:
 
         if existing:
             merged["AssetId"] = existing.get("AssetId")
-            merged["ImportedAt"] = existing.get("ImportedAt") or payload.get("ImportedAt") or now
+            merged["ImportedAt"] = (
+                existing.get("ImportedAt") or payload.get("ImportedAt") or now
+            )
+        else:
+            merged["AssetId"] = str(payload.get("AssetId") or uuid.uuid4())
+            merged["ImportedAt"] = payload.get("ImportedAt") or now
+
+        merged["UpdatedAt"] = payload.get("UpdatedAt") or now
+        self.wrapper.save_item(merged, key_field="AssetId")
+        return merged
+
+    def replace_by_path(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Replace the existing row for a path, or create it when absent."""
+        path = str(payload.get("Path") or "").strip()
+        existing = self._find_existing_by_path(path) if path else None
+
+        now = self._utc_now_iso()
+        merged = dict(existing or {})
+        merged.update(payload)
+
+        if existing:
+            merged["AssetId"] = existing.get("AssetId")
+            merged["ImportedAt"] = (
+                existing.get("ImportedAt") or payload.get("ImportedAt") or now
+            )
         else:
             merged["AssetId"] = str(payload.get("AssetId") or uuid.uuid4())
             merged["ImportedAt"] = payload.get("ImportedAt") or now
@@ -89,13 +113,23 @@ class ImageAssetsRepository:
                 if str(item.get("Hash") or "").strip() == hash_value:
                     return item
         if path:
-            for item in items:
-                if str(item.get("Path") or "").strip() == path:
-                    return item
+            return self._find_existing_by_path(path)
+        return None
+
+    def _find_existing_by_path(self, path: str) -> dict[str, Any] | None:
+        """Find one row by exact path."""
+        normalized_path = str(path or "").strip()
+        if not normalized_path:
+            return None
+        for item in self.list_all():
+            if str(item.get("Path") or "").strip() == normalized_path:
+                return item
         return None
 
     @staticmethod
-    def _apply_search(items: list[dict[str, Any]], search: str | None) -> list[dict[str, Any]]:
+    def _apply_search(
+        items: list[dict[str, Any]], search: str | None
+    ) -> list[dict[str, Any]]:
         """Filter items on common textual fields."""
         term = str(search or "").strip().lower()
         if not term:

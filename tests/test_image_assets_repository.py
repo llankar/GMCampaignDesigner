@@ -68,9 +68,24 @@ def test_delete_stale_files_keeps_only_active_paths():
 def test_list_paginated_supports_search_and_paging():
     wrapper = _FakeWrapper()
     wrapper.items = [
-        {"AssetId": "1", "Name": "Forest", "Path": "/images/forest.png", "UpdatedAt": "2026-04-03T00:00:00+00:00"},
-        {"AssetId": "2", "Name": "Castle", "Path": "/images/castle.png", "UpdatedAt": "2026-04-04T00:00:00+00:00"},
-        {"AssetId": "3", "Name": "Dungeon", "Path": "/images/dungeon.jpg", "UpdatedAt": "2026-04-05T00:00:00+00:00"},
+        {
+            "AssetId": "1",
+            "Name": "Forest",
+            "Path": "/images/forest.png",
+            "UpdatedAt": "2026-04-03T00:00:00+00:00",
+        },
+        {
+            "AssetId": "2",
+            "Name": "Castle",
+            "Path": "/images/castle.png",
+            "UpdatedAt": "2026-04-04T00:00:00+00:00",
+        },
+        {
+            "AssetId": "3",
+            "Name": "Dungeon",
+            "Path": "/images/dungeon.jpg",
+            "UpdatedAt": "2026-04-05T00:00:00+00:00",
+        },
     ]
     repository = ImageAssetsRepository(wrapper=wrapper)
 
@@ -78,3 +93,35 @@ def test_list_paginated_supports_search_and_paging():
 
     assert total == 2
     assert [item["AssetId"] for item in page] == ["2", "1"]
+
+
+def test_replace_by_path_updates_path_match_without_hash_collision():
+    wrapper = _FakeWrapper()
+    wrapper.items = [
+        {
+            "AssetId": "same-hash",
+            "Path": "/tmp/original.png",
+            "Hash": "abc",
+            "Name": "Original",
+        },
+        {
+            "AssetId": "target",
+            "Path": "/tmp/target.png",
+            "Hash": "old",
+            "Name": "Target",
+        },
+    ]
+    repository = ImageAssetsRepository(wrapper=wrapper)
+
+    updated = repository.replace_by_path(
+        {
+            "Path": "/tmp/target.png",
+            "Hash": "abc",
+            "Name": "Target Replacement",
+        }
+    )
+
+    assert updated["AssetId"] == "target"
+    assert len(wrapper.items) == 2
+    assert wrapper.items[0]["Name"] == "Original"
+    assert wrapper.items[1]["Name"] == "Target Replacement"

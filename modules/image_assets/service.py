@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from modules.image_assets.repository import ImageAssetsRepository
-from modules.image_assets.services.import_service import ImageAssetImportService, ImageAssetsImportSummary
+from modules.image_assets.services.import_service import (
+    ImageAssetImportService,
+    ImageAssetsImportSummary,
+)
 from modules.image_assets.services.search_service import (
     ImageAssetSearchResultDTO,
     ImageAssetSearchService,
@@ -39,7 +42,9 @@ class ImageAssetsService:
         search: str | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """List/search assets with pagination."""
-        return self.repository.list_paginated(page=page, page_size=page_size, search=search)
+        return self.repository.list_paginated(
+            page=page, page_size=page_size, search=search
+        )
 
     def search_images(
         self,
@@ -63,10 +68,12 @@ class ImageAssetsService:
         paths: list[str],
         recursive: bool,
         reindex_changed_only: bool,
+        update_existing_files: bool = True,
     ) -> ImageAssetsImportSummary:
         """Import many directories through the dedicated import workflow."""
         return self.import_service.import_directories(
             paths=paths,
             recursive=recursive,
             reindex_changed_only=reindex_changed_only,
+            update_existing_files=update_existing_files,
         )
