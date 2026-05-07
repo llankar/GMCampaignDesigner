@@ -24,6 +24,7 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
+from modules.maps.views.floating_drawing_toolbar import build_world_map_floating_tools
 from modules.maps.views.world_map_toolbar_view import build_world_map_toolbar
 from modules.maps.measurement.templates import (
     DEFAULT_DISTANCE_UNIT,
@@ -268,6 +269,8 @@ class WorldMapPanel(ctk.CTkFrame):
         self.canvas.bind("<ButtonPress-1>", self._on_canvas_press, add="+")
         self.canvas.bind("<B1-Motion>", self._on_canvas_drag, add="+")
         self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release, add="+")
+        build_world_map_floating_tools(self)
+
         root = self.winfo_toplevel()
         root.bind_all("<Control-z>", lambda e: self.undo_fog(e), add="+")
         root.bind_all("<Control-Z>", lambda e: self.undo_fog(e), add="+")

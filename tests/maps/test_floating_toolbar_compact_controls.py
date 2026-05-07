@@ -41,17 +41,36 @@ def test_shape_selector_stacks_shape_buttons_vertically():
     assert 'button.pack(side="left"' not in source
 
 
-def test_marker_type_filter_moved_from_floating_palette_to_top_toolbar():
+def test_maptool_marker_type_filter_stays_in_top_toolbar():
     import inspect
 
     from modules.maps.views import floating_drawing_toolbar, toolbar_view
 
-    floating_source = inspect.getsource(floating_drawing_toolbar._build_floating_drawing_toolbar)
+    floating_source = inspect.getsource(floating_drawing_toolbar.build_maptool_floating_drawing_toolbar)
     toolbar_source = inspect.getsource(toolbar_view._build_toolbar)
 
     assert 'Marker Type' not in floating_source
     assert 'MARKER_TYPE_FILTER_LABELS' in toolbar_source
     assert 'token_section = _create_collapsible_section(toolbar, "Tokens")' in toolbar_source
+
+
+def test_world_map_canvas_tools_moved_to_floating_palette():
+    import inspect
+
+    from modules.maps.views import floating_drawing_toolbar, world_map_toolbar_view
+
+    floating_source = inspect.getsource(floating_drawing_toolbar.build_world_map_floating_tools)
+    measurement_source = inspect.getsource(floating_drawing_toolbar._build_measurement_controls)
+    toolbar_source = inspect.getsource(world_map_toolbar_view.build_world_map_toolbar)
+
+    assert 'panel._open_picker("NPC")' in floating_source
+    assert 'panel._on_marker_type_filter_change' in floating_source
+    assert 'panel.measure_button' in measurement_source
+    assert 'include_global_actions=False' in floating_source
+    assert 'panel._open_picker("NPC")' not in toolbar_source
+    assert 'panel.measure_button' not in toolbar_source
+    assert 'panel.clear_fog' in toolbar_source
+    assert 'panel.reset_fog' in toolbar_source
 
 
 def test_floating_toolbar_layout_helpers_center_content():
