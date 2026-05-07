@@ -173,7 +173,7 @@ def _build_fog_controls(owner, parent, icons, *, include_global_actions):
 
 def _build_measurement_controls(panel, parent):
     """Add WorldMap measurement controls to the floating palette."""
-    measure_body = create_section(parent, "Measure")
+    measure_body = create_section(parent, "Meas.")
     panel.measure_template_menu = create_slim_option_menu(
         measure_body,
         values=MEASUREMENT_TEMPLATE_LABELS,
@@ -184,17 +184,17 @@ def _build_measurement_controls(panel, parent):
 
     panel.measure_button = ctk.CTkButton(
         measure_body,
-        text="Measure",
-        width=76,
+        text="Meas.",
+        width=40,
         command=getattr(panel, "_toggle_measure_mode", None) or (lambda: None),
     )
     panel.measure_button.pack(side="top", anchor="center", padx=0, pady=(0, 4))
 
-    panel.measure_cell_entry = ctk.CTkEntry(measure_body, width=76, justify="center")
-    panel.measure_cell_entry.insert(0, str(int(getattr(panel, "measure_grid_cell_pixels", 50))))
+    panel.measure_cell_entry = ctk.CTkEntry(measure_body, width=40, justify="center")
+    panel.measure_cell_entry.insert(0, str(int(getattr(panel, "measure_grid_cell_pixels", 40))))
     add_stacked_control(measure_body, "Cell px", panel.measure_cell_entry)
 
-    panel.measure_scale_entry = ctk.CTkEntry(measure_body, width=76, justify="center")
+    panel.measure_scale_entry = ctk.CTkEntry(measure_body, width=40, justify="center")
     panel.measure_scale_entry.insert(0, str(int(getattr(panel, "measure_grid_scale", 5))))
     add_stacked_control(measure_body, "Scale", panel.measure_scale_entry)
 
@@ -204,7 +204,7 @@ def _build_measurement_controls(panel, parent):
     panel.clear_measurements_button = ctk.CTkButton(
         measure_body,
         text="Clear",
-        width=76,
+        width=40,
         command=getattr(panel, "clear_measurements", None) or (lambda: None),
     )
     panel.clear_measurements_button.pack(side="top", anchor="center", padx=0, pady=(0, 4))

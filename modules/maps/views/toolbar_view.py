@@ -115,7 +115,7 @@ def _build_toolbar(self):
     self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
     _pack_control(self.marker_type_filter_menu, trailing=6, pady=6)
 
-    measure_section = _create_collapsible_section(toolbar, "Measure")
+    measure_section = _create_collapsible_section(toolbar, "Meas.")
     ctk.CTkLabel(measure_section, text="Template").pack(side="left", padx=(8, 4), pady=6)
     self.measure_template_menu = ctk.CTkOptionMenu(
         measure_section,
@@ -128,7 +128,7 @@ def _build_toolbar(self):
 
     self.measure_button = ctk.CTkButton(
         measure_section,
-        text="Measure",
+        text="Meas.",
         width=100,
         command=getattr(self, "_toggle_measure_mode", None) or (lambda: None),
     )
