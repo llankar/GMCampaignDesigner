@@ -3,6 +3,7 @@
 import tkinter as tk
 import customtkinter as ctk
 from modules.helpers.logging_helper import log_module_import
+from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 from modules.maps.utils.icon_loader import load_icon
 from modules.ui.icon_dropdown import IconDropdown
 
@@ -111,6 +112,19 @@ def build_world_map_toolbar(panel) -> None:
         state=ctk.DISABLED,
     )
     _pack_control(panel.back_button, trailing=6)
+
+    marker_section = _create_collapsible_section(toolbar, "Marker")
+    ctk.CTkLabel(marker_section, text="Type:", font=("Segoe UI", 14, "bold")).pack(
+        side="left", padx=(8, 6), pady=6
+    )
+    panel.marker_type_filter_menu = ctk.CTkOptionMenu(
+        marker_section,
+        values=MARKER_TYPE_FILTER_LABELS,
+        command=panel._on_marker_type_filter_change,
+        width=130,
+    )
+    panel.marker_type_filter_menu.set(getattr(panel, "marker_type_filter", "All Types") or "All Types")
+    _pack_control(panel.marker_type_filter_menu, trailing=6, pady=6)
 
     fog_section = _create_collapsible_section(toolbar, "Fog")
     fog_actions = [

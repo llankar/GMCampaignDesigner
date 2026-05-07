@@ -4,7 +4,6 @@ import tkinter as tk
 import customtkinter as ctk
 
 from modules.helpers.logging_helper import log_module_import
-from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 from modules.maps.measurement.templates import MEASUREMENT_TEMPLATE_LABELS
 from modules.maps.utils.icon_loader import load_icon
 from modules.maps.views.floating_toolbar.layout import (
@@ -408,9 +407,6 @@ def build_world_map_floating_tools(panel):
         "marker": _load_icon(panel, "assets/icons/marker.png", (24, 24)),
     }
 
-    _build_fog_controls(panel, content, icons, include_global_actions=False)
-    _build_measurement_controls(panel, content)
-
     entities_body = create_section(content, "Entities")
     entity_actions = [
         {"key": "npc", "icon": icons["npc"], "tooltip": "Add NPC", "command": lambda: panel._open_picker("NPC")},
@@ -423,13 +419,8 @@ def build_world_map_floating_tools(panel):
     entity_dropdown = IconDropdown(entities_body, entity_actions, default_key="npc", button_size=(24, 24), show_arrow=False)
     entity_dropdown.pack(side="top", anchor="center", padx=0, pady=3)
 
-    panel.marker_type_filter_menu = create_slim_option_menu(
-        entities_body,
-        values=MARKER_TYPE_FILTER_LABELS,
-        command=panel._on_marker_type_filter_change,
-    )
-    panel.marker_type_filter_menu.set(getattr(panel, "marker_type_filter", "All Types") or "All Types")
-    add_stacked_control(entities_body, "Marker", panel.marker_type_filter_menu)
+    _build_fog_controls(panel, content, icons, include_global_actions=False)
+    _build_measurement_controls(panel, content)
 
     root = panel.winfo_toplevel()
     root.bind("[", lambda e: panel._change_brush(-4), add="+")
