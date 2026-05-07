@@ -10,6 +10,7 @@ import copy
 from modules.helpers.config_helper import ConfigHelper
 from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
 from modules.maps.utils.token_facing import normalize_facing_angle
+from modules.maps.measurement.templates import MEASUREMENT_ITEM_TYPE, serialize_measurement_item
 from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
@@ -739,6 +740,8 @@ def _persist_tokens(self):
                     "height":         t.get("height", 50),
                     "border_color":   t.get("border_color", "#000000"),
                 })
+            elif item_type == MEASUREMENT_ITEM_TYPE:
+                item_data.update(serialize_measurement_item(t))
             elif item_type == "whiteboard":
                 item_data.update({
                     "points":        t.get("points", []),

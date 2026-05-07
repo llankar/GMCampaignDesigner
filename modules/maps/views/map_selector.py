@@ -17,6 +17,7 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.logging_helper import log_module_import, log_debug, log_info, log_warning
 from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
 from modules.maps.utils.token_facing import normalize_facing_angle
+from modules.maps.measurement.templates import MEASUREMENT_ITEM_TYPE, deserialize_measurement_item
 
 log_module_import(__name__)
 
@@ -595,6 +596,12 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             entry_summary.update({
                 "width": item_data["width"],
                 "height": item_data["height"],
+            })
+        elif item_type_from_rec == MEASUREMENT_ITEM_TYPE:
+            item_data = deserialize_measurement_item(rec)
+            entry_summary.update({
+                "template_type": item_data.get("template_type"),
+                "points": item_data.get("points", []),
             })
         elif item_type_from_rec == "whiteboard":
             # Handle the branch where item_type_from_rec == 'whiteboard'.
