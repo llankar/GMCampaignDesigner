@@ -5,7 +5,6 @@ import customtkinter as ctk
 
 from modules.helpers.logging_helper import log_module_import
 from modules.ui.icon_dropdown import IconDropdown
-from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 from modules.maps.views.floating_toolbar.slim_option_menu import create_slim_option_menu
 from modules.maps.views.floating_toolbar.shape_selector import add_shape_icon_selector
 from modules.maps.views.floating_toolbar.layout import (
@@ -281,14 +280,6 @@ def _build_floating_drawing_toolbar(self):
     )
     self.token_size_menu.set(str(current_token_size))
     _stacked_control(tokens_body, "Size", self.token_size_menu)
-
-    self.marker_type_filter_menu = create_slim_option_menu(
-        tokens_body,
-        values=MARKER_TYPE_FILTER_LABELS,
-        command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
-    )
-    self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
-    _stacked_control(tokens_body, "Marker Type", self.marker_type_filter_menu)
 
     shape_controls_row = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.shape_controls_row = shape_controls_row

@@ -51,7 +51,7 @@ class ShapeIconSelector(ctk.CTkFrame):
                 command=lambda selected=value: self.set(selected),
                 **self._DEFAULT_STYLE,
             )
-            button.pack(side="left", padx=(0, 3), pady=(0, 4))
+            button.pack(side="top", anchor="w", padx=0, pady=(0, 3))
             self._buttons[value] = button
             ToolTip(button, tooltip)
 
