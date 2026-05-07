@@ -25,7 +25,7 @@ from modules.maps.views.toolbar_view import (
     _update_fog_button_states,
 )
 from modules.maps.views.canvas_view import _build_canvas, _on_delete_key
-from modules.maps.views.floating_drawing_toolbar import _build_floating_drawing_toolbar
+from modules.maps.views.floating_drawing_toolbar import build_maptool_floating_drawing_toolbar
 from modules.maps.services.fog_manager import (
     _set_fog,
     clear_fog,
@@ -6377,7 +6377,7 @@ class DisplayMapController:
     # Method assignments (some will be replaced by generic item handlers)
     _build_canvas = _build_canvas
     _build_toolbar = _build_toolbar
-    _build_floating_drawing_toolbar = _build_floating_drawing_toolbar
+    _build_floating_drawing_toolbar = build_maptool_floating_drawing_toolbar
     _change_brush = _change_brush # For fog brush
     _change_token_border_color = _change_token_border_color # Specific to tokens via old menu
     
