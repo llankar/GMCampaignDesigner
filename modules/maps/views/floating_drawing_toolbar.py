@@ -7,9 +7,9 @@ from modules.helpers.logging_helper import log_module_import
 from modules.ui.icon_dropdown import IconDropdown
 from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 from modules.maps.views.floating_toolbar.slim_option_menu import create_slim_option_menu
+from modules.maps.views.floating_toolbar.shape_selector import add_shape_icon_selector
 from modules.maps.views.floating_toolbar.layout import (
     BORDER,
-    DROPDOWN_WIDTH,
     PALETTE_BG,
     SLIDER_WIDTH,
     TEXT_MUTED,
@@ -34,7 +34,6 @@ def _build_floating_drawing_toolbar(self):
         except tk.TclError:
             pass
 
-    dropdown_width = DROPDOWN_WIDTH
     slider_width = SLIDER_WIDTH
     palette = ctk.CTkFrame(
         host,
@@ -149,14 +148,7 @@ def _build_floating_drawing_toolbar(self):
     self._fog_buttons.update(fog_dropdown.option_buttons)
     self._fog_dropdown = fog_dropdown
 
-    self.shape_menu = create_slim_option_menu(
-        fog_body,
-        values=["Rectangle", "Circle"],
-        command=self._on_brush_shape_change,
-        width=dropdown_width,
-    )
-    self.shape_menu.set("Rectangle")
-    _stacked_control(fog_body, "Shape", self.shape_menu)
+    self.shape_menu = add_shape_icon_selector(fog_body, self._on_brush_shape_change)
 
     brush_size_options = list(getattr(self, "brush_size_options", list(range(4, 129, 4))))
     current_brush_size = int(getattr(self, "brush_size", brush_size_options[0] if brush_size_options else 32))
@@ -168,7 +160,6 @@ def _build_floating_drawing_toolbar(self):
         fog_body,
         values=[str(size) for size in self.brush_size_options],
         command=self._on_brush_size_change,
-        width=dropdown_width,
     )
     self.brush_size_menu.set(str(current_brush_size))
     _stacked_control(fog_body, "Size", self.brush_size_menu)
@@ -179,7 +170,6 @@ def _build_floating_drawing_toolbar(self):
         tools_body,
         values=drawing_tools,
         command=self._on_drawing_tool_change,
-        width=dropdown_width,
     )
     current_tool = self.drawing_mode.capitalize() if hasattr(self, "drawing_mode") else "Token"
     self.drawing_tool_menu.set(current_tool if current_tool in drawing_tools else "Token")
@@ -191,14 +181,14 @@ def _build_floating_drawing_toolbar(self):
     self.whiteboard_color_button = ctk.CTkButton(
         whiteboard_controls,
         text="Ink Color",
-        width=dropdown_width,
+        width=70,
         command=self._on_pick_whiteboard_color,
     )
     try:
         self.whiteboard_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.whiteboard_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
+    self.whiteboard_color_button.pack(side="top", anchor="w", padx=0, pady=(0, 4))
 
     width_container = ctk.CTkFrame(whiteboard_controls, fg_color="transparent")
     width_container.pack(side="top", fill="x", padx=0, pady=(0, 4))
@@ -229,22 +219,21 @@ def _build_floating_drawing_toolbar(self):
         text_controls,
         values=[str(size) for size in self.text_size_options],
         command=getattr(self, "_on_text_size_change", None) or (lambda _v: None),
-        width=dropdown_width,
     )
     self.text_size_menu.set(str(current_text_size))
-    self.text_size_menu.pack(side="top", fill="x", padx=0, pady=(0, 4))
+    self.text_size_menu.pack(side="top", anchor="w", padx=0, pady=(0, 4))
 
     self.text_color_button = ctk.CTkButton(
         text_controls,
         text="Text Color",
-        width=dropdown_width,
+        width=76,
         command=self._on_pick_whiteboard_color,
     )
     try:
         self.text_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.text_color_button.pack(side="top", fill="x", padx=0, pady=(0, 4))
+    self.text_color_button.pack(side="top", anchor="w", padx=0, pady=(0, 4))
 
     eraser_controls = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.eraser_controls_frame = eraser_controls
@@ -289,7 +278,6 @@ def _build_floating_drawing_toolbar(self):
         tokens_body,
         values=[str(size) for size in self.token_size_options],
         command=self._on_token_size_change,
-        width=dropdown_width,
     )
     self.token_size_menu.set(str(current_token_size))
     _stacked_control(tokens_body, "Size", self.token_size_menu)
@@ -298,7 +286,6 @@ def _build_floating_drawing_toolbar(self):
         tokens_body,
         values=MARKER_TYPE_FILTER_LABELS,
         command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
-        width=dropdown_width,
     )
     self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
     _stacked_control(tokens_body, "Marker Type", self.marker_type_filter_menu)
@@ -310,19 +297,18 @@ def _build_floating_drawing_toolbar(self):
         shape_controls_row,
         values=["Filled", "Border Only"],
         command=self._on_shape_fill_mode_change,
-        width=dropdown_width,
     )
     self.shape_fill_mode_menu.set("Filled" if hasattr(self, "shape_is_filled") and self.shape_is_filled else "Border Only")
     self.shape_fill_color_button = ctk.CTkButton(
         shape_controls_row,
         text="Fill Color",
-        width=dropdown_width,
+        width=70,
         command=self._on_pick_shape_fill_color,
     )
     self.shape_border_color_button = ctk.CTkButton(
         shape_controls_row,
         text="Border Color",
-        width=dropdown_width,
+        width=88,
         command=self._on_pick_shape_border_color,
     )
 
