@@ -143,7 +143,7 @@ def _build_floating_drawing_toolbar(self):
     ]
     fog_row = _row(fog_body)
     fog_dropdown = IconDropdown(fog_row, fog_actions, default_key="add", button_size=(24, 24), show_arrow=False)
-    fog_dropdown.pack(side="top", anchor="w", padx=0, pady=3)
+    fog_dropdown.pack(side="top", anchor="center", padx=0, pady=3)
     self._fog_buttons.update(fog_dropdown.option_buttons)
     self._fog_dropdown = fog_dropdown
 
@@ -187,11 +187,11 @@ def _build_floating_drawing_toolbar(self):
         self.whiteboard_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.whiteboard_color_button.pack(side="top", anchor="w", padx=0, pady=(0, 4))
+    self.whiteboard_color_button.pack(side="top", anchor="center", padx=0, pady=(0, 4))
 
     width_container = ctk.CTkFrame(whiteboard_controls, fg_color="transparent")
     width_container.pack(side="top", fill="x", padx=0, pady=(0, 4))
-    ctk.CTkLabel(width_container, text="Width", text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(0, 2))
+    ctk.CTkLabel(width_container, text="Width", text_color=TEXT_MUTED).pack(side="top", fill="x", padx=0, pady=(0, 2))
     self.whiteboard_width_slider = ctk.CTkSlider(
         width_container,
         from_=1,
@@ -204,11 +204,11 @@ def _build_floating_drawing_toolbar(self):
     self.whiteboard_width_slider.set(current_width)
     self.whiteboard_width_slider.pack(side="top", fill="x", padx=0)
     self.whiteboard_width_value_label = ctk.CTkLabel(width_container, text=str(int(current_width)), text_color=TEXT_MUTED)
-    self.whiteboard_width_value_label.pack(side="top", anchor="e", padx=0)
+    self.whiteboard_width_value_label.pack(side="top", fill="x", padx=0)
 
     text_controls = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.text_controls_frame = text_controls
-    ctk.CTkLabel(text_controls, text="Text Size", text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(0, 2))
+    ctk.CTkLabel(text_controls, text="Text Size", text_color=TEXT_MUTED).pack(side="top", fill="x", padx=0, pady=(0, 2))
     text_sizes = getattr(self, "text_size_options", [16, 20, 24, 32, 40])
     current_text_size = int(getattr(self, "text_size", text_sizes[0] if text_sizes else 24))
     if current_text_size not in text_sizes:
@@ -220,7 +220,7 @@ def _build_floating_drawing_toolbar(self):
         command=getattr(self, "_on_text_size_change", None) or (lambda _v: None),
     )
     self.text_size_menu.set(str(current_text_size))
-    self.text_size_menu.pack(side="top", anchor="w", padx=0, pady=(0, 4))
+    self.text_size_menu.pack(side="top", anchor="center", padx=0, pady=(0, 4))
 
     self.text_color_button = ctk.CTkButton(
         text_controls,
@@ -232,13 +232,13 @@ def _build_floating_drawing_toolbar(self):
         self.text_color_button.configure(fg_color=getattr(self, "whiteboard_color", "#FF0000"))
     except tk.TclError:
         pass
-    self.text_color_button.pack(side="top", anchor="w", padx=0, pady=(0, 4))
+    self.text_color_button.pack(side="top", anchor="center", padx=0, pady=(0, 4))
 
     eraser_controls = ctk.CTkFrame(tools_body, fg_color="transparent")
     self.eraser_controls_frame = eraser_controls
     eraser_width_container = ctk.CTkFrame(eraser_controls, fg_color="transparent")
     eraser_width_container.pack(side="top", fill="x", padx=0, pady=(0, 4))
-    ctk.CTkLabel(eraser_width_container, text="Radius", text_color=TEXT_MUTED).pack(side="top", anchor="w", padx=0, pady=(0, 2))
+    ctk.CTkLabel(eraser_width_container, text="Radius", text_color=TEXT_MUTED).pack(side="top", fill="x", padx=0, pady=(0, 2))
     self.whiteboard_eraser_slider = ctk.CTkSlider(
         eraser_width_container,
         from_=2,
@@ -255,7 +255,7 @@ def _build_floating_drawing_toolbar(self):
         text=str(int(round(current_eraser_radius))),
         text_color=TEXT_MUTED,
     )
-    self.eraser_radius_value_label.pack(side="top", anchor="e", padx=0)
+    self.eraser_radius_value_label.pack(side="top", fill="x", padx=0)
 
     tokens_body = _section("Tokens")
     token_actions = [
@@ -265,7 +265,7 @@ def _build_floating_drawing_toolbar(self):
         {"key": "marker", "icon": icons["marker"], "tooltip": "Add Marker", "command": self.add_marker},
     ]
     token_dropdown = IconDropdown(tokens_body, token_actions, default_key="npc", button_size=(24, 24), show_arrow=False)
-    token_dropdown.pack(side="top", anchor="w", padx=0, pady=3)
+    token_dropdown.pack(side="top", anchor="center", padx=0, pady=3)
 
     token_size_options = list(getattr(self, "token_size_options", list(range(16, 129, 8))))
     current_token_size = int(getattr(self, "token_size", token_size_options[0] if token_size_options else 48))
