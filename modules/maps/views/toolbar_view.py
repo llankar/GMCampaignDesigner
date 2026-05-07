@@ -6,6 +6,7 @@ from modules.ui.icon_dropdown import IconDropdown
 from modules.helpers.logging_helper import log_module_import
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.maps.measurement.templates import MEASUREMENT_TEMPLATE_LABELS
+from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
 
 log_module_import(__name__)
 
@@ -100,7 +101,19 @@ def _build_toolbar(self):
     self.parent.bind("[", lambda e: self._change_brush(-4))
     self.parent.bind("]", lambda e: self._change_brush(+4))
 
-    # Token controls live in the one-column floating drawing palette.
+    # Token creation controls live in the one-column floating drawing palette.
+    # Marker filtering belongs to the persistent top toolbar so it stays visible.
+
+    token_section = _create_collapsible_section(toolbar, "Tokens")
+    ctk.CTkLabel(token_section, text="Marker Type").pack(side="left", padx=(8, 4), pady=6)
+    self.marker_type_filter_menu = ctk.CTkOptionMenu(
+        token_section,
+        values=MARKER_TYPE_FILTER_LABELS,
+        command=getattr(self, "_on_marker_type_filter_change", None) or (lambda _v: None),
+        width=110,
+    )
+    self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
+    _pack_control(self.marker_type_filter_menu, trailing=6, pady=6)
 
     measure_section = _create_collapsible_section(toolbar, "Measure")
     ctk.CTkLabel(measure_section, text="Template").pack(side="left", padx=(8, 4), pady=6)
