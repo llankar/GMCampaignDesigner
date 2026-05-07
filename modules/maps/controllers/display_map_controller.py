@@ -1,4 +1,4 @@
-﻿"""Controller for display map."""
+"""Controller for display map."""
 
 import os
 import json
@@ -78,6 +78,18 @@ from modules.helpers.portrait_helper import (
     resolve_portrait_candidate,
 )
 from modules.ui.image_viewer import show_portrait
+from modules.maps.measurement.templates import (
+    DEFAULT_DISTANCE_UNIT,
+    DEFAULT_GRID_CELL_PIXELS,
+    DEFAULT_GRID_SCALE,
+    MEASUREMENT_ITEM_TYPE,
+    build_measurement_item,
+    deserialize_measurement_item,
+    label_for_template_type,
+    normalize_template_type,
+    render_measurement_on_canvas,
+    serialize_measurement_item,
+)
 from modules.maps.utils.text_items import (
     DEFAULT_TEXT_SIZES,
     TextFontCache,
@@ -232,6 +244,27 @@ class DisplayMapController:
         self._eraser_active = False
         self._eraser_dirty = False
         self._eraser_repaint_scheduled = False
+        self.measure_mode = False
+        self.measure_template_type = "line"
+        self.measure_template_label = "Line"
+        self.measure_grid_cell_pixels = DEFAULT_GRID_CELL_PIXELS
+        self.measure_grid_scale = DEFAULT_GRID_SCALE
+        self.measure_unit = DEFAULT_DISTANCE_UNIT
+        try:
+            self.measure_grid_cell_pixels = float(
+                ConfigHelper.get("Measurement", "grid_cell_pixels", fallback=DEFAULT_GRID_CELL_PIXELS)
+            )
+            self.measure_grid_scale = float(
+                ConfigHelper.get("Measurement", "grid_scale", fallback=DEFAULT_GRID_SCALE)
+            )
+            self.measure_unit = ConfigHelper.get("Measurement", "unit", fallback=DEFAULT_DISTANCE_UNIT)
+        except Exception:
+            self.measure_grid_cell_pixels = DEFAULT_GRID_CELL_PIXELS
+            self.measure_grid_scale = DEFAULT_GRID_SCALE
+            self.measure_unit = DEFAULT_DISTANCE_UNIT
+        self._measurement_start_world = None
+        self._measurement_preview_item = None
+        self._measurement_preview_ids = ()
 
         self._panning      = False
         self._last_mouse   = (0, 0)
@@ -3127,6 +3160,11 @@ class DisplayMapController:
             self._on_resize_handle_press(event, handle_type)
             return # A handle was pressed, resize logic takes over
 
+        if self.measure_mode and self._measurement_start_world is not None:
+            world_x = (event.x - self.pan_x) / self.zoom
+            world_y = (event.y - self.pan_y) / self.zoom
+            self._finalize_measurement((world_x, world_y))
+            return
         if self.drawing_mode == "eraser":
             # Handle the branch where drawing_mode == 'eraser'.
             world_x = (event.x - self.pan_x) / self.zoom
@@ -3171,6 +3209,13 @@ class DisplayMapController:
                 self._remove_resize_handles()
                 self._graphical_edit_mode_item = None
             existing_selection = list(self.selected_items)
+
+            if self.measure_mode:
+                world_x = (event.x - self.pan_x) / self.zoom
+                world_y = (event.y - self.pan_y) / self.zoom
+                self._measurement_start_world = (world_x, world_y)
+                self._clear_measurement_preview()
+                return
 
             if self.drawing_mode == "whiteboard":
                 # Handle the branch where drawing_mode == 'whiteboard'.
@@ -3234,6 +3279,11 @@ class DisplayMapController:
             # Continue with this path when marker after ID is set and marker start is set.
             dx = event.x - self._marker_start[0]; dy = event.y - self._marker_start[1]
             if abs(dx) > 5 or abs(dy) > 5: self.canvas.after_cancel(self._marker_after_id); self._marker_after_id = None
+        if self.measure_mode and self._measurement_start_world is not None:
+            world_x = (event.x - self.pan_x) / self.zoom
+            world_y = (event.y - self.pan_y) / self.zoom
+            self._update_measurement_preview((world_x, world_y))
+            return
         if self.drawing_mode == "eraser" and self._eraser_active:
             # Continue with this path when drawing_mode == 'eraser' and eraser active is set.
             world_x = (event.x - self.pan_x) / self.zoom
@@ -4129,6 +4179,16 @@ class DisplayMapController:
                         "actual_screen": _primary_screen_from_coords(primary_coords) or (sx, sy),
                     })
                     debug_payload["rendered_items"].append(debug_entry)
+            elif item_type == MEASUREMENT_ITEM_TYPE:
+                self._render_measurement_item(item)
+                if debug_payload is not None:
+                    start, end = item.get("points", [item.get("position"), item.get("position")])[:2]
+                    debug_payload["rendered_items"].append({
+                        "type": MEASUREMENT_ITEM_TYPE,
+                        "template_type": item.get("template_type"),
+                        "world_position": start,
+                        "end": end,
+                    })
             elif item_type == "whiteboard":
                 # Handle the branch where item_type == 'whiteboard'.
                 points = item.get("points") or []
@@ -5553,6 +5613,14 @@ class DisplayMapController:
                 new_item_data["handle_canvas_id"] = None
                 new_item_data["entry_canvas_id"] = None
                 new_item_data["border_canvas_id"] = None
+            elif item_type == MEASUREMENT_ITEM_TYPE:
+                new_item_data = deserialize_measurement_item(serialize_measurement_item(new_item_data))
+                dx, dy = offset
+                pts = []
+                for px, py in new_item_data.get("points", []):
+                    pts.append((px + dx, py + dy))
+                new_item_data["points"] = pts
+                new_item_data["position"] = pts[0] if pts else new_item_data.get("position", (0, 0))
             elif item_type in ["rectangle", "oval"]:
                 new_item_data.setdefault("shape_type", item_type)
                 new_item_data.setdefault("width", DEFAULT_SHAPE_WIDTH)
@@ -5875,8 +5943,142 @@ class DisplayMapController:
                 self._update_web_display_map()
         except tk.TclError: pass
             
+    def _read_measurement_settings(self):
+        """Read measurement scale controls and persist valid values."""
+        cell_entry = getattr(self, "measure_cell_entry", None)
+        scale_entry = getattr(self, "measure_scale_entry", None)
+        try:
+            cell_value = float(cell_entry.get()) if cell_entry else self.measure_grid_cell_pixels
+        except (TypeError, ValueError):
+            cell_value = self.measure_grid_cell_pixels
+        try:
+            scale_value = float(scale_entry.get()) if scale_entry else self.measure_grid_scale
+        except (TypeError, ValueError):
+            scale_value = self.measure_grid_scale
+        self.measure_grid_cell_pixels = max(1.0, cell_value)
+        self.measure_grid_scale = max(0.1, scale_value)
+        ConfigHelper.set("Measurement", "grid_cell_pixels", self.measure_grid_cell_pixels)
+        ConfigHelper.set("Measurement", "grid_scale", self.measure_grid_scale)
+        ConfigHelper.set("Measurement", "unit", self.measure_unit)
+
+    def _on_measure_template_change(self, selected_template):
+        """Handle measurement template type changes."""
+        self.measure_template_type = normalize_template_type(selected_template)
+        self.measure_template_label = label_for_template_type(self.measure_template_type)
+
+    def _toggle_measure_mode(self):
+        """Toggle measurement drawing mode."""
+        self.measure_mode = not getattr(self, "measure_mode", False)
+        self._read_measurement_settings()
+        if self.measure_mode:
+            self.drawing_mode = "token"
+            self.fog_mode = None
+            self._clear_whiteboard_preview()
+            self._active_whiteboard_points = []
+        else:
+            self._measurement_start_world = None
+            self._clear_measurement_preview()
+        button = getattr(self, "measure_button", None)
+        if button:
+            try:
+                button.configure(fg_color="#004c80" if self.measure_mode else "#0077CC")
+            except tk.TclError:
+                pass
+
+    def _clear_measurement_preview(self):
+        """Remove temporary measurement template canvas items."""
+        canvas = getattr(self, "canvas", None)
+        if canvas:
+            for cid in getattr(self, "_measurement_preview_ids", ()) or ():
+                try:
+                    canvas.delete(cid)
+                except tk.TclError:
+                    pass
+        self._measurement_preview_ids = ()
+        self._measurement_preview_item = None
+
+    def _measurement_item_from_points(self, start, end):
+        """Create a measurement item using current toolbar settings."""
+        self._read_measurement_settings()
+        return build_measurement_item(
+            self.measure_template_type,
+            start,
+            end,
+            grid_cell_pixels=self.measure_grid_cell_pixels,
+            grid_scale=self.measure_grid_scale,
+            unit=self.measure_unit,
+        )
+
+    def _update_measurement_preview(self, end_world):
+        """Render the temporary measurement template while dragging."""
+        if self._measurement_start_world is None:
+            return
+        self._clear_measurement_preview()
+        preview = self._measurement_item_from_points(self._measurement_start_world, end_world)
+        self._measurement_preview_item = preview
+        self._measurement_preview_ids = render_measurement_on_canvas(
+            self.canvas,
+            preview,
+            lambda x, y: (self.pan_x + x * self.zoom, self.pan_y + y * self.zoom),
+            tags=("measurement_preview",),
+        )
+        for cid in self._measurement_preview_ids:
+            try:
+                self.canvas.itemconfig(cid, state="disabled")
+                self.canvas.tag_raise(cid)
+            except tk.TclError:
+                pass
+
+    def _finalize_measurement(self, end_world):
+        """Commit the current temporary measurement as a persistent item."""
+        start = self._measurement_start_world
+        self._measurement_start_world = None
+        self._clear_measurement_preview()
+        if start is None:
+            return
+        if math.hypot(end_world[0] - start[0], end_world[1] - start[1]) < 1.0:
+            return
+        item = self._measurement_item_from_points(start, end_world)
+        self.tokens.append(item)
+        self._update_canvas_images()
+        self._persist_tokens()
+
+    def _render_measurement_item(self, item):
+        """Render one persistent measurement item."""
+        old_ids = item.get("canvas_ids") or ()
+        for cid in old_ids:
+            try:
+                self.canvas.delete(cid)
+            except tk.TclError:
+                pass
+        item["canvas_ids"] = render_measurement_on_canvas(
+            self.canvas,
+            item,
+            lambda x, y: (self.pan_x + x * self.zoom, self.pan_y + y * self.zoom),
+            tags=("measurement_persistent",),
+        )
+        self._bind_item_events(item)
+
+    def clear_measurements(self):
+        """Delete all persistent measurement templates from the map."""
+        self._clear_measurement_preview()
+        measurements = [item for item in self.tokens if item.get("type") == MEASUREMENT_ITEM_TYPE]
+        if not measurements:
+            return
+        self.tokens = [item for item in self.tokens if item.get("type") != MEASUREMENT_ITEM_TYPE]
+        for item in measurements:
+            for cid in item.get("canvas_ids", ()):
+                try:
+                    self.canvas.delete(cid)
+                except tk.TclError:
+                    pass
+        self._persist_tokens()
+        self._update_canvas_images()
+
     def _on_drawing_tool_change(self, selected_tool: str):
         """Handle drawing tool change."""
+        self.measure_mode = False
+        self._clear_measurement_preview()
         self.drawing_mode = selected_tool.lower()
         print(f"Drawing mode changed to: {self.drawing_mode}")
         menu = getattr(self, "drawing_tool_menu", None)
@@ -5885,6 +6087,12 @@ class DisplayMapController:
                 # Keep on drawing tool change resilient if this step fails.
                 if menu.get() != selected_tool:
                     menu.set(selected_tool)
+            except tk.TclError:
+                pass
+        button = getattr(self, "measure_button", None)
+        if button:
+            try:
+                button.configure(fg_color="#0077CC")
             except tk.TclError:
                 pass
         if self.drawing_mode != "whiteboard":

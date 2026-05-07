@@ -25,6 +25,18 @@ from modules.ui.chatbot_dialog import (
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
 from modules.maps.views.world_map_toolbar_view import build_world_map_toolbar
+from modules.maps.measurement.templates import (
+    DEFAULT_DISTANCE_UNIT,
+    DEFAULT_GRID_CELL_PIXELS,
+    DEFAULT_GRID_SCALE,
+    MEASUREMENT_ITEM_TYPE,
+    build_measurement_item,
+    deserialize_measurement_item,
+    label_for_template_type,
+    normalize_template_type,
+    render_measurement_on_canvas,
+    serialize_measurement_item,
+)
 from modules.maps.marker_types import (
     DEFAULT_MARKER_TYPE,
     MARKER_TYPE_LABELS,
@@ -147,6 +159,26 @@ class WorldMapPanel(ctk.CTkFrame):
         self.map_stack: list[str] = []
 
         self.tokens: list[dict] = []
+        self.measure_mode = False
+        self.measure_template_type = "line"
+        self.measure_template_label = "Line"
+        self.measure_grid_cell_pixels = DEFAULT_GRID_CELL_PIXELS
+        self.measure_grid_scale = DEFAULT_GRID_SCALE
+        self.measure_unit = DEFAULT_DISTANCE_UNIT
+        try:
+            self.measure_grid_cell_pixels = float(
+                ConfigHelper.get("Measurement", "grid_cell_pixels", fallback=DEFAULT_GRID_CELL_PIXELS)
+            )
+            self.measure_grid_scale = float(
+                ConfigHelper.get("Measurement", "grid_scale", fallback=DEFAULT_GRID_SCALE)
+            )
+            self.measure_unit = ConfigHelper.get("Measurement", "unit", fallback=DEFAULT_DISTANCE_UNIT)
+        except Exception:
+            self.measure_grid_cell_pixels = DEFAULT_GRID_CELL_PIXELS
+            self.measure_grid_scale = DEFAULT_GRID_SCALE
+            self.measure_unit = DEFAULT_DISTANCE_UNIT
+        self._measurement_start_world = None
+        self._measurement_preview_ids = ()
         self.selected_token: dict | None = None
         self.marker_type_filter = "All Types"
         self.base_image = None
@@ -946,6 +978,9 @@ class WorldMapPanel(ctk.CTkFrame):
                 continue
             entity_type = value.get('entity_type') or value.get('type') or 'Entity'
             token_type = value.get('type')
+            if token_type == MEASUREMENT_ITEM_TYPE:
+                tokens.append(deserialize_measurement_item(value))
+                continue
             if token_type not in {'map', 'entity', 'world'}:
                 continue
             if str(entity_type).lower() in {'rectangle', 'oval', 'circle', 'shape', 'line', 'polygon'}:
@@ -982,6 +1017,9 @@ class WorldMapPanel(ctk.CTkFrame):
         serialized: list[dict] = []
         for token in self.tokens:
             # Process each token from tokens.
+            if token.get("type") == MEASUREMENT_ITEM_TYPE:
+                serialized.append(serialize_measurement_item(token))
+                continue
             if str(token.get("entity_type", "")).lower() in {"rectangle", "oval", "circle", "shape", "line", "polygon"}:
                 continue
             serialized.append(
@@ -1076,6 +1114,9 @@ class WorldMapPanel(ctk.CTkFrame):
         update_world_map_fog_canvas(self, resample=Image.LANCZOS)
 
         for token in self.tokens:
+            if token.get("type") == MEASUREMENT_ITEM_TYPE:
+                self._draw_measurement(token)
+                continue
             if not self._marker_matches_filter(token):
                 continue
             self._draw_token(token)
@@ -1593,17 +1634,148 @@ class WorldMapPanel(ctk.CTkFrame):
         if self._inspector_token is token:
             self._update_color_swatch(token)
 
+    def _event_to_world_pixels(self, event) -> tuple[float, float]:
+        """Convert a canvas event to base-image pixel coordinates."""
+        if not self.render_params:
+            return (0.0, 0.0)
+        scale, offset_x, offset_y, _base_w, _base_h = self.render_params
+        if scale <= 0:
+            return (0.0, 0.0)
+        return ((event.x - offset_x) / scale, (event.y - offset_y) / scale)
+
+    def _world_pixels_to_screen(self, x: float, y: float) -> tuple[float, float]:
+        """Convert base-image pixel coordinates to canvas coordinates."""
+        if not self.render_params:
+            return (x, y)
+        scale, offset_x, offset_y, _base_w, _base_h = self.render_params
+        return (offset_x + x * scale, offset_y + y * scale)
+
+    def _read_measurement_settings(self) -> None:
+        """Read measurement scale controls from the toolbar."""
+        cell_entry = getattr(self, "measure_cell_entry", None)
+        scale_entry = getattr(self, "measure_scale_entry", None)
+        try:
+            cell_value = float(cell_entry.get()) if cell_entry else self.measure_grid_cell_pixels
+        except (TypeError, ValueError):
+            cell_value = self.measure_grid_cell_pixels
+        try:
+            scale_value = float(scale_entry.get()) if scale_entry else self.measure_grid_scale
+        except (TypeError, ValueError):
+            scale_value = self.measure_grid_scale
+        self.measure_grid_cell_pixels = max(1.0, cell_value)
+        self.measure_grid_scale = max(0.1, scale_value)
+
+    def _on_measure_template_change(self, selected_template) -> None:
+        """Handle measurement template type changes."""
+        self.measure_template_type = normalize_template_type(selected_template)
+        self.measure_template_label = label_for_template_type(self.measure_template_type)
+
+    def _toggle_measure_mode(self) -> None:
+        """Toggle measurement drawing mode."""
+        self.measure_mode = not self.measure_mode
+        self._read_measurement_settings()
+        if self.measure_mode:
+            self.fog_mode = None
+        else:
+            self._measurement_start_world = None
+            self._clear_measurement_preview()
+        button = getattr(self, "measure_button", None)
+        if button:
+            try:
+                button.configure(fg_color="#004c80" if self.measure_mode else "#0077CC")
+            except tk.TclError:
+                pass
+
+    def _measurement_item_from_points(self, start, end) -> dict:
+        """Create a measurement item using current toolbar settings."""
+        self._read_measurement_settings()
+        return build_measurement_item(
+            self.measure_template_type,
+            start,
+            end,
+            grid_cell_pixels=self.measure_grid_cell_pixels,
+            grid_scale=self.measure_grid_scale,
+            unit=self.measure_unit,
+        )
+
+    def _clear_measurement_preview(self) -> None:
+        """Remove temporary measurement render ids."""
+        for cid in getattr(self, "_measurement_preview_ids", ()) or ():
+            try:
+                self.canvas.delete(cid)
+            except tk.TclError:
+                pass
+        self._measurement_preview_ids = ()
+
+    def _update_measurement_preview(self, end_world) -> None:
+        """Render the active temporary measurement template."""
+        if self._measurement_start_world is None:
+            return
+        self._clear_measurement_preview()
+        item = self._measurement_item_from_points(self._measurement_start_world, end_world)
+        self._measurement_preview_ids = render_measurement_on_canvas(
+            self.canvas,
+            item,
+            self._world_pixels_to_screen,
+            tags=("measurement_preview",),
+        )
+        for cid in self._measurement_preview_ids:
+            try:
+                self.canvas.itemconfig(cid, state="disabled")
+                self.canvas.tag_raise(cid)
+            except tk.TclError:
+                pass
+
+    def _finalize_measurement(self, end_world) -> None:
+        """Persist the active measurement template."""
+        start = self._measurement_start_world
+        self._measurement_start_world = None
+        self._clear_measurement_preview()
+        if start is None:
+            return
+        item = self._measurement_item_from_points(start, end_world)
+        self.tokens.append(item)
+        self._draw_scene()
+        self._persist_tokens()
+
+    def _draw_measurement(self, item: dict) -> None:
+        """Draw a persistent measurement template on the world map canvas."""
+        old_ids = item.get("canvas_ids") or ()
+        for cid in old_ids:
+            try:
+                self.canvas.delete(cid)
+            except tk.TclError:
+                pass
+        item["canvas_ids"] = render_measurement_on_canvas(
+            self.canvas,
+            item,
+            self._world_pixels_to_screen,
+            tags=("measurement_persistent",),
+        )
+
+    def clear_measurements(self) -> None:
+        """Delete all persistent measurement templates on the current world map."""
+        self._clear_measurement_preview()
+        remaining = [token for token in self.tokens if token.get("type") != MEASUREMENT_ITEM_TYPE]
+        if len(remaining) == len(self.tokens):
+            return
+        self.tokens = remaining
+        self._draw_scene()
+        self._persist_tokens()
+
     def _on_canvas_press(self, event) -> str | None:
         """Handle canvas press."""
+        if self.measure_mode:
+            self._measurement_start_world = self._event_to_world_pixels(event)
+            self._clear_measurement_preview()
+            return "break"
         if self.fog_mode in ("add", "rem"):
-            # Handle the branch where fog mode is in ('add', 'rem').
             if not self._fog_action_active:
                 push_fog_history(self)
                 self._fog_action_active = True
             paint_world_map_fog(self, event)
             return "break"
         if self.fog_mode in ("add_rect", "rem_rect"):
-            # Handle the branch where fog mode is in ('add_rect', 'rem_rect').
             if not self._fog_action_active:
                 push_fog_history(self)
                 self._fog_action_active = True
@@ -1614,6 +1786,9 @@ class WorldMapPanel(ctk.CTkFrame):
 
     def _on_canvas_drag(self, event) -> str | None:
         """Handle canvas drag."""
+        if self.measure_mode and self._measurement_start_world is not None:
+            self._update_measurement_preview(self._event_to_world_pixels(event))
+            return "break"
         if self.fog_mode in ("add", "rem"):
             paint_world_map_fog(self, event)
             return "break"
@@ -1624,8 +1799,10 @@ class WorldMapPanel(ctk.CTkFrame):
 
     def _on_canvas_release(self, event) -> str | None:
         """Handle canvas release."""
+        if self.measure_mode and self._measurement_start_world is not None:
+            self._finalize_measurement(self._event_to_world_pixels(event))
+            return "break"
         if self.fog_mode in ("add", "rem"):
-            # Handle the branch where fog mode is in ('add', 'rem').
             if self._fog_action_active:
                 self._fog_action_active = False
             return "break"
@@ -1633,7 +1810,6 @@ class WorldMapPanel(ctk.CTkFrame):
             self.fog_mode in ("add_rect", "rem_rect")
             and self._fog_rect_start_world is not None
         ):
-            # Handle the branch where fog mode is in ('add_rect', 'rem_rect') and fog rect start world is available.
             end_world = self._fog_event_to_world(event)
             apply_world_map_fog_rectangle(self, self._fog_rect_start_world, end_world)
             self._fog_rect_start_world = None

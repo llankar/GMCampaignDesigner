@@ -6,6 +6,7 @@ from modules.ui.icon_dropdown import IconDropdown
 from modules.helpers.logging_helper import log_module_import
 from modules.scenarios.plot_twist_panel import PlotTwistPanel
 from modules.maps.marker_types import MARKER_TYPE_FILTER_LABELS
+from modules.maps.measurement.templates import MEASUREMENT_TEMPLATE_LABELS
 
 log_module_import(__name__)
 
@@ -207,6 +208,45 @@ def _build_toolbar(self):
     )
     self.marker_type_filter_menu.set(getattr(self, "marker_type_filter", "All Types") or "All Types")
     _pack_control(self.marker_type_filter_menu, trailing=4)
+
+    measure_section = _create_collapsible_section(toolbar, "Measure")
+    ctk.CTkLabel(measure_section, text="Template").pack(side="left", padx=(8, 4), pady=6)
+    self.measure_template_menu = ctk.CTkOptionMenu(
+        measure_section,
+        values=MEASUREMENT_TEMPLATE_LABELS,
+        command=getattr(self, "_on_measure_template_change", None) or (lambda _v: None),
+        width=110,
+    )
+    self.measure_template_menu.set(getattr(self, "measure_template_label", "Line"))
+    _pack_control(self.measure_template_menu, trailing=4, pady=6)
+
+    self.measure_button = ctk.CTkButton(
+        measure_section,
+        text="Measure",
+        width=100,
+        command=getattr(self, "_toggle_measure_mode", None) or (lambda: None),
+    )
+    _pack_control(self.measure_button, trailing=4)
+
+    ctk.CTkLabel(measure_section, text="Cell px").pack(side="left", padx=(8, 4), pady=6)
+    self.measure_cell_entry = ctk.CTkEntry(measure_section, width=62)
+    self.measure_cell_entry.insert(0, str(int(getattr(self, "measure_grid_cell_pixels", 50))))
+    _pack_control(self.measure_cell_entry, trailing=4, pady=6)
+
+    ctk.CTkLabel(measure_section, text="Scale").pack(side="left", padx=(4, 4), pady=6)
+    self.measure_scale_entry = ctk.CTkEntry(measure_section, width=62)
+    self.measure_scale_entry.insert(0, str(int(getattr(self, "measure_grid_scale", 5))))
+    _pack_control(self.measure_scale_entry, trailing=2, pady=6)
+    self.measure_unit_label = ctk.CTkLabel(measure_section, text=getattr(self, "measure_unit", "ft") + "/cell")
+    _pack_control(self.measure_unit_label, trailing=6, pady=6)
+
+    self.clear_measurements_button = ctk.CTkButton(
+        measure_section,
+        text="Clear",
+        width=80,
+        command=getattr(self, "clear_measurements", None) or (lambda: None),
+    )
+    _pack_control(self.clear_measurements_button, trailing=6)
 
     drawing_section = _create_collapsible_section(toolbar, "Drawings")
 
