@@ -2,7 +2,11 @@
 
 import tkinter as tk
 from PIL import ImageTk, Image
-from modules.maps.utils.token_facing import facing_arrow_points, normalize_facing_angle
+from modules.maps.utils.token_facing import (
+    facing_arrow_points,
+    facing_arrowhead_points,
+    normalize_facing_angle,
+)
 from screeninfo import get_monitors
 from modules.helpers.logging_helper import log_module_import
 from modules.maps.utils.text_items import TextFontCache
@@ -151,11 +155,27 @@ def _update_fullscreen_map(self):
                 self.fs_canvas.itemconfig(t_id, text=item.get('entity_id', ''))
                 arrow = facing_arrow_points(item.get('position', (0, 0)), size_px, facing_angle, zoom=float(self.zoom), pan_x=float(self.pan_x), pan_y=float(self.pan_y))
                 self.fs_canvas.coords(f_id, *arrow)
-                self.fs_canvas.itemconfig(f_id, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)), arrow='last')
+                self.fs_canvas.itemconfig(f_id, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)), arrow='none')
                 end_x, end_y = arrow[2], arrow[3]
-                handle_radius = max(5, int(nw * 0.10))
-                self.fs_canvas.coords(fh_id, end_x - handle_radius, end_y - handle_radius, end_x + handle_radius, end_y + handle_radius)
-                self.fs_canvas.itemconfig(fh_id, fill=item.get('border_color', '#38bdf8'))
+                head_points = facing_arrowhead_points(
+                    end_x,
+                    end_y,
+                    facing_angle,
+                    length=max(10, int(nw * 0.24)),
+                    width=max(8, int(nw * 0.18)),
+                )
+                if self.fs_canvas.type(fh_id) != 'polygon':
+                    self.fs_canvas.delete(fh_id)
+                    fh_id = self.fs_canvas.create_polygon(
+                        *head_points,
+                        fill=item.get('border_color', '#38bdf8'),
+                        outline='white',
+                        width=2,
+                    )
+                    item['fs_canvas_ids'] = (b_id, i_id, t_id, f_id, fh_id)
+                else:
+                    self.fs_canvas.coords(fh_id, *head_points)
+                    self.fs_canvas.itemconfig(fh_id, fill=item.get('border_color', '#38bdf8'), outline='white', width=2)
             else:
                 b_id = self.fs_canvas.create_rectangle(sx - 3, sy - 3, sx + nw + 3, sy + nh + 3,
                                                        outline=item.get('border_color', '#0000ff'), width=3)
@@ -163,10 +183,21 @@ def _update_fullscreen_map(self):
                 t_id = self.fs_canvas.create_text(sx + nw // 2, sy + nh + 2, text=item.get('entity_id', ''),
                                                   fill='white', anchor='n')
                 arrow = facing_arrow_points(item.get('position', (0, 0)), size_px, facing_angle, zoom=float(self.zoom), pan_x=float(self.pan_x), pan_y=float(self.pan_y))
-                f_id = self.fs_canvas.create_line(*arrow, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)), arrow='last')
+                f_id = self.fs_canvas.create_line(*arrow, fill=item.get('border_color', '#38bdf8'), width=max(2, int(nw * 0.06)), arrow='none')
                 end_x, end_y = arrow[2], arrow[3]
-                handle_radius = max(5, int(nw * 0.10))
-                fh_id = self.fs_canvas.create_oval(end_x - handle_radius, end_y - handle_radius, end_x + handle_radius, end_y + handle_radius, fill=item.get('border_color', '#38bdf8'), outline='white', width=2)
+                head_points = facing_arrowhead_points(
+                    end_x,
+                    end_y,
+                    facing_angle,
+                    length=max(10, int(nw * 0.24)),
+                    width=max(8, int(nw * 0.18)),
+                )
+                fh_id = self.fs_canvas.create_polygon(
+                    *head_points,
+                    fill=item.get('border_color', '#38bdf8'),
+                    outline='white',
+                    width=2,
+                )
                 item['fs_canvas_ids'] = (b_id, i_id, t_id, f_id, fh_id)
 
             # HP-related cross for dead tokens

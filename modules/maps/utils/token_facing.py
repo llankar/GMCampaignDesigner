@@ -63,3 +63,30 @@ def facing_arrow_points(
         end_world_x * zoom + pan_x - offset_x,
         end_world_y * zoom + pan_y - offset_y,
     )
+
+
+def facing_arrowhead_points(
+    tip_x: float,
+    tip_y: float,
+    angle: Any,
+    *,
+    length: float,
+    width: float | None = None,
+) -> tuple[float, float, float, float, float, float]:
+    """Return triangle polygon points for an arrowhead whose tip follows *angle*."""
+    head_length = max(1.0, float(length))
+    head_width = max(1.0, float(width if width is not None else head_length * 0.72))
+    vec_x, vec_y = facing_vector(angle)
+    base_x = float(tip_x) - vec_x * head_length
+    base_y = float(tip_y) - vec_y * head_length
+    perp_x = -vec_y
+    perp_y = vec_x
+    half_width = head_width / 2.0
+    return (
+        float(tip_x),
+        float(tip_y),
+        base_x + perp_x * half_width,
+        base_y + perp_y * half_width,
+        base_x - perp_x * half_width,
+        base_y - perp_y * half_width,
+    )

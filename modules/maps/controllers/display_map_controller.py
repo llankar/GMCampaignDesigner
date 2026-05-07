@@ -60,6 +60,7 @@ from modules.maps.utils.icon_loader import load_icon
 from modules.maps.utils.token_facing import (
     facing_angle_from_points,
     facing_arrow_points,
+    facing_arrowhead_points,
     normalize_facing_angle,
 )
 from PIL import Image, ImageTk, ImageDraw
@@ -4448,23 +4449,27 @@ class DisplayMapController:
             return
 
         line_width = max(2, int(float(size_px) * 0.06))
-        handle_radius = max(5, int(float(size_px) * 0.10))
+        head_length = max(10, int(float(size_px) * 0.24))
+        head_width = max(8, int(float(size_px) * 0.18))
+        head_points = facing_arrowhead_points(
+            end_x, end_y, angle, length=head_length, width=head_width
+        )
         arrow_color = token.get("border_color", "#38bdf8") or "#38bdf8"
         ids = token.get("facing_canvas_ids") or ()
         if ids and len(ids) == 2:
             arrow_id, handle_id = ids
             try:
                 self.canvas.coords(arrow_id, start_x, start_y, end_x, end_y)
-                self.canvas.itemconfig(arrow_id, fill=arrow_color, width=line_width, arrow=tk.LAST)
-                self.canvas.coords(
-                    handle_id,
-                    end_x - handle_radius,
-                    end_y - handle_radius,
-                    end_x + handle_radius,
-                    end_y + handle_radius,
-                )
-                self.canvas.itemconfig(handle_id, fill=arrow_color)
+                self.canvas.itemconfig(arrow_id, fill=arrow_color, width=line_width, arrow=tk.NONE)
+                if self.canvas.type(handle_id) != "polygon":
+                    self.canvas.delete(handle_id)
+                    raise tk.TclError("legacy facing handle")
+                self.canvas.coords(handle_id, *head_points)
+                self.canvas.itemconfig(handle_id, fill=arrow_color, outline="white", width=2)
             except tk.TclError:
+                for facing_id in (arrow_id, handle_id):
+                    if facing_id:
+                        self.canvas.delete(facing_id)
                 token.pop("facing_canvas_ids", None)
                 self._draw_token_facing_arrow(token, sx, sy, size_px)
             return
@@ -4477,15 +4482,11 @@ class DisplayMapController:
                 end_y,
                 fill=arrow_color,
                 width=line_width,
-                arrow=tk.LAST,
-                arrowshape=(12, 14, 5),
+                arrow=tk.NONE,
                 tags=("token_facing",),
             )
-            handle_id = self.canvas.create_oval(
-                end_x - handle_radius,
-                end_y - handle_radius,
-                end_x + handle_radius,
-                end_y + handle_radius,
+            handle_id = self.canvas.create_polygon(
+                *head_points,
                 fill=arrow_color,
                 outline="white",
                 width=2,
