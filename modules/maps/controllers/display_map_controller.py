@@ -25,6 +25,7 @@ from modules.maps.views.toolbar_view import (
     _update_fog_button_states,
 )
 from modules.maps.views.canvas_view import _build_canvas, _on_delete_key
+from modules.maps.views.floating_drawing_toolbar import _build_floating_drawing_toolbar
 from modules.maps.services.fog_manager import (
     _set_fog,
     clear_fog,
@@ -6204,6 +6205,7 @@ class DisplayMapController:
             shape_border_color_button = getattr(self, 'shape_border_color_button', None)
             whiteboard_color_button = getattr(self, "whiteboard_color_button", None)
             whiteboard_width_slider = getattr(self, "whiteboard_width_slider", None)
+            text_color_button = getattr(self, "text_color_button", None)
             whiteboard_controls_frame = getattr(self, "whiteboard_controls_frame", None)
             eraser_controls_frame = getattr(self, "eraser_controls_frame", None)
             eraser_slider = getattr(self, "whiteboard_eraser_slider", None)
@@ -6334,8 +6336,11 @@ class DisplayMapController:
                         text_size_menu.master.pack(side="left", padx=(0, 6), pady=6)
                     except Exception:
                         pass
-                if whiteboard_color_button:
-                    whiteboard_color_button.pack(side="left", padx=(0, 6), pady=6)
+                if text_color_button:
+                    try:
+                        text_color_button.pack(side="left", padx=(0, 6), pady=6)
+                    except tk.TclError:
+                        pass
             else:
                 shape_controls_row = getattr(self, "shape_controls_row", None)
                 if shape_controls_row:
@@ -6372,6 +6377,7 @@ class DisplayMapController:
     # Method assignments (some will be replaced by generic item handlers)
     _build_canvas = _build_canvas
     _build_toolbar = _build_toolbar
+    _build_floating_drawing_toolbar = _build_floating_drawing_toolbar
     _change_brush = _change_brush # For fog brush
     _change_token_border_color = _change_token_border_color # Specific to tokens via old menu
     

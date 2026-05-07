@@ -79,6 +79,10 @@ def _build_canvas(self):
     except Exception:
         pass
 
+
+    if hasattr(self, "_build_floating_drawing_toolbar"):
+        self._build_floating_drawing_toolbar()
+
     if hasattr(self, "_on_canvas_focus_out"):
         self.canvas.bind("<FocusOut>", self._on_canvas_focus_out)
 
