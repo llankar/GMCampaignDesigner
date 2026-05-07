@@ -52,7 +52,7 @@ def hide_option_menu_arrow(menu: ctk.CTkOptionMenu) -> None:
         fg_color = menu.cget("fg_color")
         hover_color = menu.cget("fg_color")
         menu.configure(
-            anchor="w",
+            anchor="center",
             button_color=fg_color,
             button_hover_color=hover_color,
             dropdown_font=ctk.CTkFont(size=CONTROL_FONT_SIZE),
@@ -73,7 +73,7 @@ def _expand_text_label(menu: ctk.CTkOptionMenu) -> None:
         return
     try:
         label.grid_configure(column=0, columnspan=2, sticky="ew", padx=(6, 6))
-        label.configure(anchor="w")
+        label.configure(anchor="center")
     except tk.TclError:
         return
 

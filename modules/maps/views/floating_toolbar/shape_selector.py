@@ -51,7 +51,7 @@ class ShapeIconSelector(ctk.CTkFrame):
                 command=lambda selected=value: self.set(selected),
                 **self._DEFAULT_STYLE,
             )
-            button.pack(side="top", anchor="w", padx=0, pady=(0, 3))
+            button.pack(side="top", anchor="center", padx=0, pady=(0, 3))
             self._buttons[value] = button
             ToolTip(button, tooltip)
 
@@ -78,5 +78,5 @@ def add_shape_icon_selector(parent: tk.Misc, command: Callable[[str], None]) -> 
     row = create_row(parent)
     add_small_label(row, "Shape")
     selector = ShapeIconSelector(row, command)
-    selector.pack(side="top", anchor="w", padx=0, pady=(0, 1))
+    selector.pack(side="top", anchor="center", padx=0, pady=(0, 1))
     return selector
