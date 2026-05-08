@@ -6,5 +6,10 @@
     "editor.tabSize": 4,
     "files.exclude": {
         "**/__pycache__": true
-    }
+    },
+    "python.testing.pytestArgs": [
+        "scripts"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
 }

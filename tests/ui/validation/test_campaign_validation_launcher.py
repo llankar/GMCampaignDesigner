@@ -15,6 +15,11 @@ from src.ui.validation.campaign_validation_launcher import (
     campaign_option_from_item,
     load_campaign_options,
 )
+from src.ui.validation.campaign_scenario_entity_hierarchy import (
+    campaign_validation_reference_config,
+    discover_scenario_linked_entity_rules,
+)
+from src.validation import FIELD_EXPECTED_TYPES
 
 
 class FakeWrapper:
@@ -255,6 +260,164 @@ def test_build_campaign_validation_hierarchy_attaches_only_referenced_scenarios(
     assert downtime_arc["scenario_refs"] == []
     assert "scenarios" not in downtime_arc
     assert hierarchy["entities"] == []
+
+
+def test_scenario_linked_entity_rules_are_discovered_from_template_metadata():
+    rules = discover_scenario_linked_entity_rules(
+        {"relics": FakeWrapper([]), "npcs": FakeWrapper([])},
+        template_loader=lambda _entity: {
+            "fields": [
+                {"name": "Scenes", "type": "list_longtext"},
+                {"name": "Relics", "type": "list", "linked_type": "Relics"},
+                {"name": "Witnesses", "type": "list_longtext", "linked_type": "NPCs"},
+                {"name": "IgnoredText", "type": "text", "linked_type": "NPCs"},
+            ]
+        },
+        entity_definitions_loader=lambda: {
+            "relics": {"label": "Relics"},
+            "npcs": {"label": "NPCs"},
+        },
+    )
+
+    assert [
+        (
+            rule.source_field,
+            rule.entity_slug,
+            rule.expected_type,
+            rule.canonical_field,
+            rule.child_collection,
+        )
+        for rule in rules
+    ] == [
+        ("Relics", "relics", "relic", "relic_refs", "relics"),
+        ("Witnesses", "npcs", "npc", "npc_refs", "npcs"),
+    ]
+
+
+def test_build_campaign_validation_hierarchy_attaches_scenario_linked_entities():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {"arcs": [{"name": "Opening Arc", "scenarios": ["s1"]}]},
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper(
+                [
+                    {
+                        "id": "s1",
+                        "Title": "Opening Scene",
+                        "Creatures": ["Android rebelle"],
+                        "NPCs": ["Asha"],
+                        "Places": ["Dock Nine"],
+                        "Maps": ["Dock Map"],
+                    }
+                ]
+            ),
+            "creatures": FakeWrapper([{"Name": "Android rebelle"}]),
+            "npcs": FakeWrapper([{"Name": "Asha"}]),
+            "places": FakeWrapper([{"Name": "Dock Nine"}]),
+            "maps": FakeWrapper([{"Name": "Dock Map"}]),
+        },
+        campaign,
+    )
+    graph = validate_reference_graph(hierarchy, campaign=campaign)
+
+    scenario = hierarchy["arcs"][0]["scenarios"][0]
+    assert "creature_refs" not in scenario
+    assert "npc_refs" not in scenario
+    assert "location_refs" not in scenario
+    assert "map_refs" not in scenario
+    assert [creature["id"] for creature in scenario["creatures"]] == [
+        "Android rebelle"
+    ]
+    assert [npc["id"] for npc in scenario["npcs"]] == ["Asha"]
+    assert [place["id"] for place in scenario["locations"]] == ["Dock Nine"]
+    assert [map_item["id"] for map_item in scenario["maps"]] == ["Dock Map"]
+    assert hierarchy["entities"] == []
+    assert graph.issues == ()
+
+
+def test_missing_scenario_linked_entity_refs_remain_missing_references():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {"arcs": [{"name": "Opening Arc", "scenarios": ["s1"]}]},
+    }
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper(
+                [{"id": "s1", "Title": "Opening Scene", "Creatures": ["Missing Bot"]}]
+            ),
+            "creatures": FakeWrapper([]),
+        },
+        campaign,
+    )
+    graph = validate_reference_graph(hierarchy, campaign=campaign)
+
+    scenario = hierarchy["arcs"][0]["scenarios"][0]
+    assert scenario["creature_refs"] == ["Missing Bot"]
+    assert [issue.issue_type for issue in graph.issues] == [
+        IssueType.MISSING_REFERENCE
+    ]
+    assert graph.issues[0].payload.field == "creature_refs"
+    assert graph.issues[0].payload.referenced_name == "Missing Bot"
+
+
+def test_custom_scenario_linked_entity_field_uses_template_derived_rules():
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {"arcs": [{"name": "Opening Arc", "scenarios": ["s1"]}]},
+    }
+    rules = discover_scenario_linked_entity_rules(
+        {"relics": FakeWrapper([])},
+        template_loader=lambda _entity: {
+            "fields": [
+                {"name": "Relics", "type": "list", "linked_type": "Relics"},
+                {"name": "BackupRelics", "type": "list", "linked_type": "Relics"},
+            ]
+        },
+        entity_definitions_loader=lambda: {"relics": {"label": "Relics"}},
+    )
+
+    hierarchy = build_campaign_validation_hierarchy(
+        {
+            "campaigns": FakeWrapper([campaign]),
+            "scenarios": FakeWrapper(
+                [
+                    {
+                        "id": "s1",
+                        "Title": "Opening Scene",
+                        "Relics": ["Sun Spear"],
+                        "BackupRelics": ["Moon Shield"],
+                    }
+                ]
+            ),
+            "relics": FakeWrapper([{"Name": "Sun Spear"}, {"Name": "Moon Shield"}]),
+        },
+        campaign,
+        scenario_link_rules=rules,
+    )
+    graph = validate_reference_graph(
+        hierarchy,
+        campaign=campaign,
+        config=campaign_validation_reference_config(rules),
+    )
+
+    scenario = hierarchy["arcs"][0]["scenarios"][0]
+    assert "scenario.Relics" not in FIELD_EXPECTED_TYPES
+    assert "relic_refs" not in scenario
+    assert [relic["id"] for relic in scenario["relics"]] == [
+        "Sun Spear",
+        "Moon Shield",
+    ]
+    assert hierarchy["entities"] == []
+    assert graph.issues == ()
 
 
 def test_build_campaign_validation_hierarchy_resolves_arc_scenario_refs_by_key_fields():

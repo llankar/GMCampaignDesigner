@@ -12,6 +12,15 @@ from src.ui.validation.campaign_scenario_hierarchy import (
     attach_referenced_scenarios_to_arcs,
     build_scenario_reference_index,
 )
+from src.ui.validation.campaign_scenario_entity_hierarchy import (
+    ScenarioLinkedEntityRule,
+    attach_referenced_entities_to_scenarios,
+    campaign_validation_normalization_rules,
+    campaign_validation_reference_config,
+    discover_scenario_linked_entity_rules,
+    entity_source_signature,
+    validator_entity_type_for_slug,
+)
 from src.ui.validation.dialogs.ambiguous_reference_dialog import (
     AmbiguousReferenceDialogConfig,
     open_ambiguous_reference_dialog,
@@ -128,14 +137,22 @@ class CampaignHierarchyValidationLauncher:
                 return None
 
             started_at = monotonic()
+            scenario_link_rules = discover_scenario_linked_entity_rules(
+                entity_wrappers
+            )
             progress = ValidationScanProgress(self.app).show("Scanning arcs...")
             hierarchy = build_campaign_validation_hierarchy(
                 entity_wrappers,
                 selected_campaign,
                 progress=progress,
+                scenario_link_rules=scenario_link_rules,
             )
             progress.set_phase("Checking references...")
-            graph = validate_reference_graph(hierarchy, campaign=selected_campaign.item)
+            graph = validate_reference_graph(
+                hierarchy,
+                campaign=selected_campaign.item,
+                config=campaign_validation_reference_config(scenario_link_rules),
+            )
             controller = ValidationWizardController(
                 _wizard_items(graph),
                 campaign=selected_campaign.item,
@@ -319,39 +336,58 @@ def build_campaign_validation_hierarchy(
     campaign: Mapping[str, Any] | CampaignSelectorOption,
     *,
     progress: ValidationScanProgress | None = None,
+    scenario_link_rules: Sequence[ScenarioLinkedEntityRule] | None = None,
 ) -> dict[str, Any]:
     """Build a validator-friendly hierarchy for one explicitly selected campaign."""
 
+    active_scenario_link_rules = (
+        tuple(scenario_link_rules)
+        if scenario_link_rules is not None
+        else discover_scenario_linked_entity_rules(entity_wrappers)
+    )
+    normalization_rules = campaign_validation_normalization_rules(
+        active_scenario_link_rules
+    )
     selected = (
         campaign
         if isinstance(campaign, CampaignSelectorOption)
         else campaign_option_from_item(campaign)
     )
     root: dict[str, Any] = normalize_validator_reference_fields(
-        "campaign", selected.item
+        "campaign",
+        selected.item,
+        rules=normalization_rules,
     )
     root["type"] = "campaign"
     root["entity_type"] = "campaign"
     root["id"] = selected.campaign_id
     root["name"] = selected.label
     root["arcs"] = build_campaign_arc_nodes(selected.item.get("Arcs"))
-    scenario_nodes = _load_scenario_nodes(entity_wrappers, progress=progress)
+    scenario_nodes = _load_scenario_nodes(
+        entity_wrappers,
+        progress=progress,
+        normalization_rules=normalization_rules,
+    )
     attach_referenced_scenarios_to_arcs(
         root["arcs"], build_scenario_reference_index(scenario_nodes)
     )
-    root["entities"] = []
+    entity_nodes_by_slug = _load_entity_nodes_by_slug(
+        entity_wrappers,
+        progress=progress,
+        normalization_rules=normalization_rules,
+    )
+    attached_entity_signatures = attach_referenced_entities_to_scenarios(
+        _iter_attached_scenario_nodes(root["arcs"]),
+        entity_nodes_by_slug,
+        active_scenario_link_rules,
+    )
+    root["entities"] = [
+        node
+        for slug in sorted(entity_nodes_by_slug)
+        for index, node in entity_nodes_by_slug[slug]
+        if entity_source_signature(slug, index, node) not in attached_entity_signatures
+    ]
     entities = root["entities"]
-
-    for slug in sorted(entity_wrappers):
-        if slug in {"campaigns", "scenarios"}:
-            continue
-        if progress is not None:
-            progress.set_phase(_scan_phase_for_slug(slug))
-        wrapper = entity_wrappers[slug]
-        for index, item in enumerate(_safe_load_items(wrapper)):
-            if not isinstance(item, Mapping):
-                continue
-            entities.append(_normalize_entity_node(slug, item, index))
 
     log_info(
         (
@@ -369,6 +405,7 @@ def _load_scenario_nodes(
     entity_wrappers: Mapping[str, Any],
     *,
     progress: ValidationScanProgress | None = None,
+    normalization_rules: Sequence[Any] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Load and normalize all scenarios for arc-local hierarchy attachment."""
 
@@ -378,10 +415,59 @@ def _load_scenario_nodes(
     if progress is not None:
         progress.set_phase(_scan_phase_for_slug("scenarios"))
     return tuple(
-        _normalize_entity_node("scenarios", item, index)
+        _normalize_entity_node(
+            "scenarios",
+            item,
+            index,
+            normalization_rules=normalization_rules,
+        )
         for index, item in enumerate(_safe_load_items(wrapper))
         if isinstance(item, Mapping)
     )
+
+
+def _load_entity_nodes_by_slug(
+    entity_wrappers: Mapping[str, Any],
+    *,
+    progress: ValidationScanProgress | None = None,
+    normalization_rules: Sequence[Any] | None = None,
+) -> dict[str, tuple[tuple[int, dict[str, Any]], ...]]:
+    """Load non-campaign, non-scenario entities for flat or scenario placement."""
+
+    nodes_by_slug: dict[str, tuple[tuple[int, dict[str, Any]], ...]] = {}
+    for slug in sorted(entity_wrappers):
+        if slug in {"campaigns", "scenarios"}:
+            continue
+        if progress is not None:
+            progress.set_phase(_scan_phase_for_slug(slug))
+        wrapper = entity_wrappers[slug]
+        nodes = tuple(
+            (
+                index,
+                _normalize_entity_node(
+                    slug,
+                    item,
+                    index,
+                    normalization_rules=normalization_rules,
+                ),
+            )
+            for index, item in enumerate(_safe_load_items(wrapper))
+            if isinstance(item, Mapping)
+        )
+        if nodes:
+            nodes_by_slug[slug] = nodes
+    return nodes_by_slug
+
+
+def _iter_attached_scenario_nodes(
+    arcs: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    scenarios: list[dict[str, Any]] = []
+    for arc in arcs:
+        for scenario in arc.get("scenarios", ()):
+            if isinstance(scenario, dict):
+                scenarios.append(scenario)
+    return tuple(scenarios)
 
 
 def _log_validation_diagnostics(graph: ReferenceValidationResult) -> None:
@@ -448,10 +534,18 @@ def _safe_load_items(wrapper: Any) -> Sequence[Any]:
 
 
 def _normalize_entity_node(
-    slug: str, item: Mapping[str, Any], index: int
+    slug: str,
+    item: Mapping[str, Any],
+    index: int,
+    *,
+    normalization_rules: Sequence[Any] | None = None,
 ) -> dict[str, Any]:
     entity_type = _singular_entity_type(slug)
-    node = normalize_validator_reference_fields(entity_type, item)
+    node = normalize_validator_reference_fields(
+        entity_type,
+        item,
+        rules=normalization_rules,
+    )
     identifier = _identifier_for(node, slug, index)
     node.setdefault("type", entity_type)
     node.setdefault("entity_type", entity_type)
@@ -461,20 +555,7 @@ def _normalize_entity_node(
 
 
 def _singular_entity_type(slug: str) -> str:
-    overrides = {
-        "campaigns": "campaign",
-        "scenarios": "scenario",
-        "places": "location",
-        "npcs": "npc",
-        "pcs": "pc",
-    }
-    if slug in overrides:
-        return overrides[slug]
-    if slug.endswith("ies"):
-        return f"{slug[:-3]}y"
-    if slug.endswith("s"):
-        return slug[:-1]
-    return slug
+    return validator_entity_type_for_slug(slug)
 
 
 def _identifier_for(item: Mapping[str, Any], slug: str, index: int) -> str:

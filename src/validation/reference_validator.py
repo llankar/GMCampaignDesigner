@@ -90,6 +90,9 @@ class ReferenceValidatorConfig:
             key: set(value) for key, value in ALLOWED_HIERARCHY_CHILDREN.items()
         }
     )
+    model_child_collections: Mapping[str, tuple[str, ...]] = field(
+        default_factory=lambda: dict(MODEL_CHILD_COLLECTIONS)
+    )
 
 
 @dataclass(frozen=True)
@@ -218,7 +221,9 @@ def validate_reference_graph(
 
     active_config = config or ReferenceValidatorConfig()
     traversal_root = _resolve_traversal_root(hierarchy, campaign)
-    entities = tuple(_walk_entities(traversal_root))
+    entities = tuple(
+        _walk_entities(traversal_root, active_config.model_child_collections)
+    )
     entity_index = _build_entity_index(entities)
     references = tuple(_walk_references(entities, active_config.field_expected_types))
     diagnostics = _build_traversal_diagnostics(entities, references)
@@ -364,7 +369,10 @@ def _build_traversal_diagnostics(
     )
 
 
-def _walk_entities(root: Any) -> Iterable[EntityRecord]:
+def _walk_entities(
+    root: Any,
+    model_child_collections: Mapping[str, tuple[str, ...]],
+) -> Iterable[EntityRecord]:
     """Yield selected-campaign entities in explicit model hierarchy order."""
 
     counter = 0
@@ -401,7 +409,11 @@ def _walk_entities(root: Any) -> Iterable[EntityRecord]:
                 yield current
                 child_base_path = current.path
 
-            for key in _child_collection_keys(entity_type, value):
+            for key in _child_collection_keys(
+                entity_type,
+                value,
+                model_child_collections,
+            ):
                 child_value = value.get(key, ())
                 for child_segment, child in _ordered_collection_items(child_value):
                     yield from visit(
@@ -693,10 +705,11 @@ def _parent_collection_index(
 def _child_collection_keys(
     entity_type: str,
     value: Mapping[str, Any],
+    model_child_collections: Mapping[str, tuple[str, ...]],
 ) -> tuple[str, ...]:
     """Return explicit child collections for the current model entity."""
 
-    explicit_keys = MODEL_CHILD_COLLECTIONS.get(entity_type, ())
+    explicit_keys = model_child_collections.get(entity_type, ())
     fallback_keys = tuple(key for key in FALLBACK_CHILD_COLLECTIONS if key in value)
     if entity_type:
         return tuple(dict.fromkeys(explicit_keys + fallback_keys))
