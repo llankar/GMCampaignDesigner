@@ -3,6 +3,11 @@
 import customtkinter as ctk
 from modules.helpers import theme_manager
 from modules.helpers.text_helpers import format_multiline_text
+from modules.helpers.tk_text_safety import (
+    LABEL_DISPLAY_LIMIT,
+    LONGFORM_DISPLAY_LIMIT,
+    safe_display_text,
+)
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -135,7 +140,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         header.pack(fill="x", padx=8, pady=(8, 4))
         label = ctk.CTkLabel(
             header,
-            text=name,
+            text=safe_display_text(name, max_chars=LABEL_DISPLAY_LIMIT),
             font=fonts["title"],
             text_color=colors["text"],
             anchor="w",
@@ -158,7 +163,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         label_title.pack(fill="x")
         label_content = ctk.CTkLabel(
             frame,
-            text=content,
+            text=safe_display_text(content, max_chars=LONGFORM_DISPLAY_LIMIT),
             font=fonts["body"],
             text_color=colors["text"],
             anchor="w",
@@ -178,7 +183,7 @@ def display_pcs_in_banner(banner_frame, pcs_items):
         )
         pc_frame.grid(row=0, column=col_idx, sticky="nsew", padx=8, pady=(0, 8))
 
-        display_name = pc_data.get("Name") or pc_name
+        display_name = safe_display_text(pc_data.get("Name") or pc_name, max_chars=LABEL_DISPLAY_LIMIT)
         add_header(pc_frame, display_name)
 
         add_section(pc_frame, "Traits", format_multiline_text(pc_data.get("Traits", "")))
