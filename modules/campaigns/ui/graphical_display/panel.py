@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-import customtkinter as ctk
+import importlib
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox
+
+import customtkinter as ctk
 
 from modules.generic.entity_detail_factory import open_entity_tab
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.helpers import theme_manager
 from modules.campaigns.services.poster_export import build_poster_theme_from_tokens, render_campaign_poster
+from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+from modules.scenarios.gm_screen_view import GMScreenView
+
 from .components import (
     CampaignOverviewHero,
     ArcSelectorStrip,
@@ -22,9 +27,9 @@ from .components import (
     ScenarioSelectorStrip,
 )
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
-from modules.scenarios.gm_screen_view import GMScreenView
-from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
-from . import services as _graph_services
+
+# Import the services submodule directly to avoid the package lazy __getattr__ hook.
+_graph_services = importlib.import_module(f"{__package__}.services")
 
 
 class CampaignOverviewSelectionStore(getattr(_graph_services, "CampaignOverviewSelectionStore", object)):

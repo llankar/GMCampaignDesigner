@@ -6,6 +6,19 @@ import types
 from pathlib import Path
 
 
+def _make_services_stub():
+    """Create a services package stub that still allows submodule imports."""
+    services_stub = types.ModuleType("modules.campaigns.ui.graphical_display.services")
+    services_stub.__path__ = [str(Path("modules/campaigns/ui/graphical_display/services"))]
+    services_stub.open_scenario_in_embedded_gm_screen = (
+        lambda widget, scenario_name, fallback: widget.winfo_toplevel().open_gm_screen(
+            show_empty_message=True,
+            scenario_name=scenario_name,
+        )
+    )
+    return services_stub
+
+
 class _DummyWidget:
     def __init__(self, *args, **kwargs):
         """Initialize the _DummyWidget instance."""
@@ -159,9 +172,7 @@ sys.modules.setdefault(
 )
 sys.modules.setdefault(
     "modules.campaigns.ui.graphical_display.services",
-    types.SimpleNamespace(
-        open_scenario_in_embedded_gm_screen=lambda widget, scenario_name, fallback: widget.winfo_toplevel().open_gm_screen(show_empty_message=True, scenario_name=scenario_name)
-    ),
+    _make_services_stub(),
 )
 
 MODULE_PATH = Path("modules/campaigns/ui/graphical_display/panel.py")
