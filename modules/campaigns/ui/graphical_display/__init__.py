@@ -3,7 +3,9 @@
 Use lazy exports so importing the package does not immediately import UI windows.
 """
 
-__all__ = ["CampaignGraphWindow", "CampaignGraphPanel"]
+from importlib import import_module
+
+__all__ = ["CampaignGraphWindow", "CampaignGraphPanel", "services"]
 
 
 def __getattr__(name: str):
@@ -16,4 +18,6 @@ def __getattr__(name: str):
         from .panel import CampaignGraphPanel
 
         return CampaignGraphPanel
+    if name == "services":
+        return import_module(f"{__name__}.services")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
