@@ -122,7 +122,10 @@ class CalendarStateStore:
 
     @staticmethod
     def _int_or_none(value):
-        """Internal helper for int or none."""
+        """Return an integer for valid numeric values, otherwise None."""
+        if value is None:
+            return None
+
         try:
             return int(value)
         except (TypeError, ValueError):
