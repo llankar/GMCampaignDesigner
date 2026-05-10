@@ -79,7 +79,7 @@ def test_load_items_keeps_json_decoder_stop_iteration_as_text(tmp_path, monkeypa
         conn.execute("CREATE TABLE events (Name TEXT PRIMARY KEY, Notes TEXT)")
         conn.execute(
             "INSERT INTO events (Name, Notes) VALUES (?, ?)",
-            ("Session", "[draft note"),
+            ("Session", "[draft note]"),
         )
         conn.commit()
     finally:
@@ -89,7 +89,7 @@ def test_load_items_keeps_json_decoder_stop_iteration_as_text(tmp_path, monkeypa
 
     wrapper = GenericModelWrapper("events", db_path=str(db_path))
 
-    assert wrapper.load_items() == [{"Name": "Session", "Notes": "[draft note"}]
+    assert wrapper.load_items() == [{"Name": "Session", "Notes": "[draft note]"}]
 
 
 def test_deserialize_possible_json_keeps_direct_malformed_json_text():
@@ -98,3 +98,30 @@ def test_deserialize_possible_json_keeps_direct_malformed_json_text():
 
     assert deserialize_possible_json(" [calendar note") == " [calendar note"
     assert deserialize_possible_json("{not really json") == "{not really json"
+
+
+def test_incomplete_json_like_text_is_not_sent_to_decoder(monkeypatch):
+    """Verify incomplete note text is kept without invoking JSON decoding."""
+    from modules.generic.deserialization import json_value_parser
+
+    def fail_if_called(_value):
+        raise AssertionError("json.loads should not be called for incomplete text")
+
+    monkeypatch.setattr(json_value_parser.json, "loads", fail_if_called)
+
+    assert (
+        json_value_parser.deserialize_possible_json("[calendar note")
+        == "[calendar note"
+    )
+    assert (
+        json_value_parser.deserialize_possible_json(" {calendar note")
+        == " {calendar note"
+    )
+
+
+def test_complete_invalid_json_like_text_still_loads_as_plain_text():
+    """Verify invalid-but-balanced note text remains plain text."""
+    from modules.generic.deserialization.json_value_parser import deserialize_possible_json
+
+    assert deserialize_possible_json("[calendar note]") == "[calendar note]"
+    assert deserialize_possible_json("{not really json}") == "{not really json}"

@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-_JSON_PREFIXES = ("{", "[", "\"")
+from modules.generic.deserialization.json_candidates import looks_like_json_candidate
+
 _RECOVERABLE_JSON_PARSE_ERRORS = (
     json.JSONDecodeError,
     TypeError,
@@ -13,12 +14,6 @@ _RECOVERABLE_JSON_PARSE_ERRORS = (
     StopIteration,
     RecursionError,
 )
-
-
-def _is_recoverable_parse_error(error: Exception) -> bool:
-    """Return whether a JSON parse failure should keep the raw DB value."""
-
-    return isinstance(error, _RECOVERABLE_JSON_PARSE_ERRORS)
 
 
 def deserialize_possible_json(value: Any) -> Any:
@@ -33,12 +28,10 @@ def deserialize_possible_json(value: Any) -> Any:
         return value
 
     stripped_value = value.strip()
-    if not stripped_value.startswith(_JSON_PREFIXES):
+    if not looks_like_json_candidate(stripped_value):
         return value
 
     try:
         return json.loads(stripped_value)
-    except Exception as error:
-        if _is_recoverable_parse_error(error):
-            return value
-        raise
+    except _RECOVERABLE_JSON_PARSE_ERRORS:
+        return value
