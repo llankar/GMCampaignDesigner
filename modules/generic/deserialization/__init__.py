@@ -1,6 +1,4 @@
-"""Backward-compatible import location for generic JSON deserialization."""
-
-from __future__ import annotations
+"""Deserialization helpers for generic entity storage."""
 
 from modules.generic.deserialization.json_value_parser import deserialize_possible_json
 

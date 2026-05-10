@@ -64,3 +64,29 @@ def test_load_items_keeps_malformed_json_like_text(tmp_path):
     assert loaded == [
         {"Name": "Session", "Notes": "[draft note", "Tags": ["one", "two"]}
     ]
+
+
+def test_load_items_keeps_json_decoder_stop_iteration_as_text(tmp_path, monkeypatch):
+    """Verify odd decoder failures keep JSON-looking text loadable."""
+    from modules.generic.deserialization import json_value_parser
+
+    def broken_loads(_value):
+        raise StopIteration(1)
+
+    db_path = tmp_path / "calendar.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("CREATE TABLE events (Name TEXT PRIMARY KEY, Notes TEXT)")
+        conn.execute(
+            "INSERT INTO events (Name, Notes) VALUES (?, ?)",
+            ("Session", "[draft note"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    monkeypatch.setattr(json_value_parser.json, "loads", broken_loads)
+
+    wrapper = GenericModelWrapper("events", db_path=str(db_path))
+
+    assert wrapper.load_items() == [{"Name": "Session", "Notes": "[draft note"}]
