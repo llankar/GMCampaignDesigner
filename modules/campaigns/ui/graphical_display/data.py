@@ -8,6 +8,12 @@ from typing import Any, Iterable
 from modules.campaigns.shared.arc_parser import coerce_arc_list
 from modules.helpers.template_loader import load_template
 from modules.helpers.text_helpers import coerce_text
+from modules.campaigns.ui.graphical_display.text_safety import (
+    LABEL_DISPLAY_LIMIT,
+    LONGFORM_DISPLAY_LIMIT,
+    safe_display_list,
+    safe_display_text,
+)
 
 
 @dataclass(slots=True)
@@ -61,7 +67,9 @@ class CampaignGraphPayload:
     arcs: list[CampaignGraphArc] = field(default_factory=list)
 
 
-def build_campaign_option_index(campaign_items: Iterable[dict[str, Any]]) -> tuple[list[str], dict[str, dict[str, Any]]]:
+def build_campaign_option_index(
+    campaign_items: Iterable[dict[str, Any]],
+) -> tuple[list[str], dict[str, dict[str, Any]]]:
     """Build campaign option index."""
     options: list[str] = []
     index: dict[str, dict[str, Any]] = {}
@@ -69,7 +77,7 @@ def build_campaign_option_index(campaign_items: Iterable[dict[str, Any]]) -> tup
         # Process each campaign from campaign_items.
         if not isinstance(campaign, dict):
             continue
-        name = coerce_text(campaign.get("Name")).strip()
+        name = safe_display_text(campaign.get("Name"), max_chars=LABEL_DISPLAY_LIMIT)
         if not name or name in index:
             continue
         options.append(name)
@@ -77,7 +85,10 @@ def build_campaign_option_index(campaign_items: Iterable[dict[str, Any]]) -> tup
     return options, index
 
 
-def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_items: Iterable[dict[str, Any]]) -> CampaignGraphPayload | None:
+def build_campaign_graph_payload(
+    campaign_item: dict[str, Any] | None,
+    scenario_items: Iterable[dict[str, Any]],
+) -> CampaignGraphPayload | None:
     """Build campaign graph payload."""
     if not isinstance(campaign_item, dict):
         return None
@@ -90,16 +101,16 @@ def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_
 
     rendered_arcs: list[CampaignGraphArc] = []
     for index, arc in enumerate(arcs, start=1):
-        arc_name = coerce_text(arc.get("name")).strip() or f"Arc {index}"
+        arc_name = safe_display_text(arc.get("name"), max_chars=LABEL_DISPLAY_LIMIT) or f"Arc {index}"
         scenario_names = _coerce_string_list(arc.get("scenarios"))
         rendered_scenarios = [_build_scenario_payload(name, scenario_index, link_fields) for name in scenario_names]
         used_scenarios.update(scenario_names)
         rendered_arcs.append(
             CampaignGraphArc(
                 name=arc_name,
-                status=coerce_text(arc.get("status")).strip() or "Planned",
-                summary=coerce_text(arc.get("summary")).strip(),
-                objective=coerce_text(arc.get("objective")).strip(),
+                status=safe_display_text(arc.get("status"), max_chars=LABEL_DISPLAY_LIMIT) or "Planned",
+                summary=safe_display_text(arc.get("summary"), max_chars=LONGFORM_DISPLAY_LIMIT),
+                objective=safe_display_text(arc.get("objective"), max_chars=LONGFORM_DISPLAY_LIMIT),
                 scenarios=rendered_scenarios,
             )
         )
@@ -117,15 +128,15 @@ def build_campaign_graph_payload(campaign_item: dict[str, Any] | None, scenario_
         )
 
     return CampaignGraphPayload(
-        name=coerce_text(campaign_item.get("Name")).strip() or "Unnamed campaign",
-        logline=coerce_text(campaign_item.get("Logline")).strip(),
-        genre=coerce_text(campaign_item.get("Genre")).strip(),
-        tone=coerce_text(campaign_item.get("Tone")).strip(),
-        status=coerce_text(campaign_item.get("Status")).strip(),
-        setting=coerce_text(campaign_item.get("Setting")).strip(),
-        main_objective=coerce_text(campaign_item.get("MainObjective")).strip(),
-        stakes=coerce_text(campaign_item.get("Stakes")).strip(),
-        themes=coerce_text(campaign_item.get("Themes")).strip(),
+        name=safe_display_text(campaign_item.get("Name"), max_chars=LABEL_DISPLAY_LIMIT) or "Unnamed campaign",
+        logline=safe_display_text(campaign_item.get("Logline"), max_chars=LONGFORM_DISPLAY_LIMIT),
+        genre=safe_display_text(campaign_item.get("Genre"), max_chars=LABEL_DISPLAY_LIMIT),
+        tone=safe_display_text(campaign_item.get("Tone"), max_chars=LABEL_DISPLAY_LIMIT),
+        status=safe_display_text(campaign_item.get("Status"), max_chars=LABEL_DISPLAY_LIMIT),
+        setting=safe_display_text(campaign_item.get("Setting"), max_chars=LONGFORM_DISPLAY_LIMIT),
+        main_objective=safe_display_text(campaign_item.get("MainObjective"), max_chars=LONGFORM_DISPLAY_LIMIT),
+        stakes=safe_display_text(campaign_item.get("Stakes"), max_chars=LONGFORM_DISPLAY_LIMIT),
+        themes=safe_display_text(campaign_item.get("Themes"), max_chars=LONGFORM_DISPLAY_LIMIT),
         linked_scenario_count=len({*linked_scenarios, *used_scenarios}),
         arcs=rendered_arcs,
     )
@@ -138,7 +149,7 @@ def _build_scenario_index(scenario_items: Iterable[dict[str, Any]]) -> dict[str,
         # Process each raw from scenario_items.
         if not isinstance(raw, dict):
             continue
-        title = coerce_text(raw.get("Title")).strip()
+        title = safe_display_text(raw.get("Title"), max_chars=LABEL_DISPLAY_LIMIT)
         if not title:
             continue
         index[title] = raw
@@ -151,9 +162,9 @@ def _build_scenario_payload(
     link_fields: list[tuple[str, str]],
 ) -> CampaignGraphScenario:
     """Build scenario payload."""
-    title = coerce_text(title).strip()
+    title = safe_display_text(title, max_chars=LABEL_DISPLAY_LIMIT)
     scenario = scenario_index.get(title, {})
-    summary = coerce_text(scenario.get("Summary")).strip()
+    summary = safe_display_text(scenario.get("Summary"), max_chars=LONGFORM_DISPLAY_LIMIT)
     briefing = _pick_first_text(
         scenario,
         "Briefing",
@@ -199,7 +210,7 @@ def _build_scenario_payload(
         "Threats",
     ) or _derive_stakes(summary, scenario.get("Secrets"))
     scene_count = _coerce_scene_count(scenario.get("Scenes"))
-    has_secrets = bool(coerce_text(scenario.get("Secrets")).strip())
+    has_secrets = bool(safe_display_text(scenario.get("Secrets"), max_chars=1))
 
     return CampaignGraphScenario(
         title=title or "Untitled scenario",
@@ -237,16 +248,8 @@ def iter_scenario_link_fields() -> list[tuple[str, str]]:
 
 
 def _coerce_string_list(value: Any) -> list[str]:
-    """Coerce string list."""
-    if not isinstance(value, list):
-        return []
-    result: list[str] = []
-    for entry in value:
-        # Process each entry from value.
-        text = coerce_text(entry).strip()
-        if text and text not in result:
-            result.append(text)
-    return result
+    """Coerce string list into Tk-safe display values."""
+    return safe_display_list(value, item_max_chars=LABEL_DISPLAY_LIMIT)
 
 
 def _pick_first_text(record: dict[str, Any], *keys: str) -> str:
@@ -258,8 +261,8 @@ def _pick_first_text(record: dict[str, Any], *keys: str) -> str:
             # Handle the branch where isinstance(value, list).
             joined = " • ".join(_coerce_string_list(value)).strip()
             if joined:
-                return joined
-        text = coerce_text(value).strip()
+                return safe_display_text(joined, max_chars=LONGFORM_DISPLAY_LIMIT)
+        text = safe_display_text(value, max_chars=LONGFORM_DISPLAY_LIMIT)
         if text:
             return text
     return ""
@@ -272,9 +275,12 @@ def _derive_hook(summary: str, scenes: Any) -> str:
         for scene in scenes:
             # Process each scene from scenes.
             if isinstance(scene, dict):
-                first_scene = coerce_text(scene.get("Title") or scene.get("Scene") or scene.get("Summary") or scene.get("Text")).strip()
+                first_scene = safe_display_text(
+                    scene.get("Title") or scene.get("Scene") or scene.get("Summary") or scene.get("Text"),
+                    max_chars=LONGFORM_DISPLAY_LIMIT,
+                )
             else:
-                first_scene = coerce_text(scene).strip()
+                first_scene = safe_display_text(scene, max_chars=LONGFORM_DISPLAY_LIMIT)
             if first_scene:
                 break
     if first_scene:
@@ -284,7 +290,7 @@ def _derive_hook(summary: str, scenes: Any) -> str:
 
 def _derive_stakes(summary: str, secrets: Any) -> str:
     """Internal helper for derive stakes."""
-    secret_text = coerce_text(secrets).strip()
+    secret_text = safe_display_text(secrets, max_chars=LONGFORM_DISPLAY_LIMIT)
     if secret_text:
         return _first_sentence(secret_text)
     sentences = [segment.strip() for segment in str(summary or "").replace("\n", " ").split(".") if segment.strip()]
