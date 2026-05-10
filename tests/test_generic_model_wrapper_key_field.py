@@ -90,3 +90,11 @@ def test_load_items_keeps_json_decoder_stop_iteration_as_text(tmp_path, monkeypa
     wrapper = GenericModelWrapper("events", db_path=str(db_path))
 
     assert wrapper.load_items() == [{"Name": "Session", "Notes": "[draft note"}]
+
+
+def test_deserialize_possible_json_keeps_direct_malformed_json_text():
+    """Verify direct parser calls preserve malformed JSON-looking notes."""
+    from modules.generic.deserialization.json_value_parser import deserialize_possible_json
+
+    assert deserialize_possible_json(" [calendar note") == " [calendar note"
+    assert deserialize_possible_json("{not really json") == "{not really json"

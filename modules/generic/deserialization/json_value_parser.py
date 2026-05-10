@@ -6,7 +6,19 @@ import json
 from typing import Any
 
 _JSON_PREFIXES = ("{", "[", "\"")
-_JSON_PARSE_EXCEPTIONS = (json.JSONDecodeError, TypeError, ValueError, StopIteration)
+_RECOVERABLE_JSON_PARSE_ERRORS = (
+    json.JSONDecodeError,
+    TypeError,
+    ValueError,
+    StopIteration,
+    RecursionError,
+)
+
+
+def _is_recoverable_parse_error(error: Exception) -> bool:
+    """Return whether a JSON parse failure should keep the raw DB value."""
+
+    return isinstance(error, _RECOVERABLE_JSON_PARSE_ERRORS)
 
 
 def deserialize_possible_json(value: Any) -> Any:
@@ -26,5 +38,7 @@ def deserialize_possible_json(value: Any) -> Any:
 
     try:
         return json.loads(stripped_value)
-    except _JSON_PARSE_EXCEPTIONS:
-        return value
+    except Exception as error:
+        if _is_recoverable_parse_error(error):
+            return value
+        raise
