@@ -35,10 +35,7 @@ from modules.helpers.theme_manager import (
     THEME_SF,
 )
 from modules.helpers.text_helpers import rtf_to_html, format_multiline_text
-try:
-    from tkhtmlview import HTMLLabel  # type: ignore
-except Exception:
-    HTMLLabel = None  # fallback to plain textbox
+from modules.ui.html import HTMLLabel
 
 
 @dataclass

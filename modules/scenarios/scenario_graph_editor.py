@@ -1,4 +1,4 @@
-﻿"""Editor helpers for scenario graph."""
+"""Editor helpers for scenario graph."""
 
 import json
 import math
@@ -18,10 +18,7 @@ import textwrap
 import html
 from collections.abc import Mapping
 
-try:  # Optional rich-text renderer for detail panel content
-    from tkhtmlview import HTMLLabel  # type: ignore
-except Exception:  # pragma: no cover - fallback when library is absent
-    HTMLLabel = None
+from modules.ui.html import HTMLLabel
 
 from modules.helpers.template_loader import load_template
 from modules.generic.generic_model_wrapper import GenericModelWrapper
