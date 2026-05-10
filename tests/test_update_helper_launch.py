@@ -6,6 +6,7 @@ import types
 from pathlib import Path
 
 import pytest
+from packaging.version import Version
 
 if "requests" not in sys.modules:
     requests_stub = types.ModuleType("requests")
@@ -112,3 +113,73 @@ def test_launch_installer_copies_helper_when_frozen(
     assert cleanup_indices, "expected cleanup root to be provided"
     for index in cleanup_indices:
         assert Path(captured["args"][index + 1]) in temp_dirs
+
+
+class _FakeResponse:
+    def __init__(self, payload):
+        """Initialize the fake response."""
+        self._payload = payload
+
+    def raise_for_status(self):
+        """Simulate a successful response status."""
+        return None
+
+    def json(self):
+        """Return the fake JSON payload."""
+        return self._payload
+
+
+class _FakeSession:
+    def __init__(self, payload):
+        """Initialize the fake session."""
+        self.headers = {}
+        self._payload = payload
+
+    def get(self, *_args, **_kwargs):
+        """Return a fake releases response."""
+        return _FakeResponse(self._payload)
+
+
+def test_check_for_update_skips_gallery_bundle_release_tags(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify gallery bundle releases do not crash the application updater."""
+    monkeypatch.setattr(update_helper, "read_installed_version", lambda: Version("1.0.0"))
+    session = _FakeSession(
+        [
+            {
+                "draft": False,
+                "prerelease": False,
+                "tag_name": "bundle-fallout-20260509-091119",
+                "assets": [
+                    {
+                        "name": "fallout-bundle.zip",
+                        "browser_download_url": "https://example.invalid/fallout-bundle.zip",
+                        "size": 123,
+                    }
+                ],
+            },
+            {
+                "draft": False,
+                "prerelease": False,
+                "tag_name": "v1.0.1",
+                "assets": [
+                    {
+                        "name": "GMCampaignDesigner.zip",
+                        "browser_download_url": "https://example.invalid/GMCampaignDesigner.zip",
+                        "size": 456,
+                    }
+                ],
+            },
+        ]
+    )
+
+    _current, candidate = update_helper.check_for_update(session=session)
+
+    assert candidate is not None
+    assert candidate.tag == "v1.0.1"
+    assert candidate.version == Version("1.0.1")
+
+
+def test_normalize_tag_rejects_non_application_bundle_tags() -> None:
+    """Verify non-application release tags are rejected with a controlled error."""
+    with pytest.raises(RuntimeError, match="valid application version"):
+        update_helper._normalize_tag("bundle-fallout-20260509-091119")
