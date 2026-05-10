@@ -367,10 +367,7 @@ def _normalize_tag(tag: str) -> Version:
     ``packaging`` raise an ``InvalidVersion`` that can bubble up to the UI.
     """
     candidate = tag.strip()
-    if not candidate:
-        raise RuntimeError("Release tag is empty")
-
-    candidates = [candidate]
+    candidates = [candidate] if candidate else []
     if candidate.lower().startswith("v") and len(candidate) > 1:
         candidates.append(candidate[1:])
 

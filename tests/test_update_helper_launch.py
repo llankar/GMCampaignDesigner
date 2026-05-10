@@ -183,6 +183,7 @@ def test_normalize_tag_accepts_prefixed_and_plain_version_tags() -> None:
     """Verify application release tags are accepted with or without a v prefix."""
     assert update_helper._normalize_tag("v1.2.3") == Version("1.2.3")
     assert update_helper._normalize_tag("1.2.3") == Version("1.2.3")
+    assert update_helper._normalize_tag("  v1.2.3  ") == Version("1.2.3")
 
 
 def test_normalize_tag_rejects_non_application_bundle_tags() -> None:
