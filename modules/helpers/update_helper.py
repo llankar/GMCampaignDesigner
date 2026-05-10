@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 import requests
-from packaging.version import Version, InvalidVersion
+from packaging.version import InvalidVersion, Version
 
 from modules.helpers.logging_helper import (
     log_debug,
@@ -139,7 +139,7 @@ def check_for_update(
         tag_name = release.get("tag_name") or ""
         try:
             candidate_version = _normalize_tag(tag_name)
-        except Exception as exc:
+        except RuntimeError as exc:
             log_warning(
                 f"Skipping release with invalid tag '{tag_name}': {exc}",
                 func_name="modules.helpers.update_helper.check_for_update",
@@ -384,7 +384,7 @@ def _normalize_tag(tag: str) -> Version:
         except InvalidVersion:
             continue
 
-    raise RuntimeError(f"Release tag does not contain a valid application version: {tag}")
+    raise RuntimeError("Release tag does not contain a valid application version")
 
 
 def _select_asset(assets: Sequence[dict], preferred_asset: Optional[str]) -> Optional[dict]:
