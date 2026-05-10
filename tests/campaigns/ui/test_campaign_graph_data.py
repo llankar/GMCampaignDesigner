@@ -124,3 +124,45 @@ def test_build_campaign_graph_payload_repairs_legacy_mojibake(monkeypatch):
     assert payload.arcs[0].scenarios[0].summary == clean_summary
     assert payload.arcs[0].scenarios[0].briefing == clean_briefing
     assert payload.arcs[0].scenarios[0].title == "Retrouver agent fugueur Miyazato Hokichi"
+
+
+def test_build_campaign_graph_payload_truncates_oversized_display_text(monkeypatch):
+    """Verify oversized imported text is bounded before reaching Tk widgets."""
+    monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [("NPCs", "NPCs")])
+
+    huge_label = "A" * 1_000
+    huge_body = "B" * 12_000
+    campaign = {
+        "Name": huge_label,
+        "Logline": huge_body,
+        "LinkedScenarios": [huge_label],
+        "Arcs": [
+            {
+                "name": huge_label,
+                "summary": huge_body,
+                "objective": huge_body,
+                "scenarios": [huge_label],
+            }
+        ],
+    }
+    scenarios = [
+        {
+            "Title": huge_label,
+            "Summary": huge_body,
+            "Briefing": huge_body,
+            "NPCs": [huge_label],
+        }
+    ]
+
+    payload = build_campaign_graph_payload(campaign, scenarios)
+
+    assert payload is not None
+    assert len(payload.name) <= module.LABEL_DISPLAY_LIMIT
+    assert payload.name.endswith("…")
+    assert len(payload.logline) <= module.LONGFORM_DISPLAY_LIMIT
+    assert payload.logline.endswith("…")
+    assert len(payload.arcs[0].name) <= module.LABEL_DISPLAY_LIMIT
+    assert len(payload.arcs[0].summary) <= module.LONGFORM_DISPLAY_LIMIT
+    assert len(payload.arcs[0].scenarios[0].title) <= module.LABEL_DISPLAY_LIMIT
+    assert len(payload.arcs[0].scenarios[0].summary) <= module.LONGFORM_DISPLAY_LIMIT
+    assert len(payload.arcs[0].scenarios[0].entity_links[0].name) <= module.LABEL_DISPLAY_LIMIT
