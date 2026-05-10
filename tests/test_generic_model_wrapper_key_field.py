@@ -125,3 +125,32 @@ def test_complete_invalid_json_like_text_still_loads_as_plain_text():
 
     assert deserialize_possible_json("[calendar note]") == "[calendar note]"
     assert deserialize_possible_json("{not really json}") == "{not really json}"
+
+
+def test_balanced_prose_is_not_sent_to_decoder(monkeypatch):
+    """Verify bracketed prose avoids noisy JSON decoder exceptions."""
+    from modules.generic.deserialization import json_value_parser
+
+    def fail_if_called(_value):
+        raise AssertionError("json.loads should not be called for bracketed prose")
+
+    monkeypatch.setattr(json_value_parser.json, "loads", fail_if_called)
+
+    assert (
+        json_value_parser.deserialize_possible_json("[calendar note]")
+        == "[calendar note]"
+    )
+    assert (
+        json_value_parser.deserialize_possible_json("{not really json}")
+        == "{not really json}"
+    )
+
+
+def test_valid_json_containers_are_still_decoded():
+    """Verify stricter candidate detection still accepts real JSON payloads."""
+    from modules.generic.deserialization.json_value_parser import deserialize_possible_json
+
+    assert deserialize_possible_json('["calendar note"]') == ["calendar note"]
+    assert deserialize_possible_json('{"title": "calendar note"}') == {
+        "title": "calendar note"
+    }
