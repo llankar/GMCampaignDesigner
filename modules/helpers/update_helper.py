@@ -1,4 +1,4 @@
-﻿"""Utilities for update helper."""
+"""Utilities for update helper."""
 
 from __future__ import annotations
 
@@ -359,13 +359,32 @@ def _emit_progress(callback: Optional[ProgressCallback], message: str, fraction:
 
 
 def _normalize_tag(tag: str) -> Version:
-    """Normalize tag."""
+    """Normalize a release tag into an application version.
+
+    GitHub releases are also used by the online asset gallery, whose tags are
+    named like ``bundle-fallout-20260509-091119``. Those tags are not
+    application versions and must be ignored by the updater instead of letting
+    ``packaging`` raise an ``InvalidVersion`` that can bubble up to the UI.
+    """
     candidate = tag.strip()
     if not candidate:
         raise RuntimeError("Release tag is empty")
+
+    candidates = [candidate]
     if candidate.lower().startswith("v") and len(candidate) > 1:
-        candidate = candidate[1:]
-    return Version(candidate)
+        candidates.append(candidate[1:])
+
+    embedded_version = _extract_version_string(candidate)
+    if embedded_version:
+        candidates.append(embedded_version)
+
+    for value in candidates:
+        try:
+            return Version(value)
+        except InvalidVersion:
+            continue
+
+    raise RuntimeError(f"Release tag does not contain a valid application version: {tag}")
 
 
 def _select_asset(assets: Sequence[dict], preferred_asset: Optional[str]) -> Optional[dict]:
