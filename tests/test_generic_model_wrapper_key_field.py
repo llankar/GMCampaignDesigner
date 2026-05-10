@@ -39,3 +39,28 @@ def test_scenarios_save_items_uses_title_as_unique_field(tmp_path):
     assert len(loaded) == 1
     assert loaded[0]["Title"] == "Scenario One"
     assert loaded[0]["Summary"] == "Updated"
+
+
+def test_load_items_keeps_malformed_json_like_text(tmp_path):
+    """Verify JSON-looking plain text does not break generic loading."""
+    db_path = tmp_path / "calendar.db"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute(
+            "CREATE TABLE events (Name TEXT PRIMARY KEY, Notes TEXT, Tags TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO events (Name, Notes, Tags) VALUES (?, ?, ?)",
+            ("Session", "[draft note", '["one", "two"]'),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    wrapper = GenericModelWrapper("events", db_path=str(db_path))
+
+    loaded = wrapper.load_items()
+
+    assert loaded == [
+        {"Name": "Session", "Notes": "[draft note", "Tags": ["one", "two"]}
+    ]

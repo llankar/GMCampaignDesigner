@@ -3,6 +3,7 @@
 import sqlite3
 import json
 from db.db import get_connection, load_schema_from_json
+from modules.generic.json_value_deserializer import deserialize_possible_json
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -26,14 +27,7 @@ class GenericModelWrapper:
         item = {}
         for key in row.keys():
             # Process each key from row.keys().
-            value = row[key]
-            if isinstance(value, str) and value.strip().startswith(("{", "[", "\"")):
-                try:
-                    item[key] = json.loads(value)
-                except (TypeError, json.JSONDecodeError):
-                    item[key] = value
-            else:
-                item[key] = value
+            item[key] = deserialize_possible_json(row[key])
         return item
 
     def _infer_key_field(self, key_field=None):
