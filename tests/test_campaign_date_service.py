@@ -52,6 +52,19 @@ def test_calendar_runtime_state_defaults_to_campaign_today(campaign_db):
     assert runtime["active_date"] == date(2030, 1, 2)
 
 
+def test_calendar_state_store_ignores_null_numeric_values(campaign_db):
+    """Verify that nullable stored dimensions do not crash state restoration."""
+    stored_state = {
+        "filters": {"agenda_window_days": None},
+        "panel_widths": {"left_sidebar": None, "center_grid": None},
+    }
+
+    runtime = CalendarStateStore.to_runtime_state(stored_state)
+
+    assert runtime["filters"]["agenda_window_days"] == 7
+    assert runtime["panel_widths"] == {"left_sidebar": None, "center_grid": None}
+
+
 def test_campaign_date_service_rejects_invalid_values(campaign_db):
     """Verify that campaign date service rejects invalid values."""
     with pytest.raises(ValueError):
