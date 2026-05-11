@@ -143,6 +143,11 @@ class _FakeSession:
 def test_check_for_update_skips_gallery_bundle_release_tags(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify gallery bundle releases do not crash the application updater."""
     monkeypatch.setattr(update_helper, "read_installed_version", lambda: Version("1.0.0"))
+
+    def _fail_normalize_tag(_tag: str) -> Version:
+        raise AssertionError("check_for_update must use _try_normalize_tag")
+
+    monkeypatch.setattr(update_helper, "_normalize_tag", _fail_normalize_tag)
     session = _FakeSession(
         [
             {
@@ -179,14 +184,103 @@ def test_check_for_update_skips_gallery_bundle_release_tags(monkeypatch: pytest.
     assert candidate.version == Version("1.0.1")
 
 
+def test_check_for_update_skips_bundle_tags_with_embedded_versions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify gallery bundle tags with semantic-looking versions are ignored."""
+    monkeypatch.setattr(update_helper, "read_installed_version", lambda: Version("1.0.0"))
+    session = _FakeSession(
+        [
+            {
+                "draft": False,
+                "prerelease": False,
+                "tag_name": "bundle-fallout-1.2.3",
+                "assets": [
+                    {
+                        "name": "fallout-bundle.zip",
+                        "browser_download_url": "https://example.invalid/fallout-bundle.zip",
+                        "size": 123,
+                    }
+                ],
+            },
+            {
+                "draft": False,
+                "prerelease": False,
+                "tag_name": "v1.0.1",
+                "assets": [
+                    {
+                        "name": "GMCampaignDesigner.zip",
+                        "browser_download_url": "https://example.invalid/GMCampaignDesigner.zip",
+                        "size": 456,
+                    }
+                ],
+            },
+        ]
+    )
+
+    _current, candidate = update_helper.check_for_update(session=session)
+
+    assert candidate is not None
+    assert candidate.tag == "v1.0.1"
+    assert candidate.version == Version("1.0.1")
+
+
+def test_check_for_update_does_not_parse_raw_bundle_tags(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify bundle tags are rejected before calling Version with the raw tag."""
+    monkeypatch.setattr(update_helper, "read_installed_version", lambda: Version("1.0.0"))
+    parsed_values: list[str] = []
+
+    def _tracking_version(value: str) -> Version:
+        parsed_values.append(value)
+        if value.startswith("bundle-"):
+            raise AssertionError(f"Version received raw bundle tag: {value}")
+        return Version(value)
+
+    monkeypatch.setattr(update_helper, "Version", _tracking_version)
+    session = _FakeSession(
+        [
+            {
+                "draft": False,
+                "prerelease": False,
+                "tag_name": "bundle-fallout-20260509-091119",
+                "assets": [
+                    {
+                        "name": "fallout-bundle.zip",
+                        "browser_download_url": "https://example.invalid/fallout-bundle.zip",
+                        "size": 123,
+                    }
+                ],
+            },
+            {
+                "draft": False,
+                "prerelease": False,
+                "tag_name": "v1.0.1",
+                "assets": [
+                    {
+                        "name": "GMCampaignDesigner.zip",
+                        "browser_download_url": "https://example.invalid/GMCampaignDesigner.zip",
+                        "size": 456,
+                    }
+                ],
+            },
+        ]
+    )
+
+    _current, candidate = update_helper.check_for_update(session=session)
+
+    assert candidate is not None
+    assert candidate.tag == "v1.0.1"
+    assert "bundle-fallout-20260509-091119" not in parsed_values
+
+
 def test_normalize_tag_accepts_prefixed_and_plain_version_tags() -> None:
     """Verify application release tags are accepted with or without a v prefix."""
     assert update_helper._normalize_tag("v1.2.3") == Version("1.2.3")
     assert update_helper._normalize_tag("1.2.3") == Version("1.2.3")
     assert update_helper._normalize_tag("  v1.2.3  ") == Version("1.2.3")
+    assert update_helper._normalize_tag("GMCampaignDesigner-v1.2.3") == Version("1.2.3")
 
 
 def test_normalize_tag_rejects_non_application_bundle_tags() -> None:
     """Verify non-application release tags are rejected with a controlled error."""
-    with pytest.raises(RuntimeError, match="valid application version"):
+    with pytest.raises(RuntimeError) as excinfo:
         update_helper._normalize_tag("bundle-fallout-20260509-091119")
+    assert str(excinfo.value) == "Release tag does not contain a valid application version"

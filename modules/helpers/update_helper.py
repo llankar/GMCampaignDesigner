@@ -54,6 +54,7 @@ _VERSION_FILE = _PROJECT_ROOT / "version.txt"
 _INSTALL_HELPER = _PROJECT_ROOT / "scripts" / "apply_update.py"
 _FROZEN_INSTALL_HELPER_NAME = "RPGCampaignUpdater.exe" if os.name == "nt" else "RPGCampaignUpdater"
 _VERSION_PATTERN = re.compile(r"(\d+(?:\.\d+)+)")
+_INVALID_RELEASE_TAG_ERROR = "Release tag does not contain a valid application version"
 
 
 def read_installed_version(path: Path = _VERSION_FILE) -> Version:
@@ -137,11 +138,10 @@ def check_for_update(
         if channel.lower() == "stable" and release.get("prerelease"):
             continue
         tag_name = release.get("tag_name") or ""
-        try:
-            candidate_version = _normalize_tag(tag_name)
-        except RuntimeError as exc:
+        candidate_version = _try_normalize_tag(tag_name)
+        if candidate_version is None:
             log_warning(
-                f"Skipping release with invalid tag '{tag_name}': {exc}",
+                f"Skipping release with invalid tag '{tag_name}': {_INVALID_RELEASE_TAG_ERROR}",
                 func_name="modules.helpers.update_helper.check_for_update",
             )
             continue
@@ -358,8 +358,8 @@ def _emit_progress(callback: Optional[ProgressCallback], message: str, fraction:
             pass
 
 
-def _normalize_tag(tag: str) -> Version:
-    """Normalize a release tag into an application version.
+def _try_normalize_tag(tag: str) -> Optional[Version]:
+    """Return an application version from a release tag, or None if invalid.
 
     GitHub releases are also used by the online asset gallery, whose tags are
     named like ``bundle-fallout-20260509-091119``. Those tags are not
@@ -367,6 +367,9 @@ def _normalize_tag(tag: str) -> Version:
     ``packaging`` raise an ``InvalidVersion`` that can bubble up to the UI.
     """
     candidate = tag.strip()
+    if candidate.lower().startswith("bundle-"):
+        return None
+
     candidates = [candidate] if candidate else []
     if candidate.lower().startswith("v") and len(candidate) > 1:
         candidates.append(candidate[1:])
@@ -381,7 +384,15 @@ def _normalize_tag(tag: str) -> Version:
         except InvalidVersion:
             continue
 
-    raise RuntimeError("Release tag does not contain a valid application version")
+    return None
+
+
+def _normalize_tag(tag: str) -> Version:
+    """Normalize a release tag into an application version."""
+    version = _try_normalize_tag(tag)
+    if version is None:
+        raise RuntimeError(_INVALID_RELEASE_TAG_ERROR)
+    return version
 
 
 def _select_asset(assets: Sequence[dict], preferred_asset: Optional[str]) -> Optional[dict]:

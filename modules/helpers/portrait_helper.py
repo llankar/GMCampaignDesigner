@@ -11,8 +11,35 @@ from typing import Iterable, List, Optional
 from modules.helpers.config_helper import ConfigHelper
 
 
+def _starts_with_literal_word(text: str, word: str) -> bool:
+    """Return whether text starts with a standalone literal word."""
+    if not text.startswith(word):
+        return False
+    remainder = text[len(word) :]
+    return not remainder or remainder[0].isspace() or remainder[0] == ","
+
+
+def _looks_like_sequence_literal(stripped: str) -> bool:
+    """Return whether bracketed text looks like a real sequence literal."""
+    if not stripped.startswith("[") or not stripped.endswith("]"):
+        return False
+
+    inner = stripped[1:-1].strip()
+    if not inner:
+        return True
+
+    if inner[0] in "\"'[{(-+0123456789":
+        return True
+
+    literal_words = ("None", "True", "False", "Ellipsis", "null", "true", "false")
+    return any(_starts_with_literal_word(inner, word) for word in literal_words)
+
+
 def _parse_sequence_text(stripped: str):
     """Return a decoded list-like value from JSON or Python literal text."""
+    if not _looks_like_sequence_literal(stripped):
+        return None
+
     for parser in (json.loads, ast.literal_eval):
         try:
             parsed = parser(stripped)
