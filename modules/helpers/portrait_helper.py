@@ -2,12 +2,25 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 from pathlib import Path
 from typing import Iterable, List, Optional
 
 from modules.helpers.config_helper import ConfigHelper
+
+
+def _parse_sequence_text(stripped: str):
+    """Return a decoded list-like value from JSON or Python literal text."""
+    for parser in (json.loads, ast.literal_eval):
+        try:
+            parsed = parser(stripped)
+        except (ValueError, SyntaxError, json.JSONDecodeError):
+            continue
+        if isinstance(parsed, (list, tuple, set)):
+            return parsed
+    return None
 
 
 def _extract_dict_value(value: dict) -> str:
@@ -43,11 +56,8 @@ def parse_portrait_value(value) -> List[str]:
         if not stripped:
             return []
         if stripped.startswith("[") and stripped.endswith("]"):
-            # Handle the branch where stripped.startswith('[') and stripped.endswith(']').
-            try:
-                parsed = json.loads(stripped)
-            except json.JSONDecodeError:
-                parsed = None
+            # Support JSON arrays and Python-style list literals saved by older data.
+            parsed = _parse_sequence_text(stripped)
             if parsed is not None:
                 return _flatten_portrait_values(parsed)
         lines = [line.strip() for line in stripped.splitlines() if line.strip()]
