@@ -32,7 +32,12 @@ from src.ui.validation.dialogs.campaign_selector_dialog import (
 )
 from src.ui.validation.dialogs.missing_reference_dialog import (
     MissingReferenceDialogConfig,
+    RemapTargetProvider,
     open_missing_reference_dialog,
+)
+from src.ui.validation.dialogs.remap_target_selector_dialog import (
+    RemapTargetOption,
+    open_remap_target_selector_dialog,
 )
 from src.ui.validation.dialogs.invalid_hierarchy_dialog import (
     InvalidHierarchyDialogConfig,
@@ -68,9 +73,11 @@ from src.ui.validation.validation_wizard_controller import (
 from src.validation import (
     IssueType,
     ReferenceValidationResult,
+    ValidationIssue,
     normalize_validator_reference_fields,
     validate_reference_graph,
 )
+from src.validation.reference_validator import EntityRecord
 
 CampaignSelector = Callable[
     [Any, Sequence[CampaignSelectorOption]],
@@ -273,7 +280,11 @@ class CampaignHierarchyValidationLauncher:
                 step,
                 reference=resolve_reference_for_issue(step.issue, run.graph.references),
                 config=MissingReferenceDialogConfig(
-                    on_step=lambda next_step: self._handle_step(run, next_step)
+                    remap_target_provider=build_missing_reference_remap_target_provider(
+                        self.app,
+                        run.graph,
+                    ),
+                    on_step=lambda next_step: self._handle_step(run, next_step),
                 ),
             )
             return
@@ -325,6 +336,48 @@ class CampaignHierarchyValidationLauncher:
             HIERARCHY_CONSISTENCY_TITLE,
             safe_display_text(step.message, max_chars=LONGFORM_DISPLAY_LIMIT),
         )
+
+
+def build_missing_reference_remap_target_provider(
+    master: Any,
+    graph: ReferenceValidationResult,
+    *,
+    selector: Callable[
+        [Any, Sequence[RemapTargetOption]],
+        EntityRecord | None,
+    ] = open_remap_target_selector_dialog,
+) -> RemapTargetProvider:
+    """Build a provider that lets users choose a compatible existing entity."""
+
+    def provide_remap_target(issue: ValidationIssue) -> EntityRecord | None:
+        targets = remap_target_options_for_issue(issue, graph.entities)
+        return selector(master, targets)
+
+    return provide_remap_target
+
+
+def remap_target_options_for_issue(
+    issue: ValidationIssue,
+    entities: Sequence[EntityRecord],
+) -> tuple[RemapTargetOption, ...]:
+    """Return existing entities compatible with a missing-reference issue."""
+
+    if issue.issue_type != IssueType.MISSING_REFERENCE:
+        return ()
+
+    expected_type = _normalize_entity_type(issue.payload.expected_type)
+    if not expected_type:
+        return ()
+
+    return tuple(
+        RemapTargetOption(entity)
+        for entity in entities
+        if _normalize_entity_type(entity.entity_type) == expected_type
+    )
+
+
+def _normalize_entity_type(entity_type: str | None) -> str:
+    return str(entity_type or "").strip().lower().replace(" ", "_")
 
 
 def load_campaign_options(

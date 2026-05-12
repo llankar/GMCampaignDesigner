@@ -87,6 +87,11 @@ REMAP_LABEL = "Remap"
 REMOVE_LABEL = "Remove"
 NO_REMAP_TARGET_SELECTOR_MESSAGE = "No target selector is configured for remapping."
 REMAPPING_UNAVAILABLE_TITLE = "Remapping unavailable"
+CHOOSE_REMAP_TARGET_TITLE = "Choose remap target"
+CHOOSE_REMAP_TARGET_MESSAGE = (
+    "Select an existing compatible entity to replace this missing reference."
+)
+NO_REMAP_TARGETS_MESSAGE = "No compatible existing entities are available for remapping."
 
 CHOOSE_CAMPAIGN_TITLE = "Choose a campaign"
 CHOOSE_CAMPAIGN_MESSAGE = (

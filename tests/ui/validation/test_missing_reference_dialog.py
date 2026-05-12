@@ -1,5 +1,8 @@
 """Regression tests for missing-reference validation dialog helpers."""
 
+import sys
+import types
+
 from src.ui.validation import (
     ValidationWizardController,
     ValidationWizardIssue,
@@ -14,6 +17,11 @@ from src.ui.validation.dialogs import (
     creation_request_from_issue,
     entity_slug_for_expected_type,
 )
+from src.ui.validation.campaign_validation_launcher import (
+    build_missing_reference_remap_target_provider,
+    remap_target_options_for_issue,
+)
+from src.ui.validation.labels import REMAP_LABEL
 from src.validation import validate_reference_graph
 
 
@@ -185,3 +193,121 @@ def test_dialog_actions_delegate_remap_remove_and_ignore_to_controller():
     assert dialog.ignore().status == ValidationWizardStatus.COMPLETED
     assert controller.summary.skipped_session == 1
     assert ignore_hierarchy["arc_refs"] == ["Missing Arc"]
+
+
+def test_remap_target_options_only_include_expected_entity_type():
+    hierarchy = {
+        "type": "arc",
+        "id": "A1",
+        "scenario_refs": ["Missing Scenario"],
+        "scenarios": [
+            {"type": "scenario", "id": "S1", "name": "Existing Scenario"},
+        ],
+    }
+    graph = validate_reference_graph(hierarchy, campaign={"id": "sample"})
+
+    options = remap_target_options_for_issue(graph.issues[0], graph.entities)
+
+    assert [option.entity.identifier for option in options] == ["S1"]
+    assert options[0].display_text.startswith("Existing Scenario (S1)")
+
+
+def test_remap_target_provider_returns_selector_choice():
+    hierarchy = {
+        "type": "arc",
+        "id": "A1",
+        "scenario_refs": ["Missing Scenario"],
+        "scenarios": [
+            {"type": "scenario", "id": "S1", "name": "Existing Scenario"},
+        ],
+    }
+    graph = validate_reference_graph(hierarchy, campaign={"id": "sample"})
+    observed_targets = []
+
+    def selector(master, targets):
+        observed_targets.extend(targets)
+        return targets[0].entity
+
+    provider = build_missing_reference_remap_target_provider(
+        object(),
+        graph,
+        selector=selector,
+    )
+
+    assert provider(graph.issues[0]).identifier == "S1"
+    assert [target.entity.identifier for target in observed_targets] == ["S1"]
+
+
+def test_dialog_show_hides_remap_button_without_provider(monkeypatch):
+    graph, reference, controller = _wizard_for(
+        {"type": "campaign", "id": "C1", "arc_refs": ["Missing Arc"]}
+    )
+    fake_ctk = _install_fake_customtkinter(monkeypatch)
+    dialog = MissingReferenceDialog(None, controller, graph.issues[0], reference=reference)
+
+    dialog.show()
+
+    assert REMAP_LABEL not in fake_ctk.button_texts
+    assert fake_ctk.column_indexes[-3:] == [0, 1, 2]
+
+
+def test_dialog_show_includes_remap_button_with_provider(monkeypatch):
+    graph, reference, controller = _wizard_for(
+        {"type": "campaign", "id": "C1", "arc_refs": ["Missing Arc"]}
+    )
+    fake_ctk = _install_fake_customtkinter(monkeypatch)
+    dialog = MissingReferenceDialog(
+        None,
+        controller,
+        graph.issues[0],
+        reference=reference,
+        config=MissingReferenceDialogConfig(remap_target_provider=lambda issue: "A1"),
+    )
+
+    dialog.show()
+
+    assert REMAP_LABEL in fake_ctk.button_texts
+    assert fake_ctk.column_indexes[-4:] == [0, 1, 2, 3]
+
+
+def _install_fake_customtkinter(monkeypatch):
+    fake_ctk = types.SimpleNamespace(button_texts=[], column_indexes=[])
+
+    class _Widget:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def grid(self, *args, **kwargs):
+            return None
+
+        def grid_columnconfigure(self, index, **kwargs):
+            fake_ctk.column_indexes.append(index)
+
+        def title(self, *args, **kwargs):
+            return None
+
+        def transient(self, *args, **kwargs):
+            return None
+
+        def grab_set(self, *args, **kwargs):
+            return None
+
+        def geometry(self, *args, **kwargs):
+            return None
+
+        def destroy(self):
+            return None
+
+    class _Button(_Widget):
+        def __init__(self, *args, text="", command=None, **kwargs):
+            super().__init__(*args, **kwargs)
+            fake_ctk.button_texts.append(text)
+            self.command = command
+
+    fake_ctk.CTkToplevel = _Widget
+    fake_ctk.CTkFrame = _Widget
+    fake_ctk.CTkLabel = _Widget
+    fake_ctk.CTkButton = _Button
+    fake_ctk.CTkFont = lambda *args, **kwargs: None
+    monkeypatch.setitem(sys.modules, "customtkinter", fake_ctk)
+    return fake_ctk
