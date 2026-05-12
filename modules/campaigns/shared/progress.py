@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from modules.campaigns.shared.arc_status import CANONICAL_PROGRESS_STATUSES, canonicalize_scenario_status
+from modules.campaigns.shared.scenario_status import read_scenario_status
 
 _PLANNED, _IN_PROGRESS, _PAUSED, _COMPLETED = CANONICAL_PROGRESS_STATUSES
 _STATUS_PROGRESS = {
@@ -25,7 +26,7 @@ def arc_progress_from_scenarios(scenarios: Iterable[Any] | None) -> float:
     scenario_list = list(scenarios or [])
     if not scenario_list:
         return 0.0
-    return sum(status_progress(_read_status(scenario)) for scenario in scenario_list) / len(scenario_list)
+    return sum(status_progress(read_scenario_status(scenario)) for scenario in scenario_list) / len(scenario_list)
 
 
 def campaign_progress_from_arcs(arcs: Iterable[Any] | None) -> float:
@@ -34,13 +35,6 @@ def campaign_progress_from_arcs(arcs: Iterable[Any] | None) -> float:
     if not arc_list:
         return 0.0
     return sum(arc_progress_from_scenarios(_read_scenarios(arc)) for arc in arc_list) / len(arc_list)
-
-
-def _read_status(scenario: Any) -> object:
-    """Read a status from either a dataclass-style object or a dictionary."""
-    if isinstance(scenario, dict):
-        return scenario.get("Status") or scenario.get("status")
-    return getattr(scenario, "status", None)
 
 
 def _read_scenarios(arc: Any) -> Iterable[Any] | None:
