@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
 from modules.helpers.template_loader import load_entity_definitions, load_template
+from src.validation.source_metadata import SOURCE_ITEM_KEY
 from src.validation.field_normalization import (
     FIELD_NORMALIZATION_RULES,
     FieldNormalizationRule,
@@ -208,7 +209,7 @@ def attach_referenced_entities_to_scenarios(
                     identity = _identity_signature(rule.entity_slug, match)
                     if identity in local_identities:
                         continue
-                    child_collection.append(deepcopy(dict(match)))
+                    child_collection.append(_copy_attached_node(match))
                     local_identities.add(identity)
                     attached_signatures.add(signature)
 
@@ -220,6 +221,12 @@ def attach_referenced_entities_to_scenarios(
                 scenario.pop(rule.canonical_field, None)
 
     return frozenset(attached_signatures)
+
+
+def _copy_attached_node(node: Mapping[str, Any]) -> dict[str, Any]:
+    if SOURCE_ITEM_KEY in node:
+        return dict(node)
+    return deepcopy(dict(node))
 
 
 def entity_source_signature(

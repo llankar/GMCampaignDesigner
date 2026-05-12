@@ -187,6 +187,7 @@ class ValidationWizardController:
         presenter: ValidationWizardPresenter | None = None,
         metrics: ValidationWizardMetrics | None = None,
         started_at: float | None = None,
+        on_successful_change: Callable[[ReferenceActionResult], None] | None = None,
     ) -> None:
         self._items = tuple(_coerce_issue_item(issue) for issue in issues)
         self._campaign = dict(campaign)
@@ -194,6 +195,7 @@ class ValidationWizardController:
         self._ignore_store = ignore_store or SessionIgnoreStore()
         self._reference_resolver = reference_resolver
         self._presenter = presenter
+        self._on_successful_change = on_successful_change
         self._started_at = started_at if started_at is not None else monotonic()
         self._cursor = -1
         self._summary = ValidationWizardSummary(
@@ -420,6 +422,14 @@ class ValidationWizardController:
     def _handle_action_result(self, result: ReferenceActionResult) -> ValidationWizardStep:
         if not result.success:
             return self._action_failed(result.ui_message, result)
+        if self._on_successful_change is not None and result.changes_applied:
+            try:
+                self._on_successful_change(result)
+            except Exception as exc:
+                return self._action_failed(
+                    f"Changes were applied but could not be saved: {exc}",
+                    result,
+                )
         self._summary = _summary_with_result(self._summary, result)
         return self._advance_to_next_issue()
 

@@ -15,6 +15,7 @@ from src.ui.validation.campaign_validation_launcher import (
     build_campaign_validation_hierarchy,
     campaign_option_from_item,
     load_campaign_options,
+    save_validation_sources,
 )
 from src.ui.validation.campaign_scenario_entity_hierarchy import (
     campaign_validation_reference_config,
@@ -863,3 +864,66 @@ def test_build_campaign_validation_hierarchy_reports_lightweight_phases():
 
     assert "Scanning arcs..." in phases
     assert "Scanning scenarios..." in phases
+
+
+def test_campaign_validation_removes_multiple_stale_index_references_and_saves_sources():
+    """Validation fixes keep going after earlier removals shift reference indexes."""
+
+    class SavingWrapper(FakeWrapper):
+        def __init__(self, items):
+            super().__init__(items)
+            self.saved_items = []
+
+        def save_item(self, item):
+            self.saved_items.append(dict(item))
+
+    campaign = {
+        "id": "c1",
+        "Name": "Dragonfall",
+        "Arcs": {"arcs": [{"name": "Arc 1", "scenarios": ["Main Quest"]}]},
+    }
+    scenario = {
+        "Title": "Main Quest",
+        "Places": ["Mutated Mariner Camp", "Sunken Dock"],
+    }
+    campaign_wrapper = SavingWrapper([campaign])
+    scenario_wrapper = SavingWrapper([scenario])
+    wrappers = {"campaigns": campaign_wrapper, "scenarios": scenario_wrapper}
+    rules = discover_scenario_linked_entity_rules(wrappers)
+    hierarchy = build_campaign_validation_hierarchy(
+        wrappers,
+        campaign,
+        scenario_link_rules=rules,
+        include_source_metadata=True,
+    )
+    graph = validate_reference_graph(
+        hierarchy,
+        campaign=campaign,
+        config=campaign_validation_reference_config(rules),
+    )
+    controller = ValidationWizardController(
+        tuple(
+            ValidationWizardIssue(
+                issue=issue,
+                reference=resolve_reference_for_issue(issue, graph.references),
+                target=resolve_target_for_issue(issue, graph.entities),
+            )
+            for issue in graph.issues
+        ),
+        campaign=graph.campaign,
+        on_successful_change=lambda _result: save_validation_sources(graph),
+    )
+
+    assert [issue.payload.referenced_name for issue in graph.issues] == [
+        "Mutated Mariner Camp",
+        "Sunken Dock",
+    ]
+    controller.start()
+    second_step = controller.submit_action("remove")
+    assert second_step.status == ValidationWizardStatus.SHOW_ISSUE
+    final_step = controller.submit_action("remove")
+
+    assert final_step.status == ValidationWizardStatus.COMPLETED
+    assert scenario["Places"] == []
+    assert scenario_wrapper.saved_items[-1]["Places"] == []
+    assert campaign_wrapper.saved_items
