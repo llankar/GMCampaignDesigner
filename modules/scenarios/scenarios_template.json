@@ -1,6 +1,7 @@
 {
   "fields": [
       {"name": "Title", "type": "text"},
+      {"name": "Status", "type": "text"},
       {"name": "Summary", "type": "longtext"},
       {"name": "Secrets", "type": "longtext"},
       {"name": "Scenes", "type": "list_longtext"},
