@@ -5,6 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol, Sequence
 
+from modules.helpers.tk_text_safety import (
+    LABEL_DISPLAY_LIMIT,
+    LONGFORM_DISPLAY_LIMIT,
+    safe_display_text,
+)
 from src.ui.validation.labels import (
     AMBIGUOUS_REFERENCE_MESSAGE,
     AMBIGUOUS_REFERENCE_TITLE,
@@ -60,11 +65,21 @@ class AmbiguousReferenceCandidate:
     def display_name(self) -> str:
         """Return the user-facing name, falling back to the identifier."""
 
-        return self.name or self.identifier
+        return safe_display_text(
+            self.name or self.identifier,
+            max_chars=LABEL_DISPLAY_LIMIT,
+        )
 
     @property
     def display_path(self) -> str:
         """Return a compact hierarchical path for the candidate card."""
+
+        if self.hierarchy_path:
+            path = " > ".join(
+                safe_display_text(part, max_chars=LABEL_DISPLAY_LIMIT)
+                for part in self.hierarchy_path
+            )
+            return safe_display_text(path, max_chars=LONGFORM_DISPLAY_LIMIT)
 
         return " › ".join(self.hierarchy_path) if self.hierarchy_path else "—"
 
@@ -74,9 +89,20 @@ class AmbiguousReferenceCandidate:
 
         infos: list[str] = []
         if self.description:
-            infos.append(self.description)
+            infos.append(
+                safe_display_text(self.description, max_chars=LONGFORM_DISPLAY_LIMIT)
+            )
         if self.tags:
-            infos.append(f"{TAGS_LABEL}: {', '.join(self.tags)}")
+            tags = ", ".join(
+                safe_display_text(tag, max_chars=LABEL_DISPLAY_LIMIT)
+                for tag in self.tags
+            )
+            infos.append(
+                safe_display_text(
+                    f"{TAGS_LABEL}: {tags}",
+                    max_chars=LONGFORM_DISPLAY_LIMIT,
+                )
+            )
         return tuple(infos)
 
     @property
@@ -162,8 +188,14 @@ class AmbiguousReferenceDialog:
         ctk.CTkLabel(
             window,
             text=AMBIGUOUS_REFERENCE_MESSAGE.format(
-                referenced_name=payload.referenced_name,
-                expected_type=payload.expected_type,
+                referenced_name=safe_display_text(
+                    payload.referenced_name,
+                    max_chars=LABEL_DISPLAY_LIMIT,
+                ),
+                expected_type=safe_display_text(
+                    payload.expected_type,
+                    max_chars=LABEL_DISPLAY_LIMIT,
+                ),
             ),
             wraplength=700,
             justify="left",

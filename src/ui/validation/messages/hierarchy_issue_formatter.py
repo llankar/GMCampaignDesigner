@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+from modules.helpers.tk_text_safety import LABEL_DISPLAY_LIMIT, safe_display_text
 from src.validation import ValidationIssue
 
 
@@ -137,5 +138,8 @@ def _is_other_parent(
 
 def _entity_label(entity_type: str, identifier: str) -> str:
     normalized_type = entity_type.strip() or "target"
-    normalized_identifier = identifier.strip() or "<unknown>"
+    normalized_identifier = (
+        safe_display_text(identifier, max_chars=LABEL_DISPLAY_LIMIT).strip()
+        or "<unknown>"
+    )
     return f'{normalized_type.capitalize()} "{normalized_identifier}"'

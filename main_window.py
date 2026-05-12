@@ -3776,7 +3776,8 @@ class MainWindow(ctk.CTk):
         )
 
         launcher = CampaignHierarchyValidationLauncher(self)
-        return launcher.launch()
+        launcher.launch()
+        return None
 
     def open_campaign_builder(self, guided_tour_active: bool = False):
         """Open campaign builder."""

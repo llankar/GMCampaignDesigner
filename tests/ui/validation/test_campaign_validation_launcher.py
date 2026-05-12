@@ -7,6 +7,7 @@ from src.ui.validation import (
     resolve_reference_for_issue,
     resolve_target_for_issue,
 )
+from modules.helpers.tk_text_safety import ELLIPSIS, LONGFORM_DISPLAY_LIMIT
 from src.validation import IssueType, validate_reference_graph
 from src.ui.validation.campaign_validation_launcher import (
     CampaignValidationRun,
@@ -763,6 +764,39 @@ def test_launcher_reports_bootstrap_exception_without_summary(monkeypatch):
             ),
         )
     ]
+
+
+def test_launcher_bounds_bootstrap_exception_detail_before_messagebox(monkeypatch):
+    messages = []
+    summaries = []
+    huge_detail = "validator offline " + ("x" * 12_000)
+
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.open_validation_summary_dialog",
+        lambda *_args, **_kwargs: summaries.append(_args),
+    )
+    monkeypatch.setattr(
+        "tkinter.messagebox.showerror",
+        lambda title, message: messages.append((title, message)),
+    )
+
+    def fail_validation(*_args, **_kwargs):
+        raise RuntimeError(huge_detail)
+
+    monkeypatch.setattr(
+        "src.ui.validation.campaign_validation_launcher.validate_reference_graph",
+        fail_validation,
+    )
+    launcher = CampaignHierarchyValidationLauncher(
+        FakeApp({"campaigns": FakeWrapper([_campaign()])})
+    )
+
+    assert launcher.launch(_campaign()) is None
+    assert summaries == []
+    assert messages[0][0] == "Validation unavailable"
+    assert len(messages[0][1]) <= LONGFORM_DISPLAY_LIMIT
+    assert ELLIPSIS in messages[0][1]
+    assert huge_detail not in messages[0][1]
 
 
 def test_launcher_summary_includes_scan_metrics(monkeypatch):

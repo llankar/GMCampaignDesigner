@@ -6,8 +6,10 @@ from src.ui.validation import (
     ValidationWizardStatus,
     resolve_reference_for_issue,
 )
+from modules.helpers.tk_text_safety import ELLIPSIS, LABEL_DISPLAY_LIMIT, LONGFORM_DISPLAY_LIMIT
 from src.ui.validation.dialogs import (
     AmbiguousReferenceDialog,
+    AmbiguousReferenceCandidate,
     AmbiguousReferenceDialogConfig,
 )
 from src.validation import validate_reference_graph
@@ -131,3 +133,21 @@ def test_payload_candidate_strings_are_usable_when_no_provider_is_configured():
         candidate.entity_type == "scenario"
         for candidate in dialog.displayed_candidates
     )
+
+
+def test_candidate_display_text_is_bounded_for_tk_widgets():
+    candidate = AmbiguousReferenceCandidate(
+        identifier="target-id",
+        name="N" * 1_000,
+        entity_type="scenario",
+        hierarchy_path=("campaign:C1", "scenario:" + ("S" * 12_000)),
+        description="D" * 12_000,
+        tags=("T" * 1_000,),
+    )
+
+    assert len(candidate.display_name) <= LABEL_DISPLAY_LIMIT
+    assert len(candidate.display_path) <= LONGFORM_DISPLAY_LIMIT
+    assert all(len(line) <= LONGFORM_DISPLAY_LIMIT for line in candidate.key_infos)
+    assert ELLIPSIS in candidate.display_name
+    assert ELLIPSIS in candidate.display_path
+    assert candidate.remap_target == "target-id"

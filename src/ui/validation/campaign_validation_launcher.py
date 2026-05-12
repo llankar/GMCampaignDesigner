@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from time import monotonic
 from typing import Any, Callable, Mapping, Sequence
 
+from modules.helpers.tk_text_safety import LONGFORM_DISPLAY_LIMIT, safe_display_text
 from modules.helpers.logging_helper import log_exception, log_info
 from src.ui.validation.campaign_arc_hierarchy import build_campaign_arc_nodes
 from src.ui.validation.campaign_scenario_hierarchy import (
@@ -188,7 +189,13 @@ class CampaignHierarchyValidationLauncher:
             )
             step = validation_setup_failed_step(
                 VALIDATION_UNAVAILABLE_TITLE,
-                f"{VALIDATION_UNAVAILABLE_MESSAGE}\n\n{TECHNICAL_DETAIL_LABEL}: {exc}",
+                safe_display_text(
+                    (
+                        f"{VALIDATION_UNAVAILABLE_MESSAGE}\n\n"
+                        f"{TECHNICAL_DETAIL_LABEL}: {exc}"
+                    ),
+                    max_chars=LONGFORM_DISPLAY_LIMIT,
+                ),
             )
             self._handle_step(None, step)
             return None
@@ -227,7 +234,10 @@ class CampaignHierarchyValidationLauncher:
                 if step.setup_failure
                 else VALIDATION_IMPOSSIBLE_TITLE
             )
-            messagebox.showerror(title, step.message)
+            messagebox.showerror(
+                title,
+                safe_display_text(step.message, max_chars=LONGFORM_DISPLAY_LIMIT),
+            )
             return
 
         if step.status == ValidationWizardStatus.COMPLETED:
@@ -247,7 +257,10 @@ class CampaignHierarchyValidationLauncher:
         if step.status == ValidationWizardStatus.ACTION_FAILED:
             from tkinter import messagebox
 
-            messagebox.showwarning("Validation", step.message)
+            messagebox.showwarning(
+                "Validation",
+                safe_display_text(step.message, max_chars=LONGFORM_DISPLAY_LIMIT),
+            )
             return
 
         if step.issue is None or run is None:
@@ -281,7 +294,10 @@ class CampaignHierarchyValidationLauncher:
 
             if messagebox.askyesno(
                 HIERARCHY_CONSISTENCY_TITLE,
-                f"{step.message}\n\n{IGNORE_ISSUE_PROMPT}",
+                safe_display_text(
+                    f"{step.message}\n\n{IGNORE_ISSUE_PROMPT}",
+                    max_chars=LONGFORM_DISPLAY_LIMIT,
+                ),
             ):
                 next_step = run.controller.submit_action(
                     ValidationWizardAction.SKIP_SESSION
@@ -305,7 +321,10 @@ class CampaignHierarchyValidationLauncher:
 
         from tkinter import messagebox
 
-        messagebox.showwarning(HIERARCHY_CONSISTENCY_TITLE, step.message)
+        messagebox.showwarning(
+            HIERARCHY_CONSISTENCY_TITLE,
+            safe_display_text(step.message, max_chars=LONGFORM_DISPLAY_LIMIT),
+        )
 
 
 def load_campaign_options(

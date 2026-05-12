@@ -1,6 +1,7 @@
 """Regression tests for the validation wizard controller workflow."""
 
 from src.services import SessionIgnoreStore
+from modules.helpers.tk_text_safety import ELLIPSIS, LONGFORM_DISPLAY_LIMIT
 from src.ui.validation import (
     ValidationWizardAction,
     ValidationWizardController,
@@ -178,6 +179,21 @@ def test_wizard_can_use_reference_resolver_for_plain_issue_lists():
 
     assert step.status == ValidationWizardStatus.COMPLETED
     assert hierarchy["arc_refs"] == []
+
+
+def test_wizard_bounds_oversized_issue_text_before_ui_display():
+    huge_reference = "Missing " + ("x" * 12_000)
+    hierarchy = {"type": "campaign", "id": "C1", "arc_refs": [huge_reference]}
+    graph = _graph_for(hierarchy)
+    controller = ValidationWizardController(_wizard_items(graph), campaign=graph.campaign)
+
+    step = controller.start()
+
+    assert step.issue == graph.issues[0]
+    assert step.issue.payload.referenced_name == huge_reference
+    assert len(step.message) <= LONGFORM_DISPLAY_LIMIT
+    assert ELLIPSIS in step.message
+    assert huge_reference not in step.message
 
 
 def test_setup_failed_step_marks_scan_as_not_executed():

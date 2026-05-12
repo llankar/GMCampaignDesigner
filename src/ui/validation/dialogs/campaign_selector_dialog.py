@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Sequence
 
+from modules.helpers.tk_text_safety import LABEL_DISPLAY_LIMIT, safe_display_text
 from src.ui.validation.labels import (
     CANCEL_LABEL,
     CHOOSE_CAMPAIGN_MESSAGE,
@@ -27,8 +28,11 @@ class CampaignSelectorOption:
         """Return a stable user-facing label for dropdowns and lists."""
 
         if self.label == self.campaign_id:
-            return self.label
-        return f"{self.label} ({self.campaign_id})"
+            return safe_display_text(self.label, max_chars=LABEL_DISPLAY_LIMIT)
+        return safe_display_text(
+            f"{self.label} ({self.campaign_id})",
+            max_chars=LABEL_DISPLAY_LIMIT,
+        )
 
 
 class CampaignSelectorDialog:

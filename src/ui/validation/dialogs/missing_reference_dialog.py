@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
+from modules.helpers.tk_text_safety import LABEL_DISPLAY_LIMIT, safe_display_text
 from src.ui.validation.labels import (
     CREATE_LABEL,
     IGNORE_LABEL,
@@ -108,9 +109,18 @@ class MissingReferenceDialog:
         ctk.CTkLabel(
             window,
             text=MISSING_REFERENCE_MESSAGE.format(
-                referenced_name=payload.referenced_name,
-                expected_type=payload.expected_type,
-                source_entity=payload.source_entity,
+                referenced_name=safe_display_text(
+                    payload.referenced_name,
+                    max_chars=LABEL_DISPLAY_LIMIT,
+                ),
+                expected_type=safe_display_text(
+                    payload.expected_type,
+                    max_chars=LABEL_DISPLAY_LIMIT,
+                ),
+                source_entity=safe_display_text(
+                    payload.source_entity,
+                    max_chars=LABEL_DISPLAY_LIMIT,
+                ),
             ),
             wraplength=500,
             justify="left",

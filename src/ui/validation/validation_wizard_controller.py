@@ -13,6 +13,11 @@ from enum import Enum
 from time import monotonic
 from typing import Any, Callable, Iterable, Mapping, Protocol, Sequence
 
+from modules.helpers.tk_text_safety import (
+    LABEL_DISPLAY_LIMIT,
+    LONGFORM_DISPLAY_LIMIT,
+    safe_display_text,
+)
 from src.services import ReferenceActionResult, ReferenceFixService, SessionIgnoreStore
 from src.ui.validation.labels import (
     ENTITY_CREATION_PENDING_MESSAGE,
@@ -590,13 +595,28 @@ def _summary_canceled(summary: ValidationWizardSummary) -> ValidationWizardSumma
 
 def _format_issue_message(issue: ValidationIssue) -> str:
     if issue.issue_type == IssueType.INVALID_HIERARCHY:
-        return format_hierarchy_issue_message(issue)
+        return safe_display_text(
+            format_hierarchy_issue_message(issue),
+            max_chars=LONGFORM_DISPLAY_LIMIT,
+        )
 
     payload = issue.payload
-    return ISSUE_REFERENCE_MESSAGE.format(
-        issue_type=issue.issue_type.value,
-        source_entity=payload.source_entity,
-        field=payload.field,
-        referenced_name=payload.referenced_name,
-        expected_type=payload.expected_type,
+    return safe_display_text(
+        ISSUE_REFERENCE_MESSAGE.format(
+            issue_type=issue.issue_type.value,
+            source_entity=safe_display_text(
+                payload.source_entity,
+                max_chars=LABEL_DISPLAY_LIMIT,
+            ),
+            field=safe_display_text(payload.field, max_chars=LABEL_DISPLAY_LIMIT),
+            referenced_name=safe_display_text(
+                payload.referenced_name,
+                max_chars=LABEL_DISPLAY_LIMIT,
+            ),
+            expected_type=safe_display_text(
+                payload.expected_type,
+                max_chars=LABEL_DISPLAY_LIMIT,
+            ),
+        ),
+        max_chars=LONGFORM_DISPLAY_LIMIT,
     )

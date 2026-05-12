@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
+from modules.helpers.tk_text_safety import LONGFORM_DISPLAY_LIMIT, safe_display_text
 from src.ui.validation.labels import (
     ATTACH_LABEL,
     IGNORE_LABEL,
@@ -170,12 +171,21 @@ class InvalidHierarchyDialog:
             self.window = None
 
     def _message_text(self) -> str:
-        hint = self.issue.payload.resolution_hint.strip()
+        hint = safe_display_text(
+            self.issue.payload.resolution_hint,
+            max_chars=LONGFORM_DISPLAY_LIMIT,
+        ).strip()
         resolution_message = self._resolution_message()
-        parts = [self.step.message, resolution_message]
+        parts = [
+            safe_display_text(self.step.message, max_chars=LONGFORM_DISPLAY_LIMIT),
+            resolution_message,
+        ]
         if hint:
             parts.append(hint)
-        return "\n\n".join(part for part in parts if part)
+        return safe_display_text(
+            "\n\n".join(part for part in parts if part),
+            max_chars=LONGFORM_DISPLAY_LIMIT,
+        )
 
     def _action_buttons(self) -> tuple[tuple[str, Callable[[], Any]], ...]:
         buttons: list[tuple[str, Callable[[], Any]]] = []
