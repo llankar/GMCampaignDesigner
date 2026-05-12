@@ -255,19 +255,26 @@ class _ScenarioHeroStripStub(_CountingWidget):
 
 
 class _ScenarioIdentityPanelStub(_CountingWidget):
-    pass
+    instances = []
+
+    def __init__(self, parent, *args, **kwargs):
+        """Initialize the _ScenarioIdentityPanelStub instance."""
+        super().__init__(parent, *args, **kwargs)
+        self.kwargs = kwargs
+        type(self).instances.append(self)
 
 
 class _ScenarioBriefingPanelStub(_CountingWidget):
     pass
 
 
-def _make_scenario(title, *, links=0, record_exists=False):
+def _make_scenario(title, *, links=0, status="Planned", record_exists=False):
     """Build a minimal scenario payload for panel tests."""
     entity_links = [types.SimpleNamespace(entity_type="NPCs", name=f"NPC {index}") for index in range(links)]
     return types.SimpleNamespace(
         title=title,
         summary=f"Summary for {title}",
+        status=status,
         briefing=f"Briefing for {title}",
         objective=f"Objective for {title}",
         hook=f"Hook for {title}",
@@ -391,6 +398,7 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     _SelectorStripStub.created = 0
     _ScenarioHeroStripStub.created = 0
     _ScenarioIdentityPanelStub.created = 0
+    _ScenarioIdentityPanelStub.instances = []
     _ScenarioBriefingPanelStub.created = 0
     _ScenarioEntityBrowserStub.created = 0
 
@@ -440,7 +448,7 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
 
     panel = CampaignGraphPanel.__new__(CampaignGraphPanel)
     panel._selected_campaign = types.SimpleNamespace(arcs=[])
-    arc = _make_arc("Red Revelations", [_make_scenario("Moonlit Wake", links=2), _make_scenario("Catacomb Chase", links=3)])
+    arc = _make_arc("Red Revelations", [_make_scenario("Moonlit Wake", links=2), _make_scenario("Catacomb Chase", links=3, status="Completed")])
     panel._selected_campaign.arcs = [arc]
     panel._selected_arc_index = 0
     panel._selected_scenario_index = 0
@@ -466,6 +474,7 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     assert panel._scenario_prev_button.text == "← Previous"
     assert panel._scenario_next_button.text == "Next →"
     assert panel._scenario_status_label.text == "2 links"
+    assert _ScenarioIdentityPanelStub.instances[-1].kwargs["progress_items"][-1] == ("status", "Planned")
     assert len(scheduled) == 1
     assert len(panel._scenario_sidebar_container.winfo_children()) == 1
 
@@ -477,6 +486,7 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     assert canceled == ["job-1"]
     assert len(scheduled) == 2
     assert len(panel._scenario_sidebar_container.winfo_children()) == 1
+    assert _ScenarioIdentityPanelStub.instances[-1].kwargs["progress_items"][-1] == ("status", "Completed")
 
     scheduled[-1][1]()
 
@@ -488,6 +498,7 @@ def test_refresh_scenario_focus_builds_initial_shell(monkeypatch):
     _SelectorStripStub.created = 0
     _ScenarioHeroStripStub.created = 0
     _ScenarioIdentityPanelStub.created = 0
+    _ScenarioIdentityPanelStub.instances = []
     _ScenarioBriefingPanelStub.created = 0
     _ScenarioEntityBrowserStub.created = 0
 
