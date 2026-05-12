@@ -92,6 +92,9 @@ CHOOSE_REMAP_TARGET_MESSAGE = (
     "Select an existing compatible entity to replace this missing reference."
 )
 NO_REMAP_TARGETS_MESSAGE = "No compatible existing entities are available for remapping."
+REMAP_TARGET_SEARCH_LABEL = "Search targets"
+REMAP_TARGET_SEARCH_PLACEHOLDER = "Type a name, id, or path..."
+NO_REMAP_TARGET_SEARCH_RESULTS_MESSAGE = "No targets match your search."
 
 CHOOSE_CAMPAIGN_TITLE = "Choose a campaign"
 CHOOSE_CAMPAIGN_MESSAGE = (

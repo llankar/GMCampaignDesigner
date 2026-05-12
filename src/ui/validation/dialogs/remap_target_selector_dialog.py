@@ -15,9 +15,14 @@ from src.ui.validation.labels import (
     CHOOSE_REMAP_TARGET_MESSAGE,
     CHOOSE_REMAP_TARGET_TITLE,
     NO_REMAP_TARGETS_MESSAGE,
+    NO_REMAP_TARGET_SEARCH_RESULTS_MESSAGE,
     REMAP_LABEL,
+    REMAP_TARGET_SEARCH_LABEL,
+    REMAP_TARGET_SEARCH_PLACEHOLDER,
 )
 from src.validation.reference_validator import EntityRecord
+
+from .remap_target_filter import filter_remap_target_display_values
 
 
 @dataclass(frozen=True)
@@ -58,8 +63,12 @@ class RemapTargetSelectorDialog:
         self.selected_target: EntityRecord | None = None
         self.window: Any | None = None
         self._selected_text: Any | None = None
+        self._search_text: Any | None = None
+        self._target_dropdown: Any | None = None
+        self._search_status_label: Any | None = None
         self._remap_button: Any | None = None
         self._display_to_target = _display_index(self.targets)
+        self._filtered_display_to_target = dict(self._display_to_target)
 
     def show(self) -> EntityRecord | None:
         """Open the modal selector and return the chosen target, or ``None``."""
@@ -71,7 +80,7 @@ class RemapTargetSelectorDialog:
         window.title(CHOOSE_REMAP_TARGET_TITLE)
         window.transient(self.master)
         window.grab_set()
-        window.geometry("560x280")
+        window.geometry("560x340")
         window.grid_columnconfigure(0, weight=1)
         window.protocol("WM_DELETE_WINDOW", self.cancel)
 
@@ -88,14 +97,40 @@ class RemapTargetSelectorDialog:
                 wraplength=500,
                 justify="left",
             ).grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 14))
-            self._selected_text = ctk.StringVar(value="")
-            dropdown = ctk.CTkOptionMenu(
+            self._search_text = ctk.StringVar(value="")
+            self._search_text.trace_add("write", self._on_search_changed)
+            ctk.CTkLabel(
                 window,
-                values=tuple(self._display_to_target),
+                text=REMAP_TARGET_SEARCH_LABEL,
+                anchor="w",
+            ).grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 4))
+            search_entry = ctk.CTkEntry(
+                window,
+                textvariable=self._search_text,
+                placeholder_text=REMAP_TARGET_SEARCH_PLACEHOLDER,
+            )
+            search_entry.grid(row=3, column=0, sticky="ew", padx=20, pady=(0, 8))
+
+            self._selected_text = ctk.StringVar(value="")
+            self._target_dropdown = ctk.CTkOptionMenu(
+                window,
+                values=tuple(self._filtered_display_to_target),
                 variable=self._selected_text,
                 command=self._on_selection_changed,
             )
-            dropdown.grid(row=2, column=0, sticky="ew", padx=20, pady=4)
+            self._target_dropdown.grid(row=4, column=0, sticky="ew", padx=20, pady=4)
+            self._search_status_label = ctk.CTkLabel(
+                window,
+                text="",
+                anchor="w",
+            )
+            self._search_status_label.grid(
+                row=5,
+                column=0,
+                sticky="ew",
+                padx=20,
+                pady=(4, 0),
+            )
         else:
             ctk.CTkLabel(
                 window,
@@ -105,7 +140,7 @@ class RemapTargetSelectorDialog:
             ).grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 14))
 
         actions = ctk.CTkFrame(window)
-        actions.grid(row=3, column=0, sticky="e", padx=20, pady=(22, 20))
+        actions.grid(row=6, column=0, sticky="e", padx=20, pady=(22, 20))
         self._remap_button = ctk.CTkButton(
             actions,
             text=REMAP_LABEL,
@@ -121,9 +156,40 @@ class RemapTargetSelectorDialog:
         window.wait_window()
         return self.selected_target
 
+    def _on_search_changed(self, *_args: Any) -> None:
+        query = self._search_text.get() if self._search_text is not None else ""
+        display_values = filter_remap_target_display_values(
+            self._display_to_target,
+            query,
+        )
+        self._filtered_display_to_target = {
+            value: self._display_to_target[value] for value in display_values
+        }
+        if self._target_dropdown is not None:
+            self._target_dropdown.configure(values=display_values)
+        selected_text = (
+            self._selected_text.get() if self._selected_text is not None else ""
+        )
+        if selected_text not in self._filtered_display_to_target:
+            selected_text = ""
+            if self._selected_text is not None:
+                self._selected_text.set("")
+        if self._search_status_label is not None:
+            status_text = (
+                ""
+                if display_values
+                else NO_REMAP_TARGET_SEARCH_RESULTS_MESSAGE
+            )
+            self._search_status_label.configure(text=status_text)
+        self._on_selection_changed(selected_text)
+
     def _on_selection_changed(self, selected_text: str) -> None:
         if self._remap_button is not None:
-            state = "normal" if selected_text in self._display_to_target else "disabled"
+            state = (
+                "normal"
+                if selected_text in self._filtered_display_to_target
+                else "disabled"
+            )
             self._remap_button.configure(state=state)
 
     def remap(self) -> None:
@@ -132,7 +198,7 @@ class RemapTargetSelectorDialog:
         selected_text = (
             self._selected_text.get() if self._selected_text is not None else ""
         )
-        selected_target = self._display_to_target.get(selected_text)
+        selected_target = self._filtered_display_to_target.get(selected_text)
         if selected_target is None:
             return
         self.selected_target = selected_target.entity
