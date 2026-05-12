@@ -15,7 +15,6 @@ spec.loader.exec_module(module)
 build_campaign_graph_payload = module.build_campaign_graph_payload
 build_campaign_option_index = module.build_campaign_option_index
 
-
 def test_build_campaign_option_index_ignores_blank_names():
     """Verify that build campaign option index ignores blank names."""
     options, index = build_campaign_option_index([
@@ -27,7 +26,6 @@ def test_build_campaign_option_index_ignores_blank_names():
 
     assert options == ["Duskfall", "Iron Crown"]
     assert set(index) == {"Duskfall", "Iron Crown"}
-
 
 def test_build_campaign_graph_payload_includes_loose_threads(monkeypatch):
     """Verify that build campaign graph payload includes loose threads."""
@@ -82,6 +80,34 @@ def test_build_campaign_graph_payload_includes_loose_threads(monkeypatch):
     assert len(calls) == 1
 
 
+def test_build_campaign_graph_payload_indexes_only_referenced_scenarios(monkeypatch):
+    """Verify graph payload indexing ignores full-list scenarios not referenced by the campaign."""
+    monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [])
+    original_builder = module._build_scenario_payload
+    indexed_titles = []
+
+    def _spy_build_scenario_payload(title, scenario_index, link_fields):
+        indexed_titles.append(set(scenario_index))
+        return original_builder(title, scenario_index, link_fields)
+
+    monkeypatch.setattr(module, "_build_scenario_payload", _spy_build_scenario_payload)
+
+    campaign = {
+        "Name": "Lean Campaign",
+        "LinkedScenarios": ["Needed Scenario"],
+        "Arcs": [{"name": "Act I", "scenarios": ["Needed Scenario"]}],
+    }
+    scenarios = [
+        {"Title": "Needed Scenario", "Summary": "Keep this row."},
+        {"Title": "Unlinked Scenario", "Summary": "Do not index this row."},
+    ]
+
+    payload = build_campaign_graph_payload(campaign, scenarios)
+
+    assert payload is not None
+    assert indexed_titles == [{"Needed Scenario"}]
+    assert payload.arcs[0].scenarios[0].record_exists is True
+
 def test_build_campaign_graph_payload_repairs_legacy_mojibake(monkeypatch):
     """Verify that legacy mojibake text is repaired during overview payload build."""
     monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [])
@@ -124,7 +150,6 @@ def test_build_campaign_graph_payload_repairs_legacy_mojibake(monkeypatch):
     assert payload.arcs[0].scenarios[0].summary == clean_summary
     assert payload.arcs[0].scenarios[0].briefing == clean_briefing
     assert payload.arcs[0].scenarios[0].title == "Retrouver agent fugueur Miyazato Hokichi"
-
 
 def test_build_campaign_graph_payload_truncates_oversized_display_text(monkeypatch):
     """Verify oversized imported text is bounded before reaching Tk widgets."""
