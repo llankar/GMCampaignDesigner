@@ -5,6 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
+from src.validation.source_metadata import SOURCE_ITEM_KEY
+
 
 _SCENARIO_ID_KEYS = ("id", "uuid", "slug", "key", "Id", "ID", "Uuid", "Slug", "Key")
 _SCENARIO_NAME_KEYS = ("name", "Name", "title", "Title", "label", "Label")
@@ -56,7 +58,7 @@ def attach_referenced_scenarios_to_arcs(
                 signature = _scenario_signature(source_index, match)
                 if signature in attached_signatures:
                     continue
-                scenario_children.append(deepcopy(dict(match)))
+                scenario_children.append(_copy_attached_node(match))
                 attached_signatures.add(signature)
 
         if scenario_children:
@@ -64,6 +66,12 @@ def attach_referenced_scenarios_to_arcs(
         else:
             arc.pop("scenarios", None)
         arc["scenario_refs"] = unresolved_refs
+
+
+def _copy_attached_node(node: Mapping[str, Any]) -> dict[str, Any]:
+    if SOURCE_ITEM_KEY in node:
+        return dict(node)
+    return deepcopy(dict(node))
 
 
 def _scenario_lookup_keys(scenario: Mapping[str, Any]) -> tuple[str, ...]:

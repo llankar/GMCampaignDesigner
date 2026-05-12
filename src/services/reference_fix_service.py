@@ -12,6 +12,7 @@ from enum import Enum
 from typing import Any, Mapping, MutableMapping, MutableSequence
 
 from src.validation.hierarchy_rules import ALLOWED_HIERARCHY_CHILDREN
+from src.validation.source_metadata import source_field_for, source_item_for
 from src.validation.reference_validator import EntityRecord, ReferenceRecord
 
 
@@ -164,7 +165,9 @@ class ReferenceFixService:
             return ReferenceActionResult.error(
                 "Cannot attach: target was not found in its current collection."
             )
+        _mirror_node_field(target.parent_node, target.collection_name, origin_collection)
         source_collection.append(target_node)
+        _mirror_node_field(source_node, collection_name, source_collection)
 
         return ReferenceActionResult.ok(
             f'Entity "{target.identifier}" attached under "{reference.source.identifier}".',
@@ -250,15 +253,16 @@ def _replace_reference_value(
         return False
 
     raw_value = source_node[reference.field_name]
-    index = _reference_index(reference)
+    index = _editable_reference_index(reference, raw_value)
     if _is_mutable_reference_collection(raw_value):
-        if index is None or not 0 <= index < len(raw_value):
+        if index is None:
             return False
         raw_value[index] = _updated_reference_object(
             raw_value[index],
             target_identifier,
             target_type,
         )
+        _mirror_reference_field(reference, raw_value)
         return True
 
     source_node[reference.field_name] = _updated_reference_object(
@@ -266,6 +270,7 @@ def _replace_reference_value(
         target_identifier,
         target_type,
     )
+    _mirror_reference_field(reference, source_node[reference.field_name])
     return True
 
 
@@ -275,15 +280,63 @@ def _remove_reference_value(reference: ReferenceRecord) -> bool:
         return False
 
     raw_value = source_node[reference.field_name]
-    index = _reference_index(reference)
+    index = _editable_reference_index(reference, raw_value)
     if _is_mutable_reference_collection(raw_value):
-        if index is None or not 0 <= index < len(raw_value):
+        if index is None:
             return False
         del raw_value[index]
+        _mirror_reference_field(reference, raw_value)
         return True
 
     del source_node[reference.field_name]
+    _remove_mirrored_reference_field(reference)
     return True
+
+
+def _editable_reference_index(reference: ReferenceRecord, raw_value: Any) -> int | None:
+    index = _reference_index(reference)
+    if (
+        index is not None
+        and _is_mutable_reference_collection(raw_value)
+        and 0 <= index < len(raw_value)
+        and _reference_value_matches(raw_value[index], reference.reference_value)
+    ):
+        return index
+    if not _is_mutable_reference_collection(raw_value):
+        return None
+    for fallback_index, candidate in enumerate(raw_value):
+        if _reference_value_matches(candidate, reference.reference_value):
+            return fallback_index
+    return None
+
+
+def _reference_value_matches(value: Any, expected: str) -> bool:
+    if isinstance(value, Mapping):
+        return _normalize(_first_present(value, _REFERENCE_KEYS)) == expected
+    return _normalize(value) == expected
+
+
+def _mirror_reference_field(reference: ReferenceRecord, value: Any) -> None:
+    _mirror_node_field(reference.source.node, reference.field_name, value)
+
+
+def _remove_mirrored_reference_field(reference: ReferenceRecord) -> None:
+    source_node = reference.source.node
+    if not isinstance(source_node, Mapping):
+        return
+    source_item = source_item_for(source_node)
+    if source_item is None:
+        return
+    source_item.pop(source_field_for(source_node, reference.field_name), None)
+
+
+def _mirror_node_field(node: Mapping[str, Any] | None, field_name: str, value: Any) -> None:
+    if not isinstance(node, Mapping):
+        return
+    source_item = source_item_for(node)
+    if source_item is None:
+        return
+    source_item[source_field_for(node, field_name)] = value
 
 
 def _is_mutable_reference_collection(value: Any) -> bool:
@@ -323,6 +376,7 @@ def _attach_child_entity(
         return ""
 
     collection.append(new_entity)
+    _mirror_node_field(source_node, collection_name, collection)
     return f"{collection_name}: entity added"
 
 

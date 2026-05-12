@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import monotonic
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
 from modules.helpers.tk_text_safety import LONGFORM_DISPLAY_LIMIT, safe_display_text
 from modules.helpers.logging_helper import log_exception, log_info
@@ -71,11 +71,17 @@ from src.ui.validation.validation_wizard_controller import (
     validation_setup_failed_step,
 )
 from src.validation import (
+    FieldNormalizationRule,
     IssueType,
     ReferenceValidationResult,
     ValidationIssue,
     normalize_validator_reference_fields,
     validate_reference_graph,
+)
+from src.validation.source_metadata import (
+    attach_source_metadata,
+    source_item_for,
+    source_wrapper_for,
 )
 from src.validation.reference_validator import EntityRecord
 
@@ -154,6 +160,7 @@ class CampaignHierarchyValidationLauncher:
                 selected_campaign,
                 progress=progress,
                 scenario_link_rules=scenario_link_rules,
+                include_source_metadata=True,
             )
             progress.set_phase("Checking references...")
             graph = validate_reference_graph(
@@ -172,6 +179,7 @@ class CampaignHierarchyValidationLauncher:
                     references_checked=len(graph.references),
                 ),
                 started_at=started_at,
+                on_successful_change=lambda _result: save_validation_sources(graph),
             )
             _log_validation_diagnostics(graph)
             first_step = controller.start()
@@ -409,6 +417,7 @@ def build_campaign_validation_hierarchy(
     *,
     progress: ValidationScanProgress | None = None,
     scenario_link_rules: Sequence[ScenarioLinkedEntityRule] | None = None,
+    include_source_metadata: bool = False,
 ) -> dict[str, Any]:
     """Build a validator-friendly hierarchy for one explicitly selected campaign."""
 
@@ -434,11 +443,21 @@ def build_campaign_validation_hierarchy(
     root["entity_type"] = "campaign"
     root["id"] = selected.campaign_id
     root["name"] = selected.label
+    if include_source_metadata and isinstance(selected.item, MutableMapping):
+        attach_source_metadata(
+            root,
+            source_item=selected.item,
+            wrapper=entity_wrappers.get("campaigns"),
+            field_aliases=_field_aliases_for("campaign", normalization_rules),
+        )
     root["arcs"] = build_campaign_arc_nodes(selected.item.get("Arcs"))
+    if include_source_metadata:
+        _attach_arc_source_metadata(root["arcs"], selected.item, entity_wrappers.get("campaigns"))
     scenario_nodes = _load_scenario_nodes(
         entity_wrappers,
         progress=progress,
         normalization_rules=normalization_rules,
+        include_source_metadata=include_source_metadata,
     )
     attach_referenced_scenarios_to_arcs(
         root["arcs"], build_scenario_reference_index(scenario_nodes)
@@ -447,6 +466,7 @@ def build_campaign_validation_hierarchy(
         entity_wrappers,
         progress=progress,
         normalization_rules=normalization_rules,
+        include_source_metadata=include_source_metadata,
     )
     attached_entity_signatures = attach_referenced_entities_to_scenarios(
         _iter_attached_scenario_nodes(root["arcs"]),
@@ -478,6 +498,7 @@ def _load_scenario_nodes(
     *,
     progress: ValidationScanProgress | None = None,
     normalization_rules: Sequence[Any] | None = None,
+    include_source_metadata: bool = False,
 ) -> tuple[dict[str, Any], ...]:
     """Load and normalize all scenarios for arc-local hierarchy attachment."""
 
@@ -492,6 +513,8 @@ def _load_scenario_nodes(
             item,
             index,
             normalization_rules=normalization_rules,
+            source_item=item if include_source_metadata and isinstance(item, MutableMapping) else None,
+            source_wrapper=wrapper if include_source_metadata else None,
         )
         for index, item in enumerate(_safe_load_items(wrapper))
         if isinstance(item, Mapping)
@@ -503,6 +526,7 @@ def _load_entity_nodes_by_slug(
     *,
     progress: ValidationScanProgress | None = None,
     normalization_rules: Sequence[Any] | None = None,
+    include_source_metadata: bool = False,
 ) -> dict[str, tuple[tuple[int, dict[str, Any]], ...]]:
     """Load non-campaign, non-scenario entities for flat or scenario placement."""
 
@@ -521,6 +545,8 @@ def _load_entity_nodes_by_slug(
                     item,
                     index,
                     normalization_rules=normalization_rules,
+                    source_item=item if include_source_metadata and isinstance(item, MutableMapping) else None,
+                    source_wrapper=wrapper if include_source_metadata else None,
                 ),
             )
             for index, item in enumerate(_safe_load_items(wrapper))
@@ -580,6 +606,60 @@ def _wizard_items(
     )
 
 
+def save_validation_sources(graph: ReferenceValidationResult) -> None:
+    """Persist every source item touched by a validation graph immediately."""
+
+    saved: set[int] = set()
+    for entity in graph.entities:
+        node = entity.node
+        if not isinstance(node, Mapping):
+            continue
+        source_item = source_item_for(node)
+        wrapper = source_wrapper_for(node)
+        if source_item is None or wrapper is None or id(source_item) in saved:
+            continue
+        save_item = getattr(wrapper, "save_item", None)
+        if not callable(save_item):
+            continue
+        save_item(source_item)
+        saved.add(id(source_item))
+
+
+def _field_aliases_for(
+    entity_type: str,
+    normalization_rules: Sequence[FieldNormalizationRule] | None,
+) -> dict[str, str]:
+    return {
+        rule.canonical_field: rule.source_field
+        for rule in tuple(normalization_rules or ())
+        if rule.entity_type == entity_type and rule.source_field != rule.canonical_field
+    }
+
+
+def _attach_arc_source_metadata(
+    arc_nodes: Sequence[MutableMapping[str, Any]],
+    campaign_item: Mapping[str, Any],
+    campaign_wrapper: Any,
+) -> None:
+    raw_arcs = campaign_item.get("Arcs")
+    if isinstance(raw_arcs, Mapping):
+        raw_arcs = raw_arcs.get("arcs")
+    if not isinstance(raw_arcs, Sequence) or isinstance(raw_arcs, (str, bytes, bytearray)):
+        return
+    for index, arc_node in enumerate(arc_nodes):
+        if index >= len(raw_arcs):
+            break
+        raw_arc = raw_arcs[index]
+        if not isinstance(raw_arc, MutableMapping):
+            continue
+        attach_source_metadata(
+            arc_node,
+            source_item=raw_arc,
+            wrapper=None,
+            field_aliases={"scenario_refs": "scenarios"},
+        )
+
+
 def _scan_phase_for_slug(slug: str) -> str:
     if slug == "arcs":
         return "Scanning arcs..."
@@ -611,6 +691,8 @@ def _normalize_entity_node(
     index: int,
     *,
     normalization_rules: Sequence[Any] | None = None,
+    source_item: MutableMapping[str, Any] | None = None,
+    source_wrapper: Any = None,
 ) -> dict[str, Any]:
     entity_type = _singular_entity_type(slug)
     node = normalize_validator_reference_fields(
@@ -623,6 +705,13 @@ def _normalize_entity_node(
     node.setdefault("entity_type", entity_type)
     node.setdefault("id", identifier)
     node.setdefault("name", _display_name_for(node, identifier))
+    if source_item is not None:
+        attach_source_metadata(
+            node,
+            source_item=source_item,
+            wrapper=source_wrapper,
+            field_aliases=_field_aliases_for(entity_type, normalization_rules),
+        )
     return node
 
 
