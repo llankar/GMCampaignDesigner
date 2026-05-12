@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import tkinter as tk
 from pathlib import Path
+from typing import Any
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
@@ -27,6 +28,7 @@ from .components import (
     ScenarioSelectorStrip,
 )
 from .data import CampaignGraphArc, CampaignGraphPayload, CampaignGraphScenario, build_campaign_graph_payload, build_campaign_option_index
+from .services.payload_cache import cache_campaign_graph_payload, clear_campaign_graph_caches
 
 # Import the services submodule directly to avoid the package lazy __getattr__ hook.
 _graph_services = importlib.import_module(f"{__package__}.services")
@@ -74,9 +76,13 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self.scenario_wrapper = scenario_wrapper or GenericModelWrapper("scenarios")
         self._overview_repository = overview_repository or self._build_overview_repository()
 
-        self._campaign_items = self._overview_repository.list_campaigns_for_overview()
-        self._scenario_items = []
-        self._campaign_options, self._campaign_index = build_campaign_option_index(self._campaign_items)
+        self._payload_cache: dict[str, CampaignGraphPayload] = {}
+        self._scenario_items_cache: dict[str, list[dict[str, Any]]] = {}
+        self._scenario_items: list[dict[str, Any]] = []
+        self._campaign_items: list[dict[str, Any]] = []
+        self._campaign_options: list[str] = []
+        self._campaign_index: dict[str, dict[str, Any]] = {}
+        self._load_campaign_overview_data()
         self._selection_store = CampaignOverviewSelectionStore()
         self._selected_campaign: CampaignGraphPayload | None = None
         self._selected_arc_index = 0
@@ -98,6 +104,12 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
         self._build_body()
         self._load_initial_campaign()
+
+    def _load_campaign_overview_data(self) -> None:
+        """Load campaign overview rows and invalidate payload caches."""
+        self._campaign_items = self._overview_repository.list_campaigns_for_overview()
+        self._campaign_options, self._campaign_index = build_campaign_option_index(self._campaign_items)
+        clear_campaign_graph_caches(self._payload_cache, self._scenario_items_cache)
 
     def _build_body(self) -> None:
         """Build body."""
@@ -140,8 +152,21 @@ class CampaignGraphPanel(ctk.CTkFrame):
         """Handle campaign selected."""
         self._cancel_pending_sidebar_render()
         campaign = self._campaign_index.get(selected_name)
-        self._scenario_items = self._overview_repository.load_scenarios_for_campaign(campaign)
-        self._selected_campaign = build_campaign_graph_payload(campaign, self._scenario_items)
+        cached_payload = self._payload_cache.get(selected_name)
+        if cached_payload is None:
+            self._scenario_items = self._overview_repository.load_scenarios_for_campaign(campaign)
+            self._selected_campaign = build_campaign_graph_payload(campaign, self._scenario_items)
+            cache_campaign_graph_payload(
+                selected_name,
+                self._selected_campaign,
+                self._scenario_items,
+                self._payload_cache,
+                self._scenario_items_cache,
+            )
+        else:
+            self._scenario_items = list(self._scenario_items_cache.get(selected_name, ()))
+            self._selected_campaign = cached_payload
+
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
         self._apply_saved_focus_state(campaign)

@@ -93,10 +93,11 @@ def build_campaign_graph_payload(
     if not isinstance(campaign_item, dict):
         return None
 
-    scenario_index = _build_scenario_index(scenario_items)
-    link_fields = iter_scenario_link_fields()
     arcs = coerce_arc_list(campaign_item.get("Arcs"))
     linked_scenarios = _coerce_string_list(campaign_item.get("LinkedScenarios"))
+    needed_scenario_titles = _collect_campaign_scenario_titles(arcs, linked_scenarios)
+    scenario_index = _build_scenario_index(scenario_items, needed_titles=needed_scenario_titles)
+    link_fields = iter_scenario_link_fields()
     used_scenarios: set[str] = set()
 
     rendered_arcs: list[CampaignGraphArc] = []
@@ -142,15 +143,33 @@ def build_campaign_graph_payload(
     )
 
 
-def _build_scenario_index(scenario_items: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Build scenario index."""
+def _collect_campaign_scenario_titles(arcs: Iterable[dict[str, Any]], linked_scenarios: Iterable[str]) -> set[str]:
+    """Return the display-safe scenario titles referenced by campaign links and arcs."""
+    titles = set(linked_scenarios)
+    for arc in arcs:
+        # Process each arc from arcs.
+        if not isinstance(arc, dict):
+            continue
+        titles.update(_coerce_string_list(arc.get("scenarios")))
+    return {title for title in titles if title}
+
+
+def _build_scenario_index(
+    scenario_items: Iterable[dict[str, Any]],
+    *,
+    needed_titles: set[str] | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Build a scenario index limited to titles required by the campaign graph."""
+    if needed_titles is not None and not needed_titles:
+        return {}
+
     index: dict[str, dict[str, Any]] = {}
     for raw in scenario_items:
         # Process each raw from scenario_items.
         if not isinstance(raw, dict):
             continue
         title = safe_display_text(raw.get("Title"), max_chars=LABEL_DISPLAY_LIMIT)
-        if not title:
+        if not title or (needed_titles is not None and title not in needed_titles):
             continue
         index[title] = raw
     return index

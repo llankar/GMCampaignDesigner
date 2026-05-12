@@ -298,6 +298,43 @@ def _make_panel(canvas=None):
     return panel
 
 
+def test_on_campaign_selected_reuses_cached_payload(monkeypatch):
+    """Verify selecting the same campaign reuses the payload cache instead of rebuilding."""
+    payload = types.SimpleNamespace(name="Duskfall", arcs=[])
+    scenario_rows = [{"Title": "Opening Gambit"}]
+    calls = {"loads": 0, "builds": 0}
+
+    class _Repository:
+        def load_scenarios_for_campaign(self, campaign):
+            calls["loads"] += 1
+            return list(scenario_rows)
+
+    def _build_payload(campaign, scenarios):
+        calls["builds"] += 1
+        assert scenarios == scenario_rows
+        return payload
+
+    monkeypatch.setattr(module, "build_campaign_graph_payload", _build_payload)
+
+    panel = CampaignGraphPanel.__new__(CampaignGraphPanel)
+    panel._overview_repository = _Repository()
+    panel._campaign_index = {"Duskfall": {"Name": "Duskfall"}}
+    panel._payload_cache = {}
+    panel._scenario_items_cache = {}
+    panel._scenario_items = []
+    panel._selected_campaign = None
+    panel._cancel_pending_sidebar_render = lambda: None
+    panel._apply_saved_focus_state = lambda campaign: None
+    panel._scroll_to_top = lambda: None
+    panel._refresh_campaign_content = lambda: None
+
+    panel._on_campaign_selected("Duskfall")
+    panel._on_campaign_selected("Duskfall")
+
+    assert calls == {"loads": 1, "builds": 1}
+    assert panel._selected_campaign is payload
+    assert panel._scenario_items == scenario_rows
+
 def test_preserve_scroll_position_restores_canvas_fraction():
     """Verify that preserve scroll position restores canvas fraction."""
     canvas = _CanvasStub(fraction=0.62)
@@ -310,7 +347,6 @@ def test_preserve_scroll_position_restores_canvas_fraction():
     assert canvas.update_calls == 1
     assert canvas.moveto_calls == [0.62]
 
-
 def test_scroll_to_top_moves_canvas_to_origin():
     """Verify that scroll to top moves canvas to origin."""
     canvas = _CanvasStub(fraction=0.48)
@@ -320,7 +356,6 @@ def test_scroll_to_top_moves_canvas_to_origin():
 
     assert canvas.moveto_calls == [0.0]
     assert canvas.fraction == 0.0
-
 
 def test_get_scroll_fraction_returns_none_without_canvas():
     """Verify that get scroll fraction returns none without canvas."""
@@ -338,7 +373,6 @@ class _HostApp:
         """Open GM screen."""
         self.calls.append(kwargs)
 
-
 def test_open_scenario_gm_screen_prefers_embedded_host(monkeypatch):
     """Verify that open scenario GM screen prefers embedded host."""
     panel = CampaignGraphPanel.__new__(CampaignGraphPanel)
@@ -351,7 +385,6 @@ def test_open_scenario_gm_screen_prefers_embedded_host(monkeypatch):
     panel._open_scenario_gm_screen("Night Run")
 
     assert host.calls == [{"show_empty_message": True, "scenario_name": "Night Run"}]
-
 
 def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     """Verify that scenario focus updates reuse the shell and defer the sidebar."""
@@ -450,7 +483,6 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     assert _ScenarioEntityBrowserStub.created == 1
     assert len(panel._scenario_sidebar_container.winfo_children()) == 1
 
-
 def test_refresh_scenario_focus_builds_initial_shell(monkeypatch):
     """Verify that the first scenario refresh builds the shell and defers the sidebar."""
     _SelectorStripStub.created = 0
@@ -537,7 +569,6 @@ def test_refresh_scenario_focus_builds_initial_shell(monkeypatch):
     assert _ScenarioEntityBrowserStub.created == 1
     assert canceled == []
     assert len(panel._scenario_sidebar_container.winfo_children()) == 1
-
 
 def test_destroy_cancels_pending_sidebar_job(monkeypatch):
     """Verify that destroying the panel cancels deferred sidebar work."""
