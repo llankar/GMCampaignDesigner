@@ -6,6 +6,7 @@ import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import threading
 from modules.helpers.text_helpers import ai_text_to_rtf_json
+from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.ai.local_ai_client import LocalAIClient
 from modules.helpers.importing.merge_helper import merge_with_confirmation
@@ -192,6 +193,7 @@ def import_formatted_scenario(text):
     # --- Build Scenario Entity ---
     scenario_entity = {
         "Title": title,
+        "Status": DEFAULT_SCENARIO_STATUS,
         "Summary": {
             "text": introduction,
             "formatting": default_formatting
@@ -578,6 +580,7 @@ class ScenarioImportWindow(ctk.CTkToplevel):
             current_scenarios = scenarios_wrapper.load_items()
             scenario_item = {
                 "Title": title,
+                "Status": DEFAULT_SCENARIO_STATUS,
                 "Summary": to_longtext(summary_expanded or summary_draft or ""),
                 "Secrets": to_longtext(""),
                 "Scenes": scenes_expanded_list,

@@ -8,6 +8,7 @@ import customtkinter as ctk
 
 from campaign_generator import GENERATOR_FUNCTIONS, export_to_docx
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS
 from modules.helpers.logging_helper import log_module_import
 
 log_module_import(__name__)
@@ -149,6 +150,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         summary = "\n".join(f"{k}: {v}" for k, v in self.current_campaign.items())
         scenario_entity = {
             "Title": title,
+            "Status": DEFAULT_SCENARIO_STATUS,
             "Summary": summary,
             "Secrets": "",
             "Places": [],

@@ -1,11 +1,35 @@
 {
     "fields": [
-        {"name": "Title", "type": "text"},
-        {"name": "Summary", "type": "longtext"},
-        {"name": "Secrets", "type": "longtext"},
-        {"name": "Places", "type": "list", "linked_type": "Places"},
-        {"name": "NPCs", "type": "list", "linked_type": "NPCs"},
-        {"name": "Objects", "type": "list", "linked_type": "Objects"}
+        {
+            "name": "Title",
+            "type": "text"
+        },
+        {
+            "name": "Status",
+            "type": "text"
+        },
+        {
+            "name": "Summary",
+            "type": "longtext"
+        },
+        {
+            "name": "Secrets",
+            "type": "longtext"
+        },
+        {
+            "name": "Places",
+            "type": "list",
+            "linked_type": "Places"
+        },
+        {
+            "name": "NPCs",
+            "type": "list",
+            "linked_type": "NPCs"
+        },
+        {
+            "name": "Objects",
+            "type": "list",
+            "linked_type": "Objects"
+        }
     ]
-  }
-  
+}

@@ -3,6 +3,7 @@
 from modules.generic.editor.shared.campaign_status_field import (
     campaign_status_choices,
     canonical_campaign_status,
+    is_campaign_or_scenario_status_field,
     is_campaign_status_field,
 )
 
@@ -12,6 +13,9 @@ def test_campaign_status_field_detection():
     assert is_campaign_status_field(entity_type="campaigns", field_name="Status")
     assert is_campaign_status_field(entity_type=" Campaigns ", field_name="Status")
     assert not is_campaign_status_field(entity_type="events", field_name="Status")
+    assert is_campaign_or_scenario_status_field(entity_type="scenarios", field_name="Status")
+    assert is_campaign_or_scenario_status_field(entity_type="campaigns", field_name="Status")
+    assert not is_campaign_or_scenario_status_field(entity_type="events", field_name="Status")
     assert not is_campaign_status_field(entity_type="campaigns", field_name="State")
 
 

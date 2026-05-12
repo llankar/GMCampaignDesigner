@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from modules.campaigns.services.ai.arc_scenario_entities import ENTITY_WRAPPER_SPECS
+from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS, canonicalize_scenario_status
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 
 
@@ -34,6 +35,10 @@ class GeneratedScenarioPersistence:
                 self._save_created_entities(scenario)
                 payload = dict(scenario)
                 payload.pop("EntityCreations", None)
+                payload["Status"] = canonicalize_scenario_status(
+                    payload.get("Status"),
+                    default=DEFAULT_SCENARIO_STATUS,
+                )
                 payload["Title"] = self._make_unique_title(payload.get("Title"), reserved_titles)
                 reserved_titles.add(payload["Title"].casefold())
                 self.scenario_wrapper.save_item(payload, key_field="Title")

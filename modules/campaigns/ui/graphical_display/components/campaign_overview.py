@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 
+from modules.campaigns.shared.progress import arc_progress_from_scenarios, campaign_progress_from_arcs
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
 from modules.scenarios.gm_screen.dashboard.widgets.arc_display.arc_momentum_meter import ArcMomentumMeter
 from ..data import CampaignGraphPayload
@@ -170,19 +171,45 @@ class CampaignOverviewHero(ctk.CTkFrame):
 
         progress = ctk.CTkFrame(sidebar, fg_color=DASHBOARD_THEME.panel_bg, corner_radius=18)
         progress.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 10))
+        campaign_progress = campaign_progress_from_arcs(self._payload.arcs)
         ArcMomentumMeter(
             progress,
-            completed_steps=sum(1 for arc in self._payload.arcs if arc.status.lower() == "completed"),
-            total_steps=max(len(self._payload.arcs), 1),
-            label="Arc completion",
+            completed_steps=round(campaign_progress * 100),
+            total_steps=100,
+            label="Campaign advancement",
         ).pack(padx=12, pady=(10, 6))
         ctk.CTkLabel(
             progress,
             text=f"{self._payload.linked_scenario_count} linked scenarios",
             justify="center",
             text_color=DASHBOARD_THEME.text_secondary,
-            wraplength=120,
-        ).pack(padx=8, pady=(0, 10))
+            wraplength=140,
+        ).pack(padx=8, pady=(0, 6))
+
+        arc_progress_items = self._arc_progress_summaries()
+        if arc_progress_items:
+            arc_list = ctk.CTkFrame(progress, fg_color="transparent")
+            arc_list.pack(fill="x", padx=12, pady=(0, 10))
+            for name, percent, scenario_count in arc_progress_items:
+                context = f"{scenario_count} scenario{'s' if scenario_count != 1 else ''}"
+                ctk.CTkLabel(
+                    arc_list,
+                    text=f"{name} — {percent}%",
+                    justify="left",
+                    text_color=DASHBOARD_THEME.text_primary,
+                    font=ctk.CTkFont(size=11, weight="bold"),
+                    anchor="w",
+                    wraplength=150,
+                ).pack(fill="x", pady=(4, 0))
+                ctk.CTkLabel(
+                    arc_list,
+                    text=context,
+                    justify="left",
+                    text_color=DASHBOARD_THEME.text_secondary,
+                    font=ctk.CTkFont(size=10),
+                    anchor="w",
+                    wraplength=150,
+                ).pack(fill="x")
 
         fact_items = [
             ("Setting", self._payload.setting),
@@ -199,6 +226,17 @@ class CampaignOverviewHero(ctk.CTkFrame):
             column = (slot % 2) + 1
             _FactTile(sidebar, label=label, value=value).grid(row=row, column=column, sticky="nsew", pady=(0, 10) if row == 0 else 0, padx=(0, 10) if column == 1 else 0)
             slot += 1
+
+    def _arc_progress_summaries(self) -> list[tuple[str, int, int]]:
+        """Return display-ready per-arc advancement summaries."""
+        summaries: list[tuple[str, int, int]] = []
+        for arc in self._payload.arcs:
+            summaries.append((
+                arc.name,
+                round(arc_progress_from_scenarios(arc.scenarios) * 100),
+                len(arc.scenarios),
+            ))
+        return summaries
 
 
 class _CompactChip(ctk.CTkFrame):

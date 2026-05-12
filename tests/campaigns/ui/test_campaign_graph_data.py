@@ -80,6 +80,38 @@ def test_build_campaign_graph_payload_includes_loose_threads(monkeypatch):
     assert len(calls) == 1
 
 
+def test_build_campaign_graph_payload_canonicalizes_scenario_statuses(monkeypatch):
+    """Verify graph payload scenario status defaults and canonicalization are compatibility-safe."""
+    monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [])
+    campaign = {
+        "Name": "Status Campaign",
+        "LinkedScenarios": ["Known", "Blank", "Missing"],
+        "Arcs": [
+            {
+                "name": "Opening",
+                "status": "Completed",
+                "scenarios": ["Known", "Blank", "Missing", "Absent"],
+            }
+        ],
+    }
+    scenarios = [
+        {"Title": "Known", "Summary": "Has alias.", "Status": "running"},
+        {"Title": "Blank", "Summary": "Blank status.", "Status": ""},
+        {"Title": "Missing", "Summary": "No status."},
+    ]
+
+    payload = build_campaign_graph_payload(campaign, scenarios)
+
+    assert payload is not None
+    assert [scenario.status for scenario in payload.arcs[0].scenarios] == [
+        "In Progress",
+        "Planned",
+        "Planned",
+        "Planned",
+    ]
+    assert payload.arcs[0].scenarios[-1].record_exists is False
+
+
 def test_build_campaign_graph_payload_indexes_only_referenced_scenarios(monkeypatch):
     """Verify graph payload indexing ignores full-list scenarios not referenced by the campaign."""
     monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [])
