@@ -19,6 +19,11 @@ from .campaign_selector_dialog import (
     CampaignSelectorOption,
     open_campaign_selector_dialog,
 )
+from .remap_target_selector_dialog import (
+    RemapTargetOption,
+    RemapTargetSelectorDialog,
+    open_remap_target_selector_dialog,
+)
 from .missing_reference_dialog import (
     MissingReferenceDialog,
     MissingReferenceDialogConfig,
@@ -48,6 +53,8 @@ __all__ = [
     "InvalidHierarchyDialogConfig",
     "MissingReferenceDialog",
     "MissingReferenceDialogConfig",
+    "RemapTargetOption",
+    "RemapTargetSelectorDialog",
     "ValidationSummaryCounts",
     "ValidationSummaryDialog",
     "build_prefilled_entity",
@@ -57,5 +64,6 @@ __all__ = [
     "open_campaign_selector_dialog",
     "open_invalid_hierarchy_dialog",
     "open_missing_reference_dialog",
+    "open_remap_target_selector_dialog",
     "open_validation_summary_dialog",
 ]

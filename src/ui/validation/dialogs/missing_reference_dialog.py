@@ -128,23 +128,20 @@ class MissingReferenceDialog:
 
         actions = ctk.CTkFrame(window)
         actions.grid(row=2, column=0, sticky="ew", padx=20, pady=8)
-        for index in range(4):
-            actions.grid_columnconfigure(index, weight=1)
+        action_buttons: list[tuple[str, Callable[[], Any]]] = [
+            (CREATE_LABEL, self.create_via_generic_editor),
+            (REMOVE_LABEL, self.remove_reference),
+            (IGNORE_LABEL, self.ignore),
+        ]
+        if self.config.remap_target_provider is not None:
+            action_buttons.insert(1, (REMAP_LABEL, self.remap))
 
-        ctk.CTkButton(
-            actions, text=CREATE_LABEL, command=self.create_via_generic_editor
-        ).grid(
-            row=0, column=0, sticky="ew", padx=4, pady=4
-        )
-        ctk.CTkButton(actions, text=REMAP_LABEL, command=self.remap).grid(
-            row=0, column=1, sticky="ew", padx=4, pady=4
-        )
-        ctk.CTkButton(actions, text=REMOVE_LABEL, command=self.remove_reference).grid(
-            row=0, column=2, sticky="ew", padx=4, pady=4
-        )
-        ctk.CTkButton(actions, text=IGNORE_LABEL, command=self.ignore).grid(
-            row=0, column=3, sticky="ew", padx=4, pady=4
-        )
+        for index in range(len(action_buttons)):
+            actions.grid_columnconfigure(index, weight=1)
+        for index, (label, command) in enumerate(action_buttons):
+            ctk.CTkButton(actions, text=label, command=command).grid(
+                row=0, column=index, sticky="ew", padx=4, pady=4
+            )
         return self
 
     def create_via_generic_editor(self) -> ValidationWizardStep | None:
