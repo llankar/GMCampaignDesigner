@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from modules.campaigns.shared.arc_parser import coerce_arc_list
+from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS, canonicalize_scenario_status
 from modules.helpers.template_loader import load_template
 from modules.helpers.text_helpers import coerce_text
 from modules.campaigns.ui.graphical_display.text_safety import (
@@ -26,6 +27,7 @@ class ScenarioEntityLink:
 class CampaignGraphScenario:
     title: str
     summary: str
+    status: str = DEFAULT_SCENARIO_STATUS
     briefing: str = ""
     objective: str = ""
     hook: str = ""
@@ -234,6 +236,7 @@ def _build_scenario_payload(
     return CampaignGraphScenario(
         title=title or "Untitled scenario",
         summary=summary,
+        status=canonicalize_scenario_status(scenario.get("Status")),
         briefing=briefing,
         objective=objective,
         hook=hook,

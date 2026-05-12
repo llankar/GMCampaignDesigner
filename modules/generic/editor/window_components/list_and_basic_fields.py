@@ -6,7 +6,7 @@ from modules.generic.editor.window_components.dynamic_linked_entities import res
 from modules.generic.editor.shared.campaign_status_field import (
     campaign_status_choices,
     canonical_campaign_status,
-    is_campaign_status_field,
+    is_campaign_or_scenario_status_field,
 )
 
 
@@ -261,7 +261,7 @@ class GenericEditorWindowListAndBasicFields:
         field_type = str(field.get("type", "")).strip().lower()
         entity_type = str(getattr(self.model_wrapper, "entity_type", "") or "")
 
-        if is_campaign_status_field(entity_type=entity_type, field_name=field_name):
+        if is_campaign_or_scenario_status_field(entity_type=entity_type, field_name=field_name):
             canonical_status = canonical_campaign_status(value)
             status_var = ctk.StringVar(value=canonical_status)
             option_menu = ctk.CTkOptionMenu(

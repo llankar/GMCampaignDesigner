@@ -22,6 +22,7 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_module_import, log_info, log_exception
 from modules.helpers.template_loader import load_template, load_entity_definitions
 from modules.helpers.text_helpers import coerce_text
+from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS, canonicalize_scenario_status
 from modules.scenarios.scene_flow_components import (
     SceneFlowPreview,
 )
@@ -2120,11 +2121,19 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
                     f"A scenario titled '{title}' already exists. Overwrite it?",
                 ):
                     return False, False
+                payload["Status"] = canonicalize_scenario_status(
+                    payload.get("Status"),
+                    default=DEFAULT_SCENARIO_STATUS,
+                )
                 items[idx] = payload
                 replaced = True
                 break
 
         if not replaced:
+            payload["Status"] = canonicalize_scenario_status(
+                payload.get("Status"),
+                default=DEFAULT_SCENARIO_STATUS,
+            )
             items.append(payload)
 
         log_info(
@@ -2153,6 +2162,10 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
 
         payload = {
             "Title": title,
+            "Status": canonicalize_scenario_status(
+                self.wizard_state.get("Status"),
+                default=DEFAULT_SCENARIO_STATUS,
+            ),
             "Summary": self.wizard_state.get("Summary", ""),
             "Secrets": secrets,
             "Secret": secrets,
