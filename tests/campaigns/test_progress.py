@@ -27,6 +27,22 @@ def test_arc_progress_averages_linked_scenario_statuses_and_empty_arcs_are_zero(
     ]) == 0.5
 
 
+def test_arc_progress_uses_canonical_status_alias_fields():
+    """Verify localized/lower-case scenario status fields drive advancement."""
+    assert arc_progress_from_scenarios([
+        {"Statut": "Completed"},
+        {"status": "In Progress"},
+        {"ScenarioStatus": "Planned"},
+    ]) == 0.5
+
+
+def test_arc_progress_prefers_status_over_stale_statut_field():
+    """Verify the real Status field wins when a stale Statut value is present."""
+    assert arc_progress_from_scenarios([
+        {"Status": "Completed", "Statut": "Planned"},
+    ]) == 1.0
+
+
 def test_campaign_progress_averages_arc_advancement():
     """Verify campaign advancement averages per-arc scenario advancement."""
     arcs = [
