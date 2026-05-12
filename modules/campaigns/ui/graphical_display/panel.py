@@ -55,18 +55,27 @@ open_scenario_in_embedded_gm_screen = getattr(
 )
 
 
+def _first_configured_db_path(*wrappers) -> str | None:
+    """Return the first explicit database path configured on a wrapper."""
+    for wrapper in wrappers:
+        db_path = getattr(wrapper, "_db_path", None)
+        if db_path:
+            return db_path
+    return None
+
 
 class CampaignGraphPanel(ctk.CTkFrame):
     """RPG-forward campaign visualizer with focused arc and scenario browsing."""
 
-    def __init__(self, master, *, campaign_wrapper=None, scenario_wrapper=None):
+    def __init__(self, master, *, campaign_wrapper=None, scenario_wrapper=None, overview_repository=None):
         """Initialize the CampaignGraphPanel instance."""
         super().__init__(master, fg_color=DASHBOARD_THEME.panel_bg)
         self.campaign_wrapper = campaign_wrapper or GenericModelWrapper("campaigns")
         self.scenario_wrapper = scenario_wrapper or GenericModelWrapper("scenarios")
+        self._overview_repository = overview_repository or self._build_overview_repository()
 
-        self._campaign_items = self._safe_load(self.campaign_wrapper)
-        self._scenario_items = self._safe_load(self.scenario_wrapper)
+        self._campaign_items = self._overview_repository.list_campaigns_for_overview()
+        self._scenario_items = []
         self._campaign_options, self._campaign_index = build_campaign_option_index(self._campaign_items)
         self._selection_store = CampaignOverviewSelectionStore()
         self._selected_campaign: CampaignGraphPayload | None = None
@@ -118,17 +127,20 @@ class CampaignGraphPanel(ctk.CTkFrame):
         else:
             self._render_empty_state("No campaigns found in the active database.")
 
-    def _safe_load(self, wrapper):
-        """Internal helper for safe load."""
-        try:
-            return wrapper.load_items()
-        except Exception:
-            return []
+    def _build_overview_repository(self):
+        """Build the lightweight overview repository from wrapper database settings."""
+        repository_class = getattr(_graph_services, "CampaignOverviewRepository", None)
+        if repository_class is None:
+            from .services.overview_repository import CampaignOverviewRepository as repository_class
+
+        db_path = _first_configured_db_path(self.campaign_wrapper, self.scenario_wrapper)
+        return repository_class(db_path=db_path)
 
     def _on_campaign_selected(self, selected_name: str) -> None:
         """Handle campaign selected."""
         self._cancel_pending_sidebar_render()
         campaign = self._campaign_index.get(selected_name)
+        self._scenario_items = self._overview_repository.load_scenarios_for_campaign(campaign)
         self._selected_campaign = build_campaign_graph_payload(campaign, self._scenario_items)
         self._selected_arc_index = 0
         self._selected_scenario_index = 0
