@@ -13,7 +13,7 @@ class _DummyFrame:
         """Initialize the _DummyFrame instance."""
         self._children = []
         self._destroyed = False
-        self._configured = {}
+        self._configured = dict(kwargs)
         if args:
             parent = args[0]
             if hasattr(parent, "_children"):
@@ -154,6 +154,7 @@ sys.modules["modules.scenarios.gm_screen.dashboard.styles.dashboard_theme"] = ty
         card_border="#555555",
         text_primary="#ffffff",
         text_secondary="#cccccc",
+        arc_complete="#22c55e",
     )
 )
 
@@ -165,8 +166,8 @@ sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 
 
-def _make_scenario(title: str):
-    return types.SimpleNamespace(title=title)
+def _make_scenario(title: str, *, status: str = "Planned"):
+    return types.SimpleNamespace(title=title, status=status)
 
 
 def test_scenario_selector_strip_updates_selection_without_rebuild(monkeypatch):
@@ -215,6 +216,76 @@ def test_scenario_selector_strip_only_rebuilds_when_scenarios_change(monkeypatch
     assert rebuilt_child_ids != initial_child_ids
     assert len(rebuilt_child_ids) == 2
 
+
+def test_scenario_selector_strip_marks_completed_cards(monkeypatch):
+    """Verify completed, non-selected scenarios get distinct styling and a text marker."""
+    fake_canvas = _FakeCanvas()
+    monkeypatch.setattr(module.tk, "Canvas", lambda *args, **kwargs: fake_canvas)
+
+    strip = module.ScenarioSelectorStrip(
+        _DummyFrame(),
+        scenarios=[
+            _make_scenario("Moonlit Wake"),
+            _make_scenario("Catacomb Chase", status="completed"),
+        ],
+        selected_index=0,
+        on_select=lambda *_args: None,
+    )
+
+    planned_card, completed_card = strip._card_frames
+
+    assert planned_card._configured["fg_color"] == module.DASHBOARD_THEME.button_fg
+    assert completed_card._configured["fg_color"] == "#064e3b"
+    assert completed_card._configured["border_color"] == module.DASHBOARD_THEME.arc_complete
+    assert strip._eyebrow_labels[1]._configured["text"] == "✓ SCN 2"
+    assert strip._title_labels[1]._configured["text_color"] == "#f8fbff"
+
+
+def test_scenario_selector_strip_preserves_selected_completed_dominance(monkeypatch):
+    """Verify selected completed scenarios keep selected fill with completed border."""
+    fake_canvas = _FakeCanvas()
+    monkeypatch.setattr(module.tk, "Canvas", lambda *args, **kwargs: fake_canvas)
+
+    strip = module.ScenarioSelectorStrip(
+        _DummyFrame(),
+        scenarios=[
+            _make_scenario("Moonlit Wake"),
+            _make_scenario("Catacomb Chase", status="COMPLETED"),
+        ],
+        selected_index=0,
+        on_select=lambda *_args: None,
+    )
+
+    strip.set_selected_index(1)
+
+    completed_card = strip._card_frames[1]
+    planned_card = strip._card_frames[0]
+
+    assert completed_card._configured["fg_color"] == module.DASHBOARD_THEME.button_fg
+    assert completed_card._configured["border_width"] == 2
+    assert completed_card._configured["border_color"] == module.DASHBOARD_THEME.arc_complete
+    assert planned_card._configured["fg_color"] == module.DASHBOARD_THEME.panel_bg
+    assert strip._eyebrow_labels[1]._configured["text"] == "✓ SCN 2"
+
+
+def test_scenario_selector_strip_syncs_completed_state_without_rebuild(monkeypatch):
+    """Verify status-only updates restyle existing cards and marker labels."""
+    fake_canvas = _FakeCanvas()
+    monkeypatch.setattr(module.tk, "Canvas", lambda *args, **kwargs: fake_canvas)
+
+    strip = module.ScenarioSelectorStrip(
+        _DummyFrame(),
+        scenarios=[_make_scenario("Moonlit Wake")],
+        selected_index=0,
+        on_select=lambda *_args: None,
+    )
+    initial_child_ids = [id(child) for child in strip.inner.winfo_children()]
+
+    strip.set_scenarios([_make_scenario("Moonlit Wake", status="Completed")], 0)
+
+    assert [id(child) for child in strip.inner.winfo_children()] == initial_child_ids
+    assert strip._card_frames[0]._configured["border_color"] == module.DASHBOARD_THEME.arc_complete
+    assert strip._eyebrow_labels[0]._configured["text"] == "✓ SCN 1"
 
 def test_arc_selector_strip_renders_clean_separator(monkeypatch):
     """Verify that the arc selector uses a real bullet separator in the subtitle."""
