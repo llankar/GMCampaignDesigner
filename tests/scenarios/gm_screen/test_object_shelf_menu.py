@@ -71,3 +71,13 @@ def test_add_menu_routing_opens_object_shelf_tab() -> None:
     GMScreenView.open_selection_window(view, "Object Shelf")
 
     assert captured == ["opened"]
+
+
+def test_object_shelf_panel_defaults_to_shelf_view_mode() -> None:
+    """Shared Object Shelf hosts should expose shelf mode for canvas interactions."""
+    module = __import__("modules.objects.object_shelf_panel", fromlist=["ObjectShelfPanel"])
+    source_names = module.ObjectShelfPanel.__init__.__code__.co_names
+    source_values = module.ObjectShelfPanel.__init__.__code__.co_consts
+
+    assert "view_mode" in source_names
+    assert "shelf" in source_values

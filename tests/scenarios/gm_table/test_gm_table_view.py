@@ -488,3 +488,51 @@ def test_mount_panel_content_builds_object_shelf_page(monkeypatch) -> None:
 
     assert isinstance(mounted, _DummyHostedPage)
     assert built == {"host": "host-frame", "callback": view.open_entity_panel}
+
+
+def test_hosted_page_grids_unmounted_widget_payload() -> None:
+    """Hosted page should mount widgets returned ungridded by builders."""
+    from modules.scenarios.gm_table.pages import GMTableHostedPage
+
+    class _Payload:
+        def __init__(self) -> None:
+            self.manager = ""
+            self.grid_calls = []
+
+        def winfo_manager(self):
+            return self.manager
+
+        def grid(self, **kwargs):
+            self.grid_calls.append(kwargs)
+            self.manager = "grid"
+
+    page = GMTableHostedPage.__new__(GMTableHostedPage)
+    payload = _Payload()
+    page._payload = payload
+
+    GMTableHostedPage._grid_payload_if_needed(page)
+
+    assert payload.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
+
+
+def test_hosted_page_keeps_already_managed_payload_in_place() -> None:
+    """Hosted page should not re-layout widgets that builders already mounted."""
+    from modules.scenarios.gm_table.pages import GMTableHostedPage
+
+    class _Payload:
+        def __init__(self) -> None:
+            self.grid_calls = []
+
+        def winfo_manager(self):
+            return "pack"
+
+        def grid(self, **kwargs):
+            self.grid_calls.append(kwargs)
+
+    page = GMTableHostedPage.__new__(GMTableHostedPage)
+    payload = _Payload()
+    page._payload = payload
+
+    GMTableHostedPage._grid_payload_if_needed(page)
+
+    assert payload.grid_calls == []

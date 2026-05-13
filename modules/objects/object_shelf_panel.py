@@ -34,6 +34,7 @@ class ObjectShelfPanel(ctk.CTkFrame):
         self.items: list[dict] = []
         self.filtered_items: list[dict] = []
         self.selected_iids: set[str] = set()
+        self.view_mode = "shelf"
         self.search_var = tk.StringVar(master=self)
 
         self.shelf_view = ObjectShelfView(self, OBJECT_CATEGORY_ALLOWED)
