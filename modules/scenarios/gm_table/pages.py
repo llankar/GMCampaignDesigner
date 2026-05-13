@@ -27,8 +27,21 @@ class GMTableHostedPage(ctk.CTkFrame):
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._payload = builder(self)
+        self._grid_payload_if_needed()
         self._state_getter = state_getter
         self._close_callback = close_callback
+
+    def _grid_payload_if_needed(self) -> None:
+        """Mount returned widget payloads that were not laid out by their builder."""
+        payload = self._payload
+        if not hasattr(payload, "grid") or not hasattr(payload, "winfo_manager"):
+            return
+        try:
+            if payload.winfo_manager():
+                return
+            payload.grid(row=0, column=0, sticky="nsew")
+        except Exception:
+            pass
 
     def get_state(self) -> dict:
         """Return any serializable page state."""
