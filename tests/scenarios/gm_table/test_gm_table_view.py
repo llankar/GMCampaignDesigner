@@ -20,6 +20,16 @@ def test_resolve_default_panel_size_prefers_large_scenario_panels() -> None:
     assert scenario_size[1] > npc_size[1]
 
 
+def test_resolve_default_panel_size_opens_objects_readably() -> None:
+    """Object panels need room for description and stats text."""
+    object_size = resolve_default_panel_size("entity", {"entity_type": "Objects"})
+    npc_size = resolve_default_panel_size("entity", {"entity_type": "NPCs"})
+
+    assert object_size == (960, 700)
+    assert object_size[0] > npc_size[0]
+    assert object_size[1] > npc_size[1]
+
+
 def test_load_entity_item_accepts_title_or_name_case_insensitively() -> None:
     """Scenario lookups should work with legacy Name-only records too."""
     view = GMTableView.__new__(GMTableView)
@@ -163,6 +173,7 @@ def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
     view = GMTableView.__new__(GMTableView)
     expected_item = {"Title": "Night Run"}
     view._load_entity_item = lambda _entity_type, _name: expected_item
+
     def callback(*args, **kwargs):
         return None
 
@@ -186,6 +197,62 @@ def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
     assert captured["callback"] is callback
     assert captured["kwargs"] == {"spotlight_only": True}
     assert captured["grid"] == {"row": 0, "column": 0, "sticky": "nsew"}
+
+
+def test_build_object_entity_content_uses_scrollable_full_detail(monkeypatch) -> None:
+    """Object shelf panels should expose text fields, not only the image spotlight."""
+    captured = {}
+
+    class _DummyFrame:
+        def __init__(self) -> None:
+            self.pack_calls = []
+
+        def pack(self, **kwargs):
+            self.pack_calls.append(kwargs)
+
+    scroll_host = object()
+
+    def _fake_scroll_host(host):
+        captured["scroll_parent"] = host
+        return scroll_host
+
+    def _fake_factory(entity_type, item, *, master, open_entity_callback, **kwargs):
+        captured["entity_type"] = entity_type
+        captured["item"] = item
+        captured["master"] = master
+        captured["callback"] = open_entity_callback
+        captured["kwargs"] = kwargs
+        return _DummyFrame()
+
+    view = GMTableView.__new__(GMTableView)
+    expected_item = {"Name": "Assault Rifle", "Description": "Readable text"}
+    view._load_entity_item = lambda _entity_type, _name: expected_item
+
+    def callback(*args, **kwargs):
+        return None
+
+    view.open_entity_panel = callback
+    host = object()
+
+    monkeypatch.setattr(gm_table_view_module, "build_scroll_host", _fake_scroll_host)
+    monkeypatch.setattr(
+        gm_table_view_module, "create_entity_detail_frame", _fake_factory
+    )
+
+    frame = GMTableView._build_entity_content(
+        view,
+        host,
+        {"entity_type": "Objects", "entity_name": "Assault Rifle"},
+    )
+
+    assert isinstance(frame, _DummyFrame)
+    assert captured["scroll_parent"] is host
+    assert captured["entity_type"] == "Objects"
+    assert captured["item"] is expected_item
+    assert captured["master"] is scroll_host
+    assert captured["callback"] is callback
+    assert captured["kwargs"] == {"spotlight_only": False}
+    assert frame.pack_calls == [{"fill": "both", "expand": True}]
 
 
 def test_context_menu_handler_resolution_is_safe_without_gm_screen_api() -> None:

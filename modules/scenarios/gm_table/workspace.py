@@ -135,6 +135,8 @@ def resolve_default_panel_size(kind: str, state: dict | None = None) -> tuple[in
         return 920, 680
     if entity_type in {"Informations", "Places", "Bases"}:
         return 760, 580
+    if entity_type == "Objects":
+        return 960, 700
     if entity_type == "Creatures":
         return 680, 480
     return 680, 560
