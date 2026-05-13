@@ -14,6 +14,12 @@ class CanvasLike(Protocol):
     def create_text(self, *args, **kwargs): ...
 
 
+_TITLE_Y_OFFSET = 45
+_META_Y_OFFSET = 72
+_PROGRESS_Y_OFFSET = 91
+_TITLE_TO_META_MIN_GAP = 24
+
+
 @dataclass(frozen=True, slots=True)
 class ArcCardColors:
     """Resolved colors used to draw one selector card."""
@@ -62,6 +68,8 @@ def calculate_arc_card_metrics(x1: float, y1: float, card_width: float, card_hei
     """Return padded geometry for an arc selector card."""
     content_x = x1 + 16
     content_right = x1 + card_width - 16
+    title_y = y1 + _TITLE_Y_OFFSET
+    meta_y = max(y1 + _META_Y_OFFSET, title_y + _TITLE_TO_META_MIN_GAP)
     return ArcCardMetrics(
         x1=x1,
         y1=y1,
@@ -71,9 +79,9 @@ def calculate_arc_card_metrics(x1: float, y1: float, card_width: float, card_hei
         height=card_height,
         content_x=content_x,
         content_right=content_right,
-        title_y=y1 + 43,
-        meta_y=y1 + card_height - 31,
-        progress_y=y1 + card_height - 13,
+        title_y=title_y,
+        meta_y=meta_y,
+        progress_y=y1 + _PROGRESS_Y_OFFSET,
     )
 
 
@@ -127,7 +135,6 @@ def draw_arc_card(
         text=truncate_to_width(payload.name, title_limit),
         fill=colors.title,
         anchor="nw",
-        width=max(metrics.width - 32, 40),
         font=("Segoe UI", 12, "bold"),
         tags=tags,
     )
@@ -161,9 +168,9 @@ def truncate_to_width(value: str, limit: int) -> str:
 
 
 def _title_limit_for_width(width: float) -> int:
-    """Estimate a two-line title budget for a Segoe UI 12 bold canvas label."""
-    chars_per_line = max(int((width - 32) / 7), 14)
-    return min(chars_per_line * 2, 54)
+    """Estimate a single-line title budget for a Segoe UI 12 bold canvas label."""
+    chars_per_line = max(int((width - 32) / 6), 14)
+    return min(chars_per_line, 34)
 
 
 def _draw_status_pill(
