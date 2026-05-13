@@ -35,7 +35,7 @@ def test_truncate_to_width_uses_single_ellipsis():
 
 def test_draw_arc_card_keeps_status_and_count_separate():
     canvas = FakeCanvas()
-    metrics = calculate_arc_card_metrics(10, 16, 210, 104)
+    metrics = calculate_arc_card_metrics(10, 16, 236, 104)
     colors = ArcCardColors(
         fill="#111",
         outline="#222",
@@ -50,7 +50,7 @@ def test_draw_arc_card_keeps_status_and_count_separate():
     )
     payload = ArcCardPayload(
         index=0,
-        name="Welcome to the common rooms with a long descriptive title",
+        name="Welcome to the Commonwealth",
         status="Planned",
         scenario_count=10,
         completed_scenarios=0,
@@ -58,8 +58,25 @@ def test_draw_arc_card_keeps_status_and_count_separate():
 
     draw_arc_card(canvas, metrics, payload, colors, tags=("arc:0",))
 
-    text_values = [kwargs["text"] for kind, _args, kwargs in canvas.calls if kind == "text"]
+    text_calls = [(args, kwargs) for kind, args, kwargs in canvas.calls if kind == "text"]
+    text_values = [kwargs["text"] for _args, kwargs in text_calls]
     assert "ARC 1" in text_values
     assert "Planned" in text_values
     assert "10 scenarios" in text_values
-    assert any(value.startswith("Welcome to") and value.endswith("...") for value in text_values)
+    assert "Welcome to the Commonwealth" in text_values
+
+    title_call = next(
+        (args, kwargs)
+        for args, kwargs in text_calls
+        if kwargs["text"] == "Welcome to the Commonwealth"
+    )
+    scenario_count_call = next(
+        (args, kwargs)
+        for args, kwargs in text_calls
+        if kwargs["text"] == "10 scenarios"
+    )
+
+    assert title_call is not scenario_count_call
+    assert title_call[1]["anchor"] == "nw"
+    assert scenario_count_call[1]["anchor"] == "w"
+    assert scenario_count_call[0][1] - title_call[0][1] >= 24
