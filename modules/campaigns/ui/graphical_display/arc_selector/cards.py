@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from .text import title_limit_for_card_width, truncate_to_width
+
 
 class CanvasLike(Protocol):
     """Small protocol for the tkinter Canvas methods used by these helpers."""
@@ -128,7 +130,7 @@ def draw_arc_card(
     )
     _draw_status_pill(canvas, metrics, payload.status, colors, tags=tags)
 
-    title_limit = _title_limit_for_width(metrics.width)
+    title_limit = title_limit_for_card_width(metrics.width)
     canvas.create_text(
         metrics.content_x,
         metrics.title_y,
@@ -156,21 +158,6 @@ def scenario_count_label(count: int) -> str:
     safe_count = max(int(count or 0), 0)
     noun = "scenario" if safe_count == 1 else "scenarios"
     return f"{safe_count} {noun}"
-
-
-def truncate_to_width(value: str, limit: int) -> str:
-    """Truncate text for a fixed-width canvas card."""
-    text = str(value or "").strip()
-    if len(text) <= limit:
-        return text
-    ellipsis = "..."
-    return text[: max(limit - len(ellipsis), 0)].rstrip() + ellipsis
-
-
-def _title_limit_for_width(width: float) -> int:
-    """Estimate a single-line title budget for a Segoe UI 12 bold canvas label."""
-    chars_per_line = max(int((width - 32) / 6), 14)
-    return min(chars_per_line, 34)
 
 
 def _draw_status_pill(

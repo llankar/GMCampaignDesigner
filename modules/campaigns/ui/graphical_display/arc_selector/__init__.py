@@ -7,8 +7,8 @@ from .cards import (
     calculate_arc_card_metrics,
     draw_arc_card,
     scenario_count_label,
-    truncate_to_width,
 )
+from .text import title_limit_for_card_width, truncate_to_width
 
 __all__ = [
     "ArcCardColors",
@@ -17,5 +17,6 @@ __all__ = [
     "calculate_arc_card_metrics",
     "draw_arc_card",
     "scenario_count_label",
+    "title_limit_for_card_width",
     "truncate_to_width",
 ]

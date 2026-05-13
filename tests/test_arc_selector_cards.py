@@ -4,6 +4,7 @@ from modules.campaigns.ui.graphical_display.arc_selector import (
     calculate_arc_card_metrics,
     draw_arc_card,
     scenario_count_label,
+    title_limit_for_card_width,
     truncate_to_width,
 )
 
@@ -31,6 +32,11 @@ def test_scenario_count_label_pluralizes_cleanly():
 def test_truncate_to_width_uses_single_ellipsis():
     assert truncate_to_width("Short", 12) == "Short"
     assert truncate_to_width("Welcome to the common rooms", 18) == "Welcome to the..."
+
+
+def test_title_limit_for_card_width_matches_arc_card_content_area():
+    assert title_limit_for_card_width(236) == 24
+    assert title_limit_for_card_width(150) == 14
 
 
 def test_draw_arc_card_keeps_status_and_count_separate():
@@ -63,12 +69,12 @@ def test_draw_arc_card_keeps_status_and_count_separate():
     assert "ARC 1" in text_values
     assert "Planned" in text_values
     assert "10 scenarios" in text_values
-    assert "Welcome to the Commonwealth" in text_values
+    assert "Welcome to the Common..." in text_values
 
     title_call = next(
         (args, kwargs)
         for args, kwargs in text_calls
-        if kwargs["text"] == "Welcome to the Commonwealth"
+        if kwargs["text"] == "Welcome to the Common..."
     )
     scenario_count_call = next(
         (args, kwargs)
