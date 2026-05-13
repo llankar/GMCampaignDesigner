@@ -127,7 +127,6 @@ def draw_arc_card(
         text=truncate_to_width(payload.name, title_limit),
         fill=colors.title,
         anchor="nw",
-        width=max(metrics.width - 32, 40),
         font=("Segoe UI", 12, "bold"),
         tags=tags,
     )
@@ -161,9 +160,9 @@ def truncate_to_width(value: str, limit: int) -> str:
 
 
 def _title_limit_for_width(width: float) -> int:
-    """Estimate a two-line title budget for a Segoe UI 12 bold canvas label."""
-    chars_per_line = max(int((width - 32) / 7), 14)
-    return min(chars_per_line * 2, 54)
+    """Estimate a one-line title budget for a Segoe UI 12 bold canvas label."""
+    chars_per_line = max(int((width - 32) / 8), 14)
+    return min(chars_per_line, 34)
 
 
 def _draw_status_pill(

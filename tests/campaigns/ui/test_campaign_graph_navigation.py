@@ -299,7 +299,8 @@ def test_arc_selector_strip_renders_clean_card_elements(monkeypatch):
         on_select=lambda *_args: None,
     )
 
-    assert any(text == "PharmaCorp Protection & Espionage" for text in fake_canvas.text_calls)
+    assert any(text == "PharmaCorp Protection..." for text in fake_canvas.text_calls)
+    assert all(text != "PharmaCorp Protection & Espionage" for text in fake_canvas.text_calls)
     assert any(text == "Planned" for text in fake_canvas.text_calls)
     assert any(text == "3 scenarios" for text in fake_canvas.text_calls)
 

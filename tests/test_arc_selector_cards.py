@@ -58,8 +58,13 @@ def test_draw_arc_card_keeps_status_and_count_separate():
 
     draw_arc_card(canvas, metrics, payload, colors, tags=("arc:0",))
 
-    text_values = [kwargs["text"] for kind, _args, kwargs in canvas.calls if kind == "text"]
+    text_calls = [(args, kwargs) for kind, args, kwargs in canvas.calls if kind == "text"]
+    text_values = [kwargs["text"] for _args, kwargs in text_calls]
+    title_call = next((args, kwargs) for args, kwargs in text_calls if kwargs["text"].startswith("Welcome to"))
+
     assert "ARC 1" in text_values
     assert "Planned" in text_values
     assert "10 scenarios" in text_values
-    assert any(value.startswith("Welcome to") and value.endswith("...") for value in text_values)
+    assert "Welcome to the comm..." in text_values
+    assert title_call[1]["text"].endswith("...")
+    assert "width" not in title_call[1]
