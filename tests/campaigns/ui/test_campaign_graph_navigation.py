@@ -287,8 +287,8 @@ def test_scenario_selector_strip_syncs_completed_state_without_rebuild(monkeypat
     assert strip._card_frames[0]._configured["border_color"] == module.DASHBOARD_THEME.arc_complete
     assert strip._eyebrow_labels[0]._configured["text"] == "✓ SCN 1"
 
-def test_arc_selector_strip_renders_clean_separator(monkeypatch):
-    """Verify that the arc selector uses a real bullet separator in the subtitle."""
+def test_arc_selector_strip_renders_clean_card_elements(monkeypatch):
+    """Verify that the arc selector renders title, status, and scenario count as separate elements."""
     fake_canvas = _FakeCanvas()
     monkeypatch.setattr(module.tk, "Canvas", lambda *args, **kwargs: fake_canvas)
 
@@ -299,8 +299,9 @@ def test_arc_selector_strip_renders_clean_separator(monkeypatch):
         on_select=lambda *_args: None,
     )
 
-    assert any(text == "PharmaCorp Protection..." for text in fake_canvas.text_calls)
-    assert any(text == "Planned • 3 scenarios" for text in fake_canvas.text_calls)
+    assert any(text == "PharmaCorp Protection & Espionage" for text in fake_canvas.text_calls)
+    assert any(text == "Planned" for text in fake_canvas.text_calls)
+    assert any(text == "3 scenarios" for text in fake_canvas.text_calls)
 
 
 def test_arc_selector_truncation_helpers_emit_ascii_ellipsis():
