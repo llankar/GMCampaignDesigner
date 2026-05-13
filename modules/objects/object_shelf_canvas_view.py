@@ -803,8 +803,12 @@ class ObjectShelfView:
                     # Handle the branch where t.startswith('obj:').
                     it = self._item_by_tag.get(t)
                     if it is not None:
-                        # Use the new fixed-height lower bar with its own scrollbar
-                        self._show_item_detail_fixed(it)
+                        opener = getattr(self.host, "open_item", None)
+                        if callable(opener):
+                            opener(it)
+                        else:
+                            # Use the new fixed-height lower bar with its own scrollbar
+                            self._show_item_detail_fixed(it)
                         return "break"
         return None
 

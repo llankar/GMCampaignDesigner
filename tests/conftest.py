@@ -388,6 +388,38 @@ except ModuleNotFoundError:
 
     pil_imagedraw_module.Draw = _Draw
 
+    pil_imagefont_module = types.ModuleType("PIL.ImageFont")
+
+    class _Font:
+        def __init__(self, *args, **kwargs):
+            """Initialize the _Font instance."""
+            pass
+
+    pil_imagefont_module.ImageFont = _Font
+    pil_imagefont_module.FreeTypeFont = _Font
+    pil_imagefont_module.truetype = lambda *args, **kwargs: _Font()
+    pil_imagefont_module.load_default = lambda *args, **kwargs: _Font()
+
+    pil_imagechops_module = types.ModuleType("PIL.ImageChops")
+    pil_imagechops_module.subtract = lambda image1, image2, *args, **kwargs: image1
+    pil_imagechops_module.offset = lambda image, *args, **kwargs: image
+
+    pil_imageenhance_module = types.ModuleType("PIL.ImageEnhance")
+
+    class _Enhancer:
+        def __init__(self, image):
+            """Initialize the _Enhancer instance."""
+            self.image = image
+
+        def enhance(self, *_args, **_kwargs):
+            """Return the enhanced image stub."""
+            return self.image
+
+    pil_imageenhance_module.Brightness = _Enhancer
+    pil_imageenhance_module.Contrast = _Enhancer
+    pil_imageenhance_module.Color = _Enhancer
+    pil_imageenhance_module.Sharpness = _Enhancer
+
     pil_imagegrab_module = types.ModuleType("PIL.ImageGrab")
     pil_imagegrab_module.grab = lambda *args, **kwargs: _Image()
 
@@ -404,6 +436,9 @@ except ModuleNotFoundError:
     pil_module.ImageTk = pil_imagetk_module
     pil_module.ImageGrab = pil_imagegrab_module
     pil_module.ImageDraw = pil_imagedraw_module
+    pil_module.ImageChops = pil_imagechops_module
+    pil_module.ImageFont = pil_imagefont_module
+    pil_module.ImageEnhance = pil_imageenhance_module
     pil_module.ImageFilter = pil_imagefilter_module
 
     _ensure_module("PIL", pil_module)
@@ -412,6 +447,9 @@ except ModuleNotFoundError:
     _ensure_module("PIL.ImageTk", pil_imagetk_module)
     _ensure_module("PIL.ImageGrab", pil_imagegrab_module)
     _ensure_module("PIL.ImageDraw", pil_imagedraw_module)
+    _ensure_module("PIL.ImageChops", pil_imagechops_module)
+    _ensure_module("PIL.ImageFont", pil_imagefont_module)
+    _ensure_module("PIL.ImageEnhance", pil_imageenhance_module)
     _ensure_module("PIL.ImageFilter", pil_imagefilter_module)
 
 try:

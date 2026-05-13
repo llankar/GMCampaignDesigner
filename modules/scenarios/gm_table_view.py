@@ -18,6 +18,7 @@ from modules.helpers.template_loader import load_template as load_entity_templat
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.maps.world_map_view import WorldMapPanel
 from modules.objects.loot_generator_panel import LootGeneratorPanel
+from modules.objects.object_shelf_panel import create_object_shelf_panel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
@@ -125,6 +126,7 @@ class GMTableView(ctk.CTkFrame):
             "Image Library",
             "Handouts",
             "Loot Generator",
+            "Object Shelf",
             "Whiteboard",
             "Random Tables",
             "Plot Twists",
@@ -682,6 +684,9 @@ class GMTableView(ctk.CTkFrame):
         if option == "Loot Generator":
             self._create_panel("loot_generator", "Loot Generator", {})
             return
+        if option == "Object Shelf":
+            self._create_panel("object_shelf", "Object Shelf", {})
+            return
         if option == "Whiteboard":
             self._create_panel("whiteboard", "Whiteboard", {})
             return
@@ -769,6 +774,13 @@ class GMTableView(ctk.CTkFrame):
                 return GMTableHostedPage(
                     parent,
                     builder=lambda host: self._build_loot_generator_content(host),
+                )
+            if kind == "object_shelf":
+                return GMTableHostedPage(
+                    parent,
+                    builder=lambda host: create_object_shelf_panel(
+                        host, open_entity_callback=self.open_entity_panel
+                    ),
                 )
             if kind == "whiteboard":
                 return GMTableHostedPage(
