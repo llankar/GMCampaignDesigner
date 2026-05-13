@@ -7,6 +7,12 @@ from typing import Callable, Sequence
 import customtkinter as ctk
 
 from modules.scenarios.gm_screen.dashboard.styles.dashboard_theme import DASHBOARD_THEME
+from ..arc_selector import (
+    ArcCardColors,
+    ArcCardPayload,
+    calculate_arc_card_metrics,
+    draw_arc_card,
+)
 from ..data import CampaignGraphArc, CampaignGraphScenario
 
 
@@ -46,7 +52,7 @@ class ArcSelectorStrip(_CanvasSelector):
         self._arcs = list(arcs)
         self._selected_index = selected_index
         self._on_select = on_select
-        super().__init__(parent, height=124, bg_color=DASHBOARD_THEME.panel_alt_bg)
+        super().__init__(parent, height=136, bg_color=_theme_attr("panel_alt_bg", "#111111"))
 
     def _render(self, *_args, **_kwargs) -> None:
         """Render the operation."""
@@ -56,60 +62,64 @@ class ArcSelectorStrip(_CanvasSelector):
 
         canvas.delete("all")
         width = max(canvas.winfo_width(), 420)
-        height = max(canvas.winfo_height(), 124)
+        height = max(canvas.winfo_height(), 136)
         canvas.create_rectangle(0, 0, width, height, fill=self._bg_color, outline="")
 
         count = max(len(self._arcs), 1)
         margin = 20
         gap = 12
-        card_width = max(min((width - (margin * 2) - (gap * (count - 1))) / count, 220), 118)
+        card_height = height - 32
+        card_width = max(min((width - (margin * 2) - (gap * (count - 1))) / count, 236), 150)
         total_width = card_width * count + gap * max(count - 1, 0)
         start_x = max((width - total_width) / 2, margin)
 
         for index, arc in enumerate(self._arcs):
             x1 = start_x + index * (card_width + gap)
-            x2 = x1 + card_width
-            y1 = 18
-            y2 = height - 18
             selected = index == self._selected_index
             tag = f"arc:{index}"
-            fill = DASHBOARD_THEME.button_fg if selected else DASHBOARD_THEME.panel_bg
-            outline = DASHBOARD_THEME.accent_soft if selected else DASHBOARD_THEME.card_border
-            title_color = "#f8fbff" if selected else DASHBOARD_THEME.text_primary
-            meta_color = "#d6e9ff" if selected else DASHBOARD_THEME.text_secondary
-
-            canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline=outline, width=2, tags=(tag,))
-            canvas.create_text(
-                x1 + 14,
-                y1 + 18,
-                text=f"Arc {index + 1}",
-                fill="#8fb0dd",
-                anchor="w",
-                font=("Segoe UI", 10, "bold"),
-                tags=(tag,),
+            colors = self._arc_card_colors(arc, selected=selected)
+            payload = ArcCardPayload(
+                index=index,
+                name=arc.name,
+                status=arc.status,
+                scenario_count=len(arc.scenarios),
+                completed_scenarios=self._completed_scenario_count(arc),
             )
-            canvas.create_text(
-                x1 + 14,
-                y1 + 42,
-                text=_truncate(arc.name, 24),
-                fill=title_color,
-                anchor="w",
-                width=max(card_width - 28, 40),
-                font=("Segoe UI", 12, "bold"),
-                tags=(tag,),
-            )
-            canvas.create_text(
-                x1 + 14,
-                y2 - 18,
-                text=f"{arc.status} \u2022 {len(arc.scenarios)} scenarios",
-                fill=meta_color,
-                anchor="sw",
-                font=("Segoe UI", 9, "bold"),
+            draw_arc_card(
+                canvas,
+                calculate_arc_card_metrics(x1, 16, card_width, card_height),
+                payload,
+                colors,
                 tags=(tag,),
             )
             canvas.tag_bind(tag, "<Button-1>", lambda _e=None, idx=index: self._on_select(idx))
             canvas.tag_bind(tag, "<Enter>", lambda _e=None: canvas.configure(cursor="hand2"))
             canvas.tag_bind(tag, "<Leave>", lambda _e=None: canvas.configure(cursor=""))
+
+    def _arc_card_colors(self, arc: CampaignGraphArc, *, selected: bool) -> ArcCardColors:
+        """Return the color palette for a single arc selector card."""
+        status_color = _arc_status_color(arc.status)
+        completed = self._arc_is_complete(arc)
+        return ArcCardColors(
+            fill=_theme_attr("button_fg", "#222222") if selected else _theme_attr("panel_bg", "#333333"),
+            outline=_theme_attr("accent_soft", "#444444") if selected else _theme_attr("card_border", "#555555"),
+            title="#f8fbff" if selected else _theme_attr("text_primary", "#ffffff"),
+            eyebrow="#d7ffe7" if completed else "#8fb0dd",
+            meta="#d6e9ff" if selected else _theme_attr("text_secondary", "#cccccc"),
+            status_text="#0f172a",
+            status_fill=status_color,
+            progress_track=_theme_attr("arc_track", "#333333"),
+            progress_fill=status_color,
+            accent=status_color if selected or completed else _theme_attr("card_border", "#555555"),
+        )
+
+    def _completed_scenario_count(self, arc: CampaignGraphArc) -> int:
+        """Return completed scenarios for arc progress rendering."""
+        return sum(1 for scenario in arc.scenarios if _scenario_is_completed(scenario))
+
+    def _arc_is_complete(self, arc: CampaignGraphArc) -> bool:
+        """Return whether an arc should be presented as complete."""
+        return str(arc.status or "").strip().casefold() == "completed"
 
 
 class ScenarioSelectorStrip(ctk.CTkFrame):
@@ -295,6 +305,23 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
     def _resize_window(self, event) -> None:
         """Internal helper for resize window."""
         self.canvas.itemconfigure(self.canvas_window, height=event.height)
+
+
+def _theme_attr(name: str, fallback: str) -> str:
+    """Return a dashboard theme attribute while tolerating lean test stubs."""
+    return getattr(DASHBOARD_THEME, name, fallback)
+
+
+def _arc_status_color(status: str) -> str:
+    """Return the accent color associated with an arc status."""
+    normalized = str(status or "").strip().casefold()
+    if normalized == "completed":
+        return _theme_attr("arc_complete", "#22c55e")
+    if normalized in {"in progress", "running"}:
+        return _theme_attr("arc_active", "#f59e0b")
+    if normalized in {"paused", "blocked"}:
+        return _theme_attr("accent_soft", "#a78bfa")
+    return _theme_attr("arc_planned", "#60a5fa")
 
 
 def _truncate(value: str, limit: int) -> str:
