@@ -9,6 +9,7 @@ from uuid import uuid4
 import customtkinter as ctk
 
 from modules.characters.character_graph_editor import CharacterGraphEditor
+from modules.generic.detail_ui import build_scroll_host
 from modules.generic.entity_detail_factory import create_entity_detail_frame
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -923,6 +924,19 @@ class GMTableView(ctk.CTkFrame):
         entity_type = state.get("entity_type")
         entity_name = state.get("entity_name")
         item = self._load_entity_item(entity_type, entity_name)
+
+        if self._uses_readable_entity_detail(entity_type):
+            scrollable_host = build_scroll_host(host)
+            frame = create_entity_detail_frame(
+                entity_type,
+                item,
+                master=scrollable_host,
+                open_entity_callback=self.open_entity_panel,
+                spotlight_only=False,
+            )
+            frame.pack(fill="both", expand=True)
+            return frame
+
         frame = create_entity_detail_frame(
             entity_type,
             item,
@@ -932,6 +946,11 @@ class GMTableView(ctk.CTkFrame):
         )
         frame.grid(row=0, column=0, sticky="nsew")
         return frame
+
+    @staticmethod
+    def _uses_readable_entity_detail(entity_type: str | None) -> bool:
+        """Return whether GM Table panels should show full text details."""
+        return entity_type == "Objects"
 
     def _build_puzzle_display_content(self, host, state: dict):
         """Build the puzzle display page."""
