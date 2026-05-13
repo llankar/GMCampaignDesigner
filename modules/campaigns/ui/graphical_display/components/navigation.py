@@ -130,6 +130,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         self._on_select = on_select
         self._scenario_signature: tuple[str, ...] = tuple(_scenario_signature(scenario) for scenario in self._scenarios)
         self._card_frames: list[ctk.CTkFrame] = []
+        self._eyebrow_labels: list[ctk.CTkLabel] = []
         self._title_labels: list[ctk.CTkLabel] = []
 
         self.grid_columnconfigure(0, weight=1)
@@ -180,6 +181,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
             return
 
         self._card_frames = []
+        self._eyebrow_labels = []
         self._title_labels = []
         for child in self.inner.winfo_children():
             child.destroy()
@@ -188,12 +190,13 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         card_width = 196 if many_scenarios else 224
         for index, scenario in enumerate(self._scenarios):
             selected = index == self._selected_index
+            card_style = self._scenario_card_style(scenario, selected=selected)
             card = ctk.CTkFrame(
                 self.inner,
-                fg_color=DASHBOARD_THEME.button_fg if selected else DASHBOARD_THEME.panel_bg,
+                fg_color=card_style["fg_color"],
                 corner_radius=14,
-                border_width=2 if selected else 1,
-                border_color=DASHBOARD_THEME.accent_soft if selected else DASHBOARD_THEME.card_border,
+                border_width=card_style["border_width"],
+                border_color=card_style["border_color"],
                 width=card_width,
                 height=104,
             )
@@ -201,17 +204,18 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
             card.grid_propagate(False)
             card.grid_columnconfigure(0, weight=1)
 
-            ctk.CTkLabel(
+            eyebrow_label = ctk.CTkLabel(
                 card,
-                text=f"SCN {index + 1}",
-                text_color="#8fb0dd",
+                text=self._scenario_label_text(index, scenario),
+                text_color=card_style["eyebrow_color"],
                 font=ctk.CTkFont(size=9, weight="bold"),
                 anchor="w",
-            ).grid(row=0, column=0, sticky="w", padx=12, pady=(8, 2))
+            )
+            eyebrow_label.grid(row=0, column=0, sticky="w", padx=12, pady=(8, 2))
             title_label = ctk.CTkLabel(
                 card,
                 text=_truncate_middle(scenario.title, 46 if not many_scenarios else 36),
-                text_color="#f8fbff" if selected else DASHBOARD_THEME.text_primary,
+                text_color=card_style["title_color"],
                 font=ctk.CTkFont(size=13, weight="bold"),
                 anchor="w",
                 justify="left",
@@ -225,6 +229,7 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
                 clickable.bind("<Leave>", lambda _event, target=card: target.configure(cursor=""))
 
             self._card_frames.append(card)
+            self._eyebrow_labels.append(eyebrow_label)
             self._title_labels.append(title_label)
 
         self.after_idle(self._sync_scrollregion)
@@ -238,15 +243,54 @@ class ScenarioSelectorStrip(ctk.CTkFrame):
         """Restyle existing cards to match the selected scenario."""
         for index, card in enumerate(self._card_frames):
             selected = index == self._selected_index
+            scenario = self._scenarios[index] if index < len(self._scenarios) else None
+            card_style = self._scenario_card_style(scenario, selected=selected)
             card.configure(
-                fg_color=DASHBOARD_THEME.button_fg if selected else DASHBOARD_THEME.panel_bg,
-                border_width=2 if selected else 1,
-                border_color=DASHBOARD_THEME.accent_soft if selected else DASHBOARD_THEME.card_border,
+                fg_color=card_style["fg_color"],
+                border_width=card_style["border_width"],
+                border_color=card_style["border_color"],
             )
+            if index < len(self._eyebrow_labels):
+                self._eyebrow_labels[index].configure(
+                    text=self._scenario_label_text(index, scenario),
+                    text_color=card_style["eyebrow_color"],
+                )
             if index < len(self._title_labels):
                 self._title_labels[index].configure(
-                    text_color="#f8fbff" if selected else DASHBOARD_THEME.text_primary,
+                    text_color=card_style["title_color"],
                 )
+
+    def _scenario_card_style(self, scenario: CampaignGraphScenario | None, *, selected: bool) -> dict[str, str | int]:
+        """Return the colors for a scenario selector card."""
+        completed = _scenario_is_completed(scenario)
+        if selected:
+            return {
+                "fg_color": DASHBOARD_THEME.button_fg,
+                "border_width": 2,
+                "border_color": DASHBOARD_THEME.arc_complete if completed else DASHBOARD_THEME.accent_soft,
+                "title_color": "#f8fbff",
+                "eyebrow_color": "#d7ffe7" if completed else "#8fb0dd",
+            }
+        if completed:
+            return {
+                "fg_color": "#064e3b",
+                "border_width": 1,
+                "border_color": DASHBOARD_THEME.arc_complete,
+                "title_color": "#f8fbff",
+                "eyebrow_color": "#d7ffe7",
+            }
+        return {
+            "fg_color": DASHBOARD_THEME.panel_bg,
+            "border_width": 1,
+            "border_color": DASHBOARD_THEME.card_border,
+            "title_color": DASHBOARD_THEME.text_primary,
+            "eyebrow_color": "#8fb0dd",
+        }
+
+    def _scenario_label_text(self, index: int, scenario: CampaignGraphScenario | None) -> str:
+        """Return the accessible scenario number label text."""
+        prefix = "✓ " if _scenario_is_completed(scenario) else ""
+        return f"{prefix}SCN {index + 1}"
 
     def _resize_window(self, event) -> None:
         """Internal helper for resize window."""
@@ -274,6 +318,11 @@ def _truncate_middle(value: str, limit: int) -> str:
     head = max(remaining // 2, 1)
     tail = max(remaining - head, 1)
     return f"{text[:head].rstrip()}{ellipsis}{text[-tail:].lstrip()}"
+
+
+def _scenario_is_completed(scenario: CampaignGraphScenario | None) -> bool:
+    """Return whether a scenario has the canonical completed status."""
+    return str(getattr(scenario, "status", "") or "").strip().casefold() == "completed"
 
 
 def _scenario_signature(scenario: CampaignGraphScenario) -> str:
