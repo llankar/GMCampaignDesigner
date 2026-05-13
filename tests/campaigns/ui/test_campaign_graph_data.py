@@ -4,6 +4,8 @@ import importlib.util
 import sys
 from pathlib import Path
 
+from modules.campaigns.shared.progress import campaign_progress_from_arcs
+
 
 MODULE_PATH = Path("modules/campaigns/ui/graphical_display/data.py")
 spec = importlib.util.spec_from_file_location("campaign_graph_data", MODULE_PATH)
@@ -110,6 +112,23 @@ def test_build_campaign_graph_payload_canonicalizes_scenario_statuses(monkeypatc
         "Planned",
     ]
     assert payload.arcs[0].scenarios[-1].record_exists is False
+
+
+def test_build_campaign_graph_payload_preserves_completed_status_for_progress(monkeypatch):
+    """Verify completed scenario Status survives graph payload build and counts as progress."""
+    monkeypatch.setattr(module, "iter_scenario_link_fields", lambda: [])
+    campaign = {
+        "Name": "Completion Campaign",
+        "LinkedScenarios": ["Finale"],
+        "Arcs": [{"name": "Final Act", "scenarios": ["Finale"]}],
+    }
+    scenarios = [{"Title": "Finale", "Summary": "The last scene.", "Status": "Completed"}]
+
+    payload = build_campaign_graph_payload(campaign, scenarios)
+
+    assert payload is not None
+    assert payload.arcs[0].scenarios[0].status == "Completed"
+    assert campaign_progress_from_arcs(payload.arcs) == 1.0
 
 
 def test_build_campaign_graph_payload_indexes_only_referenced_scenarios(monkeypatch):

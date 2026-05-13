@@ -31,6 +31,7 @@ CAMPAIGN_CONFIG_COLUMNS: tuple[str, ...] = (
 
 SCENARIO_OVERVIEW_COLUMNS: tuple[str, ...] = (
     "Title",
+    "Status",
     "Summary",
     "Briefing",
     "ScenarioBriefing",

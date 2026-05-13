@@ -473,7 +473,9 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     assert len(panel._scenario_right_stack.winfo_children()) == 2
     assert panel._scenario_prev_button.text == "← Previous"
     assert panel._scenario_next_button.text == "Next →"
-    assert panel._scenario_status_label.text == "2 links"
+    assert panel._scenario_status_label.text == "Planned"
+    assert panel._scenario_status_label._configured["fg_color"] == "status:Planned"
+    assert panel._scenario_status_label._configured["text_color"] == "#f8fbff"
     assert _ScenarioIdentityPanelStub.instances[-1].kwargs["progress_items"][-1] == ("status", "Planned")
     assert len(scheduled) == 1
     assert len(panel._scenario_sidebar_container.winfo_children()) == 1
@@ -487,6 +489,9 @@ def test_scenario_focus_updates_in_place_and_defers_sidebar(monkeypatch):
     assert len(scheduled) == 2
     assert len(panel._scenario_sidebar_container.winfo_children()) == 1
     assert _ScenarioIdentityPanelStub.instances[-1].kwargs["progress_items"][-1] == ("status", "Completed")
+    assert panel._scenario_status_label.text == "Completed"
+    assert panel._scenario_status_label._configured["fg_color"] == "status:Completed"
+    assert panel._scenario_status_label._configured["text_color"] == "#f8fbff"
 
     scheduled[-1][1]()
 

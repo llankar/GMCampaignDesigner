@@ -93,6 +93,7 @@ def test_list_linked_scenarios_loads_only_campaign_references_and_payload_fields
             """
             CREATE TABLE scenarios (
                 Title TEXT PRIMARY KEY,
+                Status TEXT,
                 Summary TEXT,
                 Briefing TEXT,
                 Objective TEXT,
@@ -109,12 +110,13 @@ def test_list_linked_scenarios_loads_only_campaign_references_and_payload_fields
         conn.execute(
             """
             INSERT INTO scenarios (
-                Title, Summary, Briefing, Objective, Hook, Stakes, Scenes,
+                Title, Status, Summary, Briefing, Objective, Hook, Stakes, Scenes,
                 Secrets, Places, Factions, Notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "Opening Gambit",
+                "Completed",
                 "Begin at the gala.",
                 "Brief the GM.",
                 "Find the spy",
@@ -130,12 +132,13 @@ def test_list_linked_scenarios_loads_only_campaign_references_and_payload_fields
         conn.execute(
             """
             INSERT INTO scenarios (
-                Title, Summary, Briefing, Objective, Hook, Stakes, Scenes,
+                Title, Status, Summary, Briefing, Objective, Hook, Stakes, Scenes,
                 Secrets, Places, Factions, Notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 "Unlinked Scenario",
+                "In Progress",
                 "Should not load.",
                 "",
                 "",
@@ -158,6 +161,7 @@ def test_list_linked_scenarios_loads_only_campaign_references_and_payload_fields
     assert scenarios == [
         {
             "Title": "Opening Gambit",
+            "Status": "Completed",
             "Summary": "Begin at the gala.",
             "Briefing": "Brief the GM.",
             "Objective": "Find the spy",

@@ -803,8 +803,9 @@ class CampaignGraphPanel(ctk.CTkFrame):
             title_label.configure(text=selected_scenario.title)
         if status_label is not None:
             status_label.configure(
-                text=f"{len(selected_scenario.entity_links)} links",
-                fg_color=self._status_color(f"{len(selected_scenario.entity_links)} links"),
+                text=selected_scenario.status,
+                fg_color=self._status_color(selected_scenario.status),
+                text_color=self._status_text_color(selected_scenario.status),
             )
 
         self._render_selected_scenario_primary(arc, selected_scenario)
