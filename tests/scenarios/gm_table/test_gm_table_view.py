@@ -152,11 +152,12 @@ def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
         def grid(self, **kwargs):
             captured["grid"] = kwargs
 
-    def _fake_factory(entity_type, item, *, master, open_entity_callback):
+    def _fake_factory(entity_type, item, *, master, open_entity_callback, **kwargs):
         captured["entity_type"] = entity_type
         captured["item"] = item
         captured["master"] = master
         captured["callback"] = open_entity_callback
+        captured["kwargs"] = kwargs
         return _DummyFrame()
 
     view = GMTableView.__new__(GMTableView)
@@ -183,6 +184,7 @@ def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
     assert captured["item"] is expected_item
     assert captured["master"] is host
     assert captured["callback"] is callback
+    assert captured["kwargs"] == {"spotlight_only": True}
     assert captured["grid"] == {"row": 0, "column": 0, "sticky": "nsew"}
 
 
@@ -430,3 +432,59 @@ def test_apply_fog_action_routes_to_active_map_panel() -> None:
         ("reset",),
         ("undo",),
     ]
+
+
+def test_add_menu_options_include_object_shelf_static() -> None:
+    """GM Table add-menu declaration should expose the shared object shelf."""
+    options_source = gm_table_view_module.GMTableView.__init__.__code__.co_consts
+
+    assert "Object Shelf" in options_source
+
+
+def test_handle_add_option_routes_object_shelf_panel_creation() -> None:
+    """Add menu object shelf option should spawn an object shelf panel."""
+    captured = []
+    view = GMTableView.__new__(GMTableView)
+    view._create_panel = lambda kind, title, state: captured.append(
+        (kind, title, state)
+    )
+
+    GMTableView._handle_add_option(view, "Object Shelf")
+
+    assert captured == [("object_shelf", "Object Shelf", {})]
+
+
+def test_mount_panel_content_builds_object_shelf_page(monkeypatch) -> None:
+    """Object shelf panels should mount through the shared shelf builder."""
+    captured = {}
+
+    class _DummyHostedPage:
+        def __init__(self, parent, *, builder, **kwargs) -> None:
+            captured["parent"] = parent
+            captured["builder"] = builder
+            captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(gm_table_view_module, "GMTableHostedPage", _DummyHostedPage)
+    monkeypatch.setattr(
+        gm_table_view_module,
+        "create_object_shelf_panel",
+        lambda host, open_entity_callback=None: {
+            "host": host,
+            "callback": open_entity_callback,
+        },
+    )
+
+    view = GMTableView.__new__(GMTableView)
+    view.open_entity_panel = object()
+    definition = gm_table_view_module.PanelDefinition(
+        panel_id="panel-shelf",
+        kind="object_shelf",
+        title="Object Shelf",
+        state={},
+    )
+
+    mounted = GMTableView._mount_panel_content(view, object(), definition)
+    built = captured["builder"]("host-frame")
+
+    assert isinstance(mounted, _DummyHostedPage)
+    assert built == {"host": "host-frame", "callback": view.open_entity_panel}

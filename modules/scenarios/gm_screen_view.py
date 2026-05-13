@@ -44,6 +44,7 @@ from modules.ui.chatbot_dialog import (
     _DEFAULT_NAME_FIELD_OVERRIDES as CHATBOT_NAME_OVERRIDES,
 )
 from modules.objects.loot_generator_panel import LootGeneratorPanel
+from modules.objects.object_shelf_panel import create_object_shelf_panel
 from modules.scenarios.random_tables_panel import RandomTablesPanel
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
@@ -240,6 +241,7 @@ class GMScreenView(ctk.CTkFrame):
             "Image Library",
             "Handouts",
             "Loot Generator",
+            "Object Shelf",
             "Whiteboard",
             "Random Tables",
             "Plot Twists",
@@ -2006,6 +2008,8 @@ class GMScreenView(ctk.CTkFrame):
             self.open_scene_flow_tab(scenario_title=scen, title=title or (f"Scene Flow: {scen}" if scen else "Scene Flow"))
         elif kind == "loot_generator":
             self.open_loot_generator_tab(title=title or "Loot Generator")
+        elif kind == "object_shelf":
+            self.open_object_shelf_tab(title=title or "Object Shelf")
         elif kind == "random_tables":
             self.open_random_tables_tab(title=title or "Random Tables", initial_state=tab_def.get("state"))
         elif kind == "whiteboard":
@@ -2521,6 +2525,25 @@ class GMScreenView(ctk.CTkFrame):
             frame,
             content_factory=factory,
             layout_meta={"kind": "loot_generator"},
+        )
+
+    def open_object_shelf_tab(self, title=None):
+        """Open the embedded object shelf inside the GM screen."""
+        frame = create_object_shelf_panel(
+            self.content_area, open_entity_callback=self.open_entity_tab
+        )
+
+        def factory(master):
+            """Build an object shelf panel for restored tab content."""
+            return create_object_shelf_panel(
+                master, open_entity_callback=self.open_entity_tab
+            )
+
+        self.add_tab(
+            title or "Object Shelf",
+            frame,
+            content_factory=factory,
+            layout_meta={"kind": "object_shelf"},
         )
 
     def open_handouts_tab(self, title=None, activate=True):
@@ -3055,6 +3078,9 @@ class GMScreenView(ctk.CTkFrame):
         elif entity_type == "Loot Generator":
             # Handle the branch where entity_type == 'Loot Generator'.
             self.open_loot_generator_tab()
+            return
+        elif entity_type == "Object Shelf":
+            self.open_object_shelf_tab()
             return
         elif entity_type == "Whiteboard":
             # Handle the branch where entity_type == 'Whiteboard'.
