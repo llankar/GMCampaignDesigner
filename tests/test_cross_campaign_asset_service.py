@@ -1,8 +1,10 @@
 """Regression tests for cross campaign asset service."""
 
+import shutil
+import sqlite3
 import sys
 import types
-import sqlite3
+import zipfile
 
 import pytest
 
@@ -19,6 +21,9 @@ if "winsound" not in sys.modules:
     winsound_stub.PlaySound = _noop
     sys.modules["winsound"] = winsound_stub
 
+from modules.ui.ambiance.library.index_store import CampaignWallpaperIndexStore
+from modules.ui.ambiance.library.models import WallpaperLibraryItem
+
 from modules.generic.cross_campaign_asset_service import (
     CampaignDatabase,
     _rewrite_record_paths,
@@ -28,6 +33,57 @@ from modules.generic.cross_campaign_asset_service import (
     analyze_bundle,
     apply_import,
 )
+
+
+def test_analyze_bundle_rejects_unsafe_zip_member_path(tmp_path):
+    """Bundle extraction should reject zip members that escape the extraction root."""
+    bundle_path = tmp_path / "unsafe.zip"
+    with zipfile.ZipFile(bundle_path, "w") as zf:
+        zf.writestr("manifest.json", '{"version": 1}')
+        zf.writestr("../escape.txt", "nope")
+
+    with pytest.raises(ValueError, match="Unsafe bundle member path"):
+        analyze_bundle(bundle_path, tmp_path / "target.db")
+
+    assert not (tmp_path / "escape.txt").exists()
+
+
+def test_analyze_bundle_ignores_unsafe_or_malformed_ambiance_wallpaper_entries(tmp_path):
+    """Wallpaper bundle metadata should sanitize relative paths and tolerate malformed numbers."""
+    bundle_path = tmp_path / "wallpapers.zip"
+    with zipfile.ZipFile(bundle_path, "w") as zf:
+        zf.writestr(
+            "manifest.json",
+            '{"version": 1, "ambiance_wallpapers": {"index_path": "ambiance_wallpapers/index.json"}}',
+        )
+        zf.writestr(
+            "ambiance_wallpapers/index.json",
+            (
+                '{"items": ['
+                '{"id": "safe", "relative_path": "nested/sky.png", "filename": "sky.png", '
+                '"created_at": "not-a-float"},'
+                '{"id": "unsafe", "relative_path": "../escape.png", "filename": "escape.png"}'
+                ']}'
+            ),
+        )
+
+    analysis = analyze_bundle(bundle_path, tmp_path / "target.db")
+    try:
+        assert analysis.ambiance_wallpapers == [
+            {
+                "id": "safe",
+                "relative_path": "nested/sky.png",
+                "filename": "sky.png",
+                "media_type": "image",
+                "width": None,
+                "height": None,
+                "filesize": 0,
+                "created_at": 0.0,
+                "tags": [],
+            }
+        ]
+    finally:
+        shutil.rmtree(analysis.temp_dir, ignore_errors=True)
 
 
 def test_export_bundle_raises_when_database_missing(tmp_path):
@@ -268,3 +324,139 @@ def test_apply_import_restores_extra_files_for_asset_bundle(tmp_path):
     assert restored.exists()
     assert restored.read_text(encoding="utf-8") == '{"categories": []}'
     assert summary.get("extra_files_imported", 0) >= 1
+
+
+def _write_wallpaper(campaign_root, relative_path="nested/sky.png", content=b"sky"):
+    store = CampaignWallpaperIndexStore(str(campaign_root))
+    media = store.wallpapers_dir / relative_path
+    media.parent.mkdir(parents=True, exist_ok=True)
+    media.write_bytes(content)
+    item = WallpaperLibraryItem(
+        id="wall-1",
+        relative_path=relative_path,
+        filename=media.name,
+        media_type="image",
+        width=1920,
+        height=1080,
+        filesize=len(content),
+        created_at=123.0,
+        tags=("night", "forest"),
+    )
+    store.save([item])
+    return item, media
+
+
+def test_export_bundle_includes_ambiance_wallpaper_files_and_metadata(tmp_path):
+    """Ambiance wallpaper media and index metadata should be bundled separately."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    item, _media = _write_wallpaper(source_root)
+
+    source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
+    bundle_path = tmp_path / "wallpapers.zip"
+
+    manifest = export_bundle(bundle_path, source_campaign, selected_records={}, include_database=False)
+
+    section = manifest["ambiance_wallpapers"]
+    assert section["count"] == 1
+    assert section["items"][0]["id"] == item.id
+    assert section["items"][0]["relative_path"] == item.relative_path
+    with zipfile.ZipFile(bundle_path, "r") as zf:
+        names = set(zf.namelist())
+    assert "ambiance_wallpapers/index.json" in names
+    assert "ambiance_wallpapers/files/nested/sky.png" in names
+
+
+def test_apply_import_restores_ambiance_wallpaper_media_and_index(tmp_path):
+    """Regular imports should restore wallpaper files and merge the target index."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    item, _media = _write_wallpaper(source_root)
+    bundle_path = tmp_path / "wallpapers.zip"
+    export_bundle(bundle_path, CampaignDatabase("Source", source_root, db_path), {}, include_database=False)
+
+    target_root = tmp_path / "target"
+    target_root.mkdir(parents=True, exist_ok=True)
+    target_db = target_root / "campaign.db"
+    sqlite3.connect(target_db).close()
+    target_campaign = CampaignDatabase("Target", target_root, target_db)
+
+    analysis = analyze_bundle(bundle_path, target_campaign.db_path)
+    assert analysis.ambiance_wallpapers[0]["relative_path"] == item.relative_path
+    summary = apply_import(analysis, target_campaign, overwrite=False)
+
+    target_store = CampaignWallpaperIndexStore(str(target_root))
+    restored = target_store.wallpapers_dir / item.relative_path
+    assert restored.read_bytes() == b"sky"
+    assert target_store.load()[0].tags == item.tags
+    assert summary["ambiance_wallpapers_imported"] == 1
+    assert summary["ambiance_wallpapers_updated"] == 0
+    assert summary["ambiance_wallpapers_skipped"] == 0
+
+
+def test_apply_import_skips_or_overwrites_existing_ambiance_wallpapers(tmp_path):
+    """Wallpaper import duplicates should match by relative_path or id and honor overwrite."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    item, _media = _write_wallpaper(source_root, content=b"new")
+    bundle_path = tmp_path / "wallpapers.zip"
+    export_bundle(bundle_path, CampaignDatabase("Source", source_root, db_path), {}, include_database=False)
+
+    target_root = tmp_path / "target"
+    target_root.mkdir(parents=True, exist_ok=True)
+    target_db = target_root / "campaign.db"
+    sqlite3.connect(target_db).close()
+    target_store = CampaignWallpaperIndexStore(str(target_root))
+    existing_media = target_store.wallpapers_dir / item.relative_path
+    existing_media.parent.mkdir(parents=True, exist_ok=True)
+    existing_media.write_bytes(b"old")
+    target_store.save([
+        WallpaperLibraryItem(
+            id="existing-id",
+            relative_path=item.relative_path,
+            filename=item.filename,
+            media_type="image",
+            width=100,
+            height=100,
+            filesize=3,
+            created_at=1.0,
+            tags=("old",),
+        )
+    ])
+    target_campaign = CampaignDatabase("Target", target_root, target_db)
+
+    skip_summary = apply_import(analyze_bundle(bundle_path, target_db), target_campaign, overwrite=False)
+    assert existing_media.read_bytes() == b"old"
+    assert target_store.load()[0].id == "existing-id"
+    assert skip_summary["ambiance_wallpapers_skipped"] == 1
+
+    overwrite_summary = apply_import(analyze_bundle(bundle_path, target_db), target_campaign, overwrite=True)
+    loaded = target_store.load()
+    assert existing_media.read_bytes() == b"new"
+    assert len(loaded) == 1
+    assert loaded[0].id == item.id
+    assert loaded[0].tags == item.tags
+    assert overwrite_summary["ambiance_wallpapers_updated"] == 1
+
+
+def test_install_full_campaign_bundle_restores_ambiance_wallpapers(tmp_path):
+    """Full campaign installation should restore ambiance wallpaper files and index."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    item, _media = _write_wallpaper(source_root)
+    bundle_path = tmp_path / "full_wallpapers.zip"
+    export_bundle(bundle_path, CampaignDatabase("Source", source_root, db_path), {}, include_database=True)
+
+    installed = install_full_campaign_bundle(bundle_path, tmp_path / "installed")
+
+    store = CampaignWallpaperIndexStore(str(installed.root))
+    assert (store.wallpapers_dir / item.relative_path).read_bytes() == b"sky"
+    assert store.load()[0].id == item.id

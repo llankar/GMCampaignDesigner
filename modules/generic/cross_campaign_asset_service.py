@@ -11,10 +11,17 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from modules.audio.entity_audio import normalize_audio_reference
+from modules.generic.ambiance_wallpaper_bundle import (
+    MANIFEST_KEY as AMBIANCE_WALLPAPERS_MANIFEST_KEY,
+    export_wallpaper_bundle,
+    install_wallpaper_bundle,
+    load_wallpaper_manifest,
+    merge_wallpaper_bundle,
+)
 from modules.generic.cross_campaign_bundle_extras import collect_full_campaign_extra_files
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
@@ -70,6 +77,7 @@ class BundleAnalysis:
     database: Optional[dict] = None
     world_maps: Optional[Dict[str, dict]] = None
     systems: Optional[List[dict]] = None
+    ambiance_wallpapers: Optional[List[dict]] = None
 
 
 def _resolve_active_campaign() -> CampaignDatabase:
@@ -748,6 +756,10 @@ def export_bundle(
                 "data_path": "data/world_maps.json",
             }
 
+        wallpaper_manifest = export_wallpaper_bundle(source_campaign.root, temp_root)
+        if wallpaper_manifest:
+            manifest[AMBIANCE_WALLPAPERS_MANIFEST_KEY] = wallpaper_manifest
+
         if include_database:
             try:
                 # Keep bundle resilient if this step fails.
@@ -790,6 +802,29 @@ def export_bundle(
     return manifest
 
 
+def _safe_extract_zip(zf: zipfile.ZipFile, target_dir: Path) -> None:
+    """Extract *zf* while rejecting members that would escape *target_dir*."""
+    root = target_dir.resolve()
+    for member in zf.infolist():
+        name = str(member.filename or "")
+        normalized = name.replace("\\", "/")
+        member_path = PurePosixPath(normalized)
+        parts = member_path.parts
+        if (
+            not normalized
+            or name != normalized
+            or member_path.is_absolute()
+            or any(part in ("", ".", "..") or ":" in part for part in parts)
+        ):
+            raise ValueError(f"Unsafe bundle member path: {member.filename}")
+        destination = (root / Path(*parts)).resolve()
+        try:
+            destination.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"Unsafe bundle member path: {member.filename}") from exc
+    zf.extractall(root)
+
+
 def _call_progress(callback, message: str, fraction: float) -> None:
     """Internal helper for call progress."""
     if callback is None:
@@ -810,7 +845,7 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
     try:
         # Keep analyze bundle resilient if this step fails.
         with zipfile.ZipFile(bundle_path, "r") as zf:
-            zf.extractall(temp_dir)
+            _safe_extract_zip(zf, temp_dir)
 
         manifest_path = temp_dir / "manifest.json"
         if not manifest_path.exists():
@@ -910,6 +945,8 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
                             func_name="modules.generic.cross_campaign_asset_service.analyze_bundle",
                         )
 
+        ambiance_wallpapers = load_wallpaper_manifest(temp_dir, manifest)
+
         return BundleAnalysis(
             manifest=manifest,
             data_by_type=data_by_type,
@@ -919,6 +956,7 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
             database=database_entry,
             world_maps=world_maps or None,
             systems=systems,
+            ambiance_wallpapers=ambiance_wallpapers or None,
         )
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1032,6 +1070,9 @@ def apply_import_for_entity_types(
             "systems_imported": 0,
             "systems_skipped": 0,
             "systems_updated": 0,
+            "ambiance_wallpapers_imported": 0,
+            "ambiance_wallpapers_updated": 0,
+            "ambiance_wallpapers_skipped": 0,
         }
 
     filtered_data = {
@@ -1058,6 +1099,7 @@ def apply_import_for_entity_types(
         database=analysis.database,
         world_maps=filtered_world_maps,
         systems=None,
+        ambiance_wallpapers=analysis.ambiance_wallpapers,
     )
     return apply_import(
         filtered_analysis,
@@ -1085,6 +1127,9 @@ def apply_import(
         "systems_imported": 0,
         "systems_skipped": 0,
         "systems_updated": 0,
+        "ambiance_wallpapers_imported": 0,
+        "ambiance_wallpapers_updated": 0,
+        "ambiance_wallpapers_skipped": 0,
     }
 
     try:
@@ -1238,6 +1283,14 @@ def apply_import(
         if analysis.world_maps:
             rewritten_world_maps = _rewrite_world_map_entries(analysis.world_maps, replacements)
             _merge_world_map_entries(target_campaign.root, rewritten_world_maps)
+
+        wallpaper_summary = merge_wallpaper_bundle(
+            analysis.temp_dir,
+            target_campaign.root,
+            analysis.ambiance_wallpapers or [],
+            overwrite=overwrite,
+        )
+        summary.update(wallpaper_summary)
     finally:
         shutil.rmtree(analysis.temp_dir, ignore_errors=True)
 
@@ -1260,7 +1313,7 @@ def install_full_campaign_bundle(
     try:
         # Keep install full campaign bundle resilient if this step fails.
         with zipfile.ZipFile(bundle_path, "r") as zf:
-            zf.extractall(temp_dir)
+            _safe_extract_zip(zf, temp_dir)
 
         manifest_path = temp_dir / "manifest.json"
         if not manifest_path.exists():
@@ -1293,7 +1346,8 @@ def install_full_campaign_bundle(
 
         assets = manifest.get("assets") or []
         extra_files = manifest.get("extra_files") or []
-        total_steps = max(len(assets) + len(extra_files) + 1, 1)
+        wallpaper_count = len(load_wallpaper_manifest(temp_dir, manifest))
+        total_steps = max(len(assets) + len(extra_files) + wallpaper_count + 1, 1)
         _call_progress(progress_callback, "Copying database", 1 / total_steps)
 
         target_root = target_dir.resolve()
@@ -1367,6 +1421,8 @@ def install_full_campaign_bundle(
                 f"Copying extra files ({index}/{len(extra_files)})",
                 min((extra_offset + index + 1) / total_steps, 1.0),
             )
+
+        install_wallpaper_bundle(temp_dir, target_root, manifest)
 
         campaign_name = str(manifest.get("source_campaign", {}).get("name") or target_dir.name)
         return CampaignDatabase(name=campaign_name, root=target_dir, db_path=db_destination)
