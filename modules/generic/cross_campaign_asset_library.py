@@ -10,7 +10,6 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
-
 import customtkinter as ctk
 from PIL import Image
 from tkinter import END, filedialog, messagebox, simpledialog, ttk
@@ -45,7 +44,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         """Initialize the CrossCampaignAssetLibraryWindow instance."""
         super().__init__(master)
         self.title("Cross-campaign Asset Library")
-        self.geometry("1400x760")
+        self.geometry("1650x800")
         self.minsize(1200, 620)
         self.transient(master)
         self.lift()
