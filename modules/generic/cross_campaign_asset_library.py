@@ -45,8 +45,8 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         """Initialize the CrossCampaignAssetLibraryWindow instance."""
         super().__init__(master)
         self.title("Cross-campaign Asset Library")
-        self.geometry("1200x720")
-        self.minsize(1000, 620)
+        self.geometry("1400x760")
+        self.minsize(1200, 620)
         self.transient(master)
         self.lift()
         self.focus_force()
@@ -117,13 +117,16 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             tree = ttk.Treeview(tab, columns=columns, show="headings", selectmode="extended", height=14)
             tree.heading("name", text="Name")
             tree.heading("summary", text="Summary")
-            tree.column("name", width=220, anchor="w")
-            tree.column("summary", width=360, anchor="w")
+            tree.column("name", width=280, anchor="w", stretch=False)
+            tree.column("summary", width=760, anchor="w", stretch=False)
             tree.grid(row=0, column=0, sticky="nsew")
             tree.bind("<<TreeviewSelect>>", lambda _evt, et=entity_type: self.update_preview_from_tree(et))
+
             yscroll = ttk.Scrollbar(tab, orient="vertical", command=tree.yview)
-            tree.configure(yscrollcommand=yscroll.set)
+            xscroll = ttk.Scrollbar(tab, orient="horizontal", command=tree.xview)
+            tree.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
             yscroll.grid(row=0, column=1, sticky="ns")
+            xscroll.grid(row=1, column=0, sticky="ew")
             self.treeviews[entity_type] = tree
 
         self.preview_frame = ctk.CTkFrame(self.right_frame)
