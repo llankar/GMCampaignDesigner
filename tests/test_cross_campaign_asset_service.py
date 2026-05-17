@@ -127,6 +127,45 @@ def test_collect_assets_includes_image_library_files(tmp_path):
     assert assets[0].absolute_path == image_file.resolve()
 
 
+def test_villain_assets_collect_and_rewrite_portrait_and_audio(tmp_path):
+    """Villains should export and import both portrait and audio media paths."""
+    campaign_root = tmp_path / "campaign"
+    portrait_path = "portraits/villains/lich.png"
+    audio_path = "audio/villains/lich_theme.mp3"
+    portrait_file = campaign_root / portrait_path
+    audio_file = campaign_root / audio_path
+    portrait_file.parent.mkdir(parents=True, exist_ok=True)
+    audio_file.parent.mkdir(parents=True, exist_ok=True)
+    portrait_file.write_bytes(b"portrait-bytes")
+    audio_file.write_bytes(b"audio-bytes")
+    record = {
+        "Name": "The Ashen Lich",
+        "Portrait": portrait_path,
+        "Audio": audio_path,
+    }
+
+    assets = collect_assets("villains", [record], campaign_root)
+
+    assets_by_type = {asset.asset_type: asset for asset in assets}
+    assert set(assets_by_type) == {"portrait", "audio"}
+    assert assets_by_type["portrait"].original_path == portrait_path
+    assert assets_by_type["portrait"].absolute_path == portrait_file.resolve()
+    assert assets_by_type["audio"].original_path == audio_path
+    assert assets_by_type["audio"].absolute_path == audio_file.resolve()
+
+    updated = _rewrite_record_paths(
+        "villains",
+        record,
+        {
+            portrait_path: "assets/portraits/villains/lich.png",
+            audio_path: "assets/audio/villains/lich_theme.mp3",
+        },
+    )
+
+    assert updated["Portrait"] == "assets/portraits/villains/lich.png"
+    assert updated["Audio"] == "assets/audio/villains/lich_theme.mp3"
+
+
 def test_rewrite_record_paths_updates_image_library_fields(tmp_path):
     """Image library rows should update Path + RelativePath after import."""
     target_campaign_root = (tmp_path / "target").resolve()

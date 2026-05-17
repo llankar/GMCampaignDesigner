@@ -37,8 +37,8 @@ log_module_import(__name__)
 BUNDLE_VERSION = 1
 
 
-PORTRAIT_ENTITY_TYPES = {"npcs", "objects", "pcs", "creatures", "places", "clues", "factions"}
-AUDIO_ENTITY_TYPES = {"npcs", "pcs", "creatures", "places"}
+PORTRAIT_ENTITY_TYPES = {"npcs", "objects", "pcs", "creatures", "places", "clues", "factions", "villains"}
+AUDIO_ENTITY_TYPES = {"npcs", "pcs", "creatures", "places", "villains"}
 ATTACHMENT_FIELDS = {
     "clues": "Attachment",
     "informations": "Attachment",
