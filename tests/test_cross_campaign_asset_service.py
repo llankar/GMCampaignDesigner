@@ -402,6 +402,39 @@ def test_install_full_campaign_bundle_restores_campaign_custom_random_tables_fil
     assert restored_campaign_custom.read_text(encoding="utf-8") == '{"tables": []}'
 
 
+def test_install_full_campaign_bundle_restores_custom_templates(tmp_path):
+    """Installing a full campaign bundle should restore custom entity template files."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    custom_entities = source_root / "templates" / "custom_entities.json"
+    custom_entities.parent.mkdir(parents=True, exist_ok=True)
+    custom_entities.write_text('{"entities": ["rivals"]}', encoding="utf-8")
+
+    rivals_template = source_root / "templates" / "rivals_template.json"
+    rivals_template.write_text('{"name": "Rivals", "fields": []}', encoding="utf-8")
+
+    source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
+    bundle_path = tmp_path / "full_bundle.zip"
+    manifest = export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
+    extra_paths = {entry.get("relative_path") for entry in manifest.get("extra_files") or []}
+
+    assert "templates/custom_entities.json" in extra_paths
+    assert "templates/rivals_template.json" in extra_paths
+
+    target_root = tmp_path / "installed_campaign"
+    installed = install_full_campaign_bundle(bundle_path, target_root)
+
+    restored_custom_entities = installed.root / "templates" / "custom_entities.json"
+    restored_rivals_template = installed.root / "templates" / "rivals_template.json"
+    assert restored_custom_entities.exists()
+    assert restored_custom_entities.read_text(encoding="utf-8") == '{"entities": ["rivals"]}'
+    assert restored_rivals_template.exists()
+    assert restored_rivals_template.read_text(encoding="utf-8") == '{"name": "Rivals", "fields": []}'
+
+
 def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_path):
     """Installing a full campaign bundle should restore maptools + GM table extra files."""
     source_root = tmp_path / "source"
