@@ -42,6 +42,7 @@ from modules.helpers.logging_helper import (
 from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
 from modules.ai.pipeline import execute_ai_chat
 from modules.generic.entities.linking import entity_label_map, resolve_entity_slug
+from modules.generic.entities.merge import EntityMergeError, merge_selected_entities
 
 log_module_import(__name__)
 
@@ -3154,6 +3155,12 @@ class GenericListView(ctk.CTkFrame):
                 label="Turn to PC",
                 command=lambda: self.turn_npc_to_pc(iid),
             )
+        selected_items = self._selected_items_in_tree_order(iid)
+        if len(selected_items) >= 2:
+            menu.add_command(
+                label="Merge entities",
+                command=lambda: self.merge_selected_entities(iid),
+            )
         menu.add_command(
             label="Delete",
             command=lambda: self.delete_item(iid)
@@ -3291,6 +3298,82 @@ class GenericListView(ctk.CTkFrame):
         _, play_audio, _ = _lazy_audio()
         if not play_audio(audio_value, entity_label=name):
             messagebox.showwarning("Audio", f"Unable to play audio for {name}.")
+
+
+    def _selected_items_in_tree_order(self, iid=None):
+        """Return selected items in the current Treeview selection order."""
+        selection = []
+        if hasattr(self, "tree"):
+            try:
+                selection = list(self.tree.selection())
+            except Exception:
+                selection = []
+        if iid and iid not in selection:
+            selection = [iid]
+        selected_items = []
+        seen_item_ids = set()
+        for selected_iid in selection:
+            item, base_id = self._find_item_by_iid(selected_iid)
+            if not item or not base_id or id(item) in seen_item_ids:
+                continue
+            seen_item_ids.add(id(item))
+            selected_items.append(item)
+        return selected_items
+
+    def merge_selected_entities(self, iid=None):
+        """Merge the selected entities into the first selected entity."""
+        selected_items = self._selected_items_in_tree_order(iid)
+        if len(selected_items) < 2:
+            messagebox.showinfo("Merge entities", "Select at least two entities to merge.")
+            return
+        survivor_name = selected_items[0].get(self.unique_field, "") if self.unique_field else ""
+        try:
+            result = merge_selected_entities(
+                self.items,
+                selected_items,
+                self.template,
+                self.unique_field,
+            )
+        except EntityMergeError as exc:
+            messagebox.showinfo("Merge entities", str(exc))
+            return
+        except Exception as exc:
+            log_warning(
+                f"Failed to merge selected entities: {exc}",
+                func_name="GenericListView.merge_selected_entities",
+            )
+            messagebox.showerror("Merge entities", f"Unable to merge entities:\n{exc}")
+            return
+
+        self.items = result.items
+        survivor_base_id = self._get_base_id(result.survivor)
+        self.selected_iids = {survivor_base_id} if survivor_base_id else set()
+        self.model_wrapper.save_items(self.items)
+        self._save_list_order()
+        self.filter_items(self.search_var.get())
+        self._focus_surviving_entity(survivor_base_id)
+        if survivor_base_id:
+            self.after(50, lambda base_id=survivor_base_id: self._focus_surviving_entity(base_id))
+        log_info(
+            f"Merged {len(selected_items)} entities into {survivor_name!r}; removed {len(result.removed)}",
+            func_name="GenericListView.merge_selected_entities",
+        )
+
+    def _focus_surviving_entity(self, base_id):
+        """Select, focus, and scroll to the merged survivor when it is visible."""
+        if not base_id or not hasattr(self, "tree"):
+            return
+        tree_iids = self._base_to_iids.get(base_id, [])
+        if not tree_iids:
+            return
+        target_iid = tree_iids[0]
+        try:
+            self.tree.selection_set(target_iid)
+            self.tree.focus(target_iid)
+            self.tree.see(target_iid)
+        except Exception:
+            return
+        self._update_tree_selection_tags([target_iid])
 
     def delete_item(self, iid):
         """Delete item."""
