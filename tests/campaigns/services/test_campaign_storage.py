@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from modules.campaigns.services.campaign_storage import (
     normalize_campaign_db_path,
     seed_default_templates,
 )
+from modules.helpers.template_loader import _BUILTIN_ENTITY_METADATA
 
 
 def test_normalize_campaign_db_path_returns_absolute_path(tmp_path: Path) -> None:
@@ -35,25 +35,61 @@ def test_ensure_campaign_directory_creates_parent_directory(tmp_path: Path) -> N
     assert Path(normalized).name == "state.db"
 
 
-def test_seed_default_templates_copies_missing_templates(tmp_path: Path) -> None:
-    """Verify that seed default templates copies missing templates."""
+def test_default_template_entities_match_builtin_metadata_order() -> None:
+    """Verify campaign template defaults mirror built-in entity metadata order."""
+    assert DEFAULT_TEMPLATE_ENTITIES == tuple(_BUILTIN_ENTITY_METADATA)
+
+
+def test_seed_default_templates_copies_all_default_templates_when_present(
+    tmp_path: Path,
+) -> None:
+    """Verify that seed default templates copies every default entity template."""
     db_path = tmp_path / "campaigns" / "lot3.db"
     project_root = tmp_path / "project"
 
-    for entity in DEFAULT_TEMPLATE_ENTITIES[:2]:
+    for entity in DEFAULT_TEMPLATE_ENTITIES:
         entity_dir = project_root / "modules" / entity
         entity_dir.mkdir(parents=True)
-        (entity_dir / f"{entity}_template.json").write_text(f"{{\"entity\": \"{entity}\"}}", encoding="utf-8")
+        (entity_dir / f"{entity}_template.json").write_text(
+            f'{{"entity": "{entity}"}}',
+            encoding="utf-8",
+        )
 
     template_dir = seed_default_templates(
         str(db_path),
-        entities=DEFAULT_TEMPLATE_ENTITIES[:2],
         project_root=project_root,
     )
 
     assert template_dir == db_path.parent / "templates"
-    assert (template_dir / "pcs_template.json").read_text(encoding="utf-8") == '{"entity": "pcs"}'
-    assert (template_dir / "npcs_template.json").read_text(encoding="utf-8") == '{"entity": "npcs"}'
+    for entity in DEFAULT_TEMPLATE_ENTITIES:
+        assert (template_dir / f"{entity}_template.json").read_text(
+            encoding="utf-8"
+        ) == (f'{{"entity": "{entity}"}}')
+
+
+def test_seed_default_templates_skips_missing_source_templates(tmp_path: Path) -> None:
+    """Verify that missing default template source files are skipped gracefully."""
+    db_path = tmp_path / "campaigns" / "lot3.db"
+    project_root = tmp_path / "project"
+
+    villains_dir = project_root / "modules" / "villains"
+    villains_dir.mkdir(parents=True)
+    (villains_dir / "villains_template.json").write_text(
+        '{"entity": "villains"}',
+        encoding="utf-8",
+    )
+
+    template_dir = seed_default_templates(
+        str(db_path),
+        entities=("villains", "puzzles", "image_assets"),
+        project_root=project_root,
+    )
+
+    assert (template_dir / "villains_template.json").read_text(encoding="utf-8") == (
+        '{"entity": "villains"}'
+    )
+    assert not (template_dir / "puzzles_template.json").exists()
+    assert not (template_dir / "image_assets_template.json").exists()
 
 
 def test_seed_default_templates_preserves_existing_files(tmp_path: Path) -> None:
@@ -62,7 +98,9 @@ def test_seed_default_templates_preserves_existing_files(tmp_path: Path) -> None
     project_root = tmp_path / "project"
     entity_dir = project_root / "modules" / "pcs"
     entity_dir.mkdir(parents=True)
-    (entity_dir / "pcs_template.json").write_text('{"entity": "source"}', encoding="utf-8")
+    (entity_dir / "pcs_template.json").write_text(
+        '{"entity": "source"}', encoding="utf-8"
+    )
 
     existing_template = db_path.parent / "templates" / "pcs_template.json"
     existing_template.parent.mkdir(parents=True)
@@ -73,7 +111,9 @@ def test_seed_default_templates_preserves_existing_files(tmp_path: Path) -> None
     assert existing_template.read_text(encoding="utf-8") == '{"entity": "existing"}'
 
 
-def test_seed_default_templates_uses_service_relative_project_root_when_not_provided(tmp_path: Path, monkeypatch) -> None:
+def test_seed_default_templates_uses_service_relative_project_root_when_not_provided(
+    tmp_path: Path, monkeypatch
+) -> None:
     """Verify that seed default templates uses service relative project root when not provided."""
     db_path = tmp_path / "campaigns" / "lot3.db"
     monkeypatch.chdir(tmp_path)
