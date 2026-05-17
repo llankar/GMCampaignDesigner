@@ -215,6 +215,147 @@ def test_export_bundle_full_campaign_includes_image_assets_even_without_selectio
     assert any(asset.get("asset_type") == "image_library" for asset in manifest["assets"])
 
 
+def test_export_bundle_full_campaign_keeps_explicit_selections(tmp_path, monkeypatch):
+    """Explicitly selected entity lists should not be replaced by full-campaign backfill."""
+    campaign_root = tmp_path / "source_campaign"
+    campaign_root.mkdir(parents=True, exist_ok=True)
+    db_path = campaign_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    selected_villain = {"Name": "Selected Villain"}
+    loaded_types = []
+
+    def fake_load_entities(entity_type, _db_path):
+        loaded_types.append(entity_type)
+        if entity_type == "villains":
+            return [{"Name": "Database Villain"}]
+        if entity_type == "campaigns":
+            return [{"Name": "Loaded Campaign"}]
+        return []
+
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.list_known_entities",
+        lambda: ["villains", "campaigns"],
+    )
+    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+
+    manifest = export_bundle(
+        tmp_path / "bundle.zip",
+        CampaignDatabase(name="Source", root=campaign_root, db_path=db_path),
+        selected_records={"villains": [selected_villain]},
+        include_database=True,
+    )
+
+    assert loaded_types == ["campaigns"]
+    assert manifest["entities"]["villains"]["count"] == 1
+    assert manifest["entities"]["campaigns"]["count"] == 1
+
+    with zipfile.ZipFile(tmp_path / "bundle.zip", "r") as zf:
+        villains = zf.read("data/villains.json").decode("utf-8")
+    assert "Selected Villain" in villains
+    assert "Database Villain" not in villains
+
+
+def test_export_bundle_full_campaign_skips_missing_backfill_tables(tmp_path, monkeypatch):
+    """Missing tables during full-campaign backfill should not stop later entity types."""
+    campaign_root = tmp_path / "source_campaign"
+    campaign_root.mkdir(parents=True, exist_ok=True)
+    db_path = campaign_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    loaded_types = []
+
+    def fake_load_entities(entity_type, _db_path):
+        loaded_types.append(entity_type)
+        if entity_type == "missing_entities":
+            raise sqlite3.OperationalError("no such table: missing_entities")
+        if entity_type == "campaigns":
+            return [{"Name": "Loaded Campaign"}]
+        return []
+
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.list_known_entities",
+        lambda: ["missing_entities", "campaigns"],
+    )
+    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+
+    manifest = export_bundle(
+        tmp_path / "bundle.zip",
+        CampaignDatabase(name="Source", root=campaign_root, db_path=db_path),
+        selected_records={},
+        include_database=True,
+    )
+
+    assert loaded_types == ["missing_entities", "campaigns"]
+    assert "missing_entities" not in manifest["entities"]
+    assert manifest["entities"]["campaigns"]["count"] == 1
+
+
+def test_export_bundle_full_campaign_loads_all_known_entities_and_villain_media(tmp_path, monkeypatch):
+    """Full campaign exports should backfill every known entity type and villain media."""
+    campaign_root = tmp_path / "source_campaign"
+    campaign_root.mkdir(parents=True, exist_ok=True)
+    db_path = campaign_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+
+    image_file = campaign_root / "assets" / "image_library" / "tiles" / "forest.png"
+    portrait_file = campaign_root / "portraits" / "villains" / "lich.png"
+    audio_file = campaign_root / "audio" / "villains" / "lich_theme.mp3"
+    for media_file, content in (
+        (image_file, b"forest-bytes"),
+        (portrait_file, b"portrait-bytes"),
+        (audio_file, b"audio-bytes"),
+    ):
+        media_file.parent.mkdir(parents=True, exist_ok=True)
+        media_file.write_bytes(content)
+
+    records_by_type = {
+        "villains": [
+            {
+                "Name": "The Ashen Lich",
+                "Portrait": "portraits/villains/lich.png",
+                "Audio": "audio/villains/lich_theme.mp3",
+            }
+        ],
+        "campaigns": [{"Name": "Embers of Dusk"}],
+        "scenarios": [{"Name": "The First Spark"}],
+        "image_assets": [{"Name": "Forest Tile", "RelativePath": "assets/image_library/tiles/forest.png"}],
+        "maps": [{"Name": "Cavern"}],
+    }
+
+    def fake_load_entities(entity_type, _db_path):
+        return records_by_type.get(entity_type, [])
+
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.list_known_entities",
+        lambda: ["villains", "campaigns", "scenarios", "image_assets", "maps"],
+    )
+    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+
+    manifest = export_bundle(
+        tmp_path / "bundle.zip",
+        CampaignDatabase(name="Source", root=campaign_root, db_path=db_path),
+        selected_records={},
+        include_database=True,
+    )
+
+    for entity_type in ("villains", "campaigns", "scenarios", "image_assets", "maps"):
+        assert manifest["entities"][entity_type]["count"] == 1
+
+    villain_assets = {
+        asset["asset_type"]: asset
+        for asset in manifest["assets"]
+        if asset["entity_type"] == "villains" and asset["record_key"] == "The Ashen Lich"
+    }
+    assert villain_assets["portrait"]["original_path"] == "portraits/villains/lich.png"
+    assert villain_assets["audio"]["original_path"] == "audio/villains/lich_theme.mp3"
+
+    with zipfile.ZipFile(tmp_path / "bundle.zip", "r") as zf:
+        names = set(zf.namelist())
+    assert "assets/portraits/villains/lich.png" in names
+    assert "assets/audio/villains/lich_theme.mp3" in names
+
+
 def test_install_full_campaign_bundle_restores_random_tables_files(tmp_path):
     """Installing a full campaign bundle should restore random table JSON files."""
     source_root = tmp_path / "source"

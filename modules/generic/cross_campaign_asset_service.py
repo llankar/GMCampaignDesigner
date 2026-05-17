@@ -31,6 +31,7 @@ from modules.helpers.logging_helper import (
     log_module_import,
     log_warning,
 )
+from modules.helpers.template_loader import list_known_entities
 
 log_module_import(__name__)
 
@@ -134,6 +135,11 @@ def discover_databases_in_directory(directory: Path) -> List[CampaignDatabase]:
     return results
 
 
+def _is_missing_table_error(exc: sqlite3.OperationalError) -> bool:
+    """Return True when SQLite reports a missing table."""
+    return "no such table" in str(exc).lower()
+
+
 def load_entities(entity_type: str, db_path: Path) -> List[dict]:
     """Load entities."""
     wrapper = GenericModelWrapper(entity_type, db_path=str(db_path))
@@ -141,7 +147,7 @@ def load_entities(entity_type: str, db_path: Path) -> List[dict]:
         # Keep entities resilient if this step fails.
         return wrapper.load_items()
     except sqlite3.OperationalError as exc:
-        if "no such table" in str(exc).lower():
+        if _is_missing_table_error(exc):
             log_warning(
                 f"Skipping entity type '{entity_type}' in {db_path}: {exc}",
                 func_name="modules.generic.cross_campaign_asset_service.load_entities",
@@ -154,6 +160,26 @@ def save_entities(entity_type: str, db_path: Path, items: List[dict], *, replace
     """Save entities."""
     wrapper = GenericModelWrapper(entity_type, db_path=str(db_path))
     wrapper.save_items(items, replace=replace)
+
+
+def _load_full_campaign_records(source_campaign: CampaignDatabase, selected_for_bundle: dict) -> None:
+    """Backfill all known entity records for full-campaign exports.
+
+    Explicit selections are authoritative: if a type is already present in
+    ``selected_for_bundle``, keep those records and only load missing types.
+    """
+    for entity_type in list_known_entities():
+        if entity_type in selected_for_bundle:
+            continue
+        try:
+            selected_for_bundle[entity_type] = load_entities(entity_type, source_campaign.db_path)
+        except sqlite3.OperationalError as exc:
+            if not _is_missing_table_error(exc):
+                raise
+            log_warning(
+                f"Skipping entity type '{entity_type}' for full campaign export: {exc}",
+                func_name="modules.generic.cross_campaign_asset_service._load_full_campaign_records",
+            )
 
 
 def _ensure_campaign_systems_table(conn: sqlite3.Connection) -> None:
@@ -630,24 +656,8 @@ def export_bundle(
         raise FileNotFoundError(source_campaign.db_path)
 
     selected_for_bundle = {entity: list(records) for entity, records in selected_records.items()}
-    if include_database and "image_assets" not in selected_for_bundle:
-        try:
-            selected_for_bundle["image_assets"] = load_entities("image_assets", source_campaign.db_path)
-        except Exception as exc:
-            log_warning(
-                f"Unable to include image library records for full campaign export: {exc}",
-                func_name="modules.generic.cross_campaign_asset_service.export_bundle",
-            )
-    if include_database and "maps" not in selected_for_bundle:
-        # Full-campaign exports should always include map records so fog-mask
-        # files and token/marker media can be discovered and bundled.
-        try:
-            selected_for_bundle["maps"] = load_entities("maps", source_campaign.db_path)
-        except Exception as exc:
-            log_warning(
-                f"Unable to include map records for full campaign export: {exc}",
-                func_name="modules.generic.cross_campaign_asset_service.export_bundle",
-            )
+    if include_database:
+        _load_full_campaign_records(source_campaign, selected_for_bundle)
 
     data_dir = Path(tempfile.mkdtemp(prefix="asset_export_"))
     temp_root = Path(data_dir)
