@@ -8,20 +8,24 @@ import sqlite3
 from pathlib import Path
 from typing import Iterable, Sequence
 
-
 DEFAULT_TEMPLATE_ENTITIES: tuple[str, ...] = (
+    "events",
+    "campaigns",
+    "scenarios",
     "pcs",
     "npcs",
-    "scenarios",
+    "villains",
+    "creatures",
     "factions",
     "bases",
     "places",
     "objects",
-    "creatures",
     "informations",
     "clues",
+    "puzzles",
     "maps",
     "books",
+    "image_assets",
 )
 
 
@@ -50,7 +54,11 @@ def seed_default_templates(
     template_dir = campaign_dir / "templates"
     template_dir.mkdir(parents=True, exist_ok=True)
 
-    project_root_path = Path(project_root) if project_root is not None else Path(__file__).resolve().parents[3]
+    project_root_path = (
+        Path(project_root)
+        if project_root is not None
+        else Path(__file__).resolve().parents[3]
+    )
     for entity in entities:
         # Process each entity from entities.
         src = project_root_path / "modules" / entity / f"{entity}_template.json"
