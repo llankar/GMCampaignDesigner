@@ -38,6 +38,19 @@ if errorlevel 1 (
 )
 
 REM ===== Build =====
+echo [INFO] Checking Python packaging prerequisites...
+python -c "import pkg_resources" >nul 2>nul
+if errorlevel 1 (
+  echo [WARN] pkg_resources is missing. Attempting to repair setuptools...
+  python -m pip install --upgrade --force-reinstall "setuptools<82"
+  if errorlevel 1 goto :pkg_resources_err
+  python -c "import pkg_resources" >nul 2>nul
+  if errorlevel 1 goto :pkg_resources_err
+  echo [INFO] pkg_resources restored successfully.
+) else (
+  echo [INFO] pkg_resources is available.
+)
+
 pyinstaller --noconfirm --clean main_window.spec
 if errorlevel 1 goto :err
 
@@ -125,3 +138,9 @@ goto :eof
 echo.
 echo "[FAILED] ErrorLevel=%ERRORLEVEL%"
 exit /b %ERRORLEVEL%
+
+:pkg_resources_err
+echo.
+echo [ERROR] pkg_resources is still unavailable after repairing setuptools.
+echo [ERROR] Run python -m pip install --upgrade --force-reinstall setuptools^<82 and rerun this script.
+goto :err
