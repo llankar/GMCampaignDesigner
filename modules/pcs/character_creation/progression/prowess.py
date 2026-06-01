@@ -16,7 +16,7 @@ def rank_index_from_advancement_total(advancements: int) -> int:
 
     for idx, (start, end, _rank_name, _skill_cap_points) in enumerate(RANK_TABLE):
         if start <= advancements <= end:
-            return max(0, idx - 1)
+            return max(0, idx )
 
     return max(0, len(RANK_TABLE) - 2)
 
@@ -32,6 +32,7 @@ def prowess_points_from_advancement_choices(advancement_choices: list[dict]) -> 
             continue
 
         rank_index = rank_index_from_advancement_total(advancement_total)
+        # Rank is 1-based in the character-creation rules; internal rank_index stays 0-based.
         budgets.append(1 + rank_index)
     return budgets
 

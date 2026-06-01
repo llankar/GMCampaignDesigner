@@ -116,6 +116,11 @@ def build_character(character_input: dict) -> CharacterCreationResult:
         favorites,
         extra_generated_bonus=bonus_from_advancements,
     )
+    total_skill_budget = 15 + bonus_from_advancements
+    if summary["spent_base"] > total_skill_budget:
+        raise CharacterCreationError(
+            f"Points de compétence insuffisants: {summary['spent_base']} utilisés pour {total_skill_budget} disponibles."
+        )
     if summary["used_bonus"] > summary["generated_bonus"]:
         raise CharacterCreationError(
             f"Points bonus insuffisants: {summary['used_bonus']} utilisés pour {summary['generated_bonus']} générés."

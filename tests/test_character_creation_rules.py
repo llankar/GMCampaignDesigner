@@ -129,10 +129,35 @@ def test_bonus_points_only_on_favorites():
     """Verify that bonus points only on favorites."""
     payload = _payload()
     payload["skills"]["Combat"] = 4
+    payload["skills"]["Athlétisme"] = 1
     payload["bonus_skills"]["Artisanat"] = 1
 
     result = build_character(payload)
     assert result.rank_name == "Novice"
+
+
+def test_build_character_rejects_base_skill_points_over_budget_without_skill_improvement():
+    """Verify that build character rejects excess base skill points without skill-improvement advancement."""
+    payload = _payload()
+    payload["skills"]["Artisanat"] = 1
+
+    try:
+        build_character(payload)
+        assert False, "Expected CharacterCreationError"
+    except CharacterCreationError as exc:
+        assert "Points de compétence insuffisants" in str(exc)
+
+
+def test_skill_improvement_advancement_increases_total_skill_budget():
+    """Verify that skill improvement advancement increases the total skill budget by one."""
+    payload = _payload()
+    payload["skills"]["Artisanat"] = 1
+    payload["advancements"] = 1
+    payload["advancement_choices"] = [{"type": "skill_improvement", "details": "Artisanat"}]
+
+    result = build_character(payload)
+    assert result.rank_name == "Novice"
+    assert result.effective_skill_points["Artisanat"] == 2
 
 
 def test_advancement_choices_count_must_match_advancements():
@@ -214,6 +239,28 @@ def test_superficial_health_includes_rank_bonus():
     result = build_character(payload)
     assert result.rank_name == "Expérimenté"
     assert result.superficial_health == 17
+
+
+def test_prowess_points_advancement_grants_rank_based_budget():
+    """Verify that prowess points advancement grants rank-based points starting at rank 1."""
+    payload = _payload()
+    payload["advancements"] = 1
+    payload["advancement_choices"] = [{"type": "prowess_points", "details": "+2"}]
+    payload["feats"] = [
+        {
+            "name": "Maitrise",
+            "options": ["Bonus dommages : 2 pt (+5)", "Armure : 2 pt (+6)"],
+            "limitation": "Canalisation",
+        },
+        {
+            "name": "Feu",
+            "options": ["Effet particulier : 2 pt (+4)", "Zone d'effet : 2 pt (+5)"],
+            "limitation": "Flamme requise",
+        },
+    ]
+
+    result = build_character(payload)
+    assert result.rank_name == "Novice"
 
 
 def test_skill_improvement_advancement_increases_skill_points():

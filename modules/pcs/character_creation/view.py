@@ -7,11 +7,17 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
-from .constants import SKILLS
+from .constants import DIE_STEPS, SKILLS
 from .equipment import available_equipment_points, max_pe_per_object
 from .exporters import export_character_sheet
 from .points import summarize_point_budgets
-from .progression import ADVANCEMENT_OPTIONS, BASE_FEAT_COUNT, BASE_PROWESS_POINTS, prowess_points_from_advancement_choices
+from .progression import (
+    ADVANCEMENT_OPTIONS,
+    BASE_FEAT_COUNT,
+    BASE_PROWESS_POINTS,
+    apply_advancement_effects,
+    prowess_points_from_advancement_choices,
+)
 from .progression.rank_limits import bonus_skill_points_from_advancements, max_favorite_skills
 from .rules_engine import CharacterCreationError, build_character
 from .storage import CharacterDraftRepository
@@ -66,6 +72,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self.favorite_vars = {}
         self.skill_vars = {}
         self.bonus_skill_vars = {}
+        self.skill_die_vars = {}
         self.skills_header_var = tk.StringVar(value="Skills (15 base points, max favorites: 6)")
         ctk.CTkLabel(scroll, textvariable=self.skills_header_var, font=("Arial", 14, "bold")).grid(
             row=5, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2)
@@ -79,14 +86,16 @@ class CharacterCreationView(ctk.CTkFrame):
         for i, skill in enumerate(SKILLS):
             # Process each (i, skill) from enumerate(SKILLS).
             r = i // 2
-            c = (i % 2) * 3
+            c = (i % 2) * 4
             ctk.CTkLabel(skill_frame, text=skill).grid(row=r, column=c, sticky="w", padx=(6, 2), pady=2)
             fav = tk.BooleanVar(value=i < 6)
             pts = tk.StringVar(value="0")
             bonus_pts = tk.StringVar(value="0")
+            die_var = tk.StringVar(value="-")
             self.favorite_vars[skill] = fav
             self.skill_vars[skill] = pts
             self.bonus_skill_vars[skill] = bonus_pts
+            self.skill_die_vars[skill] = die_var
             ctk.CTkCheckBox(skill_frame, text="Fav", variable=fav, onvalue=True, offvalue=False).grid(row=r, column=c + 1)
             point_box = ctk.CTkFrame(skill_frame)
             point_box.grid(row=r, column=c + 2, padx=(2, 10), pady=1, sticky="w")
@@ -95,9 +104,10 @@ class CharacterCreationView(ctk.CTkFrame):
             ctk.CTkLabel(point_box, text="+", width=12).grid(row=0, column=2, padx=(0, 2))
             ctk.CTkLabel(point_box, text="Bo", width=18).grid(row=0, column=3, padx=(0, 2))
             ctk.CTkEntry(point_box, textvariable=bonus_pts, width=40).grid(row=0, column=4)
-            fav.trace_add("write", self._update_remaining_points_marker)
-            pts.trace_add("write", self._update_remaining_points_marker)
-            bonus_pts.trace_add("write", self._update_remaining_points_marker)
+            ctk.CTkLabel(skill_frame, textvariable=die_var, width=42).grid(row=r, column=c + 3, sticky="w", padx=(0, 4))
+            fav.trace_add("write", self._on_skill_points_changed)
+            pts.trace_add("write", self._on_skill_points_changed)
+            bonus_pts.trace_add("write", self._on_skill_points_changed)
 
         ctk.CTkLabel(scroll, text="Prowess", font=("Arial", 14, "bold")).grid(
             row=8, column=0, sticky="w", padx=6, pady=(10, 2)
@@ -144,6 +154,7 @@ class CharacterCreationView(ctk.CTkFrame):
 
         self._update_favorites_limit_ui()
         self._update_remaining_points_marker()
+        self._update_skill_dice_markers()
         self._update_equipment_points_marker()
         self._refresh_draft_selector()
         self._render_advancement_rows()
@@ -210,6 +221,7 @@ class CharacterCreationView(ctk.CTkFrame):
         """Handle advancements changed."""
         self._update_favorites_limit_ui()
         self._render_advancement_rows()
+        self._update_skill_dice_markers()
         self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
         self._update_equipment_points_marker()
@@ -223,6 +235,7 @@ class CharacterCreationView(ctk.CTkFrame):
     def _render_advancement_rows(self):
         """Render advancement rows."""
         existing_choices = self._collect_cached_advancement_choices()
+        stringvar_master = self._stringvar_master()
 
         for widget in self.advancement_frame.winfo_children():
             widget.destroy()
@@ -242,8 +255,9 @@ class CharacterCreationView(ctk.CTkFrame):
             for idx in range(advancement_count):
                 existing_choice = self._advancement_choices_cache[idx] if idx < len(self._advancement_choices_cache) else {}
                 initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
-                option_var = tk.StringVar(value=initial_type)
-                details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
+                option_var = tk.StringVar(master=stringvar_master, value=initial_type)
+                details_var = tk.StringVar(master=stringvar_master, value=(existing_choice.get("details") or "").strip())
+                details_var.trace_add("write", self._on_advancement_choice_updated)
                 self.advancement_rows.append(
                     {
                         "type_var": option_var,
@@ -270,10 +284,10 @@ class CharacterCreationView(ctk.CTkFrame):
 
             existing_choice = self._advancement_choices_cache[idx] if idx < len(self._advancement_choices_cache) else {}
             initial_type = (existing_choice.get("type") or "").strip() or ADVANCEMENT_OPTIONS[0][0]
-            option_var = tk.StringVar(value=initial_type)
+            option_var = tk.StringVar(master=stringvar_master, value=initial_type)
             option_label_map = {value: label for value, label in ADVANCEMENT_OPTIONS}
             option_value_map = {label: value for value, label in ADVANCEMENT_OPTIONS}
-            option_label_var = tk.StringVar(value=option_label_map.get(initial_type, ADVANCEMENT_OPTIONS[0][1]))
+            option_label_var = tk.StringVar(master=stringvar_master, value=option_label_map.get(initial_type, ADVANCEMENT_OPTIONS[0][1]))
 
             bind_advancement_type_and_label_vars(
                 type_var=option_var,
@@ -291,7 +305,8 @@ class CharacterCreationView(ctk.CTkFrame):
             )
             choice.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
 
-            details_var = tk.StringVar(value=(existing_choice.get("details") or "").strip())
+            details_var = tk.StringVar(master=stringvar_master, value=(existing_choice.get("details") or "").strip())
+            details_var.trace_add("write", self._on_advancement_choice_updated)
             ctk.CTkEntry(row_frame, textvariable=details_var, placeholder_text="Narrative / mechanical details")\
                 .grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=(0, 6))
 
@@ -331,6 +346,7 @@ class CharacterCreationView(ctk.CTkFrame):
         self._render_feat_rows(self._collect_current_feats())
         self._update_remaining_points_marker()
         self._update_equipment_points_marker()
+        self._update_skill_dice_markers()
 
     def _collect_current_feats(self) -> list[dict]:
         """Collect current feats."""
@@ -472,6 +488,7 @@ class CharacterCreationView(ctk.CTkFrame):
         )
 
         self._update_remaining_points_marker()
+        self._update_skill_dice_markers()
         self._update_equipment_points_marker()
 
     def _update_equipment_points_marker(self, *_args) -> None:
@@ -507,6 +524,18 @@ class CharacterCreationView(ctk.CTkFrame):
         except ValueError:
             return 0
 
+    def _stringvar_master(self):
+        """Return a Tk master suitable for temporary StringVars."""
+        for attr_name in ("inputs", "favorite_vars", "skill_vars", "bonus_skill_vars", "skill_die_vars"):
+            mapping = getattr(self, attr_name, None)
+            if not isinstance(mapping, dict):
+                continue
+            for var in mapping.values():
+                master = getattr(var, "_root", None)
+                if master is not None:
+                    return master
+        return None
+
     def _update_remaining_points_marker(self, *_args) -> None:
         """Update remaining points marker."""
         base_points = {skill: self._safe_int(var.get()) for skill, var in self.skill_vars.items()}
@@ -532,6 +561,54 @@ class CharacterCreationView(ctk.CTkFrame):
             f"Bonus remaining: {summary['remaining_bonus']} | "
             f"Favorites: {len(favorites)}/{favorite_limit}"
         )
+
+    def _on_skill_points_changed(self, *_args) -> None:
+        """Update skill point-dependent UI markers."""
+        self._update_remaining_points_marker()
+        self._update_skill_dice_markers()
+
+    def _skill_die_for_points(self, total_points: int) -> str:
+        """Return the die label for a skill total."""
+        return DIE_STEPS.get(total_points, "d12+4")
+
+    def _update_skill_dice_markers(self, *_args) -> None:
+        """Update the dice-level label shown next to each skill row."""
+        if not getattr(self, "skill_die_vars", None):
+            return
+
+        effective_skill_points = self._current_effective_skill_points_for_display()
+        for skill, die_var in self.skill_die_vars.items():
+            die_var.set(self._skill_die_for_points(effective_skill_points.get(skill, 0)))
+
+    def _current_advancement_choices(self) -> list[dict[str, str]]:
+        """Collect the current advancement choices from the UI."""
+        return [
+            {
+                "type": row["type_var"].get().strip(),
+                "details": row["details_var"].get().strip(),
+            }
+            for row in self.advancement_rows
+        ]
+
+    def _current_effective_skill_points_for_display(self) -> dict[str, int]:
+        """Return the effective skill points after applying advancement effects."""
+        base_skill_points = {skill: self._safe_int(var.get()) for skill, var in self.skill_vars.items()}
+        bonus_skill_points = {skill: self._safe_int(var.get()) for skill, var in self.bonus_skill_vars.items()}
+        current_skill_points = {
+            skill: base_skill_points.get(skill, 0) + bonus_skill_points.get(skill, 0)
+            for skill in SKILLS
+        }
+        progression_effects = apply_advancement_effects(
+            base_skill_points=current_skill_points,
+            favorites=self._current_favorites(),
+            advancement_choices=self._current_advancement_choices(),
+            is_superhero=False,
+        )
+        return progression_effects.effective_skill_points
+
+    def _current_favorites(self) -> list[str]:
+        """Collect the current favorite skills from the UI."""
+        return [skill for skill, var in self.favorite_vars.items() if var.get()]
 
     def create_character_pdf(self):
         """Create character PDF."""
