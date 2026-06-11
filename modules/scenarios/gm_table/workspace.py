@@ -38,9 +38,6 @@ TABLE_PALETTE = {
 
 TABLE_CANVAS_BG = "#0D111B"
 
-BOOK_PANEL_SKINS = {"binder"}
-FILE_FOLDER_PANEL_SKINS = {"dossier"}
-PAPER_PANEL_SKINS = {"paper_stack", "parchment", "index_cards"}
 PAPER_BODY_COLORS = {
     "paper_stack": {"panel_bg": "#F3E8D0", "panel_border": "#D7C29A"},
     "parchment": {"panel_bg": "#F1DFAF", "panel_border": "#C99A3E"},
@@ -521,9 +518,9 @@ class GMTablePanel(ctk.CTkFrame):
     ) -> None:
         self._skin = resolve_panel_skin(definition.kind, definition.state)
         self._skin_name = self._skin.name
-        self._is_book_skin = self._skin_name in BOOK_PANEL_SKINS
-        self._is_file_folder_skin = self._skin_name in FILE_FOLDER_PANEL_SKINS
-        self._is_paper_skin = self._skin_name in PAPER_PANEL_SKINS
+        self._is_book_skin = self._skin.show_spine
+        self._is_file_folder_skin = self._skin.show_file_tab
+        self._is_paper_skin = self._skin.show_page_edges
         paper_body_colors = PAPER_BODY_COLORS.get(self._skin_name, {})
         self._panel_bg = paper_body_colors.get("panel_bg", self._skin.panel_bg)
         self._panel_border = paper_body_colors.get("panel_border", self._skin.panel_border)
@@ -756,7 +753,7 @@ class GMTablePanel(ctk.CTkFrame):
         self.spine.grid_propagate(False)
         self.spine_label = ctk.CTkLabel(
             self.spine,
-            text="BOOK",
+            text=self._skin.icon or "BOOK",
             text_color=self._skin.eyebrow_color,
             font=ctk.CTkFont(size=9, weight="bold"),
         )
@@ -845,7 +842,7 @@ class GMTablePanel(ctk.CTkFrame):
 
     def _build_paper_marker(self, skin: PanelSkin) -> None:
         """Render a small decorative paper marker when appropriate."""
-        marker = PAPER_DECORATIVE_MARKERS.get(self._skin_name)
+        marker = self._skin.icon or PAPER_DECORATIVE_MARKERS.get(self._skin_name)
         if not marker:
             return
         self.paper_marker_label = ctk.CTkLabel(
