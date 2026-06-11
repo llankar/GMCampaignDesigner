@@ -14,6 +14,10 @@ from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
 from modules.scenarios.gm_table.panel_skins import PanelSkin, resolve_panel_skin
+from modules.scenarios.gm_table.panel_depth_styles import (
+    PanelDepthStyle,
+    resolve_panel_depth_style,
+)
 
 
 TABLE_PALETTE = {
@@ -524,6 +528,9 @@ class GMTablePanel(ctk.CTkFrame):
         self._panel_bg = paper_body_colors.get("panel_bg", self._skin.panel_bg)
         self._panel_border = paper_body_colors.get("panel_border", self._skin.panel_border)
         self._panel_border_width = 1 if self._is_paper_skin else self._skin.border_width
+        self._depth_style = resolve_panel_depth_style(self._skin_name)
+        self._depth_layers: list[ctk.CTkFrame] = []
+        self._edge_accent_widgets: list[tk.Widget] = []
         super().__init__(
             master,
             width=width,
@@ -592,6 +599,8 @@ class GMTablePanel(ctk.CTkFrame):
         except Exception:
             pass
 
+        self._build_depth_accents(self._depth_style)
+
         self._bind_focus(self)
         self._bind_focus(self.body)
         for widget in self._header_drag_widgets:
@@ -599,6 +608,139 @@ class GMTablePanel(ctk.CTkFrame):
         self._install_drag_bindings()
         self._install_resize_bindings()
         self._refresh_window_controls()
+
+    def attach_depth_layers(self, layers: list[ctk.CTkFrame]) -> None:
+        """Attach sibling depth layers that should follow this panel geometry."""
+        if self._depth_layers:
+            self.destroy_depth_layers()
+        self._depth_layers = list(layers)
+        self._sync_depth_layers()
+
+    def destroy_depth_layers(self) -> None:
+        """Destroy sibling depth layers owned by this panel."""
+        for layer in list(self._depth_layers):
+            try:
+                layer.destroy()
+            except Exception:
+                pass
+        self._depth_layers.clear()
+
+    def lift_depth_layers(self) -> None:
+        """Raise sibling depth layers without raising the real panel."""
+        for layer in self._depth_layers:
+            try:
+                layer.lift()
+            except Exception:
+                continue
+
+    def lift_with_depth(self) -> None:
+        """Raise sibling depth layers immediately beneath the real panel."""
+        self.lift_depth_layers()
+        self.lift()
+
+    def _hide_depth_layers(self) -> None:
+        """Hide depth layers without affecting panel state."""
+        for layer in self._depth_layers:
+            try:
+                layer.place_forget()
+            except Exception:
+                pass
+
+    def _sync_depth_layers(self) -> None:
+        """Keep decorative sibling layers aligned to the current panel rectangle."""
+        if self._layout_mode == "minimized":
+            self._hide_depth_layers()
+            return
+        width = self._current_geometry["width"]
+        height = self._current_geometry["height"]
+        for layer, layer_style in zip(
+            self._depth_layers,
+            self._depth_style.shadow_layers,
+            strict=False,
+        ):
+            layer.place_configure(
+                x=self._current_geometry["x"] + layer_style.offset_x,
+                y=self._current_geometry["y"] + layer_style.offset_y,
+                width=max(self.MIN_WIDTH, width + layer_style.expand_width),
+                height=max(self.MIN_HEIGHT, height + layer_style.expand_height),
+            )
+
+    def _build_depth_accents(self, style: PanelDepthStyle) -> None:
+        """Render inner edge highlights and skin-specific stack strips."""
+        for accent in style.edge_accents:
+            widget = tk.Frame(self, bg=accent.color, highlightthickness=0, bd=0)
+            if accent.side == "top":
+                widget.place(
+                    x=accent.inset,
+                    y=accent.inset,
+                    relwidth=1.0,
+                    width=-(accent.inset * 2),
+                    height=accent.thickness,
+                )
+            elif accent.side == "bottom":
+                widget.place(
+                    x=accent.inset,
+                    rely=1.0,
+                    y=-(accent.inset + accent.thickness),
+                    relwidth=1.0,
+                    width=-(accent.inset * 2),
+                    height=accent.thickness,
+                )
+            elif accent.side == "left":
+                widget.place(
+                    x=accent.inset,
+                    y=accent.inset,
+                    width=accent.thickness,
+                    relheight=1.0,
+                    height=-(accent.inset * 2),
+                )
+            elif accent.side == "right":
+                widget.place(
+                    relx=1.0,
+                    x=-(accent.inset + accent.thickness),
+                    y=accent.inset,
+                    width=accent.thickness,
+                    relheight=1.0,
+                    height=-(accent.inset * 2),
+                )
+            else:
+                continue
+            self._edge_accent_widgets.append(widget)
+
+        if style.stack_strip_side and style.stack_strip_color:
+            strip = tk.Frame(
+                self,
+                bg=style.stack_strip_color,
+                highlightthickness=0,
+                bd=0,
+            )
+            if style.stack_strip_side == "right":
+                strip.place(
+                    relx=1.0,
+                    x=-(style.stack_strip_width + 7),
+                    y=18,
+                    width=style.stack_strip_width,
+                    relheight=1.0,
+                    height=-36,
+                )
+            elif style.stack_strip_side == "bottom":
+                strip.place(
+                    x=18,
+                    rely=1.0,
+                    y=-(style.stack_strip_width + 7),
+                    relwidth=1.0,
+                    width=-36,
+                    height=style.stack_strip_width,
+                )
+            self._edge_accent_widgets.append(strip)
+
+        for widget in self._edge_accent_widgets:
+            self._bind_focus(widget)
+            try:
+                widget.lower()
+            except Exception:
+                pass
+        self.resize_handle.lift()
 
     def _build_book_spine(self) -> None:
         """Add a narrow book-like spine to binder panels."""
@@ -797,6 +939,11 @@ class GMTablePanel(ctk.CTkFrame):
         widget.bind("<ButtonRelease-1>", self._stop_resize, add="+")
 
     @property
+    def depth_style(self) -> PanelDepthStyle:
+        """Return the decorative sibling-layer style for this panel."""
+        return self._depth_style
+
+    @property
     def layout_mode(self) -> str:
         """Return the current layout mode."""
         return self._layout_mode
@@ -868,6 +1015,7 @@ class GMTablePanel(ctk.CTkFrame):
         self._minimized_restore_mode = restore_mode
         self._layout_mode = "minimized"
         self.place_forget()
+        self._hide_depth_layers()
         self._refresh_window_controls()
 
     def restore_from_minimized(self, *, surface_w: int, surface_h: int) -> bool:
@@ -1122,6 +1270,7 @@ class GMTablePanel(ctk.CTkFrame):
         }
         self._set_size(self._current_geometry["width"], self._current_geometry["height"])
         self.place_configure(x=self._current_geometry["x"], y=self._current_geometry["y"])
+        self._sync_depth_layers()
 
     def _set_size(self, width: int, height: int) -> None:
         """Update the CTk widget size."""
@@ -1133,6 +1282,11 @@ class GMTablePanel(ctk.CTkFrame):
         except Exception:
             pass
         self.resize_handle.lift()
+
+    def destroy(self) -> None:
+        """Destroy the real panel and any sibling decorative layers."""
+        self.destroy_depth_layers()
+        super().destroy()
 
     def _resolve_drag_snap_mode(self, event) -> str | None:
         """Resolve the current drag pointer against the workspace snap map."""
@@ -1867,9 +2021,20 @@ class GMTableWorkspace(ctk.CTkFrame):
         for current_id, panel in self._panels.items():
             is_target = current_id == panel_id and panel.layout_mode != "minimized"
             panel.set_focus_state(is_target)
-            if is_target:
-                panel.lift()
+        self._restack_panel_layers()
         self._raise_workspace_overlays()
+
+    def _restack_panel_layers(self) -> None:
+        """Keep decorative depth layers below real panels so they do not steal panel clicks."""
+        ordered_panels = [
+            self._panels[panel_id]
+            for panel_id in self._z_order
+            if panel_id in self._panels and self._panels[panel_id].layout_mode != "minimized"
+        ]
+        for panel in ordered_panels:
+            panel.lift_depth_layers()
+        for panel in ordered_panels:
+            panel.lift()
 
     def _raise_workspace_overlays(self) -> None:
         """Keep the camera HUD and minimap above every desk panel."""
@@ -1986,6 +2151,20 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._raise_workspace_overlays()
         self._schedule_layout_changed()
 
+    def _create_panel_depth_layers(self, panel: GMTablePanel) -> list[ctk.CTkFrame]:
+        """Create non-interactive sibling layers that sit behind a panel."""
+        layers: list[ctk.CTkFrame] = []
+        for layer_style in panel.depth_style.shadow_layers:
+            frame = ctk.CTkFrame(
+                self.surface,
+                fg_color=layer_style.color,
+                corner_radius=layer_style.corner_radius,
+                border_width=layer_style.border_width,
+                border_color=layer_style.border_color or layer_style.color,
+            )
+            layers.append(frame)
+        return layers
+
     def remove_panel(self, panel_id: str) -> None:
         """Close a panel."""
         panel = self._panels.pop(panel_id, None)
@@ -2062,6 +2241,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             on_toggle_maximize=self.toggle_panel_maximize,
             on_window_action=self.handle_window_action,
         )
+        panel.attach_depth_layers(self._create_panel_depth_layers(panel))
         self._apply_floating_geometry(panel, world_geometry)
         panel_payload = self._build_panel(panel.body, definition)
         self._mount_payload_widget(panel.body, panel_payload)
@@ -2488,6 +2668,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             if layout_mode == "minimized":
                 panel._layout_mode = "minimized"
                 panel.place_forget()
+                panel._hide_depth_layers()
                 panel._refresh_window_controls()
             elif layout_mode in SNAP_LAYOUT_MODES:
                 surface_w, surface_h = self._surface_geometry()
