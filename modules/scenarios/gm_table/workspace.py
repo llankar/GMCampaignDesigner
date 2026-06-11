@@ -13,6 +13,7 @@ from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
+from modules.scenarios.gm_table.panel_skins import resolve_panel_skin
 
 
 TABLE_PALETTE = {
@@ -500,14 +501,15 @@ class GMTablePanel(ctk.CTkFrame):
         on_toggle_maximize: Callable[[str], None],
         on_window_action: Callable[[str, str], None],
     ) -> None:
+        self._skin = resolve_panel_skin(definition.kind, definition.state)
         super().__init__(
             master,
             width=width,
             height=height,
-            fg_color=TABLE_PALETTE["panel_bg"],
+            fg_color=self._skin.panel_bg,
             corner_radius=22,
-            border_width=1,
-            border_color=TABLE_PALETTE["panel_border"],
+            border_width=self._skin.border_width,
+            border_color=self._skin.panel_border,
         )
         self.definition = definition
         self._on_focus = on_focus
@@ -539,17 +541,22 @@ class GMTablePanel(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.header = ctk.CTkFrame(self, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=18)
+        self.header = ctk.CTkFrame(
+            self,
+            fg_color=self._skin.header_bg,
+            corner_radius=18,
+            border_width=self._skin.header_border_width,
+            border_color=self._skin.header_border,
+        )
         self.header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 0))
         self.header.grid_columnconfigure(0, weight=1)
 
-        normalized_kind = str(definition.kind or "").strip().lower()
-        self._show_eyebrow = normalized_kind not in {"", "entity"}
+        self._show_eyebrow = bool(self._skin.label)
 
         self.eyebrow_label = ctk.CTkLabel(
             self.header,
-            text=(definition.kind or "panel").replace("_", " ").title(),
-            text_color=TABLE_PALETTE["accent"],
+            text=self._skin.label,
+            text_color=self._skin.eyebrow_color,
             font=ctk.CTkFont(size=11, weight="bold"),
         )
         self.eyebrow_label.grid(row=0, column=0, padx=(14, 8), pady=(10, 0), sticky="w")
@@ -559,7 +566,7 @@ class GMTablePanel(ctk.CTkFrame):
         self.title_label = ctk.CTkLabel(
             self.header,
             text=definition.title,
-            text_color=TABLE_PALETTE["text"],
+            text_color=self._skin.title_color,
             font=ctk.CTkFont(size=17, weight="bold"),
             anchor="w",
         )
@@ -576,9 +583,9 @@ class GMTablePanel(ctk.CTkFrame):
             text="-",
             width=30,
             height=28,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
+            fg_color=self._skin.control_bg,
+            hover_color=self._skin.control_hover,
+            text_color=self._skin.control_text,
             corner_radius=12,
             command=lambda: self._dispatch_window_action("minimize"),
         )
@@ -589,9 +596,9 @@ class GMTablePanel(ctk.CTkFrame):
             text="Max",
             width=54,
             height=28,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
+            fg_color=self._skin.control_bg,
+            hover_color=self._skin.control_hover,
+            text_color=self._skin.control_text,
             corner_radius=12,
             command=lambda: self._dispatch_window_action("toggle_maximize"),
         )
@@ -602,9 +609,9 @@ class GMTablePanel(ctk.CTkFrame):
             text="...",
             width=34,
             height=28,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
+            fg_color=self._skin.control_bg,
+            hover_color=self._skin.control_hover,
+            text_color=self._skin.control_text,
             corner_radius=12,
             command=self._show_actions_menu,
         )
@@ -615,9 +622,9 @@ class GMTablePanel(ctk.CTkFrame):
             text="x",
             width=30,
             height=28,
-            fg_color=TABLE_PALETTE["accent_soft"],
-            hover_color="#5B3414",
-            text_color=TABLE_PALETTE["text"],
+            fg_color=self._skin.close_bg,
+            hover_color=self._skin.close_hover,
+            text_color=self._skin.control_text,
             corner_radius=12,
             command=lambda: self._on_close(self.definition.panel_id),
         )
@@ -635,8 +642,8 @@ class GMTablePanel(ctk.CTkFrame):
             text="//",
             width=32,
             height=24,
-            fg_color=TABLE_PALETTE["table_chip"],
-            text_color=TABLE_PALETTE["muted"],
+            fg_color=self._skin.resize_bg,
+            text_color=self._skin.resize_text,
             corner_radius=10,
         )
         self.resize_handle.place(relx=1.0, rely=1.0, x=-10, y=-10, anchor="se")
@@ -687,7 +694,7 @@ class GMTablePanel(ctk.CTkFrame):
             cursor = spec.pop("cursor")
             handle = tk.Frame(
                 self,
-                bg=TABLE_PALETTE["panel_bg"],
+                bg=self._skin.panel_bg,
                 highlightthickness=0,
                 bd=0,
                 cursor=cursor,
@@ -1004,7 +1011,7 @@ class GMTablePanel(ctk.CTkFrame):
     def set_focus_state(self, focused: bool) -> None:
         """Update focus styling."""
         self._is_focused = bool(focused)
-        self.configure(border_color=TABLE_PALETTE["panel_focus"] if focused else TABLE_PALETTE["panel_border"])
+        self.configure(border_color=self._skin.panel_focus if focused else self._skin.panel_border)
 
     def set_title(self, title: str) -> None:
         """Refresh the visible title."""
