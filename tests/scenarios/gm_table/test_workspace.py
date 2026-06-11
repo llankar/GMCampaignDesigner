@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import tkinter as tk
 from types import SimpleNamespace
 
@@ -161,6 +162,13 @@ class _FakePanel:
 
     def set_focus_state(self, focused: bool) -> None:
         self.focused = focused
+
+    def lift_depth_layers(self) -> None:
+        pass
+
+    def lift_with_depth(self) -> None:
+        self.lift_depth_layers()
+        self.lift()
 
     def lift(self) -> None:
         self.lifted = True
@@ -1718,3 +1726,12 @@ def test_mount_payload_widget_preserves_existing_geometry_manager() -> None:
         assert payload.winfo_manager() == "pack"
     finally:
         root.destroy()
+
+
+def test_gm_table_panel_init_resolves_skin_from_definition_kind_and_state():
+    init_source = inspect.getsource(GMTablePanel.__init__)
+
+    assert "resolve_panel_skin" in init_source
+    assert "definition.kind" in init_source
+    assert "definition.state" in init_source
+    assert "self._skin = resolve_panel_skin(definition.kind, definition.state)" in init_source
