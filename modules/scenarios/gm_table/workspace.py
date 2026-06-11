@@ -13,7 +13,7 @@ from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
-from modules.scenarios.gm_table.panel_skins import resolve_panel_skin
+from modules.scenarios.gm_table.panel_skins import PanelSkin, resolve_panel_skin
 
 
 TABLE_PALETTE = {
@@ -33,6 +33,20 @@ TABLE_PALETTE = {
 }
 
 TABLE_CANVAS_BG = "#0D111B"
+
+BOOK_PANEL_SKINS = {"binder"}
+FILE_FOLDER_PANEL_SKINS = {"dossier"}
+PAPER_PANEL_SKINS = {"paper_stack", "parchment", "index_cards"}
+PAPER_BODY_COLORS = {
+    "paper_stack": {"panel_bg": "#F3E8D0", "panel_border": "#D7C29A"},
+    "parchment": {"panel_bg": "#F1DFAF", "panel_border": "#C99A3E"},
+    "index_cards": {"panel_bg": "#F8FAFC", "panel_border": "#CBD5E1"},
+}
+PAPER_DECORATIVE_MARKERS = {
+    "paper_stack": "📎",
+    "parchment": "✍",
+    "index_cards": "✦",
+}
 
 
 DEFAULT_PANEL_SIZES = {
@@ -502,14 +516,22 @@ class GMTablePanel(ctk.CTkFrame):
         on_window_action: Callable[[str, str], None],
     ) -> None:
         self._skin = resolve_panel_skin(definition.kind, definition.state)
+        self._skin_name = self._skin.name
+        self._is_book_skin = self._skin_name in BOOK_PANEL_SKINS
+        self._is_file_folder_skin = self._skin_name in FILE_FOLDER_PANEL_SKINS
+        self._is_paper_skin = self._skin_name in PAPER_PANEL_SKINS
+        paper_body_colors = PAPER_BODY_COLORS.get(self._skin_name, {})
+        self._panel_bg = paper_body_colors.get("panel_bg", self._skin.panel_bg)
+        self._panel_border = paper_body_colors.get("panel_border", self._skin.panel_border)
+        self._panel_border_width = 1 if self._is_paper_skin else self._skin.border_width
         super().__init__(
             master,
             width=width,
             height=height,
-            fg_color=self._skin.panel_bg,
+            fg_color=self._panel_bg,
             corner_radius=22,
-            border_width=self._skin.border_width,
-            border_color=self._skin.panel_border,
+            border_width=self._panel_border_width,
+            border_color=self._panel_border,
         )
         self.definition = definition
         self._on_focus = on_focus
@@ -538,102 +560,20 @@ class GMTablePanel(ctk.CTkFrame):
         self._current_geometry = {"x": 0, "y": 0, "width": width, "height": height}
         self._resize_handles: dict[str, tk.Frame] = {}
         self._is_focused = False
+        self._content_column = 1 if self._is_book_skin else 0
+        self._header_drag_widgets: list[tk.Widget] = []
         self.grid_rowconfigure(1, weight=1)
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=0 if self._is_book_skin else 1)
+        if self._is_book_skin:
+            self.grid_columnconfigure(1, weight=1)
+            self._build_book_spine()
 
-        self.header = ctk.CTkFrame(
-            self,
-            fg_color=self._skin.header_bg,
-            corner_radius=18,
-            border_width=self._skin.header_border_width,
-            border_color=self._skin.header_border,
-        )
-        self.header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 0))
-        self.header.grid_columnconfigure(0, weight=1)
-
-        self._show_eyebrow = bool(self._skin.label)
-
-        self.eyebrow_label = ctk.CTkLabel(
-            self.header,
-            text=self._skin.label,
-            text_color=self._skin.eyebrow_color,
-            font=ctk.CTkFont(size=11, weight="bold"),
-        )
-        self.eyebrow_label.grid(row=0, column=0, padx=(14, 8), pady=(10, 0), sticky="w")
-        if not self._show_eyebrow:
-            self.eyebrow_label.grid_remove()
-
-        self.title_label = ctk.CTkLabel(
-            self.header,
-            text=definition.title,
-            text_color=self._skin.title_color,
-            font=ctk.CTkFont(size=17, weight="bold"),
-            anchor="w",
-        )
-        title_row = 1 if self._show_eyebrow else 0
-        title_pady = (0, 10) if self._show_eyebrow else (10, 10)
-        self.title_label.grid(row=title_row, column=0, padx=14, pady=title_pady, sticky="ew")
-
-        self.controls = ctk.CTkFrame(self.header, fg_color="transparent")
-        controls_rowspan = 2 if self._show_eyebrow else 1
-        self.controls.grid(row=0, column=1, rowspan=controls_rowspan, padx=(8, 10), pady=10, sticky="ne")
-
-        self.minimize_button = ctk.CTkButton(
-            self.controls,
-            text="-",
-            width=30,
-            height=28,
-            fg_color=self._skin.control_bg,
-            hover_color=self._skin.control_hover,
-            text_color=self._skin.control_text,
-            corner_radius=12,
-            command=lambda: self._dispatch_window_action("minimize"),
-        )
-        self.minimize_button.pack(side="left", padx=(0, 6))
-
-        self.maximize_button = ctk.CTkButton(
-            self.controls,
-            text="Max",
-            width=54,
-            height=28,
-            fg_color=self._skin.control_bg,
-            hover_color=self._skin.control_hover,
-            text_color=self._skin.control_text,
-            corner_radius=12,
-            command=lambda: self._dispatch_window_action("toggle_maximize"),
-        )
-        self.maximize_button.pack(side="left", padx=(0, 6))
-
-        self.actions_button = ctk.CTkButton(
-            self.controls,
-            text="...",
-            width=34,
-            height=28,
-            fg_color=self._skin.control_bg,
-            hover_color=self._skin.control_hover,
-            text_color=self._skin.control_text,
-            corner_radius=12,
-            command=self._show_actions_menu,
-        )
-        self.actions_button.pack(side="left", padx=(0, 6))
-
-        self.close_button = ctk.CTkButton(
-            self.controls,
-            text="x",
-            width=30,
-            height=28,
-            fg_color=self._skin.close_bg,
-            hover_color=self._skin.close_hover,
-            text_color=self._skin.control_text,
-            corner_radius=12,
-            command=lambda: self._on_close(self.definition.panel_id),
-        )
-        self.close_button.pack(side="left")
+        self._build_physical_header(self._skin)
 
         self._actions_menu = tk.Menu(self, tearoff=0)
 
         self.body = ctk.CTkFrame(self, fg_color="transparent")
-        self.body.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.body.grid(row=1, column=self._content_column, sticky="nsew", padx=10, pady=10)
         self.body.grid_rowconfigure(0, weight=1)
         self.body.grid_columnconfigure(0, weight=1)
 
@@ -653,13 +593,162 @@ class GMTablePanel(ctk.CTkFrame):
             pass
 
         self._bind_focus(self)
-        self._bind_focus(self.header)
         self._bind_focus(self.body)
-        self._bind_focus(self.title_label)
-        self._bind_focus(self.eyebrow_label)
+        for widget in self._header_drag_widgets:
+            self._bind_focus(widget)
         self._install_drag_bindings()
         self._install_resize_bindings()
         self._refresh_window_controls()
+
+    def _build_book_spine(self) -> None:
+        """Add a narrow book-like spine to binder panels."""
+        self.spine = ctk.CTkFrame(
+            self,
+            width=22,
+            fg_color=self._skin.header_bg,
+            corner_radius=16,
+            border_width=1,
+            border_color=self._skin.header_border,
+        )
+        self.spine.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(8, 0), pady=8)
+        self.spine.grid_propagate(False)
+        self.spine_label = ctk.CTkLabel(
+            self.spine,
+            text="BOOK",
+            text_color=self._skin.eyebrow_color,
+            font=ctk.CTkFont(size=9, weight="bold"),
+        )
+        self.spine_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._add_header_drag_widgets(self.spine, self.spine_label)
+
+    def _add_header_drag_widgets(self, *widgets: tk.Widget) -> None:
+        """Register widgets that should behave like header drag zones."""
+        for widget in widgets:
+            if widget not in self._header_drag_widgets:
+                self._header_drag_widgets.append(widget)
+
+    def _build_physical_header(self, skin: PanelSkin) -> None:
+        """Build the physical-object header chrome for the panel."""
+        self.header = ctk.CTkFrame(
+            self,
+            fg_color=skin.header_bg,
+            corner_radius=18,
+            border_width=skin.header_border_width,
+            border_color=skin.header_border,
+        )
+        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=8, pady=(8, 0))
+        self.header.grid_columnconfigure(0, weight=1)
+
+        self._show_eyebrow = bool(skin.label)
+        title_row = 1 if self._show_eyebrow else 0
+        title_pady = (0, 10) if self._show_eyebrow else (10, 10)
+        if self._is_file_folder_skin:
+            title_row += 1
+            title_pady = (0, 10)
+
+        self._add_header_drag_widgets(self.header)
+        self._build_file_folder_tab(skin)
+        self._build_paper_marker(skin)
+
+        self.eyebrow_label = ctk.CTkLabel(
+            self.header,
+            text=skin.label,
+            text_color=skin.eyebrow_color,
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
+        self.eyebrow_label.grid(
+            row=1 if self._is_file_folder_skin else 0,
+            column=0,
+            padx=(14, 8),
+            pady=(8, 0),
+            sticky="w",
+        )
+        if not self._show_eyebrow:
+            self.eyebrow_label.grid_remove()
+
+        self.title_label = ctk.CTkLabel(
+            self.header,
+            text=self.definition.title,
+            text_color=skin.title_color,
+            font=ctk.CTkFont(size=17, weight="bold"),
+            anchor="w",
+        )
+        self.title_label.grid(row=title_row, column=0, padx=14, pady=title_pady, sticky="ew")
+
+        self._add_header_drag_widgets(self.title_label, self.eyebrow_label)
+        self._build_desk_object_controls(skin, row_span=max(1, title_row + 1))
+
+    def _build_file_folder_tab(self, skin: PanelSkin) -> None:
+        """Render a raised top tab for file-folder panels."""
+        if not self._is_file_folder_skin:
+            return
+        entity_type = str(self.definition.state.get("entity_type") or "").strip()
+        tab_text = entity_type or skin.label or self.definition.kind.replace("_", " ").title()
+        self.folder_tab = ctk.CTkFrame(
+            self.header,
+            fg_color=skin.control_bg,
+            corner_radius=12,
+            border_width=1,
+            border_color=skin.header_border,
+        )
+        self.folder_tab.grid(row=0, column=0, padx=(12, 8), pady=(6, 0), sticky="w")
+        self.folder_tab_label = ctk.CTkLabel(
+            self.folder_tab,
+            text=tab_text,
+            text_color=skin.control_text,
+            font=ctk.CTkFont(size=10, weight="bold"),
+        )
+        self.folder_tab_label.pack(padx=12, pady=3)
+        self._add_header_drag_widgets(self.folder_tab, self.folder_tab_label)
+
+    def _build_paper_marker(self, skin: PanelSkin) -> None:
+        """Render a small decorative paper marker when appropriate."""
+        marker = PAPER_DECORATIVE_MARKERS.get(self._skin_name)
+        if not marker:
+            return
+        self.paper_marker_label = ctk.CTkLabel(
+            self.header,
+            text=marker,
+            width=26,
+            height=24,
+            text_color=skin.eyebrow_color,
+            font=ctk.CTkFont(size=15, weight="bold"),
+        )
+        self.paper_marker_label.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ne")
+        self._add_header_drag_widgets(self.paper_marker_label)
+
+    def _build_desk_object_controls(self, skin: PanelSkin, *, row_span: int) -> None:
+        """Pack existing window controls as a compact desk-object control cluster."""
+        self.controls = ctk.CTkFrame(
+            self.header,
+            fg_color=skin.control_bg,
+            corner_radius=14,
+            border_width=1,
+            border_color=skin.header_border,
+        )
+        self.controls.grid(row=0, column=1, rowspan=row_span, padx=(8, 10), pady=8, sticky="ne")
+
+        button_specs = (
+            ("minimize_button", "–", self._dispatch_window_action, "minimize", skin.control_bg, skin.control_hover),
+            ("maximize_button", "□", self._dispatch_window_action, "toggle_maximize", skin.control_bg, skin.control_hover),
+            ("actions_button", "⋯", None, None, skin.control_bg, skin.control_hover),
+            ("close_button", "×", self._on_close, self.definition.panel_id, skin.close_bg, skin.close_hover),
+        )
+        for index, (name, text, handler, value, fg_color, hover_color) in enumerate(button_specs):
+            command = self._show_actions_menu if name == "actions_button" else lambda callback=handler, arg=value: callback(arg)
+            button = ctk.CTkButton(
+                self.controls,
+                text=text,
+                width=28,
+                height=26,
+                fg_color=fg_color,
+                hover_color=hover_color,
+                text_color=skin.control_text,
+                corner_radius=10,
+                command=command,
+            )
+            button.pack(side="left", padx=(4 if index == 0 else 0, 4), pady=4)
+            setattr(self, name, button)
 
     def _bind_focus(self, widget) -> None:
         """Raise the panel when clicked."""
@@ -668,10 +757,7 @@ class GMTablePanel(ctk.CTkFrame):
 
     def _install_drag_bindings(self) -> None:
         """Enable drag interactions from the header."""
-        drag_widgets = [self.header, self.title_label]
-        if self._show_eyebrow:
-            drag_widgets.append(self.eyebrow_label)
-        for widget in drag_widgets:
+        for widget in self._header_drag_widgets:
             widget.bind("<ButtonPress-1>", self._start_drag, add="+")
             widget.bind("<B1-Motion>", self._drag_to, add="+")
             widget.bind("<ButtonRelease-1>", self._stop_drag, add="+")
@@ -694,7 +780,7 @@ class GMTablePanel(ctk.CTkFrame):
             cursor = spec.pop("cursor")
             handle = tk.Frame(
                 self,
-                bg=self._skin.panel_bg,
+                bg=self._panel_bg,
                 highlightthickness=0,
                 bd=0,
                 cursor=cursor,
@@ -912,7 +998,7 @@ class GMTablePanel(ctk.CTkFrame):
 
     def _refresh_window_controls(self) -> None:
         """Refresh control labels for the current layout mode."""
-        maximize_label = "Restore" if self._layout_mode in SNAP_LAYOUT_MODES else "Max"
+        maximize_label = "↙" if self._layout_mode in SNAP_LAYOUT_MODES else "□"
         self.maximize_button.configure(text=maximize_label)
 
     def _start_drag(self, event) -> None:
@@ -1011,7 +1097,7 @@ class GMTablePanel(ctk.CTkFrame):
     def set_focus_state(self, focused: bool) -> None:
         """Update focus styling."""
         self._is_focused = bool(focused)
-        self.configure(border_color=self._skin.panel_focus if focused else self._skin.panel_border)
+        self.configure(border_color=self._skin.panel_focus if focused else self._panel_border)
 
     def set_title(self, title: str) -> None:
         """Refresh the visible title."""
