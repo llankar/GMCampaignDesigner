@@ -139,6 +139,7 @@ class GMTableView(ctk.CTkFrame):
             "separator",
             ("Save Table Layout", self.save_layout_now),
             ("Tile Panels", self._tile_panels),
+            ("Spread on Desk", self._spread_panels_on_desk),
             ("Cascade Panels", self._cascade_panels),
             ("Restore Minimized Panels", self._restore_all_panels),
             ("Reset Table", self.reset_table),
@@ -260,6 +261,18 @@ class GMTableView(ctk.CTkFrame):
             text_color=TABLE_PALETTE["text"],
             corner_radius=16,
             command=self._tile_panels,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Spread on Desk",
+            width=132,
+            height=36,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=16,
+            command=self._spread_panels_on_desk,
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
@@ -430,6 +443,13 @@ class GMTableView(ctk.CTkFrame):
     def _tile_panels(self) -> None:
         """Tile panels into a readable layout."""
         self.workspace.auto_arrange()
+
+    def _spread_panels_on_desk(self) -> None:
+        """Spread visible panels around the current tabletop view."""
+        workspace = getattr(self, "workspace", None)
+        spread_panels = getattr(workspace, "spread_panels_on_desk", None)
+        if callable(spread_panels):
+            spread_panels()
 
     def _cascade_panels(self) -> None:
         """Cascade visible panels like desktop windows."""
