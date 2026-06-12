@@ -13,7 +13,15 @@ from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
-from modules.scenarios.gm_table.panel_skins import PanelSkin, resolve_panel_skin
+from modules.scenarios.gm_table.panel_skins import resolve_panel_skin
+from modules.scenarios.gm_table.minimized_tray import (
+    MINIMIZED_TRAY_BUTTON_GAP,
+    MINIMIZED_TRAY_BUTTON_WIDTH,
+    MINIMIZED_TRAY_NARROW_BREAKPOINT,
+    compact_tray_title,
+    minimized_tray_button_style,
+    minimized_tray_columns,
+)
 from modules.scenarios.gm_table.panel_depth_styles import (
     PanelDepthStyle,
     resolve_panel_depth_style,
@@ -79,6 +87,7 @@ CAMERA_ZOOM_STEP = 0.15
 MINIMAP_WIDTH = 176
 MINIMAP_HEIGHT = 118
 MINIMAP_PADDING = 16
+
 SNAP_LAYOUT_MODES = {
     "left",
     "right",
@@ -1439,7 +1448,7 @@ class GMTableWorkspace(ctk.CTkFrame):
 
         self.tray_label = ctk.CTkLabel(
             self.tray,
-            text="Minimized",
+            text="File Stack",
             text_color=TABLE_PALETTE["muted"],
             font=ctk.CTkFont(size=13, weight="bold"),
         )
@@ -1447,6 +1456,8 @@ class GMTableWorkspace(ctk.CTkFrame):
 
         self.tray_buttons = ctk.CTkFrame(self.tray, fg_color="transparent")
         self.tray_buttons.grid(row=0, column=1, padx=(0, 12), pady=8, sticky="ew")
+        self._tray_button_widgets: list[ctk.CTkButton] = []
+        self.tray_buttons.bind("<Configure>", self._layout_minimized_tray_buttons, add="+")
 
         self._empty_state = ctk.CTkLabel(
             self.surface,
@@ -1508,6 +1519,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
         for child in buttons_frame.winfo_children():
             child.destroy()
+        self._tray_button_widgets = []
         minimized_ids = self._minimized_panel_ids()
         if not minimized_ids:
             tray.grid_remove()
@@ -1517,16 +1529,74 @@ class GMTableWorkspace(ctk.CTkFrame):
             definition = self._definitions.get(panel_id)
             if definition is None:
                 continue
-            ctk.CTkButton(
+            skin = resolve_panel_skin(definition.kind, definition.state)
+            style = minimized_tray_button_style(skin)
+            label = f"{skin.icon} {compact_tray_title(definition.title)}".strip()
+            button = ctk.CTkButton(
                 buttons_frame,
-                text=definition.title,
+                text=label,
+                width=MINIMIZED_TRAY_BUTTON_WIDTH,
                 height=30,
-                fg_color=TABLE_PALETTE["table_chip"],
-                hover_color="#283146",
-                text_color=TABLE_PALETTE["text"],
-                corner_radius=12,
+                border_width=1,
+                font=ctk.CTkFont(size=12, weight="bold"),
                 command=lambda value=panel_id: self.restore_panel(value),
-            ).pack(side="left", padx=(0, 8))
+                **style,
+            )
+            self._tray_button_widgets.append(button)
+        if not self._tray_button_widgets:
+            tray.grid_remove()
+            return
+        self._layout_minimized_tray_buttons()
+
+    def _layout_minimized_tray_buttons(self, _event=None) -> None:
+        """Wrap minimized restore buttons so the tray stays readable when narrow."""
+        buttons = getattr(self, "_tray_button_widgets", [])
+        buttons_frame = getattr(self, "tray_buttons", None)
+        if buttons_frame is None:
+            return
+        for child in buttons_frame.winfo_children():
+            child.grid_forget()
+        if not buttons:
+            return
+        tray = getattr(self, "tray", None)
+        tray_width = int(tray.winfo_width() or 0) if tray is not None else 0
+        if tray is not None and tray_width and tray_width < MINIMIZED_TRAY_NARROW_BREAKPOINT:
+            self.tray_label.grid(
+                row=0,
+                column=0,
+                columnspan=2,
+                padx=(14, 12),
+                pady=(10, 0),
+                sticky="w",
+            )
+            buttons_frame.grid(
+                row=1,
+                column=0,
+                columnspan=2,
+                padx=(14, 12),
+                pady=(4, 10),
+                sticky="ew",
+            )
+        else:
+            self.tray_label.grid(
+                row=0, column=0, columnspan=1, padx=(14, 10), pady=10, sticky="w"
+            )
+            buttons_frame.grid(
+                row=0, column=1, columnspan=1, padx=(0, 12), pady=8, sticky="ew"
+            )
+        available_width = int(buttons_frame.winfo_width() or MINIMIZED_TRAY_BUTTON_WIDTH)
+        columns = minimized_tray_columns(available_width)
+        for column in range(max(columns, len(buttons))):
+            buttons_frame.grid_columnconfigure(column, weight=0)
+        for index, button in enumerate(buttons):
+            row, column = divmod(index, columns)
+            button.grid(
+                row=row,
+                column=column,
+                padx=(0, MINIMIZED_TRAY_BUTTON_GAP),
+                pady=(0, 4),
+                sticky="w",
+            )
 
     def _bind_surface_navigation(self) -> None:
         """Bind camera navigation to the empty table surface."""
