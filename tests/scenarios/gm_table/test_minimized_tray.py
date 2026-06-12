@@ -34,7 +34,7 @@ def test_minimized_tray_button_style_keeps_paper_skin_readable() -> None:
     style = minimized_tray_button_style(skin)
 
     assert style["fg_color"] == skin.body_color
-    assert style["text_color"] == "#111827"
+    assert style["text_color"] == "#F8FAFC"
 
 
 def test_compact_tray_title_normalizes_and_truncates_long_titles() -> None:
