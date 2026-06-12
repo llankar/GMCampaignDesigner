@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import simpledialog
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
 import customtkinter as ctk
@@ -87,6 +87,33 @@ CAMERA_ZOOM_STEP = 0.15
 MINIMAP_WIDTH = 176
 MINIMAP_HEIGHT = 118
 MINIMAP_PADDING = 16
+
+DESK_SPREAD_POSITION_OFFSETS = (
+    (-0.34, -0.24),
+    (0.18, -0.30),
+    (-0.10, 0.02),
+    (0.36, 0.10),
+    (-0.38, 0.28),
+    (0.10, 0.31),
+    (0.40, -0.12),
+    (-0.02, -0.40),
+)
+DESK_SPREAD_SHADOW_OFFSETS = (
+    (-3, 6),
+    (5, 2),
+    (2, 9),
+    (8, 5),
+    (-5, 4),
+    (4, 8),
+)
+DESK_SPREAD_ACCENT_VARIANTS = (
+    ("#FBBF24", "#F59E0B", "#7C2D12", "#451A03"),
+    ("#67E8F9", "#22D3EE", "#164E63", "#083344"),
+    ("#A78BFA", "#8B5CF6", "#4C1D95", "#2E1065"),
+    ("#34D399", "#10B981", "#064E3B", "#022C22"),
+    ("#FCA5A5", "#F87171", "#7F1D1D", "#450A0A"),
+    ("#FDE68A", "#FACC15", "#713F12", "#422006"),
+)
 
 SNAP_LAYOUT_MODES = {
     "left",
@@ -2626,6 +2653,109 @@ class GMTableWorkspace(ctk.CTkFrame):
             )
         self._apply_focus_state(visible_ids[-1])
         self._schedule_layout_changed()
+
+    def spread_panels_on_desk(self) -> None:
+        """Scatter visible floating panels around the camera center like loose desk papers."""
+        floating_ids = [
+            panel_id
+            for panel_id in self._visible_panel_ids()
+            if self._panels[panel_id].layout_mode == "floating"
+        ]
+        if not floating_ids:
+            return
+        surface_w, surface_h = self._surface_geometry()
+        margin = 28
+        center_x = surface_w / 2
+        center_y = surface_h / 2
+        for index, panel_id in enumerate(floating_ids):
+            panel = self._panels.get(panel_id)
+            if panel is None:
+                continue
+            geometry = panel.geometry_snapshot()
+            width = _clamp(
+                int(geometry.get("width", GMTablePanel.MIN_WIDTH)),
+                GMTablePanel.MIN_WIDTH,
+                max(GMTablePanel.MIN_WIDTH, surface_w - (margin * 2)),
+            )
+            height = _clamp(
+                int(geometry.get("height", GMTablePanel.MIN_HEIGHT)),
+                GMTablePanel.MIN_HEIGHT,
+                max(GMTablePanel.MIN_HEIGHT, surface_h - (margin * 2)),
+            )
+            offset_x, offset_y = DESK_SPREAD_POSITION_OFFSETS[
+                index % len(DESK_SPREAD_POSITION_OFFSETS)
+            ]
+            ring = index // len(DESK_SPREAD_POSITION_OFFSETS)
+            stagger_x = ((index % 3) - 1) * 18 + (ring * 24)
+            stagger_y = ((index % 4) - 1.5) * 14 + (ring * 20)
+            x = int(round(center_x + (surface_w * offset_x) + stagger_x - (width / 2)))
+            y = int(round(center_y + (surface_h * offset_y) + stagger_y - (height / 2)))
+            max_x = max(margin, surface_w - width - margin)
+            max_y = max(margin, surface_h - height - margin)
+            panel.clear_layout_mode()
+            self._apply_desk_spread_visual_variant(panel, index)
+            self._apply_floating_geometry(
+                panel,
+                self._screen_geometry_to_world(
+                    {
+                        "x": _clamp(x, margin, max_x),
+                        "y": _clamp(y, margin, max_y),
+                        "width": width,
+                        "height": height,
+                    }
+                ),
+            )
+        self._z_order = [
+            panel_id for panel_id in self._z_order if panel_id not in floating_ids
+        ] + floating_ids
+        self._apply_focus_state(floating_ids[-1])
+        self._schedule_layout_changed()
+
+    def _apply_desk_spread_visual_variant(self, panel: GMTablePanel, index: int) -> None:
+        """Refresh per-panel depth accents to imply varied desk-object angles."""
+        skin_name = getattr(panel, "_skin_name", "default")
+        base_style = resolve_panel_depth_style(skin_name)
+        shadow_offset_x, shadow_offset_y = DESK_SPREAD_SHADOW_OFFSETS[
+            index % len(DESK_SPREAD_SHADOW_OFFSETS)
+        ]
+        accent_top, accent_left, accent_right, accent_bottom = DESK_SPREAD_ACCENT_VARIANTS[
+            index % len(DESK_SPREAD_ACCENT_VARIANTS)
+        ]
+        accent_by_side = {
+            "top": accent_top,
+            "left": accent_left,
+            "right": accent_right,
+            "bottom": accent_bottom,
+        }
+        varied_style = replace(
+            base_style,
+            shadow_layers=tuple(
+                replace(
+                    layer,
+                    offset_x=layer.offset_x + shadow_offset_x,
+                    offset_y=layer.offset_y + shadow_offset_y,
+                )
+                for layer in base_style.shadow_layers
+            ),
+            edge_accents=tuple(
+                replace(accent, color=accent_by_side.get(accent.side, accent.color))
+                for accent in base_style.edge_accents
+            ),
+        )
+        for widget in list(getattr(panel, "_edge_accent_widgets", [])):
+            try:
+                widget.destroy()
+            except Exception:
+                pass
+        panel._edge_accent_widgets.clear()
+        panel._depth_style = varied_style
+        panel.attach_depth_layers(self._create_panel_depth_layers(panel))
+        panel._build_depth_accents(varied_style)
+        try:
+            panel.header.configure(border_color=accent_top)
+            panel.resize_handle.configure(text_color=accent_left)
+        except Exception:
+            pass
 
     def clamp_panels(self) -> None:
         """Reproject floating panels and keep snapped panels viewport-relative."""
