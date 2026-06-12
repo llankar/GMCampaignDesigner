@@ -6,8 +6,27 @@ from dataclasses import dataclass, replace
 
 
 @dataclass(frozen=True, slots=True)
+class PanelChrome:
+    """Resolved non-behavioral chrome values consumed by workspace rendering."""
+
+    panel_bg: str
+    panel_border: str
+    marker: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class DeskSpreadAccentVariant:
+    """Edge-accent palette applied when panels are spread across the desk."""
+
+    top: str
+    left: str
+    right: str
+    bottom: str
+
+
+@dataclass(frozen=True, slots=True)
 class PanelSkin:
-    """Physical-object skin resolved for a GM Table floating panel."""
+    """Polished tabletop-card skin resolved for a GM Table floating panel."""
 
     name: str
     body_color: str
@@ -19,6 +38,12 @@ class PanelSkin:
     show_spine: bool
     show_file_tab: bool
     show_page_edges: bool
+    header_text_color: str = "#F8FAFC"
+    body_text_color: str = "#E5EDF8"
+    control_surface: str = "#1D2638"
+    control_hover_color: str = "#2B3953"
+    close_surface: str = "#272334"
+    close_hover_color: str = "#7F1D3A"
 
     @property
     def label(self) -> str:
@@ -48,150 +73,198 @@ class PanelSkin:
     @property
     def header_border(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return self.accent_color
+        return _mix_with_dark(self.accent_color, 0.55)
 
     @property
     def eyebrow_color(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return self.accent_color
+        return _soft_accent(self.accent_color)
 
     @property
     def title_color(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return "#1F2937" if _is_light_color(self.header_color) else "#F4F7FB"
+        return self.header_text_color
 
     @property
     def control_bg(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return self.border_color
+        return self.control_surface
 
     @property
     def control_hover(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return self.accent_color
+        return self.control_hover_color
 
     @property
     def control_text(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return "#1F2937" if _is_light_color(self.control_bg) else "#F4F7FB"
+        return readable_text_color(self.control_surface)
 
     @property
     def close_bg(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return "#7C2D12"
+        return self.close_surface
 
     @property
     def close_hover(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return "#B45309"
+        return self.close_hover_color
 
     @property
     def resize_bg(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return self.border_color
+        return self.control_surface
 
     @property
     def resize_text(self) -> str:
         """Compatibility alias for existing workspace rendering code."""
-        return self.accent_color
+        return self.eyebrow_color
 
     @property
     def border_width(self) -> int:
         """Compatibility alias for existing workspace rendering code."""
-        return 2 if self.show_spine or self.show_file_tab else 1
+        return 1
 
     @property
     def header_border_width(self) -> int:
         """Compatibility alias for existing workspace rendering code."""
-        return 1 if self.show_file_tab or self.show_page_edges or self.show_spine else 0
+        return 1
+
+
+def _hex_to_rgb(color: str) -> tuple[int, int, int] | None:
+    value = str(color or "").strip().lstrip("#")
+    if len(value) != 6:
+        return None
+    try:
+        return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
+    except ValueError:
+        return None
+
+
+def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    return "#" + "".join(f"{max(0, min(255, channel)):02X}" for channel in rgb)
+
+
+def _mix(color: str, target: str, ratio: float) -> str:
+    rgb = _hex_to_rgb(color)
+    target_rgb = _hex_to_rgb(target)
+    if rgb is None or target_rgb is None:
+        return color
+    clamped = max(0.0, min(1.0, float(ratio)))
+    return _rgb_to_hex(
+        tuple(
+            int(round(source * (1.0 - clamped) + destination * clamped))
+            for source, destination in zip(rgb, target_rgb, strict=True)
+        )
+    )
+
+
+def _mix_with_dark(color: str, ratio: float) -> str:
+    return _mix(color, "#0B1020", ratio)
+
+
+def _soft_accent(color: str) -> str:
+    return _mix(color, "#F8FAFC", 0.18)
 
 
 def _is_light_color(color: str) -> bool:
     """Return whether a #RRGGBB color is light enough for dark text."""
-    value = str(color or "").strip().lstrip("#")
-    if len(value) != 6:
+    rgb = _hex_to_rgb(color)
+    if rgb is None:
         return False
-    try:
-        red = int(value[0:2], 16)
-        green = int(value[2:4], 16)
-        blue = int(value[4:6], 16)
-    except ValueError:
-        return False
+    red, green, blue = rgb
     return (red * 0.299 + green * 0.587 + blue * 0.114) > 186
+
+
+def readable_text_color(color: str, *, dark: str = "#111827", light: str = "#F8FAFC") -> str:
+    """Return a readable foreground for a solid ``#RRGGBB`` background."""
+    return dark if _is_light_color(color) else light
 
 
 _PANEL_SKINS: dict[str, PanelSkin] = {
     "binder": PanelSkin(
         name="binder",
-        body_color="#14111C",
-        header_color="#2A1721",
-        border_color="#5B3A2E",
-        accent_color="#FBBF24",
-        object_type="Campaign Binder",
+        body_color="#101827",
+        header_color="#172033",
+        border_color="#2B3A55",
+        accent_color="#38BDF8",
+        object_type="Campaign Dossier",
         icon="📚",
         show_spine=True,
         show_file_tab=False,
         show_page_edges=False,
+        control_surface="#202B40",
+        control_hover_color="#2F405F",
     ),
     "dossier": PanelSkin(
         name="dossier",
-        body_color="#171611",
-        header_color="#352812",
-        border_color="#8A6F3C",
-        accent_color="#FACC15",
+        body_color="#111827",
+        header_color="#182236",
+        border_color="#31415F",
+        accent_color="#A78BFA",
         object_type="Dossier",
         icon="🗂",
         show_spine=False,
         show_file_tab=True,
         show_page_edges=False,
+        control_surface="#222B3D",
+        control_hover_color="#35425C",
     ),
     "paper_stack": PanelSkin(
         name="paper_stack",
-        body_color="#F3E8D0",
-        header_color="#E8DCC4",
-        border_color="#D7C29A",
-        accent_color="#B45309",
-        object_type="Paper Stack",
+        body_color="#111927",
+        header_color="#172235",
+        border_color="#2D3A52",
+        accent_color="#22D3EE",
+        object_type="Handout Deck",
         icon="📎",
         show_spine=False,
         show_file_tab=False,
         show_page_edges=True,
+        control_surface="#1F2A3C",
+        control_hover_color="#2B3D56",
     ),
     "parchment": PanelSkin(
         name="parchment",
-        body_color="#F1DFAF",
-        header_color="#3F2F17",
-        border_color="#A16207",
-        accent_color="#F59E0B",
+        body_color="#121B25",
+        header_color="#172B36",
+        border_color="#2A4E5D",
+        accent_color="#34D399",
         object_type="Map Sheet",
         icon="✍",
         show_spine=False,
         show_file_tab=False,
         show_page_edges=True,
+        control_surface="#203442",
+        control_hover_color="#2C4B5F",
     ),
     "index_cards": PanelSkin(
         name="index_cards",
-        body_color="#F8FAFC",
-        header_color="#1E293B",
-        border_color="#CBD5E1",
-        accent_color="#A78BFA",
+        body_color="#111827",
+        header_color="#1A2334",
+        border_color="#334155",
+        accent_color="#60A5FA",
         object_type="GM Notes",
         icon="✦",
         show_spine=False,
         show_file_tab=False,
         show_page_edges=True,
+        control_surface="#252D3B",
+        control_hover_color="#3B4658",
     ),
     "slate": PanelSkin(
         name="slate",
-        body_color="#101816",
-        header_color="#17342E",
-        border_color="#2F5D50",
-        accent_color="#34D399",
+        body_color="#0F1918",
+        header_color="#142623",
+        border_color="#244943",
+        accent_color="#2DD4BF",
         object_type="Slate Board",
         icon="▣",
         show_spine=False,
         show_file_tab=False,
         show_page_edges=False,
+        control_surface="#1B302D",
+        control_hover_color="#274B45",
     ),
     "default": PanelSkin(
         name="default",
@@ -206,6 +279,29 @@ _PANEL_SKINS: dict[str, PanelSkin] = {
         show_page_edges=False,
     ),
 }
+
+_PANEL_CHROME: dict[str, PanelChrome] = {
+    "paper_stack": PanelChrome(panel_bg="#111927", panel_border="#2D3A52", marker="HANDOUT"),
+    "parchment": PanelChrome(panel_bg="#121B25", panel_border="#2A4E5D", marker="MAP"),
+    "index_cards": PanelChrome(panel_bg="#111827", panel_border="#334155", marker="NOTE"),
+}
+
+DESK_SPREAD_ACCENT_VARIANTS: tuple[DeskSpreadAccentVariant, ...] = (
+    DeskSpreadAccentVariant("#67E8F9", "#22D3EE", "#164E63", "#083344"),
+    DeskSpreadAccentVariant("#A78BFA", "#8B5CF6", "#4C1D95", "#2E1065"),
+    DeskSpreadAccentVariant("#34D399", "#10B981", "#064E3B", "#022C22"),
+    DeskSpreadAccentVariant("#93C5FD", "#60A5FA", "#1E3A8A", "#172554"),
+    DeskSpreadAccentVariant("#CBD5E1", "#94A3B8", "#334155", "#0F172A"),
+    DeskSpreadAccentVariant("#5EEAD4", "#2DD4BF", "#115E59", "#042F2E"),
+)
+
+
+def resolve_panel_chrome(skin: PanelSkin) -> PanelChrome:
+    """Return workspace chrome colors and marker text for a resolved panel skin."""
+    return _PANEL_CHROME.get(
+        skin.name,
+        PanelChrome(panel_bg=skin.panel_bg, panel_border=skin.panel_border, marker=skin.icon),
+    )
 
 _KIND_TO_SKIN = {
     "scenario": "binder",
@@ -236,114 +332,27 @@ _KIND_OBJECT_TYPES = {
 }
 
 _ENTITY_SKIN_OVERRIDES: dict[str, PanelSkin] = {
-    "NPCs": PanelSkin(
-        name="dossier",
-        body_color="#171611",
-        header_color="#352812",
-        border_color="#8A6F3C",
-        accent_color="#FACC15",
-        object_type="Character Dossier",
-        icon="👤",
-        show_spine=False,
-        show_file_tab=True,
-        show_page_edges=False,
-    ),
-    "PCs": PanelSkin(
-        name="dossier",
-        body_color="#171611",
-        header_color="#352812",
-        border_color="#8A6F3C",
-        accent_color="#FACC15",
-        object_type="Character Dossier",
-        icon="⭐",
-        show_spine=False,
-        show_file_tab=True,
-        show_page_edges=False,
-    ),
-    "Places": PanelSkin(
-        name="dossier",
-        body_color="#161B22",
-        header_color="#29424A",
-        border_color="#2F6F7E",
+    "NPCs": replace(_PANEL_SKINS["dossier"], object_type="Character Dossier", icon="👤"),
+    "PCs": replace(_PANEL_SKINS["dossier"], object_type="Character Dossier", icon="⭐"),
+    "Places": replace(
+        _PANEL_SKINS["dossier"],
+        border_color="#2F5367",
         accent_color="#67E8F9",
-        object_type="Location Folder",
+        object_type="Location Dossier",
         icon="📍",
-        show_spine=False,
-        show_file_tab=True,
-        show_page_edges=False,
     ),
-    "Bases": PanelSkin(
-        name="dossier",
-        body_color="#161B22",
-        header_color="#29424A",
-        border_color="#2F6F7E",
+    "Bases": replace(
+        _PANEL_SKINS["dossier"],
+        border_color="#2F5367",
         accent_color="#67E8F9",
-        object_type="Location Folder",
+        object_type="Location Dossier",
         icon="🏰",
-        show_spine=False,
-        show_file_tab=True,
-        show_page_edges=False,
     ),
-    "Clues": PanelSkin(
-        name="paper_stack",
-        body_color="#F8FAFC",
-        header_color="#E8DCC4",
-        border_color="#CBD5E1",
-        accent_color="#B45309",
-        object_type="Evidence Note",
-        icon="🔎",
-        show_spine=False,
-        show_file_tab=False,
-        show_page_edges=True,
-    ),
-    "Informations": PanelSkin(
-        name="paper_stack",
-        body_color="#F8FAFC",
-        header_color="#E8DCC4",
-        border_color="#CBD5E1",
-        accent_color="#B45309",
-        object_type="Evidence Note",
-        icon="🧾",
-        show_spine=False,
-        show_file_tab=False,
-        show_page_edges=True,
-    ),
-    "Objects": PanelSkin(
-        name="binder",
-        body_color="#14111C",
-        header_color="#2A1721",
-        border_color="#5B3A2E",
-        accent_color="#FBBF24",
-        object_type="Inventory Ledger",
-        icon="⚖",
-        show_spine=True,
-        show_file_tab=False,
-        show_page_edges=False,
-    ),
-    "Creatures": PanelSkin(
-        name="parchment",
-        body_color="#F1DFAF",
-        header_color="#3F2F17",
-        border_color="#A16207",
-        accent_color="#F59E0B",
-        object_type="Bestiary Page",
-        icon="🐾",
-        show_spine=False,
-        show_file_tab=False,
-        show_page_edges=True,
-    ),
-    "Scenarios": PanelSkin(
-        name="binder",
-        body_color="#14111C",
-        header_color="#2A1721",
-        border_color="#5B3A2E",
-        accent_color="#FBBF24",
-        object_type="Scenario Dossier",
-        icon="📚",
-        show_spine=True,
-        show_file_tab=False,
-        show_page_edges=False,
-    ),
+    "Clues": replace(_PANEL_SKINS["paper_stack"], object_type="Evidence Card", icon="🔎"),
+    "Informations": replace(_PANEL_SKINS["paper_stack"], object_type="Evidence Card", icon="🧾"),
+    "Objects": replace(_PANEL_SKINS["binder"], object_type="Inventory Ledger", icon="⚖"),
+    "Creatures": replace(_PANEL_SKINS["parchment"], object_type="Bestiary Card", icon="🐾"),
+    "Scenarios": replace(_PANEL_SKINS["binder"], object_type="Scenario Dossier", icon="📚"),
 }
 
 

@@ -13,7 +13,11 @@ from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
-from modules.scenarios.gm_table.panel_skins import resolve_panel_skin
+from modules.scenarios.gm_table.panel_skins import (
+    DESK_SPREAD_ACCENT_VARIANTS,
+    resolve_panel_chrome,
+    resolve_panel_skin,
+)
 from modules.scenarios.gm_table.minimized_tray import (
     MINIMIZED_TRAY_BUTTON_GAP,
     MINIMIZED_TRAY_BUTTON_WIDTH,
@@ -45,18 +49,6 @@ TABLE_PALETTE = {
 }
 
 TABLE_CANVAS_BG = "#0D111B"
-
-PAPER_BODY_COLORS = {
-    "paper_stack": {"panel_bg": "#F3E8D0", "panel_border": "#D7C29A"},
-    "parchment": {"panel_bg": "#F1DFAF", "panel_border": "#C99A3E"},
-    "index_cards": {"panel_bg": "#F8FAFC", "panel_border": "#CBD5E1"},
-}
-PAPER_DECORATIVE_MARKERS = {
-    "paper_stack": "📎",
-    "parchment": "✍",
-    "index_cards": "✦",
-}
-
 
 DEFAULT_PANEL_SIZES = {
     "campaign_dashboard": (780, 560),
@@ -106,15 +98,6 @@ DESK_SPREAD_SHADOW_OFFSETS = (
     (-5, 4),
     (4, 8),
 )
-DESK_SPREAD_ACCENT_VARIANTS = (
-    ("#FBBF24", "#F59E0B", "#7C2D12", "#451A03"),
-    ("#67E8F9", "#22D3EE", "#164E63", "#083344"),
-    ("#A78BFA", "#8B5CF6", "#4C1D95", "#2E1065"),
-    ("#34D399", "#10B981", "#064E3B", "#022C22"),
-    ("#FCA5A5", "#F87171", "#7F1D1D", "#450A0A"),
-    ("#FDE68A", "#FACC15", "#713F12", "#422006"),
-)
-
 SNAP_LAYOUT_MODES = {
     "left",
     "right",
@@ -557,9 +540,10 @@ class GMTablePanel(ctk.CTkFrame):
         self._is_book_skin = self._skin.show_spine
         self._is_file_folder_skin = self._skin.show_file_tab
         self._is_paper_skin = self._skin.show_page_edges
-        paper_body_colors = PAPER_BODY_COLORS.get(self._skin_name, {})
-        self._panel_bg = paper_body_colors.get("panel_bg", self._skin.panel_bg)
-        self._panel_border = paper_body_colors.get("panel_border", self._skin.panel_border)
+        panel_chrome = resolve_panel_chrome(self._skin)
+        self._panel_bg = panel_chrome.panel_bg
+        self._panel_border = panel_chrome.panel_border
+        self._panel_marker = panel_chrome.marker
         self._panel_border_width = 1 if self._is_paper_skin else self._skin.border_width
         self._depth_style = resolve_panel_depth_style(self._skin_name)
         self._depth_layers: list[ctk.CTkFrame] = []
@@ -747,7 +731,15 @@ class GMTablePanel(ctk.CTkFrame):
                 highlightthickness=0,
                 bd=0,
             )
-            if style.stack_strip_side == "right":
+            if style.stack_strip_side == "left":
+                strip.place(
+                    x=7,
+                    y=18,
+                    width=style.stack_strip_width,
+                    relheight=1.0,
+                    height=-36,
+                )
+            elif style.stack_strip_side == "right":
                 strip.place(
                     relx=1.0,
                     x=-(style.stack_strip_width + 7),
@@ -776,25 +768,17 @@ class GMTablePanel(ctk.CTkFrame):
         self.resize_handle.lift()
 
     def _build_book_spine(self) -> None:
-        """Add a narrow book-like spine to binder panels."""
+        """Add a restrained accent rail for dossier-style panels."""
         self.spine = ctk.CTkFrame(
             self,
-            width=22,
-            fg_color=self._skin.header_bg,
-            corner_radius=16,
-            border_width=1,
-            border_color=self._skin.header_border,
+            width=8,
+            fg_color=self._skin.accent_color,
+            corner_radius=8,
+            border_width=0,
         )
-        self.spine.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(8, 0), pady=8)
+        self.spine.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(10, 0), pady=12)
         self.spine.grid_propagate(False)
-        self.spine_label = ctk.CTkLabel(
-            self.spine,
-            text=self._skin.icon or "BOOK",
-            text_color=self._skin.eyebrow_color,
-            font=ctk.CTkFont(size=9, weight="bold"),
-        )
-        self.spine_label.place(relx=0.5, rely=0.5, anchor="center")
-        self._add_header_drag_widgets(self.spine, self.spine_label)
+        self._add_header_drag_widgets(self.spine)
 
     def _add_header_drag_widgets(self, *widgets: tk.Widget) -> None:
         """Register widgets that should behave like header drag zones."""
@@ -803,7 +787,7 @@ class GMTablePanel(ctk.CTkFrame):
                 self._header_drag_widgets.append(widget)
 
     def _build_physical_header(self, skin: PanelSkin) -> None:
-        """Build the physical-object header chrome for the panel."""
+        """Build the polished tabletop-card header chrome for the panel."""
         self.header = ctk.CTkFrame(
             self,
             fg_color=skin.header_bg,
@@ -811,15 +795,15 @@ class GMTablePanel(ctk.CTkFrame):
             border_width=skin.header_border_width,
             border_color=skin.header_border,
         )
-        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=8, pady=(8, 0))
+        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=10, pady=(10, 0))
         self.header.grid_columnconfigure(0, weight=1)
 
         self._show_eyebrow = bool(skin.label)
         title_row = 1 if self._show_eyebrow else 0
-        title_pady = (0, 10) if self._show_eyebrow else (10, 10)
+        title_pady = (0, 12) if self._show_eyebrow else (12, 12)
         if self._is_file_folder_skin:
             title_row += 1
-            title_pady = (0, 10)
+            title_pady = (0, 12)
 
         self._add_header_drag_widgets(self.header)
         self._build_file_folder_tab(skin)
@@ -834,8 +818,8 @@ class GMTablePanel(ctk.CTkFrame):
         self.eyebrow_label.grid(
             row=1 if self._is_file_folder_skin else 0,
             column=0,
-            padx=(14, 8),
-            pady=(8, 0),
+            padx=(16, 8),
+            pady=(10, 0),
             sticky="w",
         )
         if not self._show_eyebrow:
@@ -848,7 +832,7 @@ class GMTablePanel(ctk.CTkFrame):
             font=ctk.CTkFont(size=17, weight="bold"),
             anchor="w",
         )
-        self.title_label.grid(row=title_row, column=0, padx=14, pady=title_pady, sticky="ew")
+        self.title_label.grid(row=title_row, column=0, padx=16, pady=title_pady, sticky="ew")
 
         self._add_header_drag_widgets(self.title_label, self.eyebrow_label)
         self._build_desk_object_controls(skin, row_span=max(1, title_row + 1))
@@ -862,67 +846,89 @@ class GMTablePanel(ctk.CTkFrame):
         self.folder_tab = ctk.CTkFrame(
             self.header,
             fg_color=skin.control_bg,
-            corner_radius=12,
+            corner_radius=10,
             border_width=1,
             border_color=skin.header_border,
         )
-        self.folder_tab.grid(row=0, column=0, padx=(12, 8), pady=(6, 0), sticky="w")
+        self.folder_tab.grid(row=0, column=0, padx=(14, 8), pady=(8, 0), sticky="w")
         self.folder_tab_label = ctk.CTkLabel(
             self.folder_tab,
             text=tab_text,
             text_color=skin.control_text,
             font=ctk.CTkFont(size=10, weight="bold"),
         )
-        self.folder_tab_label.pack(padx=12, pady=3)
+        self.folder_tab_label.pack(padx=12, pady=4)
         self._add_header_drag_widgets(self.folder_tab, self.folder_tab_label)
 
     def _build_paper_marker(self, skin: PanelSkin) -> None:
-        """Render a small decorative paper marker when appropriate."""
-        marker = self._skin.icon or PAPER_DECORATIVE_MARKERS.get(self._skin_name)
+        """Render a compact content-type pill for paper/handout skins."""
+        if not self._is_paper_skin:
+            return
+        marker = self._panel_marker
         if not marker:
             return
         self.paper_marker_label = ctk.CTkLabel(
             self.header,
             text=marker,
-            width=26,
+            width=58,
             height=24,
+            fg_color=skin.control_bg,
+            corner_radius=10,
             text_color=skin.eyebrow_color,
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=10, weight="bold"),
         )
-        self.paper_marker_label.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="ne")
+        self.paper_marker_label.grid(row=0, column=2, padx=(0, 10), pady=10, sticky="ne")
         self._add_header_drag_widgets(self.paper_marker_label)
 
     def _build_desk_object_controls(self, skin: PanelSkin, *, row_span: int) -> None:
-        """Pack existing window controls as a compact desk-object control cluster."""
+        """Pack existing window controls as a compact control cluster."""
         self.controls = ctk.CTkFrame(
             self.header,
             fg_color=skin.control_bg,
-            corner_radius=14,
+            corner_radius=12,
             border_width=1,
             border_color=skin.header_border,
         )
-        self.controls.grid(row=0, column=1, rowspan=row_span, padx=(8, 10), pady=8, sticky="ne")
+        self.controls.grid(row=0, column=1, rowspan=row_span, padx=(8, 12), pady=10, sticky="ne")
 
         button_specs = (
-            ("minimize_button", "–", self._dispatch_window_action, "minimize", skin.control_bg, skin.control_hover),
-            ("maximize_button", "□", self._dispatch_window_action, "toggle_maximize", skin.control_bg, skin.control_hover),
+            (
+                "minimize_button",
+                "–",
+                self._dispatch_window_action,
+                "minimize",
+                skin.control_bg,
+                skin.control_hover,
+            ),
+            (
+                "maximize_button",
+                "□",
+                self._dispatch_window_action,
+                "toggle_maximize",
+                skin.control_bg,
+                skin.control_hover,
+            ),
             ("actions_button", "⋯", None, None, skin.control_bg, skin.control_hover),
             ("close_button", "×", self._on_close, self.definition.panel_id, skin.close_bg, skin.close_hover),
         )
         for index, (name, text, handler, value, fg_color, hover_color) in enumerate(button_specs):
-            command = self._show_actions_menu if name == "actions_button" else lambda callback=handler, arg=value: callback(arg)
+            command = (
+                self._show_actions_menu
+                if name == "actions_button"
+                else lambda callback=handler, arg=value: callback(arg)
+            )
             button = ctk.CTkButton(
                 self.controls,
                 text=text,
-                width=28,
-                height=26,
+                width=30,
+                height=28,
                 fg_color=fg_color,
                 hover_color=hover_color,
                 text_color=skin.control_text,
-                corner_radius=10,
+                corner_radius=9,
                 command=command,
             )
-            button.pack(side="left", padx=(4 if index == 0 else 0, 4), pady=4)
+            button.pack(side="left", padx=(5 if index == 0 else 0, 5), pady=5)
             setattr(self, name, button)
 
     def _bind_focus(self, widget) -> None:
@@ -1392,6 +1398,23 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._desk_texture_canvas.place(relx=0.0, rely=0.0, relwidth=1.0, relheight=1.0)
         self._desk_texture = InfiniteDeskTexture(self._desk_texture_canvas)
         self._desk_texture.load_theme(theme_manager.get_theme())
+
+        self._snap_preview_mode: str | None = None
+        self._snap_preview = ctk.CTkFrame(
+            self.surface,
+            fg_color="#142235",
+            corner_radius=18,
+            border_width=2,
+            border_color=TABLE_PALETTE["panel_focus"],
+        )
+        self._snap_preview_label = ctk.CTkLabel(
+            self._snap_preview,
+            text="",
+            text_color=TABLE_PALETTE["text"],
+            font=ctk.CTkFont(size=13, weight="bold"),
+        )
+        self._snap_preview_label.place(relx=0.5, rely=0.5, anchor="center")
+        self._snap_preview.place_forget()
 
         self._nav_hud = ctk.CTkFrame(
             self.surface,
@@ -1935,7 +1958,13 @@ class GMTableWorkspace(ctk.CTkFrame):
             if not is_middle_button or not self._widget_is_in_surface_subtree(widget):
                 return
         if is_middle_button:
-            if not self._drag_controller.allows_middle_drag_start(event):
+            drag_controller = getattr(self, "_drag_controller", None)
+            allows_middle_drag = (
+                drag_controller.allows_middle_drag_start(event)
+                if drag_controller is not None
+                else True
+            )
+            if not allows_middle_drag:
                 self._pan_origin = None
                 return "break"
             self._pin_snapped_panels_to_world()
@@ -2395,12 +2424,34 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
 
     def preview_snap_target(self, panel_id: str, mode: str | None) -> None:
-        """No-op: magnetic snap preview has been removed from GM Table."""
-        _ = panel_id, mode
+        """Show a restrained preview rectangle for the requested snap target."""
+        panel = self._panels.get(panel_id)
+        if panel is None or mode not in SNAP_MODE_LABELS:
+            self.clear_snap_preview()
+            return
+        preview = getattr(self, "_snap_preview", None)
+        if preview is None:
+            return
+        geometry = fit_viewport_snap(panel, self.surface, mode)
+        preview.configure(width=geometry["width"], height=geometry["height"])
+        preview.place(x=geometry["x"], y=geometry["y"])
+        label = getattr(self, "_snap_preview_label", None)
+        if label is not None:
+            label.configure(text=SNAP_MODE_LABELS[mode])
+        self._snap_preview_mode = mode
+        preview.lift()
+        try:
+            panel.lift()
+        except Exception:
+            pass
+        self._raise_workspace_overlays()
 
     def clear_snap_preview(self) -> None:
-        """No-op: magnetic snap preview has been removed from GM Table."""
-        return
+        """Hide any visible snap-preview overlay."""
+        self._snap_preview_mode = None
+        preview = getattr(self, "_snap_preview", None)
+        if preview is not None:
+            preview.place_forget()
 
     def resize_panel(self, panel_id: str, width: int, height: int) -> None:
         """Resize an existing panel and keep it visible."""
@@ -2718,14 +2769,14 @@ class GMTableWorkspace(ctk.CTkFrame):
         shadow_offset_x, shadow_offset_y = DESK_SPREAD_SHADOW_OFFSETS[
             index % len(DESK_SPREAD_SHADOW_OFFSETS)
         ]
-        accent_top, accent_left, accent_right, accent_bottom = DESK_SPREAD_ACCENT_VARIANTS[
+        accent_variant = DESK_SPREAD_ACCENT_VARIANTS[
             index % len(DESK_SPREAD_ACCENT_VARIANTS)
         ]
         accent_by_side = {
-            "top": accent_top,
-            "left": accent_left,
-            "right": accent_right,
-            "bottom": accent_bottom,
+            "top": accent_variant.top,
+            "left": accent_variant.left,
+            "right": accent_variant.right,
+            "bottom": accent_variant.bottom,
         }
         varied_style = replace(
             base_style,
@@ -2752,8 +2803,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         panel.attach_depth_layers(self._create_panel_depth_layers(panel))
         panel._build_depth_accents(varied_style)
         try:
-            panel.header.configure(border_color=accent_top)
-            panel.resize_handle.configure(text_color=accent_left)
+            panel.header.configure(border_color=accent_variant.top)
+            panel.resize_handle.configure(text_color=accent_variant.left)
         except Exception:
             pass
 

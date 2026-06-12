@@ -20,6 +20,12 @@ _CARD_WIDTH = 148
 _CARD_HEIGHT = 164
 _CARD_GAP = 6
 _THUMBNAIL_SIZE = (128, 88)
+_PAGE_TEXT = "#E5EDF8"
+_PAGE_MUTED = "#9AA7BD"
+_PAGE_SURFACE = "#111927"
+_PAGE_SURFACE_ALT = "#172235"
+_PAGE_BORDER = "#2D3A52"
+_PAGE_ACCENT = "#22D3EE"
 _ANIMATION_LABELS = tuple(label for label, _value in REVEAL_ANIMATION_OPTIONS)
 _ANIMATION_BY_LABEL = {label: value for label, value in REVEAL_ANIMATION_OPTIONS}
 _LABEL_BY_ANIMATION = {value: label for label, value in REVEAL_ANIMATION_OPTIONS}
@@ -67,40 +73,72 @@ class GMTableHandoutsPage(ctk.CTkFrame):
             text=title,
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, sticky="ew", pady=(0, 4))
+            text_color=_PAGE_TEXT,
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 6))
 
-        controls = ctk.CTkFrame(self, fg_color="transparent")
-        controls.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        controls = ctk.CTkFrame(
+            self,
+            fg_color=_PAGE_SURFACE_ALT,
+            corner_radius=14,
+            border_width=1,
+            border_color=_PAGE_BORDER,
+        )
+        controls.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         controls.grid_columnconfigure(0, weight=1)
 
         search = ctk.CTkEntry(
             controls,
             textvariable=self._query_var,
             placeholder_text="Filter handouts…",
-            height=30,
+            height=34,
+            fg_color=_PAGE_SURFACE,
+            border_color=_PAGE_BORDER,
+            text_color=_PAGE_TEXT,
+            placeholder_text_color=_PAGE_MUTED,
         )
-        search.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        search.grid(row=0, column=0, sticky="ew", padx=(10, 8), pady=10)
         search.bind("<KeyRelease>", lambda _event: self._render_grid())
 
-        ctk.CTkButton(controls, text="Refresh", width=88, height=30, command=self.refresh).grid(row=0, column=1)
+        ctk.CTkButton(
+            controls,
+            text="Refresh",
+            width=88,
+            height=34,
+            fg_color="#1F6F86",
+            hover_color="#2589A4",
+            text_color="#F8FAFC",
+            corner_radius=10,
+            command=self.refresh,
+        ).grid(row=0, column=1, pady=10)
         ctk.CTkOptionMenu(
             controls,
             values=list(_ANIMATION_LABELS),
             variable=self._animation_var,
             width=136,
-            height=30,
-        ).grid(row=0, column=2, sticky="e")
+            height=34,
+            fg_color=_PAGE_SURFACE,
+            button_color="#1F6F86",
+            button_hover_color="#2589A4",
+            text_color=_PAGE_TEXT,
+            corner_radius=10,
+        ).grid(row=0, column=2, sticky="e", padx=(8, 10), pady=10)
 
         ctk.CTkLabel(
             self,
             textvariable=self._status_var,
             anchor="w",
             justify="left",
-            text_color="#F59E0B",
+            text_color="#FCA5A5",
             wraplength=460,
-        ).grid(row=2, column=0, sticky="ew", pady=(0, 4))
+        ).grid(row=2, column=0, sticky="ew", pady=(0, 6))
 
-        self._grid_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self._grid_frame = ctk.CTkScrollableFrame(
+            self,
+            fg_color=_PAGE_SURFACE,
+            corner_radius=14,
+            border_width=1,
+            border_color=_PAGE_BORDER,
+        )
         self._grid_frame.grid(row=3, column=0, sticky="nsew")
         self.bind("<Configure>", self._on_resize)
 
@@ -148,7 +186,8 @@ class GMTableHandoutsPage(ctk.CTkFrame):
                 self._grid_frame,
                 text="No scenario handouts found.",
                 anchor="w",
-            ).grid(row=0, column=0, sticky="ew", padx=4, pady=4)
+                text_color=_PAGE_MUTED,
+            ).grid(row=0, column=0, sticky="ew", padx=12, pady=12)
             return
 
         for column in range(self._column_count):
@@ -158,20 +197,28 @@ class GMTableHandoutsPage(ctk.CTkFrame):
             row = index // self._column_count
             column = index % self._column_count
             card = self._build_card(self._grid_frame, handout)
-            card.grid(row=row, column=column, sticky="nsew", padx=3, pady=3)
+            card.grid(row=row, column=column, sticky="nsew", padx=6, pady=6)
             self._visible_cards[handout.id] = card
 
         self._highlight_selected()
 
     def _build_card(self, master, handout: HandoutItem) -> ctk.CTkFrame:
         """Create a compact clickable handout tile."""
-        card = ctk.CTkFrame(master, corner_radius=10, width=_CARD_WIDTH, height=_CARD_HEIGHT)
+        card = ctk.CTkFrame(
+            master,
+            corner_radius=12,
+            width=_CARD_WIDTH,
+            height=_CARD_HEIGHT,
+            fg_color="#121826",
+            border_width=1,
+            border_color="#233047",
+        )
         card.grid_propagate(False)
         card.grid_columnconfigure(0, weight=1)
 
         thumb, is_broken = self._get_thumbnail(handout.path)
-        thumb_label = ctk.CTkLabel(card, text="", image=thumb)
-        thumb_label.grid(row=0, column=0, padx=5, pady=(5, 2), sticky="n")
+        thumb_label = ctk.CTkLabel(card, text="", image=thumb, fg_color="#0B1220", corner_radius=10)
+        thumb_label.grid(row=0, column=0, padx=7, pady=(7, 3), sticky="n")
 
         ctk.CTkLabel(
             card,
@@ -180,7 +227,8 @@ class GMTableHandoutsPage(ctk.CTkFrame):
             justify="left",
             wraplength=_CARD_WIDTH - 14,
             font=ctk.CTkFont(size=12, weight="bold"),
-        ).grid(row=1, column=0, sticky="ew", padx=7)
+            text_color=_PAGE_TEXT,
+        ).grid(row=1, column=0, sticky="ew", padx=8)
 
         if handout.subtitle:
             ctk.CTkLabel(
@@ -188,13 +236,13 @@ class GMTableHandoutsPage(ctk.CTkFrame):
                 text=handout.subtitle,
                 height=16,
                 corner_radius=8,
-                fg_color="#2F3A4E",
+                fg_color="#243249",
                 text_color="#C9D3E6",
                 font=ctk.CTkFont(size=10, weight="bold"),
-            ).grid(row=2, column=0, sticky="w", padx=7, pady=(2, 1))
+            ).grid(row=2, column=0, sticky="w", padx=8, pady=(3, 1))
 
         warning_text = ""
-        warning_color = "#EF4444"
+        warning_color = "#FCA5A5"
         if is_broken:
             warning_text = "File unavailable"
         ctk.CTkLabel(
@@ -238,7 +286,7 @@ class GMTableHandoutsPage(ctk.CTkFrame):
 
     @staticmethod
     def _build_placeholder_thumb() -> ctk.CTkImage:
-        placeholder = Image.new("RGB", _THUMBNAIL_SIZE, color="#293241")
+        placeholder = Image.new("RGB", _THUMBNAIL_SIZE, color="#172235")
         return ctk.CTkImage(light_image=placeholder, dark_image=placeholder, size=_THUMBNAIL_SIZE)
 
     @staticmethod
@@ -276,8 +324,8 @@ class GMTableHandoutsPage(ctk.CTkFrame):
             selected = handout_id == self._selected_id
             card.configure(
                 border_width=1 if selected else 0,
-                border_color="#D9A441" if selected else "#344054",
-                fg_color="#1F2937" if selected else "#121826",
+                border_color=_PAGE_ACCENT if selected else "#233047",
+                fg_color="#182338" if selected else "#121826",
             )
 
     def get_state(self) -> dict:
