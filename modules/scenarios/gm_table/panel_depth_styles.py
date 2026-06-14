@@ -16,7 +16,7 @@ class DepthLayerStyle:
     color: str
     border_color: str | None = None
     border_width: int = 0
-    corner_radius: int = 22
+    corner_radius: int = 24
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,100 +41,103 @@ class PanelDepthStyle:
 
 
 _COMMON_EDGE_ACCENTS = (
-    EdgeAccentStyle("top", "#26364F", thickness=1, inset=12),
-    EdgeAccentStyle("left", "#223149", thickness=1, inset=12),
-    EdgeAccentStyle("right", "#070B13", thickness=2, inset=12),
-    EdgeAccentStyle("bottom", "#070B13", thickness=2, inset=12),
+    EdgeAccentStyle("top", "#2E4260", thickness=1, inset=12),
+    EdgeAccentStyle("left", "#273C58", thickness=1, inset=12),
+    EdgeAccentStyle("right", "#070B15", thickness=2, inset=12),
+    EdgeAccentStyle("bottom", "#070B15", thickness=2, inset=12),
 )
 
 _DEFAULT_STYLE = PanelDepthStyle(
-    shadow_layers=(DepthLayerStyle(8, 10, 0, 0, "#050812", corner_radius=22),),
+    shadow_layers=(DepthLayerStyle(10, 14, 0, 0, "#040810", corner_radius=24),),
     edge_accents=_COMMON_EDGE_ACCENTS,
 )
 
 _SKIN_DEPTH_STYLES: dict[str, PanelDepthStyle] = {
+    # Fleet Admiral binder — navy shadows, no side strip
     "binder": PanelDepthStyle(
         shadow_layers=(
-            DepthLayerStyle(8, 10, 0, 0, "#050812", corner_radius=22),
-            DepthLayerStyle(3, 4, 0, 0, "#0B1220", border_color="#1D2C45", border_width=1, corner_radius=22),
+            DepthLayerStyle(10, 14, 0, 0, "#040810", corner_radius=24),
+            DepthLayerStyle(4, 5, 0, 0, "#0A1530", border_color="#1B3565", border_width=1, corner_radius=24),
         ),
         edge_accents=(
-            EdgeAccentStyle("top", "#28405E", thickness=1, inset=12),
-            EdgeAccentStyle("left", "#24425E", thickness=1, inset=12),
+            EdgeAccentStyle("top", "#305080", thickness=1, inset=12),
+            EdgeAccentStyle("left", "#2A4A78", thickness=1, inset=12),
             EdgeAccentStyle("right", "#07101C", thickness=2, inset=12),
             EdgeAccentStyle("bottom", "#07101C", thickness=2, inset=12),
         ),
-        stack_strip_side="left",
-        stack_strip_color="#38BDF8",
-        stack_strip_width=4,
     ),
+    # Shadow Archive dossier — indigo shadows, violet strip
     "dossier": PanelDepthStyle(
         shadow_layers=(
-            DepthLayerStyle(8, 10, 0, 0, "#050812", corner_radius=22),
-            DepthLayerStyle(3, 4, 0, 0, "#0E1626", border_color="#26334B", border_width=1, corner_radius=22),
+            DepthLayerStyle(10, 14, 0, 0, "#04050E", corner_radius=24),
+            DepthLayerStyle(4, 5, 0, 0, "#0E0F28", border_color="#2C2E72", border_width=1, corner_radius=24),
         ),
         edge_accents=(
-            EdgeAccentStyle("top", "#2C3550", thickness=1, inset=12),
-            EdgeAccentStyle("left", "#2B334B", thickness=1, inset=12),
-            EdgeAccentStyle("right", "#080D16", thickness=2, inset=12),
-            EdgeAccentStyle("bottom", "#080D16", thickness=2, inset=12),
+            EdgeAccentStyle("top", "#343668", thickness=1, inset=12),
+            EdgeAccentStyle("left", "#2E3060", thickness=1, inset=12),
+            EdgeAccentStyle("right", "#070810", thickness=2, inset=12),
+            EdgeAccentStyle("bottom", "#070810", thickness=2, inset=12),
         ),
         stack_strip_side="left",
-        stack_strip_color="#A78BFA",
-        stack_strip_width=4,
+        stack_strip_color="#A855F7",
+        stack_strip_width=6,
     ),
+    # Obsidian Archive paper_stack — cold blue shadows, sky-blue strip
     "paper_stack": PanelDepthStyle(
         shadow_layers=(
-            DepthLayerStyle(8, 10, 0, 0, "#050812", corner_radius=22),
-            DepthLayerStyle(3, 4, 0, 0, "#0F1828", border_color="#24324A", border_width=1, corner_radius=22),
+            DepthLayerStyle(10, 14, 0, 0, "#040810", corner_radius=24),
+            DepthLayerStyle(4, 5, 0, 0, "#0A1428", border_color="#1A3256", border_width=1, corner_radius=24),
         ),
         edge_accents=(
-            EdgeAccentStyle("top", "#253750", thickness=1, inset=12),
-            EdgeAccentStyle("left", "#203248", thickness=1, inset=12),
+            EdgeAccentStyle("top", "#2A4870", thickness=1, inset=12),
+            EdgeAccentStyle("left", "#243E68", thickness=1, inset=12),
             EdgeAccentStyle("right", "#07101C", thickness=2, inset=12),
             EdgeAccentStyle("bottom", "#07101C", thickness=2, inset=12),
         ),
         stack_strip_side="left",
-        stack_strip_color="#22D3EE",
-        stack_strip_width=4,
+        stack_strip_color="#0EB4E7",
+        stack_strip_width=6,
     ),
+    # Forest Cartographer parchment — forest shadows, emerald strip
     "parchment": PanelDepthStyle(
         shadow_layers=(
-            DepthLayerStyle(8, 10, 0, 0, "#050812", corner_radius=22),
-            DepthLayerStyle(3, 4, 0, 0, "#0D1B24", border_color="#224252", border_width=1, corner_radius=22),
+            DepthLayerStyle(10, 14, 0, 0, "#030A08", corner_radius=24),
+            DepthLayerStyle(4, 5, 0, 0, "#091814", border_color="#165C3C", border_width=1, corner_radius=24),
         ),
         edge_accents=(
-            EdgeAccentStyle("top", "#254B58", thickness=1, inset=12),
-            EdgeAccentStyle("left", "#244856", thickness=1, inset=12),
-            EdgeAccentStyle("right", "#061119", thickness=2, inset=12),
-            EdgeAccentStyle("bottom", "#061119", thickness=2, inset=12),
+            EdgeAccentStyle("top", "#226048", thickness=1, inset=12),
+            EdgeAccentStyle("left", "#1E5440", thickness=1, inset=12),
+            EdgeAccentStyle("right", "#060E0A", thickness=2, inset=12),
+            EdgeAccentStyle("bottom", "#060E0A", thickness=2, inset=12),
         ),
         stack_strip_side="left",
-        stack_strip_color="#34D399",
-        stack_strip_width=4,
+        stack_strip_color="#10C97C",
+        stack_strip_width=6,
     ),
+    # Inkmaster Archive index_cards — navy shadows, warm amber strip
     "index_cards": PanelDepthStyle(
         shadow_layers=(
-            DepthLayerStyle(8, 10, 0, 0, "#050812", corner_radius=22),
-            DepthLayerStyle(3, 4, 0, 0, "#101827", border_color="#28364D", border_width=1, corner_radius=22),
+            DepthLayerStyle(10, 14, 0, 0, "#040810", corner_radius=24),
+            DepthLayerStyle(4, 5, 0, 0, "#0D1526", border_color="#1E3458", border_width=1, corner_radius=24),
         ),
         edge_accents=(
-            EdgeAccentStyle("top", "#303B50", thickness=1, inset=12),
-            EdgeAccentStyle("left", "#2B3548", thickness=1, inset=12),
-            EdgeAccentStyle("right", "#080D16", thickness=2, inset=12),
-            EdgeAccentStyle("bottom", "#080D16", thickness=2, inset=12),
+            EdgeAccentStyle("top", "#2E4870", thickness=1, inset=12),
+            EdgeAccentStyle("left", "#283E68", thickness=1, inset=12),
+            EdgeAccentStyle("right", "#07101C", thickness=2, inset=12),
+            EdgeAccentStyle("bottom", "#07101C", thickness=2, inset=12),
         ),
         stack_strip_side="left",
         stack_strip_color="#F59E0B",
-        stack_strip_width=4,
+        stack_strip_width=6,
     ),
+    # Obsidian Codex slate — near-black teal shadows, no strip
     "slate": PanelDepthStyle(
-        shadow_layers=(DepthLayerStyle(8, 10, 0, 0, "#04100F", corner_radius=22),),
+        shadow_layers=(DepthLayerStyle(10, 14, 0, 0, "#02080A", corner_radius=24),),
         edge_accents=(
-            EdgeAccentStyle("top", "#27615A", thickness=1, inset=12),
-            EdgeAccentStyle("left", "#24564F", thickness=1, inset=12),
-            EdgeAccentStyle("right", "#04100F", thickness=2, inset=12),
-            EdgeAccentStyle("bottom", "#04100F", thickness=2, inset=12),
+            EdgeAccentStyle("top", "#246860", thickness=1, inset=12),
+            EdgeAccentStyle("left", "#1E5C55", thickness=1, inset=12),
+            EdgeAccentStyle("right", "#040C0A", thickness=2, inset=12),
+            EdgeAccentStyle("bottom", "#040C0A", thickness=2, inset=12),
         ),
     ),
 }

@@ -553,7 +553,7 @@ class GMTablePanel(ctk.CTkFrame):
             width=width,
             height=height,
             fg_color=self._panel_bg,
-            corner_radius=22,
+            corner_radius=24,
             border_width=self._panel_border_width,
             border_color=self._panel_border,
         )
@@ -597,7 +597,7 @@ class GMTablePanel(ctk.CTkFrame):
         self._actions_menu = tk.Menu(self, tearoff=0)
 
         self.body = ctk.CTkFrame(self, fg_color="transparent")
-        self.body.grid(row=1, column=self._content_column, sticky="nsew", padx=10, pady=10)
+        self.body.grid(row=1, column=self._content_column, sticky="nsew", padx=10, pady=(6, 10))
         self.body.grid_rowconfigure(0, weight=1)
         self.body.grid_columnconfigure(0, weight=1)
 
@@ -776,7 +776,7 @@ class GMTablePanel(ctk.CTkFrame):
             corner_radius=8,
             border_width=0,
         )
-        self.spine.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(10, 0), pady=12)
+        self.spine.grid(row=0, column=0, rowspan=2, sticky="ns", padx=(10, 0), pady=8)
         self.spine.grid_propagate(False)
         self._add_header_drag_widgets(self.spine)
 
@@ -791,19 +791,19 @@ class GMTablePanel(ctk.CTkFrame):
         self.header = ctk.CTkFrame(
             self,
             fg_color=skin.header_bg,
-            corner_radius=18,
+            corner_radius=20,
             border_width=skin.header_border_width,
             border_color=skin.header_border,
         )
-        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=10, pady=(10, 0))
+        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=10, pady=(8, 0))
         self.header.grid_columnconfigure(0, weight=1)
 
         self._show_eyebrow = bool(skin.label)
         title_row = 1 if self._show_eyebrow else 0
-        title_pady = (0, 12) if self._show_eyebrow else (12, 12)
+        title_pady = (0, 8) if self._show_eyebrow else (8, 8)
         if self._is_file_folder_skin:
             title_row += 1
-            title_pady = (0, 12)
+            title_pady = (0, 8)
 
         self._add_header_drag_widgets(self.header)
         self._build_file_folder_tab(skin)
@@ -813,13 +813,13 @@ class GMTablePanel(ctk.CTkFrame):
             self.header,
             text=skin.label,
             text_color=skin.eyebrow_color,
-            font=ctk.CTkFont(size=11, weight="bold"),
+            font=ctk.CTkFont(size=10, weight="bold"),
         )
         self.eyebrow_label.grid(
             row=1 if self._is_file_folder_skin else 0,
             column=0,
             padx=(16, 8),
-            pady=(10, 0),
+            pady=(6, 0),
             sticky="w",
         )
         if not self._show_eyebrow:
@@ -829,7 +829,7 @@ class GMTablePanel(ctk.CTkFrame):
             self.header,
             text=self.definition.title,
             text_color=skin.title_color,
-            font=ctk.CTkFont(size=17, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
         )
         self.title_label.grid(row=title_row, column=0, padx=16, pady=title_pady, sticky="ew")
@@ -850,14 +850,14 @@ class GMTablePanel(ctk.CTkFrame):
             border_width=1,
             border_color=skin.header_border,
         )
-        self.folder_tab.grid(row=0, column=0, padx=(14, 8), pady=(8, 0), sticky="w")
+        self.folder_tab.grid(row=0, column=0, padx=(14, 8), pady=(5, 0), sticky="w")
         self.folder_tab_label = ctk.CTkLabel(
             self.folder_tab,
             text=tab_text,
             text_color=skin.control_text,
             font=ctk.CTkFont(size=10, weight="bold"),
         )
-        self.folder_tab_label.pack(padx=12, pady=4)
+        self.folder_tab_label.pack(padx=10, pady=3)
         self._add_header_drag_widgets(self.folder_tab, self.folder_tab_label)
 
     def _build_paper_marker(self, skin: PanelSkin) -> None:
@@ -877,7 +877,7 @@ class GMTablePanel(ctk.CTkFrame):
             text_color=skin.eyebrow_color,
             font=ctk.CTkFont(size=10, weight="bold"),
         )
-        self.paper_marker_label.grid(row=0, column=2, padx=(0, 10), pady=10, sticky="ne")
+        self.paper_marker_label.grid(row=0, column=2, padx=(0, 10), pady=7, sticky="ne")
         self._add_header_drag_widgets(self.paper_marker_label)
 
     def _build_desk_object_controls(self, skin: PanelSkin, *, row_span: int) -> None:
@@ -889,7 +889,7 @@ class GMTablePanel(ctk.CTkFrame):
             border_width=1,
             border_color=skin.header_border,
         )
-        self.controls.grid(row=0, column=1, rowspan=row_span, padx=(8, 12), pady=10, sticky="ne")
+        self.controls.grid(row=0, column=1, rowspan=row_span, padx=(8, 12), pady=7, sticky="ne")
 
         button_specs = (
             (
@@ -920,15 +920,15 @@ class GMTablePanel(ctk.CTkFrame):
             button = ctk.CTkButton(
                 self.controls,
                 text=text,
-                width=30,
-                height=28,
+                width=28,
+                height=24,
                 fg_color=fg_color,
                 hover_color=hover_color,
                 text_color=skin.control_text,
-                corner_radius=9,
+                corner_radius=8,
                 command=command,
             )
-            button.pack(side="left", padx=(5 if index == 0 else 0, 5), pady=5)
+            button.pack(side="left", padx=(4 if index == 0 else 0, 4), pady=4)
             setattr(self, name, button)
 
     def _bind_focus(self, widget) -> None:
@@ -2706,7 +2706,11 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._schedule_layout_changed()
 
     def spread_panels_on_desk(self) -> None:
-        """Scatter visible floating panels around the camera center like loose desk papers."""
+        """Arrange floating panels in a non-overlapping grid in infinite world space.
+
+        Panels keep their natural sizes; the grid is centred on the current
+        viewport and may extend beyond visible edges — the desk is infinite.
+        """
         floating_ids = [
             panel_id
             for panel_id in self._visible_panel_ids()
@@ -2714,48 +2718,64 @@ class GMTableWorkspace(ctk.CTkFrame):
         ]
         if not floating_ids:
             return
+
         surface_w, surface_h = self._surface_geometry()
-        margin = 28
-        center_x = surface_w / 2
-        center_y = surface_h / 2
+        n = len(floating_ids)
+        gap = 32  # world-space gap between panels — never violated
+
+        # ── 1. Read each panel's current world-space size (no resizing) ──────
+        panel_sizes: list[tuple[int, int]] = []
+        for panel_id in floating_ids:
+            panel = self._panels[panel_id]
+            wg = panel.floating_geometry_snapshot()
+            w = max(GMTablePanel.MIN_WIDTH, int(wg.get("width", GMTablePanel.MIN_WIDTH)))
+            h = max(GMTablePanel.MIN_HEIGHT, int(wg.get("height", GMTablePanel.MIN_HEIGHT)))
+            panel_sizes.append((w, h))
+
+        # ── 2. Grid layout sized to the viewport aspect ratio ─────────────────
+        aspect = max(0.5, surface_w / max(1, surface_h))
+        cols = max(1, int((n * aspect) ** 0.5 + 0.5))
+        rows = -(-n // cols)  # ceiling division
+
+        # Cell = largest panel + gap so every cell can hold any panel.
+        cell_w = max(w for w, _ in panel_sizes) + gap
+        cell_h = max(h for _, h in panel_sizes) + gap
+
+        # ── 3. Centre grid on the current world-viewport centre ───────────────
+        zoom = max(CAMERA_MIN_ZOOM, float(getattr(self, "_camera_zoom", 1.0)))
+        cam_x = _coerce_float(getattr(self, "_camera_x", 0.0))
+        cam_y = _coerce_float(getattr(self, "_camera_y", 0.0))
+        world_cx = cam_x + (surface_w / 2.0) / zoom
+        world_cy = cam_y + (surface_h / 2.0) / zoom
+
+        grid_origin_x = world_cx - (cols * cell_w - gap) / 2.0
+        grid_origin_y = world_cy - (rows * cell_h - gap) / 2.0
+
+        # ── 4. Place each panel, centred in its cell with a mild stagger ─────
+        STAGGER_X = (0, 10, -8, 12, -10, 6, -6, 8)
+        STAGGER_Y = (0, 6, -8, 4, 10, -6, 8, -4)
+
         for index, panel_id in enumerate(floating_ids):
             panel = self._panels.get(panel_id)
             if panel is None:
                 continue
-            geometry = panel.geometry_snapshot()
-            width = _clamp(
-                int(geometry.get("width", GMTablePanel.MIN_WIDTH)),
-                GMTablePanel.MIN_WIDTH,
-                max(GMTablePanel.MIN_WIDTH, surface_w - (margin * 2)),
-            )
-            height = _clamp(
-                int(geometry.get("height", GMTablePanel.MIN_HEIGHT)),
-                GMTablePanel.MIN_HEIGHT,
-                max(GMTablePanel.MIN_HEIGHT, surface_h - (margin * 2)),
-            )
-            offset_x, offset_y = DESK_SPREAD_POSITION_OFFSETS[
-                index % len(DESK_SPREAD_POSITION_OFFSETS)
-            ]
-            ring = index // len(DESK_SPREAD_POSITION_OFFSETS)
-            stagger_x = ((index % 3) - 1) * 18 + (ring * 24)
-            stagger_y = ((index % 4) - 1.5) * 14 + (ring * 20)
-            x = int(round(center_x + (surface_w * offset_x) + stagger_x - (width / 2)))
-            y = int(round(center_y + (surface_h * offset_y) + stagger_y - (height / 2)))
-            max_x = max(margin, surface_w - width - margin)
-            max_y = max(margin, surface_h - height - margin)
+            col = index % cols
+            row = index // cols
+            w, h = panel_sizes[index]
+
+            stagger_x = STAGGER_X[index % len(STAGGER_X)]
+            stagger_y = STAGGER_Y[index % len(STAGGER_Y)]
+
+            wx = round(grid_origin_x + col * cell_w + (cell_w - gap - w) / 2.0 + stagger_x, 2)
+            wy = round(grid_origin_y + row * cell_h + (cell_h - gap - h) / 2.0 + stagger_y, 2)
+
             panel.clear_layout_mode()
             self._apply_desk_spread_visual_variant(panel, index)
             self._apply_floating_geometry(
                 panel,
-                self._screen_geometry_to_world(
-                    {
-                        "x": _clamp(x, margin, max_x),
-                        "y": _clamp(y, margin, max_y),
-                        "width": width,
-                        "height": height,
-                    }
-                ),
+                {"x": wx, "y": wy, "width": w, "height": h},
             )
+
         self._z_order = [
             panel_id for panel_id in self._z_order if panel_id not in floating_ids
         ] + floating_ids

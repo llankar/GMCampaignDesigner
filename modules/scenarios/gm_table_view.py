@@ -175,29 +175,29 @@ class GMTableView(ctk.CTkFrame):
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        bar.grid(row=0, column=0, sticky="ew", padx=18, pady=18)
+        bar.grid(row=0, column=0, sticky="ew", padx=18, pady=10)
         bar.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
             bar,
             text=self.scenario_name,
             text_color=TABLE_PALETTE["text"],
-            font=ctk.CTkFont(size=18, weight="bold"),
+            font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, padx=18, pady=14, sticky="ew")
+        ).grid(row=0, column=0, padx=18, pady=8, sticky="ew")
 
         actions = ctk.CTkFrame(bar, fg_color="transparent")
-        actions.grid(row=0, column=1, padx=16, pady=14, sticky="e")
+        actions.grid(row=0, column=1, padx=12, pady=8, sticky="e")
 
         self.add_button = ctk.CTkButton(
             actions,
             text="+ Add Panel",
             width=132,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["accent"],
             hover_color="#D97706",
             text_color="#10131B",
-            corner_radius=16,
+            corner_radius=14,
             command=self._show_add_menu,
         )
         self.add_button.pack(side="left", padx=(0, 10))
@@ -206,11 +206,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Scene",
             width=100,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._focus_or_open_world_map_panel,
         ).pack(side="left", padx=(0, 10))
 
@@ -218,11 +218,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Map Tool",
             width=108,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._focus_or_open_map_tool_panel,
         ).pack(side="left", padx=(0, 10))
 
@@ -230,11 +230,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Player View",
             width=116,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._open_player_view_for_active_panel,
         ).pack(side="left", padx=(0, 10))
 
@@ -242,11 +242,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Fog",
             width=84,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._show_fog_menu,
         )
         self.fog_button.pack(side="left", padx=(0, 10))
@@ -255,11 +255,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Tile",
             width=84,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._tile_panels,
         ).pack(side="left", padx=(0, 10))
 
@@ -267,11 +267,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Spread on Desk",
             width=132,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._spread_panels_on_desk,
         ).pack(side="left", padx=(0, 10))
 
@@ -279,11 +279,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Cascade",
             width=94,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._cascade_panels,
         ).pack(side="left", padx=(0, 10))
 
@@ -291,11 +291,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Restore All",
             width=118,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self._restore_all_panels,
         ).pack(side="left", padx=(0, 10))
 
@@ -303,11 +303,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Save",
             width=84,
-            height=36,
+            height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self.save_layout_now,
         ).pack(side="left", padx=(0, 10))
 
@@ -315,11 +315,11 @@ class GMTableView(ctk.CTkFrame):
             actions,
             text="Reset",
             width=84,
-            height=36,
+            height=30,
             fg_color="#2B1C23",
             hover_color="#40222B",
             text_color=TABLE_PALETTE["text"],
-            corner_radius=16,
+            corner_radius=14,
             command=self.reset_table,
         ).pack(side="left")
 
