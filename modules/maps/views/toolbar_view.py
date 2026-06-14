@@ -26,7 +26,7 @@ def _build_toolbar(self):
         if section_tracker["count"]:
             separator = ctk.CTkFrame(
                 parent,
-                fg_color="#3a3a3a",
+                fg_color="#175C38",
                 width=2,
                 corner_radius=2,
             )
@@ -55,14 +55,19 @@ def _build_toolbar(self):
             command=_toggle,
             width=82,
             height=30,
+            fg_color="#0D2A1E",
+            hover_color="#1C3C30",
+            text_color="#10C97C",
+            border_width=1,
+            border_color="#175C38",
         )
         toggle_button.pack(side="left", padx=(0, 4), pady=4)
 
         content_frame = ctk.CTkFrame(
             section,
-            fg_color="#101010",
+            fg_color="#091A12",
             border_width=1,
-            border_color="#404040",
+            border_color="#175C38",
             corner_radius=8,
         )
         content_frame.pack(side="left", fill="y", padx=(0, 4), pady=(2, 2))

@@ -2,19 +2,21 @@
 
 import customtkinter as ctk
 
-PALETTE_BG = "#151515"
-SECTION_BG = "#1f1f1f"
-BORDER = "#3f3f3f"
-TEXT_MUTED = "#cfcfcf"
+# Palette toned to the Map Sheet / parchment skin (forest teal + vivid emerald).
+PALETTE_BG = "#091A12"
+SECTION_BG = "#0D2018"
+BORDER = "#175C38"
+TEXT_MUTED = "#6DCFA0"
+ACCENT = "#10C97C"
 SLIDER_WIDTH = 76
 CONTROL_FONT_SIZE = 11
 
 
 def create_section(parent, title):
     """Create a titled toolbar section that stacks controls vertically."""
-    section = ctk.CTkFrame(parent, fg_color=SECTION_BG, border_width=1, border_color="#303030", corner_radius=9)
+    section = ctk.CTkFrame(parent, fg_color=SECTION_BG, border_width=1, border_color=BORDER, corner_radius=9)
     section.pack(side="top", fill="x", padx=0, pady=(3, 0))
-    ctk.CTkLabel(section, text=title, text_color=TEXT_MUTED, font=ctk.CTkFont(size=11, weight="bold")).pack(
+    ctk.CTkLabel(section, text=title, text_color=ACCENT, font=ctk.CTkFont(size=11, weight="bold")).pack(
         side="top", fill="x", padx=5, pady=(4, 0)
     )
     body = ctk.CTkFrame(section, fg_color="transparent")

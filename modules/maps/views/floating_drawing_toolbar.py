@@ -7,8 +7,10 @@ from modules.helpers.logging_helper import log_module_import
 from modules.maps.measurement.templates import MEASUREMENT_TEMPLATE_LABELS
 from modules.maps.utils.icon_loader import load_icon
 from modules.maps.views.floating_toolbar.layout import (
+    ACCENT,
     BORDER,
     PALETTE_BG,
+    SECTION_BG,
     SLIDER_WIDTH,
     TEXT_MUTED,
     add_stacked_control,
@@ -45,9 +47,9 @@ def _create_floating_palette(owner, host, *, x=8, y=84, title="☰"):
     )
     owner.floating_drawing_toolbar = palette
 
-    header = ctk.CTkFrame(palette, fg_color="#242424", corner_radius=10)
+    header = ctk.CTkFrame(palette, fg_color=SECTION_BG, corner_radius=10)
     header.pack(side="top", fill="x", padx=4, pady=(4, 2))
-    handle = ctk.CTkLabel(header, text=title, text_color=TEXT_MUTED, cursor="fleur")
+    handle = ctk.CTkLabel(header, text=title, text_color=ACCENT, cursor="fleur")
     handle.pack(side="left", padx=(6, 4), pady=3)
 
     content = ctk.CTkFrame(palette, fg_color="transparent")
@@ -70,7 +72,11 @@ def _create_floating_palette(owner, host, *, x=8, y=84, title="☰"):
         except tk.TclError:
             pass
 
-    collapse_button = ctk.CTkButton(header, text="−", width=24, height=22, command=_toggle_palette)
+    collapse_button = ctk.CTkButton(
+        header, text="−", width=24, height=22, command=_toggle_palette,
+        fg_color=SECTION_BG, hover_color=BORDER, text_color=ACCENT,
+        border_width=1, border_color=BORDER, corner_radius=6,
+    )
     collapse_button.pack(side="right", padx=(1, 4), pady=3)
 
     drag_state = {"x": 0, "y": 0}

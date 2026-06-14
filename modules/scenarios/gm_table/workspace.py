@@ -787,27 +787,23 @@ class GMTablePanel(ctk.CTkFrame):
                 self._header_drag_widgets.append(widget)
 
     def _build_physical_header(self, skin: PanelSkin) -> None:
-        """Build the polished tabletop-card header chrome for the panel."""
+        """Build a Windows-style single-row title bar for the panel."""
         self.header = ctk.CTkFrame(
             self,
             fg_color=skin.header_bg,
-            corner_radius=20,
+            corner_radius=12,
             border_width=skin.header_border_width,
             border_color=skin.header_border,
         )
-        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=10, pady=(8, 0))
-        self.header.grid_columnconfigure(0, weight=1)
+        self.header.grid(row=0, column=self._content_column, sticky="ew", padx=10, pady=(10, 0))
 
         self._show_eyebrow = bool(skin.label)
-        title_row = 1 if self._show_eyebrow else 0
-        title_pady = (0, 8) if self._show_eyebrow else (8, 8)
-        if self._is_file_folder_skin:
-            title_row += 1
-            title_pady = (0, 8)
-
         self._add_header_drag_widgets(self.header)
-        self._build_file_folder_tab(skin)
-        self._build_paper_marker(skin)
+
+        # Windows-style single-row layout: pack everything directly into the header
+        # so no intermediate container Canvas can obscure the header's rounded border.
+        # Controls go first (side=right) so the title can fill remaining space.
+        self._build_desk_object_controls(skin)
 
         self.eyebrow_label = ctk.CTkLabel(
             self.header,
@@ -815,27 +811,26 @@ class GMTablePanel(ctk.CTkFrame):
             text_color=skin.eyebrow_color,
             font=ctk.CTkFont(size=10, weight="bold"),
         )
-        self.eyebrow_label.grid(
-            row=1 if self._is_file_folder_skin else 0,
-            column=0,
-            padx=(16, 8),
-            pady=(6, 0),
-            sticky="w",
-        )
-        if not self._show_eyebrow:
-            self.eyebrow_label.grid_remove()
+        if self._show_eyebrow:
+            self.eyebrow_label.pack(side="left", padx=(12, 0), pady=5)
+            _sep = ctk.CTkLabel(
+                self.header, text=" │ ", text_color=skin.header_border,
+                font=ctk.CTkFont(size=13),
+            )
+            _sep.pack(side="left", pady=5)
+            self._add_header_drag_widgets(_sep)
 
         self.title_label = ctk.CTkLabel(
             self.header,
             text=self.definition.title,
             text_color=skin.title_color,
-            font=ctk.CTkFont(size=15, weight="bold"),
+            font=ctk.CTkFont(size=13, weight="bold"),
             anchor="w",
         )
-        self.title_label.grid(row=title_row, column=0, padx=16, pady=title_pady, sticky="ew")
+        padx_title = (12, 4) if not self._show_eyebrow else (0, 4)
+        self.title_label.pack(side="left", padx=padx_title, pady=5, fill="x", expand=True)
 
-        self._add_header_drag_widgets(self.title_label, self.eyebrow_label)
-        self._build_desk_object_controls(skin, row_span=max(1, title_row + 1))
+        self._add_header_drag_widgets(self.eyebrow_label, self.title_label)
 
     def _build_file_folder_tab(self, skin: PanelSkin) -> None:
         """Render a raised top tab for file-folder panels."""
@@ -880,34 +875,14 @@ class GMTablePanel(ctk.CTkFrame):
         self.paper_marker_label.grid(row=0, column=2, padx=(0, 10), pady=7, sticky="ne")
         self._add_header_drag_widgets(self.paper_marker_label)
 
-    def _build_desk_object_controls(self, skin: PanelSkin, *, row_span: int) -> None:
-        """Pack existing window controls as a compact control cluster."""
-        self.controls = ctk.CTkFrame(
-            self.header,
-            fg_color=skin.control_bg,
-            corner_radius=12,
-            border_width=1,
-            border_color=skin.header_border,
-        )
-        self.controls.grid(row=0, column=1, rowspan=row_span, padx=(8, 12), pady=7, sticky="ne")
+    def _build_desk_object_controls(self, skin: PanelSkin) -> None:
+        """Pack window control buttons Windows-style on the right of the title bar."""
+        self.controls = ctk.CTkFrame(self.header, fg_color="transparent")
+        self.controls.pack(side="right", padx=(0, 8), pady=5)
 
         button_specs = (
-            (
-                "minimize_button",
-                "–",
-                self._dispatch_window_action,
-                "minimize",
-                skin.control_bg,
-                skin.control_hover,
-            ),
-            (
-                "maximize_button",
-                "□",
-                self._dispatch_window_action,
-                "toggle_maximize",
-                skin.control_bg,
-                skin.control_hover,
-            ),
+            ("minimize_button", "−", self._dispatch_window_action, "minimize", skin.control_bg, skin.control_hover),
+            ("maximize_button", "□", self._dispatch_window_action, "toggle_maximize", skin.control_bg, skin.control_hover),
             ("actions_button", "⋯", None, None, skin.control_bg, skin.control_hover),
             ("close_button", "×", self._on_close, self.definition.panel_id, skin.close_bg, skin.close_hover),
         )
@@ -920,15 +895,15 @@ class GMTablePanel(ctk.CTkFrame):
             button = ctk.CTkButton(
                 self.controls,
                 text=text,
-                width=28,
-                height=24,
+                width=26,
+                height=22,
                 fg_color=fg_color,
                 hover_color=hover_color,
                 text_color=skin.control_text,
-                corner_radius=8,
+                corner_radius=7,
                 command=command,
             )
-            button.pack(side="left", padx=(4 if index == 0 else 0, 4), pady=4)
+            button.pack(side="left", padx=(3 if index == 0 else 0, 3), pady=0)
             setattr(self, name, button)
 
     def _bind_focus(self, widget) -> None:
