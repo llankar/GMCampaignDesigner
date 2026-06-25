@@ -81,6 +81,7 @@ def test_render_visible_subset_skips_clearing_when_window_is_unchanged(monkeypat
     panel._ctk_images = []
     panel._open_callback = lambda _item: None
     panel._view_callback = lambda _item: None
+    panel._attach_callback = None
     panel._show_context_menu = lambda _item, _x, _y: None
     panel._load_ctk_thumb = lambda _path, _size: object()
 

@@ -3,9 +3,13 @@
     "configurations": [
         {
             "name": "Run GMCampaignDesigner",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/main_window.py",
+            "python": "C:/Users/llank/AppData/Local/Programs/Python/Python312/python.exe",
+            "debugAdapterPython": "C:/Users/llank/AppData/Local/Programs/Python/Python312/python.exe",
+            "debugLauncherPython": "C:/Users/llank/AppData/Local/Programs/Python/Python312/python.exe",
+            "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         }
     ]

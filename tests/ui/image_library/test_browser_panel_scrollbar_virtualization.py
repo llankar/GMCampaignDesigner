@@ -103,11 +103,17 @@ def test_scrollbar_yview_movement_rerenders_new_cards(monkeypatch) -> None:
     panel._ctk_images = []
     panel._open_callback = lambda _item: None
     panel._view_callback = lambda _item: None
+    panel._attach_callback = None
     panel._show_context_menu = lambda _item, _x, _y: None
     panel._load_ctk_thumb = lambda _path, _size: object()
     panel._schedule_virtualized_render = lambda force=False: panel._render_visible_subset()
+    panel._scroll_events_bound = False
+    panel._scroll_bind_job = None
+    panel._bound_canvas = None
+    panel._bound_scrollbar = None
+    panel._last_canvas_yview = None
 
-    panel._bind_scroll_events()
+    panel._ensure_scroll_bindings()
     panel._render_visible_subset()
 
     first_item_at_top = panel._active_cards[0].item.path

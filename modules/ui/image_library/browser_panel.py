@@ -17,6 +17,8 @@ from modules.ui.image_library.thumbnail_cache import ThumbnailCache, ThumbnailPl
 from modules.ui.image_library.toolbar import ImageLibraryToolbar, SORT_OPTIONS, ToolbarState
 from modules.ui.image_library.editor.image_editor_dialog import ImageEditorDialog
 from modules.ui.image_viewer import show_portrait
+from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import resolve_portrait_path
 
 
 SIZE_CONFIG = {
@@ -393,14 +395,24 @@ class ImageBrowserPanel(ctk.CTkFrame):
 
     def _load_ctk_thumb(self, path: str, size: tuple[int, int]) -> ctk.CTkImage:
         """Fetch thumbnail from cache and wrap as CTk image."""
+        resolved_path = self._resolve_thumbnail_path(path)
         try:
-            image = self._thumbnail_cache.get_thumbnail(path, size)
+            image = self._thumbnail_cache.get_thumbnail(resolved_path, size)
         except Exception:
             image = ThumbnailPlaceholderFactory.build(size)
 
         ctk_img = ctk.CTkImage(light_image=image, dark_image=image, size=size)
         self._ctk_images.append(ctk_img)
         return ctk_img
+
+    @staticmethod
+    def _resolve_thumbnail_path(path: str) -> str:
+        """Resolve image-library thumbnails the same way preview resolves portraits."""
+        try:
+            resolved = resolve_portrait_path(path, ConfigHelper.get_campaign_dir())
+        except Exception:
+            resolved = None
+        return resolved or str(Path(path).expanduser())
 
     def _clear_rendered_cards(self) -> None:
         """Remove currently rendered widgets and image references."""
