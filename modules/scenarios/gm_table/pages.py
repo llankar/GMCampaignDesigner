@@ -9,6 +9,7 @@ import customtkinter as ctk
 from PIL import Image
 
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.logging_helper import log_exception, log_warning
 from modules.helpers.portrait_helper import resolve_portrait_candidate
 from modules.image_assets import ImageAssetsService
 from modules.scenarios.gm_table.attachments import EntityAttachment
@@ -48,8 +49,11 @@ class GMTableHostedPage(ctk.CTkFrame):
             if payload.winfo_manager():
                 return
             payload.grid(row=0, column=0, sticky="nsew")
-        except Exception:
-            pass
+        except Exception as exc:
+            log_exception(
+                f"Unable to mount hosted GM Table page payload: {exc}",
+                func_name="GMTableHostedPage._grid_payload_if_needed",
+            )
 
     def get_state(self) -> dict:
         """Return any serializable page state."""
@@ -57,7 +61,11 @@ class GMTableHostedPage(ctk.CTkFrame):
             return {}
         try:
             state = self._state_getter(self._payload) or {}
-        except Exception:
+        except Exception as exc:
+            log_warning(
+                f"Unable to collect hosted GM Table page state: {exc}",
+                func_name="GMTableHostedPage.get_state",
+            )
             state = {}
         return state if isinstance(state, dict) else {}
 
@@ -67,8 +75,11 @@ class GMTableHostedPage(ctk.CTkFrame):
             return
         try:
             self._close_callback(self._payload)
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to close hosted GM Table page payload: {exc}",
+                func_name="GMTableHostedPage.close",
+            )
 
 
 class GMTableNotePage(ctk.CTkFrame):

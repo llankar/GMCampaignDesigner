@@ -1411,7 +1411,11 @@ class MainWindow(ctk.CTk):
             if not window.winfo_exists():
                 self._unregister_gm_table_window(table_id, window)
                 return None
-        except Exception:
+        except Exception as exc:
+            log_warning(
+                f"Unable to validate GM Table window '{table_id}'; unregistering it: {exc}",
+                func_name="MainWindow._get_gm_table_window",
+            )
             self._unregister_gm_table_window(table_id, window)
             return None
 
@@ -1421,38 +1425,57 @@ class MainWindow(ctk.CTk):
         """Bring a detached window to the front."""
         try:
             window.lift()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to lift detached window: {exc}",
+                func_name="MainWindow._focus_detached_window",
+            )
 
         try:
             window.focus_force()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to focus detached window: {exc}",
+                func_name="MainWindow._focus_detached_window",
+            )
 
         try:
             window.attributes("-topmost", True)
             window.after_idle(lambda: window.attributes("-topmost", False))
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to toggle detached window topmost state: {exc}",
+                func_name="MainWindow._focus_detached_window",
+            )
 
     def _maximize_detached_window(self, window) -> None:
         """Open a detached window at a desktop-friendly full size."""
         try:
             screen_width = int(window.winfo_screenwidth())
             screen_height = int(window.winfo_screenheight())
-        except Exception:
+        except Exception as exc:
+            log_warning(
+                f"Unable to read detached window screen size; using fallback geometry: {exc}",
+                func_name="MainWindow._maximize_detached_window",
+            )
             screen_width = 1920
             screen_height = 1080
 
         try:
             window.geometry(f"{screen_width}x{screen_height}+0+0")
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to set detached window geometry: {exc}",
+                func_name="MainWindow._maximize_detached_window",
+            )
 
         try:
             window.minsize(min(screen_width, 1600), min(screen_height, 900))
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to set detached window minimum size: {exc}",
+                func_name="MainWindow._maximize_detached_window",
+            )
 
     def _register_gm_table_window(self, table_id: str, window, view=None) -> None:
         """Track a detached GM Table window by table id."""
@@ -1495,8 +1518,11 @@ class MainWindow(ctk.CTk):
                 try:
                     window.title(f"GM Table - {table_name}")
                     window._gm_table_name = table_name
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to refresh GM Table window title for '{table.table_id}': {exc}",
+                        func_name="MainWindow.refresh_gm_table_window_names",
+                    )
 
     def _close_gm_table_window(self, table_id: str = DEFAULT_GM_TABLE_ID) -> None:
         """Close the detached GM Table window for a single table id if it is open."""
@@ -1509,8 +1535,11 @@ class MainWindow(ctk.CTk):
         self._unregister_gm_table_window(table_id, window)
         try:
             window.destroy()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to destroy GM Table window '{table_id}': {exc}",
+                func_name="MainWindow._close_gm_table_window",
+            )
 
     def _focus_gm_table_window(self, table_id: str = DEFAULT_GM_TABLE_ID):
         """Focus an existing GM Table window by table id."""
@@ -2980,8 +3009,11 @@ class MainWindow(ctk.CTk):
                 self._unregister_gm_table_window(table_id, window)
                 try:
                     window.destroy()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to destroy GM Table window '{table_id}' during close: {exc}",
+                        func_name="MainWindow.open_gm_table._on_close",
+                    )
 
             window.protocol("WM_DELETE_WINDOW", _on_close)
 
