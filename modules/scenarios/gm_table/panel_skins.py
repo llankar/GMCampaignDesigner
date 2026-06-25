@@ -192,7 +192,7 @@ _PANEL_SKINS: dict[str, PanelSkin] = {
         accent_color="#22D4FF",
         object_type="Campaign Dossier",
         icon="📚",
-        show_spine=False,
+        show_spine=True,
         show_file_tab=False,
         show_page_edges=False,
         control_surface="#142240",
@@ -211,17 +211,17 @@ _PANEL_SKINS: dict[str, PanelSkin] = {
         show_spine=False,
         show_file_tab=True,
         show_page_edges=False,
-        control_surface="#1C1E3C",
+        control_surface="#222B3D",
         control_hover_color="#2E3062",
     ),
     # Obsidian Archive — cold dark slate with vivid sky blue.
     # Evokes a stack of classified documents in low light.
     "paper_stack": PanelSkin(
         name="paper_stack",
-        body_color="#0A1422",
-        header_color="#0D1A2E",
-        border_color="#1A3254",
-        accent_color="#0EB4E7",
+        body_color="#111927",
+        header_color="#172235",
+        border_color="#2D3A52",
+        accent_color="#22D3EE",
         object_type="Handout Deck",
         icon="📎",
         show_spine=False,
@@ -293,7 +293,7 @@ _PANEL_SKINS: dict[str, PanelSkin] = {
 }
 
 _PANEL_CHROME: dict[str, PanelChrome] = {
-    "paper_stack": PanelChrome(panel_bg="#0A1422", panel_border="#1A3254", marker="HANDOUT"),
+    "paper_stack": PanelChrome(panel_bg="#111927", panel_border="#2D3A52", marker="HANDOUT"),
     "parchment": PanelChrome(panel_bg="#091A14", panel_border="#165C3A", marker="MAP"),
     "index_cards": PanelChrome(panel_bg="#0D1526", panel_border="#1E3458", marker="NOTE"),
 }

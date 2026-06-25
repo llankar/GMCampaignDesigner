@@ -260,11 +260,13 @@ class _FakeFrame:
 class _FakeGMTableView:
     """Fake GM Table view mounted inside the detached window."""
 
-    def __init__(self, master, *, scenario_item, root_app):
+    def __init__(self, master, *, table_id, table_name, root_app):
         """Initialize the _FakeGMTableView instance."""
         self.master = master
-        self.scenario_item = scenario_item
+        self.table_id = table_id
+        self.table_name = table_name
         self.root_app = root_app
+        self.opened_entities = []
         self.pack_calls = []
         self.after_idle_callbacks = []
         self.log_workspace_opened_calls = 0
@@ -277,6 +279,10 @@ class _FakeGMTableView:
         """Handle after idle."""
         self.after_idle_callbacks.append(callback)
 
+    def open_entity_panel(self, entity_type, name):
+        """Record a requested entity panel."""
+        self.opened_entities.append((entity_type, name))
+
     def log_workspace_opened(self):
         """Handle log workspace opened."""
         self.log_workspace_opened_calls += 1
@@ -285,9 +291,8 @@ class _FakeGMTableView:
 def test_open_gm_table_launches_detached_window_without_clearing_main_content(monkeypatch):
     """GM Table should open in its own window and leave the main app alone."""
     window = MainWindow.__new__(MainWindow)
-    scenario = {"Title": "Storm Front"}
-    window.entity_wrappers = {"scenarios": SimpleNamespace(load_items=lambda: [scenario])}
-    window._gm_table_window = None
+    window.entity_wrappers = {}
+    window._gm_table_windows = {}
     window._gm_mode = False
     window.current_gm_table = None
     window.clear_current_content_called = False
@@ -307,16 +312,17 @@ def test_open_gm_table_launches_detached_window_without_clearing_main_content(mo
 
     gm_window = MainWindow.open_gm_table(window, scenario_name="Storm Front")
 
-    assert gm_window is window._gm_table_window
+    assert gm_window is window._gm_table_windows["table_1"]
     assert window._gm_mode is False
     assert window.clear_current_content_called is False
-    assert gm_window.title_text == "GM Table - Storm Front"
+    assert gm_window.title_text == "GM Table - Main"
     assert gm_window.geometry_calls[-1] == "1920x1080+0+0"
     assert gm_window.minsize_calls[-1] == (1600, 900)
     assert gm_window.lift_calls == 1
     assert gm_window.focus_force_calls == 1
     assert gm_window.attributes_calls[0] == ("-topmost", True)
-    assert window.current_gm_table.scenario_item == scenario
+    assert window.current_gm_table.table_id == "table_1"
+    assert window.current_gm_table.table_name == "Main"
     assert window.current_gm_table.root_app is window
     assert window.current_gm_table.pack_calls == [{"fill": "both", "expand": True}]
     assert window.current_gm_table.after_idle_callbacks[0] == window.current_gm_table.log_workspace_opened
@@ -324,17 +330,19 @@ def test_open_gm_table_launches_detached_window_without_clearing_main_content(mo
     gm_window.after_idle_callbacks[0]()
     assert gm_window.attributes_calls[-1] == ("-topmost", False)
     window.current_gm_table.after_idle_callbacks[0]()
+    window.current_gm_table.after_idle_callbacks[1]()
+    assert window.current_gm_table.opened_entities == [("Scenarios", "Storm Front")]
     assert window.current_gm_table.log_workspace_opened_calls == 1
 
 
 def test_open_gm_table_reuses_an_existing_detached_window(monkeypatch):
     """Opening GM Table twice should focus the existing window."""
     window = MainWindow.__new__(MainWindow)
-    scenario = {"Title": "Storm Front"}
-    window.entity_wrappers = {"scenarios": SimpleNamespace(load_items=lambda: [scenario])}
-    window._gm_table_window = _FakeToplevel()
-    window._gm_table_window._gm_table_scenario_name = "Storm Front"
-    window.current_gm_table = _FakeGMTableView(None, scenario_item=scenario, root_app=window)
+    window.entity_wrappers = {}
+    existing = _FakeToplevel()
+    window._gm_table_windows = {"table_1": existing}
+    window.current_gm_table = _FakeGMTableView(None, table_id="table_1", table_name="Main", root_app=window)
+    existing._gm_table_view = window.current_gm_table
     window._gm_mode = False
 
     import modules.scenarios.gm_table_view as gm_table_view_module
@@ -349,20 +357,19 @@ def test_open_gm_table_reuses_an_existing_detached_window(monkeypatch):
 
     gm_window = MainWindow.open_gm_table(window, scenario_name="Storm Front")
 
-    assert gm_window is window._gm_table_window
+    assert gm_window is window._gm_table_windows["table_1"]
     assert gm_window.lift_calls == 1
     assert gm_window.focus_force_calls == 1
     assert gm_window.geometry_calls == []
     assert gm_window.minsize_calls == []
-    assert window.current_gm_table.scenario_item == scenario
+    assert window.current_gm_table.table_id == "table_1"
 
 
 def test_gm_table_window_close_clears_tracked_references(monkeypatch):
     """Closing the detached GM Table should drop the window references."""
     window = MainWindow.__new__(MainWindow)
-    scenario = {"Title": "Storm Front"}
-    window.entity_wrappers = {"scenarios": SimpleNamespace(load_items=lambda: [scenario])}
-    window._gm_table_window = None
+    window.entity_wrappers = {}
+    window._gm_table_windows = {}
     window.current_gm_table = None
     window._gm_mode = False
 
@@ -378,7 +385,7 @@ def test_gm_table_window_close_clears_tracked_references(monkeypatch):
     close_callback()
 
     assert gm_window.destroy_calls == 1
-    assert window._gm_table_window is None
+    assert window._gm_table_windows["table_1"] is None
     assert window.current_gm_table is None
 
 
@@ -386,13 +393,32 @@ def test_get_gm_table_window_clears_dead_reference():
     """Dead detached GM Table windows should be forgotten immediately."""
     window = MainWindow.__new__(MainWindow)
     gm_table_view = object()
-    window._gm_table_window = _FakeToplevel()
-    window._gm_table_window._exists = False
+    dead_window = _FakeToplevel()
+    dead_window._exists = False
+    dead_window._gm_table_view = gm_table_view
+    window._gm_table_windows = {"table_1": dead_window}
     window.current_gm_table = gm_table_view
 
     assert MainWindow._get_gm_table_window(window) is None
-    assert window._gm_table_window is None
+    assert window._gm_table_windows["table_1"] is None
     assert window.current_gm_table is None
+
+
+def test_unregister_empty_table_does_not_clear_active_other_table():
+    """Clearing one empty table slot should not drop the active view for another table."""
+    window = MainWindow.__new__(MainWindow)
+    active_view = _FakeGMTableView(
+        None, table_id="table_2", table_name="Table2", root_app=window
+    )
+    table_2_window = _FakeToplevel()
+    table_2_window._gm_table_view = active_view
+    window._gm_table_windows = {"table_1": None, "table_2": table_2_window}
+    window.current_gm_table = active_view
+
+    MainWindow._unregister_gm_table_window(window, "table_1")
+
+    assert window.current_gm_table is active_view
+    assert window._gm_table_windows["table_2"] is table_2_window
 
 
 def test_toggle_calendar_dock_ignores_destroyed_widget():
@@ -433,7 +459,7 @@ def test_clear_current_content_preserves_calendar_dock():
     window.current_gm_view = object()
     gm_table_view = object()
     window.current_gm_table = gm_table_view
-    window._gm_table_window = _FakeToplevel()
+    window._gm_table_windows = {"table_1": _FakeToplevel()}
     window._teardown_whiteboard_controller = lambda: None
 
     MainWindow.clear_current_content(window)

@@ -23,6 +23,7 @@ from modules.objects.object_shelf_panel import create_object_shelf_panel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
+from modules.scenarios.gm_table.table_registry import get_table_name, normalize_table_id
 from modules.scenarios.gm_table.attachments import (
     collect_entity_attachments,
     entity_has_attachments,
@@ -75,7 +76,8 @@ class GMTableView(ctk.CTkFrame):
         self,
         master,
         *,
-        scenario_item: dict,
+        table_id: str,
+        table_name: str,
         root_app=None,
         layout_store: GMTableLayoutStore | None = None,
     ) -> None:
@@ -83,10 +85,13 @@ class GMTableView(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.scenario = scenario_item or {}
-        self.scenario_name = (
-            self.scenario.get("Title") or self.scenario.get("Name") or "Scenario"
+        self.table_id = normalize_table_id(table_id)
+        default_table_name = get_table_name(self.table_id)
+        self.table_name = (
+            str(table_name or default_table_name).strip() or default_table_name
         )
+        self.scenario = {}
+        self.scenario_name = ""
         self._root_app = root_app
         self.layout_store = layout_store or GMTableLayoutStore()
         self._layout_settle_scheduler = LayoutSettleScheduler(self)
@@ -186,7 +191,7 @@ class GMTableView(ctk.CTkFrame):
 
         ctk.CTkLabel(
             bar,
-            text=self.scenario_name,
+            text=self.table_name,
             text_color=TABLE_PALETTE["text"],
             font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
@@ -385,7 +390,7 @@ class GMTableView(ctk.CTkFrame):
 
     def _restore_or_seed_layout(self) -> None:
         """Restore saved workspace or create a starter tabletop."""
-        layout = self.layout_store.get_scenario_layout(self.scenario_name)
+        layout = self.layout_store.get_table_layout(self.table_id)
         layout = self._filter_attachmentless_entity_panels(layout)
         if layout.get("panels"):
             self.workspace.restore(layout)
@@ -419,21 +424,18 @@ class GMTableView(ctk.CTkFrame):
         return filtered
 
     def _seed_default_panels(self) -> None:
-        """Build the default workspace focused on scenario and handouts."""
+        """Build the default table workspace without binding it to a scenario."""
         self._create_panel(
-            "entity",
-            f"Scenario: {self.scenario_name}",
-            {
-                "entity_type": "Scenarios",
-                "entity_name": self.scenario_name,
-            },
-            geometry={"x": 24, "y": 24, "width": 1040, "height": 760},
+            "campaign_dashboard",
+            "Campaign Dashboard",
+            {},
+            geometry={"x": 24, "y": 24, "width": 900, "height": 700},
         )
         self._create_panel(
-            "handouts",
-            "Handouts",
-            {"scenario_name": self.scenario_name},
-            geometry={"x": 1080, "y": 24, "width": 560, "height": 760},
+            "note",
+            f"{self.table_name} Notes",
+            {"text": ""},
+            geometry={"x": 948, "y": 24, "width": 520, "height": 520},
         )
 
     def _persist_layout(self) -> None:
@@ -447,8 +449,8 @@ class GMTableView(ctk.CTkFrame):
     def _save_layout_snapshot(self) -> None:
         """Write the latest workspace snapshot to storage."""
         try:
-            self.layout_store.save_scenario_layout(
-                self.scenario_name, self.workspace.serialize()
+            self.layout_store.save_table_layout(
+                self.table_id, self.workspace.serialize()
             )
         except Exception as exc:
             log_warning(
@@ -459,17 +461,17 @@ class GMTableView(ctk.CTkFrame):
     def save_layout_now(self) -> None:
         """Persist immediately and notify the user."""
         self._save_layout_snapshot()
-        messagebox.showinfo("GM Table", f"Layout saved for '{self.scenario_name}'.")
+        messagebox.showinfo("GM Table", f"Layout saved for '{self.table_name}'.")
 
     def reset_table(self) -> None:
-        """Reset the scenario workspace to the starter layout."""
+        """Reset the table workspace to the starter layout."""
         if not messagebox.askyesno(
             "Reset GM Table",
             "Clear every panel on this table and recreate the starter layout?",
         ):
             return
         self.workspace.clear()
-        self.layout_store.clear_scenario_layout(self.scenario_name)
+        self.layout_store.clear_table_layout(self.table_id)
         self._seed_default_panels()
 
     def _tile_panels(self) -> None:
@@ -751,11 +753,7 @@ class GMTableView(ctk.CTkFrame):
             self._create_panel("map_tool", "Map Tool", {})
             return
         if option == "Scene Flow":
-            self._create_panel(
-                "scene_flow",
-                f"Scene Flow: {self.scenario_name}",
-                {"scenario_title": self.scenario_name},
-            )
+            self._open_scenario_selection_for_panel("scene_flow")
             return
         if option == "Image Library":
             self._create_panel("image_library", "Image Library", {})
@@ -764,9 +762,7 @@ class GMTableView(ctk.CTkFrame):
             self._open_image_library_for_table_image()
             return
         if option == "Handouts":
-            self._create_panel(
-                "handouts", "Handouts", {"scenario_name": self.scenario_name}
-            )
+            self._open_scenario_selection_for_panel("handouts")
             return
         if option == "Loot Generator":
             self._create_panel("loot_generator", "Loot Generator", {})
@@ -843,7 +839,6 @@ class GMTableView(ctk.CTkFrame):
                     ),
                     state_getter=lambda _payload: self._panel_state(
                         scenario_title=definition.state.get("scenario_title")
-                        or self.scenario_name
                     ),
                 )
             if kind == "image_library":
@@ -859,10 +854,12 @@ class GMTableView(ctk.CTkFrame):
                     title=str(definition.state.get("image_title") or definition.title),
                 )
             if kind == "handouts":
+                scenario_name = str(definition.state.get("scenario_name") or "").strip()
+                scenario_item = self._load_scenario_item(scenario_name) if scenario_name else {}
                 return GMTableHandoutsPage(
                     parent,
-                    scenario_name=self.scenario_name,
-                    scenario_item=self.scenario,
+                    scenario_name=scenario_name,
+                    scenario_item=scenario_item,
                     wrappers=self.wrappers,
                     map_wrapper=self.map_wrapper,
                     initial_state=definition.state,
@@ -983,7 +980,7 @@ class GMTableView(ctk.CTkFrame):
         """Build the scene flow page."""
         widget = create_scene_flow_frame(
             host,
-            scenario_title=state.get("scenario_title") or self.scenario_name,
+            scenario_title=state.get("scenario_title") or "",
         )
         widget.grid(row=0, column=0, sticky="nsew")
         return widget
@@ -1187,6 +1184,57 @@ class GMTableView(ctk.CTkFrame):
             geometry=self._preferred_entity_geometry(entity_type),
         )
 
+
+    def _load_scenario_item(self, scenario_name: str) -> dict:
+        """Resolve a scenario by title/name for scenario-specific panels."""
+        if not scenario_name:
+            return {}
+        try:
+            item = self._load_entity_item("Scenarios", scenario_name)
+        except Exception:
+            return {}
+        return item if isinstance(item, dict) else {}
+
+    def _open_scenario_selection_for_panel(self, panel_kind: str) -> None:
+        """Ask which scenario should power a scenario-specific panel."""
+        wrapper = self.wrappers.get("Scenarios")
+        template = self._templates.get("Scenarios")
+        if wrapper is None or template is None:
+            messagebox.showerror("GM Table", "Scenarios are not available.")
+            return
+
+        popup = ctk.CTkToplevel(self)
+        popup.title("Select Scenario")
+        popup.geometry("1200x800")
+        popup.transient(self.winfo_toplevel())
+        popup.grab_set()
+        popup.focus_force()
+
+        def _open_selected(
+            selected_type: str, selected_name: str, item: dict | None = None
+        ) -> None:
+            del selected_type
+            popup.destroy()
+            scenario_title = self._entity_label("Scenarios", item, fallback=selected_name)
+            if panel_kind == "scene_flow":
+                self._create_panel(
+                    "scene_flow",
+                    f"Scene Flow: {scenario_title}",
+                    {"scenario_title": scenario_title},
+                )
+                return
+            if panel_kind == "handouts":
+                self._create_panel(
+                    "handouts",
+                    f"Handouts: {scenario_title}",
+                    {"scenario_name": scenario_title},
+                )
+
+        view = GenericListSelectionView(
+            popup, "Scenarios", wrapper, template, _open_selected
+        )
+        view.pack(fill="both", expand=True)
+
     def _open_entity_selection(self, entity_type: str) -> None:
         """Open the generic picker for entity-backed panels."""
         wrapper = self.wrappers.get(entity_type)
@@ -1266,7 +1314,7 @@ class GMTableView(ctk.CTkFrame):
     def log_workspace_opened(self) -> None:
         """Write a trace entry once the view is live."""
         log_info(
-            f"Opened GM Table for {self.scenario_name}",
+            f"Opened GM Table {self.table_id} ({self.table_name})",
             func_name="GMTableView.log_workspace_opened",
         )
 

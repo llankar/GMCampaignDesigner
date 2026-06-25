@@ -73,3 +73,32 @@ def test_layout_store_round_trips_camera_and_bookmarks(monkeypatch, tmp_path) ->
     assert loaded["camera"] == payload["camera"]
     assert loaded["home_camera"] == payload["home_camera"]
     assert loaded["bookmarks"] == payload["bookmarks"]
+
+
+def test_layout_store_round_trips_table_layout(monkeypatch, tmp_path) -> None:
+    """Table layouts should persist by stable table id instead of scenario title."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+
+    first = GMTableLayoutStore()
+    first.save_table_layout(
+        "table_2",
+        {
+            "panels": [
+                {
+                    "panel_id": "panel-2",
+                    "kind": "note",
+                    "title": "Table Notes",
+                    "state": {"text": "Shared table context"},
+                }
+            ]
+        },
+    )
+
+    second = GMTableLayoutStore()
+    loaded = second.get_table_layout("table_2")
+
+    assert loaded["panels"][0]["title"] == "Table Notes"
+    assert loaded["panels"][0]["state"]["text"] == "Shared table context"
