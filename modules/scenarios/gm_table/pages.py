@@ -12,6 +12,7 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import resolve_portrait_candidate
 from modules.image_assets import ImageAssetsService
 from modules.scenarios.gm_table.attachments import EntityAttachment
+from modules.scenarios.session_notes import SessionControls, SessionControlsCallbacks
 from modules.ui.image_library.browser_panel import ImageBrowserPanel
 from modules.ui.image_library.result_card import ImageResult
 from modules.ui.image_library.toolbar import ToolbarState
@@ -73,9 +74,13 @@ class GMTableHostedPage(ctk.CTkFrame):
 class GMTableNotePage(ctk.CTkFrame):
     """Simple fast note page for the GM table."""
 
-    def __init__(self, master, *, initial_text: str = "") -> None:
+    def __init__(
+        self, master, *, initial_text: str = "", session_mid_variable=None,
+        session_end_variable=None, session_callbacks: SessionControlsCallbacks | None = None,
+        session_controls_enabled: bool = False, scenario_actions_enabled: bool = False,
+    ) -> None:
         super().__init__(master, fg_color="transparent")
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -85,8 +90,21 @@ class GMTableNotePage(ctk.CTkFrame):
             anchor="w",
         ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
+        if session_mid_variable is not None and session_end_variable is not None and session_callbacks is not None:
+            controls = SessionControls(
+                self,
+                mid_variable=session_mid_variable,
+                end_variable=session_end_variable,
+                callbacks=session_callbacks,
+                enabled=session_controls_enabled,
+                scenario_actions_enabled=scenario_actions_enabled,
+                fg_color="transparent",
+            )
+            controls.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+            self.session_controls = controls
+
         self.textbox = ctk.CTkTextbox(self, wrap="word")
-        self.textbox.grid(row=1, column=0, sticky="nsew")
+        self.textbox.grid(row=2, column=0, sticky="nsew")
         if initial_text:
             self.textbox.insert("1.0", initial_text)
 

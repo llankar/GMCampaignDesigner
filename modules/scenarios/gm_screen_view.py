@@ -36,6 +36,8 @@ from modules.scenarios.plot_twist_scheduler import PlotTwistScheduler
 from modules.scenarios.plot_twist_panel import PlotTwistPanel, roll_plot_twist
 from modules.scenarios.gm_screen.handouts.panel import create_handouts_panel
 from modules.scenarios.session_notes import (
+    SessionControls,
+    SessionControlsCallbacks,
     build_scene_snapshot_entry,
     build_session_debrief_entry,
 )
@@ -738,56 +740,30 @@ class GMScreenView(ctk.CTkFrame):
     def _build_session_controls(self):
         """Build session controls."""
         self._load_session_hours()
-        ctk.CTkLabel(self._session_controls, text="Session:").pack(side="left", padx=(6, 4))
-
-        mid_label = ctk.CTkLabel(self._session_controls, text="Mid (hrs)")
-        mid_label.pack(side="left", padx=(0, 4))
-        mid_entry = ctk.CTkEntry(self._session_controls, width=60, textvariable=self._session_mid_var)
-        mid_entry.pack(side="left", padx=(0, 8))
-
-        end_label = ctk.CTkLabel(self._session_controls, text="End (hrs)")
-        end_label.pack(side="left", padx=(0, 4))
-        end_entry = ctk.CTkEntry(self._session_controls, width=60, textvariable=self._session_end_var)
-        end_entry.pack(side="left", padx=(0, 8))
-
-        start_btn = ctk.CTkButton(self._session_controls, text="Start", width=70, command=self._start_session)
-        start_btn.pack(side="left", padx=(0, 4))
-        end_btn = ctk.CTkButton(self._session_controls, text="End", width=70, command=self._end_session)
-        end_btn.pack(side="left", padx=(0, 4))
-        capture_btn = ctk.CTkButton(
+        controls = SessionControls(
             self._session_controls,
-            text="Capture",
-            width=84,
-            command=self._capture_scene_snapshot,
+            mid_variable=self._session_mid_var,
+            end_variable=self._session_end_var,
+            callbacks=SessionControlsCallbacks(
+                on_start=self._start_session,
+                on_end=self._end_session,
+                on_capture=self._capture_scene_snapshot,
+                on_debrief=self._append_session_debrief,
+                on_settings=self._open_settings_dialog,
+                on_hours_changed=self._persist_session_hours,
+            ),
+            fg_color="transparent",
         )
-        capture_btn.pack(side="left", padx=(0, 4))
-        debrief_btn = ctk.CTkButton(
-            self._session_controls,
-            text="Debrief",
-            width=84,
-            command=self._append_session_debrief,
-        )
-        debrief_btn.pack(side="left")
-        settings_btn = ctk.CTkButton(
-            self._session_controls,
-            text="Settings",
-            width=84,
-            command=self._open_settings_dialog,
-        )
-        settings_btn.pack(side="left", padx=(4, 0))
+        controls.pack(fill="x", expand=True)
 
-        mid_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
-        end_entry.bind("<FocusOut>", self._persist_session_hours, add="+")
-        mid_entry.bind("<Return>", self._persist_session_hours, add="+")
-        end_entry.bind("<Return>", self._persist_session_hours, add="+")
-
-        self._session_mid_entry = mid_entry
-        self._session_end_entry = end_entry
-        self._session_start_button = start_btn
-        self._session_end_button = end_btn
-        self._session_capture_button = capture_btn
-        self._session_debrief_button = debrief_btn
-        self._session_settings_button = settings_btn
+        self._session_controls_component = controls
+        self._session_mid_entry = controls.widgets.mid_entry
+        self._session_end_entry = controls.widgets.end_entry
+        self._session_start_button = controls.widgets.start_button
+        self._session_end_button = controls.widgets.end_button
+        self._session_capture_button = controls.widgets.capture_button
+        self._session_debrief_button = controls.widgets.debrief_button
+        self._session_settings_button = controls.widgets.settings_button
         self._update_session_controls_state()
 
     def _load_motion_settings(self):

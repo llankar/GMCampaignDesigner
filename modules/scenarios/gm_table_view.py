@@ -40,6 +40,7 @@ from modules.scenarios.gm_table.pages import (
     GMTableImagePage,
     GMTableNotePage,
 )
+from modules.scenarios.session_notes import SessionControlsCallbacks
 from modules.scenarios.gm_table.workspace import (
     PanelDefinition,
     TABLE_PALETTE,
@@ -97,6 +98,8 @@ class GMTableView(ctk.CTkFrame):
         )
         self.scenario = {}
         self.scenario_name = ""
+        self._session_mid_var = tk.StringVar(value="1.0")
+        self._session_end_var = tk.StringVar(value="2.0")
         self._on_switch_table = on_switch_table
         self._root_app = root_app
         self.layout_store = layout_store or GMTableLayoutStore()
@@ -973,7 +976,19 @@ class GMTableView(ctk.CTkFrame):
                 )
             if kind == "note":
                 return GMTableNotePage(
-                    parent, initial_text=str(definition.state.get("text") or "")
+                    parent,
+                    initial_text=str(definition.state.get("text") or ""),
+                    session_mid_variable=self._session_mid_var,
+                    session_end_variable=self._session_end_var,
+                    session_callbacks=SessionControlsCallbacks(
+                        on_start=self._handle_note_session_action,
+                        on_end=self._handle_note_session_action,
+                        on_capture=self._handle_note_session_action,
+                        on_debrief=self._handle_note_session_action,
+                        on_settings=self._handle_note_session_settings,
+                    ),
+                    session_controls_enabled=False,
+                    scenario_actions_enabled=False,
                 )
         except Exception as exc:
             log_warning(
@@ -989,6 +1004,22 @@ class GMTableView(ctk.CTkFrame):
         )
         fallback.grid(row=0, column=0, sticky="nsew")
         return fallback
+
+    def _handle_note_session_action(self) -> None:
+        """Explain why scenario session actions are disabled on global notes."""
+        messagebox.showinfo(
+            "Scenario Session",
+            "GM Table note tabs are global table notes. Open a scenario GM screen to start "
+            "a timed session, capture the active scene, or append a scenario debrief.",
+        )
+
+    def _handle_note_session_settings(self) -> None:
+        """Explain where shared session settings are available for global notes."""
+        messagebox.showinfo(
+            "Scenario Session",
+            "Session settings are scenario-specific. Open a scenario GM screen to adjust "
+            "timer offsets and accessibility settings.",
+        )
 
     def _build_dashboard_content(self, host):
         """Build the campaign dashboard page."""
