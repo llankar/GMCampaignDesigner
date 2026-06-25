@@ -11,13 +11,13 @@ from modules.helpers.logging_helper import log_info, log_warning
 
 
 class GMTableLayoutStore:
-    """Persist GM Table workspace state per campaign and scenario."""
+    """Persist GM Table workspace state per campaign and table id."""
 
     FILE_NAME = "gm_table_layouts.json"
 
     def __init__(self) -> None:
         self.path = os.path.join(ConfigHelper.get_campaign_dir(), self.FILE_NAME)
-        self.data: dict[str, Any] = {"scenarios": {}, "global": {}}
+        self.data: dict[str, Any] = {"scenarios": {}, "tables": {}, "global": {}}
         self._read()
 
     def _read(self) -> None:
@@ -29,6 +29,7 @@ class GMTableLayoutStore:
                 loaded = json.load(handle)
             if isinstance(loaded, dict):
                 self.data["scenarios"] = dict(loaded.get("scenarios") or {})
+                self.data["tables"] = dict(loaded.get("tables") or {})
                 self.data["global"] = dict(loaded.get("global") or {})
         except Exception as exc:
             log_warning(
@@ -50,6 +51,32 @@ class GMTableLayoutStore:
     def _deep_copy(payload: Any) -> Any:
         """Return a deep copy that is safe to mutate."""
         return json.loads(json.dumps(payload))
+
+
+    def get_table_layout(self, table_id: str) -> dict[str, Any]:
+        """Return the saved layout for a stable table id."""
+        if not table_id:
+            return {}
+        layout = self.data.get("tables", {}).get(table_id) or {}
+        if not isinstance(layout, dict):
+            return {}
+        return self._deep_copy(layout)
+
+    def save_table_layout(self, table_id: str, layout: dict[str, Any]) -> None:
+        """Persist a layout for a stable table id."""
+        if not table_id:
+            return
+        self.data.setdefault("tables", {})[table_id] = self._deep_copy(layout or {})
+        self._write()
+
+    def clear_table_layout(self, table_id: str) -> None:
+        """Delete the layout for a stable table id."""
+        if not table_id:
+            return
+        tables = self.data.setdefault("tables", {})
+        if table_id in tables:
+            tables.pop(table_id, None)
+            self._write()
 
     def get_scenario_layout(self, scenario_title: str) -> dict[str, Any]:
         """Return the saved layout for a scenario."""

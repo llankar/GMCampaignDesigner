@@ -1,4 +1,4 @@
-﻿"""Main application window and startup orchestration."""
+"""Main application window and startup orchestration."""
 
 import os
 import sys
@@ -84,6 +84,12 @@ from modules.events.services.calendar_state_store import CalendarStateStore
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+from modules.scenarios.gm_table.table_registry import (
+    DEFAULT_GM_TABLE_ID,
+    GM_TABLES,
+    get_table_name,
+    normalize_table_id,
+)
 from modules.scenarios.scenario_importer import ScenarioImportWindow
 from modules.objects.object_importer import ObjectImportWindow
 from modules.scenarios.scenario_generator_view import ScenarioGeneratorView
@@ -187,7 +193,7 @@ class MainWindow(ctk.CTk):
         self.current_gm_view = None
         self.current_gm_table = None
         self._gm_mode = False
-        self._gm_table_window = None
+        self._gm_table_windows = {table.table_id: None for table in GM_TABLES}
         self.dice_roller_window = None
         self.dice_bar_window = None
         self.audio_controller = get_audio_controller()
@@ -1378,18 +1384,34 @@ class MainWindow(ctk.CTk):
 
         return dock
 
-    def _get_gm_table_window(self):
-        """Return the detached GM Table window if it is still alive."""
-        window = self.__dict__.get("_gm_table_window")
+    def _get_gm_table_registry(self) -> dict[str, object | None]:
+        """Return the per-table detached-window registry."""
+        registry = self.__dict__.setdefault("_gm_table_windows", {})
+        legacy_window = self.__dict__.pop("_gm_table_window", None)
+        for table in GM_TABLES:
+            registry.setdefault(table.table_id, None)
+        if legacy_window is not None and registry.get(DEFAULT_GM_TABLE_ID) is None:
+            registry[DEFAULT_GM_TABLE_ID] = legacy_window
+        return registry
+
+    def _normalize_gm_table_id(self, table_id: str | None = None) -> str:
+        """Return a known GM Table id, falling back to the primary table."""
+        return normalize_table_id(table_id)
+
+    def _get_gm_table_window(self, table_id: str = DEFAULT_GM_TABLE_ID):
+        """Return a detached GM Table window by stable table id if it is alive."""
+        table_id = self._normalize_gm_table_id(table_id)
+        registry = self._get_gm_table_registry()
+        window = registry.get(table_id)
         if window is None:
             return None
 
         try:
             if not window.winfo_exists():
-                self._clear_gm_table_window_reference(window)
+                self._unregister_gm_table_window(table_id, window)
                 return None
         except Exception:
-            self._clear_gm_table_window_reference(window)
+            self._unregister_gm_table_window(table_id, window)
             return None
 
         return window
@@ -1431,27 +1453,52 @@ class MainWindow(ctk.CTk):
         except Exception:
             pass
 
-    def _clear_gm_table_window_reference(self, window=None) -> None:
-        """Forget the detached GM Table window if it matches the tracked one."""
-        tracked_window = self.__dict__.get("_gm_table_window")
+    def _register_gm_table_window(self, table_id: str, window, view=None) -> None:
+        """Track a detached GM Table window by table id."""
+        table_id = self._normalize_gm_table_id(table_id)
+        self._get_gm_table_registry()[table_id] = window
+        self.current_gm_table = view
+
+    def _unregister_gm_table_window(self, table_id: str, window=None) -> None:
+        """Forget a detached GM Table window if it matches the tracked table."""
+        table_id = self._normalize_gm_table_id(table_id)
+        registry = self._get_gm_table_registry()
+        tracked_window = registry.get(table_id)
         if window is not None and tracked_window is not window:
             return
 
-        self._gm_table_window = None
-        self.current_gm_table = None
+        registry[table_id] = None
+        current_view = (
+            getattr(window, "_gm_table_view", None) if window is not None else None
+        )
+        active_view = getattr(self, "current_gm_table", None)
+        active_table_id = getattr(active_view, "table_id", None)
+        if self.current_gm_table is current_view or (
+            window is None and active_table_id == table_id
+        ):
+            self.current_gm_table = None
 
-    def _close_gm_table_window(self) -> None:
-        """Close the detached GM Table window if it is open."""
-        window = self._get_gm_table_window()
+    def _close_gm_table_window(self, table_id: str = DEFAULT_GM_TABLE_ID) -> None:
+        """Close the detached GM Table window for a single table id if it is open."""
+        table_id = self._normalize_gm_table_id(table_id)
+        window = self._get_gm_table_window(table_id)
         if window is None:
-            self._clear_gm_table_window_reference()
+            self._unregister_gm_table_window(table_id)
             return
 
-        self._clear_gm_table_window_reference(window)
+        self._unregister_gm_table_window(table_id, window)
         try:
             window.destroy()
         except Exception:
             pass
+
+    def _focus_gm_table_window(self, table_id: str = DEFAULT_GM_TABLE_ID):
+        """Focus an existing GM Table window by table id."""
+        window = self._get_gm_table_window(table_id)
+        if window is not None:
+            self.current_gm_table = getattr(window, "_gm_table_view", None)
+            self._focus_detached_window(window)
+        return window
 
     def _toggle_calendar_dock(self):
         """Toggle calendar dock."""
@@ -2883,79 +2930,33 @@ class MainWindow(ctk.CTk):
         """Backward-compatible alias that now launches the campaign overview."""
         self._auto_open_campaign_overview()
 
-    def open_gm_table(self, *, show_empty_message=True, scenario_name=None):
-        """Open the virtual tabletop style GM Table."""
-        scenario_wrapper = self.entity_wrappers.get("scenarios") or GenericModelWrapper("scenarios")
-        self.entity_wrappers.setdefault("scenarios", scenario_wrapper)
-        scenarios = scenario_wrapper.load_items()
-        if not scenarios:
-            if show_empty_message:
-                messagebox.showwarning("No Scenarios", "No scenarios available.")
-            else:
-                log_info(
-                    "Skipped opening GM Table because no scenarios are available",
-                    func_name="main_window.MainWindow.open_gm_table",
-                )
-            return
+    def open_gm_table(
+        self,
+        *,
+        show_empty_message=True,
+        scenario_name=None,
+        table_id: str = DEFAULT_GM_TABLE_ID,
+    ):
+        """Open a virtual tabletop window without requiring scenario selection."""
+        del show_empty_message
+        table_id = self._normalize_gm_table_id(table_id)
+        table_name = get_table_name(table_id)
 
-        def _resolve_scenario_title(item):
-            """Resolve scenario title."""
-            return str((item or {}).get("Title") or (item or {}).get("Name") or "").strip()
-
-        selected = None
-        if scenario_name:
-            selected = next(
-                (item for item in scenarios if _resolve_scenario_title(item) == scenario_name),
-                None,
-            )
-            if selected is None:
-                messagebox.showwarning("GM Table", f"Scenario '{scenario_name}' not found.")
-                return
-        elif len(scenarios) == 1:
-            selected = scenarios[0]
-
-        if selected is None:
-            selection_popup = ctk.CTkToplevel(self)
-            selection_popup.title("Open GM Table")
-            selection_popup.geometry("1200x800")
-            selection_popup.transient(self.winfo_toplevel())
-            selection_popup.grab_set()
-            selection_popup.focus_force()
-
-            def _open_selected(_entity_type, name):
-                """Open the chosen scenario in the GM Table."""
-                selection_popup.destroy()
-                self.open_gm_table(show_empty_message=show_empty_message, scenario_name=name)
-
-            picker = GenericListSelectionView(
-                selection_popup,
-                "Scenarios",
-                scenario_wrapper,
-                load_template("scenarios"),
-                _open_selected,
-            )
-            picker.pack(fill="both", expand=True)
-            return
-
-        selected_title = _resolve_scenario_title(selected)
-        existing_window = self._get_gm_table_window()
+        existing_window = self._focus_gm_table_window(table_id)
         if existing_window is not None:
-            if getattr(existing_window, "_gm_table_scenario_name", None) == selected_title or scenario_name is None:
-                self._focus_detached_window(existing_window)
-                return existing_window
-            self._close_gm_table_window()
+            return existing_window
 
         try:
             from modules.scenarios.gm_table_view import GMTableView
 
             window = ctk.CTkToplevel(self)
-            window.title(f"GM Table - {selected_title}")
+            window.title(f"GM Table - {table_name}")
             self._maximize_detached_window(window)
             self._focus_detached_window(window)
 
             def _on_close():
                 """Handle GM Table close."""
-                self._clear_gm_table_window_reference(window)
+                self._unregister_gm_table_window(table_id, window)
                 try:
                     window.destroy()
                 except Exception:
@@ -2967,18 +2968,21 @@ class MainWindow(ctk.CTk):
             detail_container.pack(fill="both", expand=True)
             view = GMTableView(
                 detail_container,
-                scenario_item=selected,
+                table_id=table_id,
+                table_name=table_name,
                 root_app=self,
             )
             view.pack(fill="both", expand=True)
             window._gm_table_view = view
-            window._gm_table_scenario_name = selected_title
-            self._gm_table_window = window
-            self.current_gm_table = view
+            window._gm_table_id = table_id
+            window._gm_table_name = table_name
+            self._register_gm_table_window(table_id, window, view)
             view.after_idle(view.log_workspace_opened)
+            if scenario_name:
+                view.after_idle(lambda: view.open_entity_panel("Scenarios", scenario_name))
             return window
         except Exception:
-            self._close_gm_table_window()
+            self._close_gm_table_window(table_id)
             raise
 
     def open_gm_screen(self, *, show_empty_message=True, scenario_name=None, initial_layout=None):

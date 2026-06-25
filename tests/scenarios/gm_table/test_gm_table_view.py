@@ -318,18 +318,15 @@ def test_context_menu_binding_helpers_skip_hosts_without_menu_api(monkeypatch) -
     assert recursive_calls[-1][0] is widget
 
 
-def test_handle_add_option_routes_handouts_panel_creation() -> None:
-    """Add menu handouts option should spawn a handouts panel."""
+def test_handle_add_option_routes_handouts_to_scenario_selection() -> None:
+    """Add menu handouts option should ask which scenario powers the panel."""
     captured = []
     view = GMTableView.__new__(GMTableView)
-    view.scenario_name = "Night Run"
-    view._create_panel = lambda kind, title, state: captured.append(
-        (kind, title, state)
-    )
+    view._open_scenario_selection_for_panel = lambda panel_kind: captured.append(panel_kind)
 
     GMTableView._handle_add_option(view, "Handouts")
 
-    assert captured == [("handouts", "Handouts", {"scenario_name": "Night Run"})]
+    assert captured == ["handouts"]
 
 
 def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
@@ -344,15 +341,14 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     monkeypatch.setattr(gm_table_view_module, "GMTableHandoutsPage", _DummyHandoutsPage)
 
     view = GMTableView.__new__(GMTableView)
-    view.scenario_name = "Night Run"
-    view.scenario = {"Title": "Night Run"}
+    view._load_scenario_item = lambda scenario_name: {"Title": scenario_name}
     view.wrappers = {"NPCs": object()}
     view.map_wrapper = object()
     definition = gm_table_view_module.PanelDefinition(
         panel_id="panel-handouts",
         kind="handouts",
         title="Handouts",
-        state={"query": "map"},
+        state={"scenario_name": "Night Run", "query": "map"},
     )
 
     mounted = GMTableView._mount_panel_content(view, object(), definition)
@@ -360,15 +356,14 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     assert isinstance(mounted, _DummyHandoutsPage)
     assert captured["kwargs"]["scenario_name"] == "Night Run"
     assert captured["kwargs"]["scenario_item"] == {"Title": "Night Run"}
-    assert captured["kwargs"]["initial_state"] == {"query": "map"}
+    assert captured["kwargs"]["initial_state"] == {"scenario_name": "Night Run", "query": "map"}
 
 
-def test_seed_default_panels_opens_scenario_and_handouts_panels() -> None:
-    """Starter tabletop should open scenario details alongside handouts."""
+def test_seed_default_panels_opens_table_level_panels() -> None:
+    """Starter tabletop should not bind the table identity to a scenario."""
     captured = []
     view = GMTableView.__new__(GMTableView)
-    view.scenario_name = "Night Run"
-    view.scenario = {"Title": "Night Run", "MapName": "Docks"}
+    view.table_name = "Main"
     view._create_panel = lambda kind, title, state, *, geometry=None: captured.append(
         (kind, title, state, geometry)
     )
@@ -377,16 +372,16 @@ def test_seed_default_panels_opens_scenario_and_handouts_panels() -> None:
 
     assert captured == [
         (
-            "entity",
-            "Scenario: Night Run",
-            {"entity_type": "Scenarios", "entity_name": "Night Run"},
-            {"x": 24, "y": 24, "width": 1040, "height": 760},
+            "campaign_dashboard",
+            "Campaign Dashboard",
+            {},
+            {"x": 24, "y": 24, "width": 900, "height": 700},
         ),
         (
-            "handouts",
-            "Handouts",
-            {"scenario_name": "Night Run"},
-            {"x": 1080, "y": 24, "width": 560, "height": 760},
+            "note",
+            "Main Notes",
+            {"text": ""},
+            {"x": 948, "y": 24, "width": 520, "height": 520},
         ),
     ]
 
