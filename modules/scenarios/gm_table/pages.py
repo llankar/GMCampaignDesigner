@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
+import sys
 from typing import Callable
 
 import customtkinter as ctk
 from PIL import Image
+from tkinter import messagebox
 
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.logging_helper import log_exception, log_warning
+from modules.helpers.logging_helper import log_exception, log_info, log_warning
 from modules.helpers.portrait_helper import resolve_portrait_candidate
 from modules.image_assets import ImageAssetsService
 from modules.scenarios.gm_table.attachments import EntityAttachment
@@ -19,6 +23,46 @@ from modules.ui.image_library.result_card import ImageResult
 from modules.ui.image_library.toolbar import ToolbarState
 
 IMAGE_PANEL_SIZE = (520, 390)
+
+
+def open_attachment_file(attachment: EntityAttachment) -> bool:
+    """Open a GM Table attachment with the operating system default application."""
+    path = attachment.resolved_path or attachment.path
+    if not path:
+        messagebox.showwarning(
+            "Open Attachment",
+            "This attachment does not have an associated file.",
+        )
+        return False
+    resolved = Path(path).expanduser()
+    if not resolved.is_absolute():
+        resolved = Path(ConfigHelper.get_campaign_dir()) / resolved
+    resolved = resolved.resolve()
+    if not resolved.exists():
+        messagebox.showwarning(
+            "Open Attachment",
+            f"The attachment file could not be found:\n{resolved}",
+        )
+        return False
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(str(resolved))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(resolved)])
+        else:
+            subprocess.Popen(["xdg-open", str(resolved)])
+        log_info(
+            f"Opened GM Table attachment '{resolved}'.",
+            func_name="gm_table.pages.open_attachment_file",
+        )
+        return True
+    except Exception as exc:
+        log_warning(
+            f"Failed to open GM Table attachment '{resolved}': {exc}",
+            func_name="gm_table.pages.open_attachment_file",
+        )
+        messagebox.showerror("Open Attachment", f"Failed to open the file:\n{exc}")
+        return False
 
 
 class GMTableHostedPage(ctk.CTkFrame):
@@ -188,9 +232,16 @@ class GMTableImagePage(ctk.CTkFrame):
 class GMTableAttachmentGallery(ctk.CTkFrame):
     """Compact gallery for entity attachments on the GM Table."""
 
-    def __init__(self, master, *, attachments: list[EntityAttachment]) -> None:
+    def __init__(
+        self,
+        master,
+        *,
+        attachments: list[EntityAttachment],
+        on_open: Callable[[EntityAttachment], bool] | None = None,
+    ) -> None:
         super().__init__(master, fg_color="transparent")
         self._images: list[ctk.CTkImage] = []
+        self._on_open = on_open or open_attachment_file
         self.grid_columnconfigure(0, weight=1)
         title = f"Attachments ({len(attachments)})"
         ctk.CTkLabel(
@@ -199,7 +250,7 @@ class GMTableAttachmentGallery(ctk.CTkFrame):
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.grid(row=1, column=0, sticky="ew")
         for index, attachment in enumerate(attachments):
-            card = ctk.CTkFrame(body, corner_radius=12)
+            card = ctk.CTkFrame(body, corner_radius=12, cursor="hand2")
             card.grid(row=index // 2, column=index % 2, sticky="ew", padx=6, pady=6)
             card.grid_columnconfigure(0, weight=1)
             if attachment.is_image and attachment.resolved_path:
@@ -208,9 +259,26 @@ class GMTableAttachmentGallery(ctk.CTkFrame):
                 ctk.CTkLabel(card, text="📎", font=ctk.CTkFont(size=28)).grid(
                     row=0, column=0, pady=(10, 2)
                 )
-            ctk.CTkLabel(
-                card, text=attachment.label, wraplength=220, justify="center"
-            ).grid(row=1, column=0, padx=10, pady=(2, 10), sticky="ew")
+            label = ctk.CTkLabel(
+                card,
+                text=attachment.label,
+                wraplength=220,
+                justify="center",
+                cursor="hand2",
+            )
+            label.grid(row=1, column=0, padx=10, pady=(2, 10), sticky="ew")
+            self._bind_open(card, attachment)
+
+    def _bind_open(self, widget, attachment: EntityAttachment) -> None:
+        widget.bind(
+            "<Button-1>",
+            lambda _event=None, item=attachment: self._on_open(item),
+        )
+        for child in widget.winfo_children():
+            child.bind(
+                "<Button-1>",
+                lambda _event=None, item=attachment: self._on_open(item),
+            )
 
     def _add_image_preview(self, parent, attachment: EntityAttachment) -> None:
         try:

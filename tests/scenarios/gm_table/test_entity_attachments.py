@@ -56,3 +56,33 @@ def test_collect_entity_attachments_ignores_media_without_attachment_field(
         {"Portrait": "assets/portrait.png", "Image": "assets/portrait.png"},
         campaign_dir=str(tmp_path),
     )
+
+
+def test_open_attachment_file_uses_platform_launcher(monkeypatch, tmp_path: Path) -> None:
+    """Clicking an attachment card should open the linked file with the OS launcher."""
+    import modules.scenarios.gm_table.pages as pages
+    from modules.scenarios.gm_table.attachments import EntityAttachment
+
+    attachment_path = tmp_path / "docs" / "note.pdf"
+    _file(attachment_path)
+    launched = []
+
+    monkeypatch.setattr(pages.sys, "platform", "linux")
+    monkeypatch.setattr(
+        pages.subprocess,
+        "Popen",
+        lambda args: launched.append(args),
+    )
+
+    result = pages.open_attachment_file(
+        EntityAttachment(
+            field_name="Attachment",
+            path=str(attachment_path),
+            resolved_path=str(attachment_path),
+            label="note.pdf",
+            is_image=False,
+        )
+    )
+
+    assert result is True
+    assert launched == [["xdg-open", str(attachment_path.resolve())]]

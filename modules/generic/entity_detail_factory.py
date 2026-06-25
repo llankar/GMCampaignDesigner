@@ -2244,6 +2244,7 @@ def create_entity_detail_frame(
     open_entity_callback=None,
     *,
     spotlight_only: bool = False,
+    show_spotlight: bool = True,
 ):
     """
     Routes Scenarios through our custom header/body and
@@ -2274,6 +2275,7 @@ def create_entity_detail_frame(
                 parent,
                 open_entity_callback,
                 spotlight_only=spotlight_only,
+                show_spotlight=show_spotlight,
             ),
         )
 
@@ -2371,25 +2373,34 @@ def create_entity_detail_frame(
             break
 
     spotlight_primary = entity_type in SPOTLIGHT_PRIMARY_ENTITY_TYPES
-    shell, main_column, side_column = create_detail_split_layout(
-        content_frame,
-        spotlight_primary=spotlight_primary,
-        single_column=spotlight_only,
-    )
+    if show_spotlight:
+        shell, main_column, side_column = create_detail_split_layout(
+            content_frame,
+            spotlight_primary=spotlight_primary,
+            single_column=spotlight_only,
+        )
+    else:
+        shell = ctk.CTkFrame(content_frame, fg_color="transparent")
+        shell.grid_columnconfigure(0, weight=1)
+        shell.grid_rowconfigure(0, weight=1)
+        main_column = ctk.CTkFrame(shell, fg_color="transparent")
+        main_column.grid(row=0, column=0, sticky="nsew")
+        side_column = main_column
     shell.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
     category_label = entity_type[:-1] if entity_type.endswith("s") else entity_type
     primary_type = _resolve_primary_type_chip(entity)
     spotlight_accent_lines = _build_spotlight_accent_lines(highlight_lines, primary_type)
 
-    create_spotlight_panel(
-        side_column,
-        title=str(entity_label),
-        portrait_builder=_make_spotlight_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else None,
-        fallback_text=_spotlight_fallback(entity_type),
-        accent_lines=spotlight_accent_lines,
-        prominent=spotlight_primary,
-    )
+    if show_spotlight:
+        create_spotlight_panel(
+            side_column,
+            title=str(entity_label),
+            portrait_builder=_make_spotlight_portrait if DEFAULT_PORTRAIT_PLACEMENT in {"spotlight", "both"} else None,
+            fallback_text=_spotlight_fallback(entity_type),
+            accent_lines=spotlight_accent_lines,
+            prominent=spotlight_primary,
+        )
 
     if spotlight_only:
         return content_frame

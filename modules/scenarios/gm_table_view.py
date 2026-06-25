@@ -1279,6 +1279,7 @@ class GMTableView(ctk.CTkFrame):
                 master=scrollable_host,
                 open_entity_callback=self.open_entity_panel,
                 spotlight_only=False,
+                show_spotlight=False,
             )
             detail_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
             return scrollable_host
