@@ -425,12 +425,14 @@ class GMTableView(ctk.CTkFrame):
         entry.select_range(0, "end")
 
     def rename_table(self, name: str) -> None:
-        """Persist this table display name and refresh every open GM Table window."""
+        """Delegate table renames to the root app so every label stays in sync."""
+        root_app = self._root_app
+        if root_app is not None and hasattr(root_app, "rename_gm_table"):
+            root_app.rename_gm_table(self.table_id, name)
+            return
+
         self.layout_store.save_table_name(self.table_id, name)
         self.refresh_table_names()
-        root_app = self._root_app
-        if root_app is not None and hasattr(root_app, "refresh_gm_table_window_names"):
-            root_app.refresh_gm_table_window_names()
 
     def _handle_table_switch(self, table_name: str) -> None:
         """Request that the application opens or focuses another GM Table."""

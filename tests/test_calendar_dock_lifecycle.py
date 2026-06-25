@@ -281,6 +281,12 @@ class _FakeGMTableView:
         self.pack_calls = []
         self.after_idle_callbacks = []
         self.log_workspace_opened_calls = 0
+        self.refresh_table_names_calls = 0
+
+    def refresh_table_names(self):
+        """Record table-name refreshes."""
+        self.refresh_table_names_calls += 1
+        self.table_name = self.layout_store.get_table_name(self.table_id)
 
     def pack(self, **kwargs):
         """Handle pack."""
@@ -404,6 +410,69 @@ def test_gm_table_switch_callback_opens_other_table_without_closing_current(monk
     assert table_two_window._gm_table_view.on_switch_table is not None
     assert window.current_gm_table is table_two_window._gm_table_view
 
+
+def test_rename_gm_table_saves_and_refreshes_every_open_table(monkeypatch, tmp_path):
+    """Root-level GM Table renames should persist once and refresh all labels."""
+    window = MainWindow.__new__(MainWindow)
+    table_one_window = _FakeToplevel()
+    table_two_window = _FakeToplevel()
+    table_one_view = _FakeGMTableView(
+        None, table_id="table_1", table_name="Main", root_app=window
+    )
+    table_two_view = _FakeGMTableView(
+        None, table_id="table_2", table_name="Table2", root_app=window
+    )
+    table_one_window._gm_table_view = table_one_view
+    table_two_window._gm_table_view = table_two_view
+    window._gm_table_windows = {"table_1": table_one_window, "table_2": table_two_window}
+    window.current_gm_table = table_one_view
+    window.launcher_refreshes = 0
+    window.refresh_gm_table_launcher_labels = lambda: setattr(
+        window, "launcher_refreshes", window.launcher_refreshes + 1
+    )
+
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+
+    MainWindow.rename_gm_table(window, "table_1", "War Room")
+
+    assert table_one_view.table_name == "War Room"
+    assert table_two_view.table_name == "Table2"
+    assert table_one_view.refresh_table_names_calls == 1
+    assert table_two_view.refresh_table_names_calls == 1
+    assert window.launcher_refreshes == 1
+
+    from modules.scenarios.gm_table.layout_store import GMTableLayoutStore
+
+    assert GMTableLayoutStore().get_table_name("table_1") == "War Room"
+
+
+def test_gm_table_view_rename_delegates_to_root_app():
+    """GMTableView should not save names directly when a root app is available."""
+    from modules.scenarios.gm_table_view import GMTableView
+
+    view = GMTableView.__new__(GMTableView)
+    view.table_id = "table_2"
+    view._root_app = SimpleNamespace(rename_calls=[])
+
+    def _rename_gm_table(table_id, name):
+        view._root_app.rename_calls.append((table_id, name))
+
+    view._root_app.rename_gm_table = _rename_gm_table
+    view.layout_store = SimpleNamespace(
+        save_table_name=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("rename_table should delegate to root app")
+        )
+    )
+    view.refresh_table_names = lambda: (_ for _ in ()).throw(
+        AssertionError("root app handles GM Table refreshes")
+    )
+
+    GMTableView.rename_table(view, "Side Table")
+
+    assert view._root_app.rename_calls == [("table_2", "Side Table")]
 
 def test_gm_table_window_close_clears_tracked_references(monkeypatch):
     """Closing the detached GM Table should drop the window references."""
