@@ -154,6 +154,89 @@ def test_open_entity_panel_uses_useful_geometry_for_new_scenario_panel() -> None
     assert captured["geometry"] == {"width": 920, "height": 680}
 
 
+def test_open_entity_panel_creates_attachmentless_entities_without_popup(
+    monkeypatch,
+) -> None:
+    """Normal entity opens should not require attachments or show attachment popups."""
+    captured = {}
+    view = GMTableView.__new__(GMTableView)
+    view.workspace = SimpleNamespace()
+    view._find_existing_entity_panel = lambda _entity_type, _name, **_kwargs: None
+    view._load_entity_item = lambda _entity_type, _name: {"Name": "No Media"}
+    view._preferred_entity_geometry = lambda _entity_type: {"width": 760, "height": 580}
+
+    def _capture(kind, title, state, *, geometry=None):
+        captured["kind"] = kind
+        captured["title"] = title
+        captured["state"] = state
+        captured["geometry"] = geometry
+        return "panel-new"
+
+    view._create_panel = _capture
+    monkeypatch.setattr(
+        gm_table_view_module, "entity_has_attachments", lambda _item: False
+    )
+    monkeypatch.setattr(
+        gm_table_view_module.messagebox,
+        "showinfo",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("normal entity opens must not show an attachment popup")
+        ),
+    )
+
+    GMTableView.open_entity_panel(view, "NPCs", "No Media")
+
+    assert captured["kind"] == "entity"
+    assert captured["title"] == "NPC: No Media"
+    assert captured["state"] == {"entity_type": "NPCs", "entity_name": "No Media"}
+    assert captured["geometry"] == {"width": 760, "height": 580}
+
+
+def test_open_entity_panel_sets_attachment_only_only_when_explicit_with_attachments(
+    monkeypatch,
+) -> None:
+    """Attachment-only state is opt-in and requires at least one linked attachment."""
+    created_states = []
+    view = GMTableView.__new__(GMTableView)
+    view.workspace = SimpleNamespace()
+    view._find_existing_entity_panel = lambda _entity_type, _name, **_kwargs: None
+    view._load_entity_item = lambda _entity_type, name: {"Name": name}
+    view._preferred_entity_geometry = lambda _entity_type: {"width": 760, "height": 580}
+    view._create_panel = (
+        lambda _kind, _title, state, *, geometry=None: created_states.append(state)
+        or f"panel-{len(created_states)}"
+    )
+
+    monkeypatch.setattr(
+        gm_table_view_module, "entity_has_attachments", lambda _item: True
+    )
+    GMTableView.open_entity_panel(view, "NPCs", "Has Media")
+
+    monkeypatch.setattr(
+        gm_table_view_module, "entity_has_attachments", lambda _item: False
+    )
+    GMTableView.open_entity_panel(
+        view, "NPCs", "Requested Missing Media", attachment_only=True
+    )
+
+    monkeypatch.setattr(
+        gm_table_view_module, "entity_has_attachments", lambda _item: True
+    )
+    GMTableView.open_entity_panel(
+        view, "NPCs", "Requested Has Media", attachment_only=True
+    )
+
+    assert created_states == [
+        {"entity_type": "NPCs", "entity_name": "Has Media"},
+        {"entity_type": "NPCs", "entity_name": "Requested Missing Media"},
+        {
+            "entity_type": "NPCs",
+            "entity_name": "Requested Has Media",
+            "attachment_only": True,
+        },
+    ]
+
+
 def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
     """Entity content should be built through the shared detail factory."""
     captured = {}
