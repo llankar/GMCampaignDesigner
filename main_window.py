@@ -2987,7 +2987,9 @@ class MainWindow(ctk.CTk):
         table_id: str = DEFAULT_GM_TABLE_ID,
     ):
         """Open a virtual tabletop window without requiring scenario selection."""
-        del show_empty_message
+        # ``show_empty_message`` is retained for backwards-compatible callers.
+        # GM Table is now global, so opening it no longer depends on scenario
+        # availability and does not need a scenario-empty warning.
         table_id = self._normalize_gm_table_id(table_id)
         layout_store = GMTableLayoutStore()
         table_name = layout_store.get_table_name(table_id)
