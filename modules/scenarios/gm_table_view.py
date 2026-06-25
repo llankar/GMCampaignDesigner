@@ -598,32 +598,76 @@ class GMTableView(ctk.CTkFrame):
         }
 
     def _create_panel(
-        self, kind: str, title: str, state: dict, *, geometry: dict | None = None
+        self,
+        kind: str,
+        title: str,
+        state: dict,
+        *,
+        geometry: dict | None = None,
+        workspace: GMTableWorkspace | None = None,
     ) -> str:
-        """Create a new floating panel."""
+        """Create a new floating panel in the requested workspace."""
         definition = PanelDefinition(
             panel_id=uuid4().hex,
             kind=kind,
             title=title,
             state=dict(state or {}),
         )
-        self.workspace.add_panel(definition, geometry=geometry)
+        target_workspace = workspace or self.workspace
+        target_workspace.add_panel(definition, geometry=geometry)
         return definition.panel_id
 
-    def _add_image_panel_from_library_result(self, image_result) -> None:
+    def _create_panel_in_workspace(
+        self,
+        kind: str,
+        title: str,
+        state: dict,
+        *,
+        geometry: dict | None = None,
+        workspace: GMTableWorkspace | None = None,
+    ) -> str:
+        """Create a panel while preserving older call sites that monkeypatch _create_panel."""
+        if workspace is None:
+            if geometry is None:
+                return self._create_panel(kind, title, state)
+            return self._create_panel(kind, title, state, geometry=geometry)
+        return self._create_panel(
+            kind, title, state, geometry=geometry, workspace=workspace
+        )
+
+    def _create_panel_in_selection_workspace(
+        self,
+        kind: str,
+        title: str,
+        state: dict,
+        *,
+        geometry: dict | None = None,
+        workspace: GMTableWorkspace | None = None,
+    ) -> str:
+        """Alias used by delayed picker callbacks to target the initiating workspace."""
+        return self._create_panel_in_workspace(
+            kind, title, state, geometry=geometry, workspace=workspace
+        )
+
+    def _add_image_panel_from_library_result(
+        self, image_result, *, workspace: GMTableWorkspace | None = None
+    ) -> None:
         """Create a floating image window from an image-library selection."""
         image_path = str(getattr(image_result, "path", "") or "").strip()
         if not image_path:
             messagebox.showerror("GM Table", "The selected image has no usable path.")
             return
         image_title = str(getattr(image_result, "name", "") or "").strip() or "Image"
-        self._create_panel(
+        self._create_panel_in_workspace(
             "image",
             image_title,
             {"image_path": image_path, "image_title": image_title},
+            workspace=workspace,
         )
 
-    def _open_image_library_for_table_image(self) -> None:
+    def _open_image_library_for_table_image(
+        self, *, workspace: GMTableWorkspace | None = None
+    ) -> None:
         """Open the shared image library dialog in attach-to-table mode."""
         try:
             from modules.ui.image_library.dialogs.library_browser_dialog import (
@@ -637,7 +681,9 @@ class GMTableView(ctk.CTkFrame):
 
         dialog = ImageLibraryBrowserDialog(
             self.winfo_toplevel(),
-            on_attach_to_entity=self._add_image_panel_from_library_result,
+            on_attach_to_entity=lambda result: self._add_image_panel_from_library_result(
+                result, workspace=workspace
+            ),
         )
         dialog.title("Add Image to GM Table")
 
@@ -830,66 +876,121 @@ class GMTableView(ctk.CTkFrame):
             "GM Table", "The active map panel does not support fog tools."
         )
 
-    def _handle_add_option(self, option: str) -> None:
-        """Route add-menu options."""
+    def _handle_add_option(
+        self, option: str, *, workspace: GMTableWorkspace | None = None
+    ) -> None:
+        """Route add-menu options to the main table or a nested container workspace."""
         if option == "Campaign Dashboard":
-            self._create_panel("campaign_dashboard", "Campaign Dashboard", {})
+            self._create_panel_in_workspace(
+                "campaign_dashboard", "Campaign Dashboard", {}, workspace=workspace
+            )
             return
         if option == "World Map":
-            self._create_panel("world_map", "World Map", {})
+            self._create_panel_in_workspace(
+                "world_map", "World Map", {}, workspace=workspace
+            )
             return
         if option == "Map Tool":
-            self._create_panel("map_tool", "Map Tool", {})
+            self._create_panel_in_workspace(
+                "map_tool", "Map Tool", {}, workspace=workspace
+            )
             return
         if option == "Scene Flow":
-            self._open_scenario_selection_for_panel("scene_flow")
+            (
+                self._open_scenario_selection_for_panel("scene_flow")
+                if workspace is None
+                else self._open_scenario_selection_for_panel(
+                    "scene_flow", workspace=workspace
+                )
+            )
             return
         if option == "Image Library":
-            self._create_panel("image_library", "Image Library", {})
+            self._create_panel_in_workspace(
+                "image_library", "Image Library", {}, workspace=workspace
+            )
             return
         if option == "Image from Library":
-            self._open_image_library_for_table_image()
+            (
+                self._open_image_library_for_table_image()
+                if workspace is None
+                else self._open_image_library_for_table_image(workspace=workspace)
+            )
             return
         if option == "Handouts":
-            self._open_scenario_selection_for_panel("handouts")
+            (
+                self._open_scenario_selection_for_panel("handouts")
+                if workspace is None
+                else self._open_scenario_selection_for_panel(
+                    "handouts", workspace=workspace
+                )
+            )
             return
         if option == "Container Window":
-            self._create_panel("container_window", "Container Window", {})
+            self._create_panel_in_workspace(
+                "container_window", "Container Window", {}, workspace=workspace
+            )
             return
         if option == "Loot Generator":
-            self._create_panel("loot_generator", "Loot Generator", {})
+            self._create_panel_in_workspace(
+                "loot_generator", "Loot Generator", {}, workspace=workspace
+            )
             return
         if option == "Object Shelf":
-            self._create_panel("object_shelf", "Object Shelf", {})
+            self._create_panel_in_workspace(
+                "object_shelf", "Object Shelf", {}, workspace=workspace
+            )
             return
         if option == "Whiteboard":
-            self._create_panel("whiteboard", "Whiteboard", {})
+            self._create_panel_in_workspace(
+                "whiteboard", "Whiteboard", {}, workspace=workspace
+            )
             return
         if option == "Random Tables":
-            self._create_panel("random_tables", "Random Tables", {})
+            self._create_panel_in_workspace(
+                "random_tables", "Random Tables", {}, workspace=workspace
+            )
             return
         if option == "Plot Twists":
-            self._create_panel("plot_twists", "Plot Twists", {})
+            self._create_panel_in_workspace(
+                "plot_twists", "Plot Twists", {}, workspace=workspace
+            )
             return
         if option == "Puzzle Display":
-            self._open_puzzle_selection()
+            (
+                self._open_puzzle_selection()
+                if workspace is None
+                else self._open_puzzle_selection(workspace=workspace)
+            )
             return
         if option == "Note Tab":
             existing_notes = [
                 panel
-                for panel in self.workspace.serialize().get("panels", [])
+                for panel in (workspace or self.workspace).serialize().get("panels", [])
                 if panel.get("kind") == "note"
             ]
-            self._create_panel("note", f"Note {len(existing_notes) + 1}", {"text": ""})
+            self._create_panel_in_workspace(
+                "note",
+                f"Note {len(existing_notes) + 1}",
+                {"text": ""},
+                workspace=workspace,
+            )
             return
         if option == "Character Graph":
-            self._create_panel("character_graph", "Character Graph", {})
+            self._create_panel_in_workspace(
+                "character_graph", "Character Graph", {}, workspace=workspace
+            )
             return
         if option == "Scenario Graph Editor":
-            self._create_panel("scenario_graph", "Scenario Graph", {})
+            self._create_panel_in_workspace(
+                "scenario_graph", "Scenario Graph", {}, workspace=workspace
+            )
             return
         if option in ENTITY_TYPES:
-            self._open_entity_selection(option)
+            (
+                self._open_entity_selection(option)
+                if workspace is None
+                else self._open_entity_selection(option, workspace=workspace)
+            )
             return
 
     def _mount_panel_content(self, parent: ctk.CTkFrame, definition: PanelDefinition):
@@ -962,6 +1063,11 @@ class GMTableView(ctk.CTkFrame):
                 return GMTableContainerPage(
                     parent,
                     initial_state=definition.state,
+                    add_menu_options=getattr(self, "_add_menu_options", []),
+                    on_add_panel=lambda option, target_workspace: self._handle_add_option(
+                        option, workspace=target_workspace
+                    ),
+                    panel_builder=self._mount_panel_content,
                     on_layout_changed=self._persist_layout,
                 )
             if kind == "loot_generator":
@@ -1300,9 +1406,11 @@ class GMTableView(ctk.CTkFrame):
         entity_name: str,
         *,
         item: dict | None = None,
+        workspace: GMTableWorkspace | None = None,
     ) -> str | None:
-        """Return the existing entity panel id when present."""
-        layout = self.workspace.serialize()
+        """Return the existing entity panel id when present in a workspace."""
+        target_workspace = workspace or self.workspace
+        layout = target_workspace.serialize()
         lookup_names = self._entity_aliases(
             entity_type, item=item, fallback=entity_name
         )
@@ -1317,8 +1425,15 @@ class GMTableView(ctk.CTkFrame):
                 return str(panel.get("panel_id"))
         return None
 
-    def open_entity_panel(self, entity_type: str, name: str) -> None:
-        """Open a specific entity inside the GM Table."""
+    def open_entity_panel(
+        self,
+        entity_type: str,
+        name: str,
+        *,
+        workspace: GMTableWorkspace | None = None,
+    ) -> None:
+        """Open a specific entity inside the GM Table or a nested container."""
+        target_workspace = workspace or self.workspace
         try:
             item = self._load_entity_item(entity_type, name)
         except Exception as exc:
@@ -1326,11 +1441,13 @@ class GMTableView(ctk.CTkFrame):
             return
 
         label = self._entity_label(entity_type, item, fallback=name)
-        existing = self._find_existing_entity_panel(entity_type, label, item=item)
+        existing = self._find_existing_entity_panel(
+            entity_type, label, item=item, workspace=target_workspace
+        )
         if existing is not None:
-            self.workspace.bring_to_front(existing)
+            target_workspace.bring_to_front(existing)
             preferred = self._preferred_entity_geometry(entity_type)
-            self.workspace.ensure_panel_minimum_size(
+            target_workspace.ensure_panel_minimum_size(
                 existing,
                 preferred["width"],
                 preferred["height"],
@@ -1351,11 +1468,12 @@ class GMTableView(ctk.CTkFrame):
         }
         if entity_type != "Scenarios":
             state["attachment_only"] = True
-        self._create_panel(
+        self._create_panel_in_workspace(
             "entity",
             f"{singular}: {label}",
             state,
             geometry=self._preferred_entity_geometry(entity_type),
+            workspace=workspace,
         )
 
     def _load_scenario_item(self, scenario_name: str) -> dict:
@@ -1368,7 +1486,9 @@ class GMTableView(ctk.CTkFrame):
             return {}
         return item if isinstance(item, dict) else {}
 
-    def _open_scenario_selection_for_panel(self, panel_kind: str) -> None:
+    def _open_scenario_selection_for_panel(
+        self, panel_kind: str, *, workspace: GMTableWorkspace | None = None
+    ) -> None:
         """Ask which scenario should power a scenario-specific panel."""
         wrapper = self.wrappers.get("Scenarios")
         template = self._templates.get("Scenarios")
@@ -1392,17 +1512,19 @@ class GMTableView(ctk.CTkFrame):
                 "Scenarios", item, fallback=selected_name
             )
             if panel_kind == "scene_flow":
-                self._create_panel(
+                self._create_panel_in_selection_workspace(
                     "scene_flow",
                     f"Scene Flow: {scenario_title}",
                     {"scenario_title": scenario_title},
+                    workspace=workspace,
                 )
                 return
             if panel_kind == "handouts":
-                self._create_panel(
+                self._create_panel_in_selection_workspace(
                     "handouts",
                     f"Handouts: {scenario_title}",
                     {"scenario_name": scenario_title},
+                    workspace=workspace,
                 )
 
         view = GenericListSelectionView(
@@ -1410,7 +1532,9 @@ class GMTableView(ctk.CTkFrame):
         )
         view.pack(fill="both", expand=True)
 
-    def _open_entity_selection(self, entity_type: str) -> None:
+    def _open_entity_selection(
+        self, entity_type: str, *, workspace: GMTableWorkspace | None = None
+    ) -> None:
         """Open the generic picker for entity-backed panels."""
         wrapper = self.wrappers.get(entity_type)
         template = self._templates.get(entity_type)
@@ -1431,6 +1555,7 @@ class GMTableView(ctk.CTkFrame):
             self.open_entity_panel(
                 selected_type,
                 self._entity_label(selected_type, item, fallback=selected_name),
+                workspace=workspace,
             )
 
         view = GenericListSelectionView(
@@ -1438,7 +1563,9 @@ class GMTableView(ctk.CTkFrame):
         )
         view.pack(fill="both", expand=True)
 
-    def _open_puzzle_selection(self) -> None:
+    def _open_puzzle_selection(
+        self, *, workspace: GMTableWorkspace | None = None
+    ) -> None:
         """Open the puzzle selector for a display panel."""
         popup = ctk.CTkToplevel(self)
         popup.title("Select Puzzle")
@@ -1449,10 +1576,11 @@ class GMTableView(ctk.CTkFrame):
 
         def _open_selected(_entity_type: str, selected_name: str) -> None:
             popup.destroy()
-            self._create_panel(
+            self._create_panel_in_selection_workspace(
                 "puzzle_display",
                 f"Puzzle Display: {selected_name}",
                 {"puzzle_name": selected_name},
+                workspace=workspace,
             )
 
         view = GenericListSelectionView(

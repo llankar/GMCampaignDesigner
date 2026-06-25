@@ -322,7 +322,9 @@ def test_handle_add_option_routes_handouts_to_scenario_selection() -> None:
     """Add menu handouts option should ask which scenario powers the panel."""
     captured = []
     view = GMTableView.__new__(GMTableView)
-    view._open_scenario_selection_for_panel = lambda panel_kind: captured.append(panel_kind)
+    view._open_scenario_selection_for_panel = lambda panel_kind: captured.append(
+        panel_kind
+    )
 
     GMTableView._handle_add_option(view, "Handouts")
 
@@ -356,7 +358,10 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     assert isinstance(mounted, _DummyHandoutsPage)
     assert captured["kwargs"]["scenario_name"] == "Night Run"
     assert captured["kwargs"]["scenario_item"] == {"Title": "Night Run"}
-    assert captured["kwargs"]["initial_state"] == {"scenario_name": "Night Run", "query": "map"}
+    assert captured["kwargs"]["initial_state"] == {
+        "scenario_name": "Night Run",
+        "query": "map",
+    }
 
 
 def test_seed_default_panels_opens_table_level_panels() -> None:
@@ -628,7 +633,9 @@ def test_filter_attachmentless_entity_panels_preserves_normal_entity_panels() ->
     assert [panel["panel_id"] for panel in filtered["panels"]] == ["normal-entity"]
 
 
-def test_filter_attachmentless_entity_panels_keeps_missing_entities_for_fallback() -> None:
+def test_filter_attachmentless_entity_panels_keeps_missing_entities_for_fallback() -> (
+    None
+):
     """Missing saved entities should remain so the unavailable fallback can explain it."""
     view = GMTableView.__new__(GMTableView)
 
@@ -750,6 +757,47 @@ def test_container_window_restores_explicitly_empty_layout_without_seeding() -> 
     GMTableContainerPage._restore_or_seed_layout(page)
 
     assert calls == [("restore", {"panels": []})]
+
+
+def test_container_add_panel_menu_routes_choice_to_nested_workspace() -> None:
+    """Container Add Panel should add main-table panel types to the nested workspace."""
+    from modules.scenarios.gm_table.container_window import GMTableContainerPage
+
+    calls = []
+    workspace = object()
+    page = GMTableContainerPage.__new__(GMTableContainerPage)
+    page.workspace = workspace
+    page._on_add_panel = lambda option, target_workspace: calls.append(
+        (option, target_workspace)
+    )
+
+    GMTableContainerPage._handle_add_panel_option(page, "Random Tables")
+
+    assert calls == [("Random Tables", workspace)]
+
+
+def test_container_mounts_main_table_panel_types_with_shared_builder() -> None:
+    """Container workspaces should render non-container panel definitions via GM Table builder."""
+    from modules.scenarios.gm_table.container_window import GMTableContainerPage
+
+    parent = object()
+    definition = gm_table_view_module.PanelDefinition(
+        panel_id="panel-random-tables",
+        kind="random_tables",
+        title="Random Tables",
+        state={},
+    )
+    rendered = object()
+    page = GMTableContainerPage.__new__(GMTableContainerPage)
+    page._panel_builder = lambda host, panel_definition: (
+        host,
+        panel_definition,
+        rendered,
+    )
+
+    mounted = GMTableContainerPage._mount_container_panel(page, parent, definition)
+
+    assert mounted == (parent, definition, rendered)
 
 
 def test_handle_add_option_creates_container_window_panel() -> None:
