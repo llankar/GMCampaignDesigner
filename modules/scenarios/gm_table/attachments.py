@@ -13,7 +13,6 @@ from modules.helpers.portrait_helper import (
 )
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
-MEDIA_FIELDS = ("Portrait", "portrait", "Image", "image")
 ATTACHMENT_FIELDS = ("Attachment", "Attachments", "attachment", "attachments")
 
 
@@ -42,17 +41,12 @@ def _split_attachment_value(value) -> list[str]:
 
 
 def _candidate_values(record: dict) -> Iterable[tuple[str, str]]:
-    """Yield raw candidate paths from known media and attachment fields."""
+    """Yield raw candidate paths from explicit attachment fields only."""
     if not isinstance(record, dict):
         return
-    for field_name in (*MEDIA_FIELDS, *ATTACHMENT_FIELDS):
+    for field_name in ATTACHMENT_FIELDS:
         value = record.get(field_name)
-        parser = (
-            parse_portrait_value
-            if field_name in MEDIA_FIELDS
-            else _split_attachment_value
-        )
-        for path in parser(value):
+        for path in _split_attachment_value(value):
             cleaned = str(path or "").strip()
             if cleaned:
                 yield field_name, cleaned
@@ -68,7 +62,7 @@ def _attachment_label(path: str, resolved_path: str | None) -> str:
 def collect_entity_attachments(
     record: dict, *, campaign_dir: str | None = None
 ) -> list[EntityAttachment]:
-    """Collect de-duplicated media/attachment paths from an entity record."""
+    """Collect de-duplicated paths from explicit entity attachment fields."""
     base_dir = campaign_dir or ConfigHelper.get_campaign_dir()
     attachments: list[EntityAttachment] = []
     seen: set[str] = set()
@@ -92,5 +86,5 @@ def collect_entity_attachments(
 
 
 def entity_has_attachments(record: dict, *, campaign_dir: str | None = None) -> bool:
-    """Return whether an entity has at least one linked attachment/media path."""
+    """Return whether an entity has at least one explicit attachment path."""
     return bool(collect_entity_attachments(record, campaign_dir=campaign_dir))

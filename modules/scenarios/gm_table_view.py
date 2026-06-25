@@ -1457,7 +1457,7 @@ class GMTableView(ctk.CTkFrame):
         if entity_type != "Scenarios" and not entity_has_attachments(item):
             messagebox.showinfo(
                 "GM Table",
-                f"{label} has no linked portrait, image, or attachment to display on the table.",
+                f"{label} has no linked attachment to display on the table.",
             )
             return
 
