@@ -1431,6 +1431,7 @@ class GMTableView(ctk.CTkFrame):
         name: str,
         *,
         workspace: GMTableWorkspace | None = None,
+        attachment_only: bool = False,
     ) -> None:
         """Open a specific entity inside the GM Table or a nested container."""
         target_workspace = workspace or self.workspace
@@ -1441,6 +1442,7 @@ class GMTableView(ctk.CTkFrame):
             return
 
         label = self._entity_label(entity_type, item, fallback=name)
+        has_attachments = entity_type != "Scenarios" and entity_has_attachments(item)
         existing = self._find_existing_entity_panel(
             entity_type, label, item=item, workspace=target_workspace
         )
@@ -1454,19 +1456,12 @@ class GMTableView(ctk.CTkFrame):
             )
             return
 
-        if entity_type != "Scenarios" and not entity_has_attachments(item):
-            messagebox.showinfo(
-                "GM Table",
-                f"{label} has no linked attachment to display on the table.",
-            )
-            return
-
         singular = entity_type[:-1] if entity_type.endswith("s") else entity_type
         state = {
             "entity_type": entity_type,
             "entity_name": label,
         }
-        if entity_type != "Scenarios":
+        if has_attachments and attachment_only:
             state["attachment_only"] = True
         self._create_panel_in_workspace(
             "entity",
