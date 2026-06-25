@@ -102,3 +102,63 @@ def test_layout_store_round_trips_table_layout(monkeypatch, tmp_path) -> None:
 
     assert loaded["panels"][0]["title"] == "Table Notes"
     assert loaded["panels"][0]["state"]["text"] == "Shared table context"
+
+
+def test_layout_store_writes_table_first_schema(monkeypatch, tmp_path) -> None:
+    """New GM Table persistence should use table ids as the primary layout keys."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+
+    store = GMTableLayoutStore()
+    store.save_table_layout("table_3", {"panels": []})
+
+    assert store.data == {"tables": {"table_3": {"panels": []}}, "global": {}}
+
+
+def test_layout_store_can_clear_table_layout(monkeypatch, tmp_path) -> None:
+    """Layouts should be removable per stable table id."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+
+    store = GMTableLayoutStore()
+    store.save_table_layout("table_4", {"panels": [{"panel_id": "p1"}]})
+    store.clear_table_layout("table_4")
+
+    assert GMTableLayoutStore().get_table_layout("table_4") == {}
+
+
+def test_layout_store_persists_custom_table_names(monkeypatch, tmp_path) -> None:
+    """Custom table names should live in global table_names with defaults as fallback."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+
+    store = GMTableLayoutStore()
+    assert store.get_table_name("table_1") == "Main"
+    assert store.get_table_name("table_6") == "Table6"
+
+    store.save_table_name("table_2", "Shadow Crew")
+    reloaded = GMTableLayoutStore()
+
+    assert reloaded.get_table_name("table_2") == "Shadow Crew"
+    assert reloaded.data["global"]["table_names"] == {"table_2": "Shadow Crew"}
+
+
+def test_layout_store_clears_default_table_names_from_global(monkeypatch, tmp_path) -> None:
+    """Saving a default or blank name should remove custom table name metadata."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+
+    store = GMTableLayoutStore()
+    store.save_table_name("table_5", "Dungeon Team")
+    store.save_table_name("table_5", "Table5")
+
+    assert GMTableLayoutStore().get_table_name("table_5") == "Table5"
+    assert GMTableLayoutStore().get_global_setting("table_names") == {}

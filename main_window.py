@@ -84,6 +84,7 @@ from modules.events.services.calendar_state_store import CalendarStateStore
 from modules.generic.generic_list_view import GenericListView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
+from modules.scenarios.gm_table.layout_store import GMTableLayoutStore
 from modules.scenarios.gm_table.table_registry import (
     DEFAULT_GM_TABLE_ID,
     GM_TABLES,
@@ -2940,7 +2941,8 @@ class MainWindow(ctk.CTk):
         """Open a virtual tabletop window without requiring scenario selection."""
         del show_empty_message
         table_id = self._normalize_gm_table_id(table_id)
-        table_name = get_table_name(table_id)
+        layout_store = GMTableLayoutStore()
+        table_name = layout_store.get_table_name(table_id)
 
         existing_window = self._focus_gm_table_window(table_id)
         if existing_window is not None:
@@ -2971,6 +2973,7 @@ class MainWindow(ctk.CTk):
                 table_id=table_id,
                 table_name=table_name,
                 root_app=self,
+                layout_store=layout_store,
             )
             view.pack(fill="both", expand=True)
             window._gm_table_view = view
