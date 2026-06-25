@@ -23,10 +23,16 @@ from modules.objects.object_shelf_panel import create_object_shelf_panel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
+from modules.scenarios.gm_table.attachments import (
+    collect_entity_attachments,
+    entity_has_attachments,
+)
 from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
 from modules.scenarios.gm_table.pages import (
+    GMTableAttachmentGallery,
     GMTableHostedPage,
     GMTableImageLibraryPage,
+    GMTableImagePage,
     GMTableNotePage,
 )
 from modules.scenarios.gm_table.workspace import (
@@ -43,7 +49,6 @@ from modules.ui.chatbot_dialog import (
     open_chatbot_dialog,
 )
 from modules.whiteboard.controllers.whiteboard_controller import WhiteboardController
-
 
 ENTITY_TYPES = (
     "Factions",
@@ -125,6 +130,7 @@ class GMTableView(ctk.CTkFrame):
             "Map Tool",
             "Scene Flow",
             "Image Library",
+            "Image from Library",
             "Handouts",
             "Loot Generator",
             "Object Shelf",
@@ -380,11 +386,37 @@ class GMTableView(ctk.CTkFrame):
     def _restore_or_seed_layout(self) -> None:
         """Restore saved workspace or create a starter tabletop."""
         layout = self.layout_store.get_scenario_layout(self.scenario_name)
+        layout = self._filter_attachmentless_entity_panels(layout)
         if layout.get("panels"):
             self.workspace.restore(layout)
         else:
             self._seed_default_panels()
         self._workspace_loaded = True
+
+    def _filter_attachmentless_entity_panels(self, layout: dict) -> dict:
+        """Drop saved non-scenario entity panels that no longer have attachments."""
+        if not isinstance(layout, dict):
+            return {}
+        filtered = dict(layout)
+        panels = []
+        for panel in list(layout.get("panels") or []):
+            if not isinstance(panel, dict) or panel.get("kind") != "entity":
+                panels.append(panel)
+                continue
+            state = panel.get("state") or {}
+            entity_type = str(state.get("entity_type") or "")
+            entity_name = str(state.get("entity_name") or "")
+            if entity_type == "Scenarios":
+                panels.append(panel)
+                continue
+            try:
+                item = self._load_entity_item(entity_type, entity_name)
+            except Exception:
+                continue
+            if entity_has_attachments(item):
+                panels.append(panel)
+        filtered["panels"] = panels
+        return filtered
 
     def _seed_default_panels(self) -> None:
         """Build the default workspace focused on scenario and handouts."""
@@ -479,6 +511,37 @@ class GMTableView(ctk.CTkFrame):
         )
         self.workspace.add_panel(definition, geometry=geometry)
         return definition.panel_id
+
+    def _add_image_panel_from_library_result(self, image_result) -> None:
+        """Create a floating image window from an image-library selection."""
+        image_path = str(getattr(image_result, "path", "") or "").strip()
+        if not image_path:
+            messagebox.showerror("GM Table", "The selected image has no usable path.")
+            return
+        image_title = str(getattr(image_result, "name", "") or "").strip() or "Image"
+        self._create_panel(
+            "image",
+            image_title,
+            {"image_path": image_path, "image_title": image_title},
+        )
+
+    def _open_image_library_for_table_image(self) -> None:
+        """Open the shared image library dialog in attach-to-table mode."""
+        try:
+            from modules.ui.image_library.dialogs.library_browser_dialog import (
+                ImageLibraryBrowserDialog,
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Image Library", f"Image library is unavailable: {exc}"
+            )
+            return
+
+        dialog = ImageLibraryBrowserDialog(
+            self.winfo_toplevel(),
+            on_attach_to_entity=self._add_image_panel_from_library_result,
+        )
+        dialog.title("Add Image to GM Table")
 
     def _preferred_entity_geometry(self, entity_type: str) -> dict[str, int]:
         """Return the default geometry for an entity panel."""
@@ -697,6 +760,9 @@ class GMTableView(ctk.CTkFrame):
         if option == "Image Library":
             self._create_panel("image_library", "Image Library", {})
             return
+        if option == "Image from Library":
+            self._open_image_library_for_table_image()
+            return
         if option == "Handouts":
             self._create_panel(
                 "handouts", "Handouts", {"scenario_name": self.scenario_name}
@@ -781,7 +847,17 @@ class GMTableView(ctk.CTkFrame):
                     ),
                 )
             if kind == "image_library":
-                return GMTableImageLibraryPage(parent, initial_state=definition.state)
+                return GMTableImageLibraryPage(
+                    parent,
+                    initial_state=definition.state,
+                    on_attach_to_table=self._add_image_panel_from_library_result,
+                )
+            if kind == "image":
+                return GMTableImagePage(
+                    parent,
+                    image_path=str(definition.state.get("image_path") or ""),
+                    title=str(definition.state.get("image_title") or definition.title),
+                )
             if kind == "handouts":
                 return GMTableHandoutsPage(
                     parent,
@@ -944,6 +1020,26 @@ class GMTableView(ctk.CTkFrame):
         entity_type = state.get("entity_type")
         entity_name = state.get("entity_name")
         item = self._load_entity_item(entity_type, entity_name)
+        attachments = collect_entity_attachments(item)
+
+        if attachments:
+            host.grid_rowconfigure(0, weight=1)
+            host.grid_columnconfigure(0, weight=1)
+            scrollable_host = build_scroll_host(host)
+            attachment_gallery = GMTableAttachmentGallery(
+                scrollable_host,
+                attachments=attachments,
+            )
+            attachment_gallery.pack(fill="x", padx=8, pady=(8, 12))
+            detail_frame = create_entity_detail_frame(
+                entity_type,
+                item,
+                master=scrollable_host,
+                open_entity_callback=self.open_entity_panel,
+                spotlight_only=False,
+            )
+            detail_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+            return scrollable_host
 
         if self._uses_readable_entity_detail(entity_type):
             scrollable_host = build_scroll_host(host)
@@ -1070,6 +1166,13 @@ class GMTableView(ctk.CTkFrame):
                 existing,
                 preferred["width"],
                 preferred["height"],
+            )
+            return
+
+        if entity_type != "Scenarios" and not entity_has_attachments(item):
+            messagebox.showinfo(
+                "GM Table",
+                f"{label} has no linked portrait, image, or attachment to display on the table.",
             )
             return
 
