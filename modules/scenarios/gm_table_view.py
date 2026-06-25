@@ -490,7 +490,7 @@ class GMTableView(ctk.CTkFrame):
         self._workspace_loaded = True
 
     def _filter_attachmentless_entity_panels(self, layout: dict) -> dict:
-        """Drop saved non-scenario entity panels that no longer have attachments."""
+        """Drop only saved attachment-gallery panels that no longer have attachments."""
         if not isinstance(layout, dict):
             return {}
         filtered = dict(layout)
@@ -500,14 +500,15 @@ class GMTableView(ctk.CTkFrame):
                 panels.append(panel)
                 continue
             state = panel.get("state") or {}
-            entity_type = str(state.get("entity_type") or "")
-            entity_name = str(state.get("entity_name") or "")
-            if entity_type == "Scenarios":
+            if not isinstance(state, dict) or state.get("attachment_only") is not True:
                 panels.append(panel)
                 continue
+            entity_type = str(state.get("entity_type") or "")
+            entity_name = str(state.get("entity_name") or "")
             try:
                 item = self._load_entity_item(entity_type, entity_name)
             except Exception:
+                panels.append(panel)
                 continue
             if entity_has_attachments(item):
                 panels.append(panel)
@@ -1114,7 +1115,12 @@ class GMTableView(ctk.CTkFrame):
         """Build an entity detail page."""
         entity_type = state.get("entity_type")
         entity_name = state.get("entity_name")
-        item = self._load_entity_item(entity_type, entity_name)
+        try:
+            item = self._load_entity_item(entity_type, entity_name)
+        except Exception:
+            return self._build_unavailable_entity_content(
+                host, entity_type=entity_type, entity_name=entity_name
+            )
         attachments = collect_entity_attachments(item)
 
         if attachments:
@@ -1156,6 +1162,38 @@ class GMTableView(ctk.CTkFrame):
             spotlight_only=True,
         )
         frame.grid(row=0, column=0, sticky="nsew")
+        return frame
+
+    def _build_unavailable_entity_content(
+        self, host, *, entity_type: str | None, entity_name: str | None
+    ):
+        """Build a clear fallback for saved entity panels whose record is gone."""
+        host.grid_rowconfigure(0, weight=1)
+        host.grid_columnconfigure(0, weight=1)
+        label = str(entity_name or "Unnamed").strip() or "Unnamed"
+        type_label = str(entity_type or "entity").strip() or "entity"
+        frame = ctk.CTkFrame(host, fg_color="transparent")
+        frame.grid(row=0, column=0, sticky="nsew", padx=24, pady=24)
+        frame.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            frame,
+            text="Entity unavailable",
+            text_color=TABLE_PALETTE["text"],
+            font=ctk.CTkFont(size=18, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew")
+        ctk.CTkLabel(
+            frame,
+            text=(
+                f"The saved panel points to {type_label} '{label}', "
+                "but that record could not be found. The panel was kept so you "
+                "can decide whether to close it or recreate the entity."
+            ),
+            text_color=TABLE_PALETTE["muted"],
+            justify="left",
+            wraplength=460,
+            anchor="w",
+        ).grid(row=1, column=0, sticky="ew", pady=(10, 0))
         return frame
 
     @staticmethod
@@ -1272,13 +1310,16 @@ class GMTableView(ctk.CTkFrame):
             return
 
         singular = entity_type[:-1] if entity_type.endswith("s") else entity_type
+        state = {
+            "entity_type": entity_type,
+            "entity_name": label,
+        }
+        if entity_type != "Scenarios":
+            state["attachment_only"] = True
         self._create_panel(
             "entity",
             f"{singular}: {label}",
-            {
-                "entity_type": entity_type,
-                "entity_name": label,
-            },
+            state,
             geometry=self._preferred_entity_geometry(entity_type),
         )
 
