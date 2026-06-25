@@ -1502,13 +1502,38 @@ class MainWindow(ctk.CTk):
         ):
             self.current_gm_table = None
 
+    def rename_gm_table(self, table_id: str, new_name: str) -> None:
+        """Persist a GM Table display name and synchronize every launcher label."""
+        table_id = self._normalize_gm_table_id(table_id)
+        GMTableLayoutStore().save_table_name(table_id, new_name)
+        self.refresh_gm_table_window_names()
+        self._refresh_gm_table_launcher_labels()
+
+    def _refresh_gm_table_launcher_labels(self) -> None:
+        """Refresh future sidebar or launcher labels that expose GM Table names."""
+        refresh_callbacks = (
+            "refresh_gm_table_launcher_labels",
+            "refresh_gm_table_sidebar_labels",
+            "refresh_gm_table_labels",
+        )
+        for callback_name in refresh_callbacks:
+            callback = getattr(self, callback_name, None)
+            if callable(callback):
+                try:
+                    callback()
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to refresh GM Table launcher labels via '{callback_name}': {exc}",
+                        func_name="MainWindow._refresh_gm_table_launcher_labels",
+                    )
+
     def refresh_gm_table_window_names(self) -> None:
         """Refresh titles and switch labels in every open GM Table window."""
+        table_name_store = GMTableLayoutStore()
         for table in GM_TABLES:
             window = self._get_gm_table_window(table.table_id)
             if window is None:
                 continue
-            table_name_store = GMTableLayoutStore()
             view = getattr(window, "_gm_table_view", None)
             if view is not None and hasattr(view, "refresh_table_names"):
                 view.layout_store = table_name_store
