@@ -9,6 +9,7 @@ from typing import Callable
 
 import customtkinter as ctk
 from modules.helpers import theme_manager
+from modules.helpers.logging_helper import log_warning
 from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
@@ -2273,8 +2274,11 @@ class GMTableWorkspace(ctk.CTkFrame):
         if payload is not None and hasattr(payload, "close"):
             try:
                 payload.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                log_warning(
+                    f"Unable to close GM Table panel payload '{panel_id}': {exc}",
+                    func_name="GMTableWorkspace.remove_panel",
+                )
         if panel is not None:
             panel.destroy()
         self.clear_snap_preview()
@@ -2842,8 +2846,11 @@ class GMTableWorkspace(ctk.CTkFrame):
                     dynamic_state = payload.get_state() or {}
                     if isinstance(dynamic_state, dict):
                         snapshot.update(dynamic_state)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log_warning(
+                        f"Unable to collect GM Table panel state for '{definition.title}' ({definition.panel_id}): {exc}",
+                        func_name="GMTableWorkspace.serialize_layout",
+                    )
             panels.append(
                 {
                     "panel_id": definition.panel_id,

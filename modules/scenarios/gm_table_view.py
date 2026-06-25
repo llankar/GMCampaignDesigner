@@ -14,7 +14,7 @@ from modules.generic.entity_detail_factory import create_entity_detail_frame
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.layout_scheduler import LayoutSettleScheduler
-from modules.helpers.logging_helper import log_info, log_warning
+from modules.helpers.logging_helper import log_exception, log_info, log_warning
 from modules.helpers.template_loader import load_template as load_entity_template
 from modules.maps.controllers.display_map_controller import DisplayMapController
 from modules.maps.world_map_view import WorldMapPanel
@@ -385,8 +385,11 @@ class GMTableView(ctk.CTkFrame):
             top = self.winfo_toplevel()
             top.title(f"GM Table - {self.table_name}")
             top._gm_table_name = self.table_name
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to refresh GM Table window title for '{self.table_name}': {exc}",
+                func_name="GMTableView.refresh_table_names",
+            )
 
     def _open_rename_dialog(self) -> None:
         """Open a small dialog for editing this table display name."""
@@ -744,8 +747,11 @@ class GMTableView(ctk.CTkFrame):
             if target_map and hasattr(payload, "load_map"):
                 try:
                     payload.load_map(target_map, push_history=False)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log_exception(
+                        f"Unable to load world map '{target_map}' in existing GM Table panel: {exc}",
+                        func_name="GMTableView._focus_or_open_world_map_panel",
+                    )
             return panel_id
         return self._create_panel(
             "world_map",
@@ -769,8 +775,11 @@ class GMTableView(ctk.CTkFrame):
             if target_map and hasattr(payload, "open_map_by_name"):
                 try:
                     payload.open_map_by_name(target_map)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log_exception(
+                        f"Unable to load map '{target_map}' in existing GM Table map tool panel: {exc}",
+                        func_name="GMTableView._focus_or_open_map_tool_panel",
+                    )
             return panel_id
         return self._create_panel(
             "map_tool",
@@ -1039,8 +1048,11 @@ class GMTableView(ctk.CTkFrame):
         if map_name:
             try:
                 widget.load_map(map_name, push_history=False)
-            except Exception:
-                pass
+            except Exception as exc:
+                log_exception(
+                    f"Unable to restore world map '{map_name}' in GM Table panel: {exc}",
+                    func_name="GMTableView._build_world_map_content",
+                )
         return widget
 
     def _build_map_tool_content(self, host, state: dict):
@@ -1055,8 +1067,11 @@ class GMTableView(ctk.CTkFrame):
         if map_name and hasattr(controller, "open_map_by_name"):
             try:
                 controller.open_map_by_name(map_name)
-            except Exception:
-                pass
+            except Exception as exc:
+                log_exception(
+                    f"Unable to restore map tool map '{map_name}' in GM Table panel: {exc}",
+                    func_name="GMTableView._build_map_tool_content",
+                )
         return controller
 
     def _build_scene_flow_content(self, host, state: dict):
@@ -1407,14 +1422,23 @@ class GMTableView(ctk.CTkFrame):
         try:
             if self._workspace_loaded:
                 self._save_layout_snapshot()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_exception(
+                f"Unable to save GM Table layout during teardown: {exc}",
+                func_name="GMTableView.destroy",
+            )
         try:
             self._layout_settle_scheduler.cancel_all()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to cancel GM Table layout settle jobs during teardown: {exc}",
+                func_name="GMTableView.destroy",
+            )
         try:
             self.workspace.dispose()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_warning(
+                f"Unable to dispose GM Table workspace during teardown: {exc}",
+                func_name="GMTableView.destroy",
+            )
         super().destroy()
