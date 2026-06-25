@@ -338,6 +338,78 @@ def test_build_object_entity_content_uses_scrollable_full_detail(monkeypatch) ->
     assert frame.pack_calls == [{"fill": "both", "expand": True}]
 
 
+def test_build_entity_content_with_attachments_hides_portrait_spotlight(monkeypatch) -> None:
+    """Attachment-backed evidence cards should show attachments without an empty portrait panel."""
+    captured = {}
+
+    class _DummyWidget:
+        def __init__(self, *args, **kwargs) -> None:
+            captured.setdefault("gallery_kwargs", kwargs)
+            self.pack_calls = []
+
+        def pack(self, **kwargs):
+            self.pack_calls.append(kwargs)
+
+    scroll_host = object()
+
+    def _fake_scroll_host(host):
+        captured["scroll_parent"] = host
+        return scroll_host
+
+    def _fake_factory(entity_type, item, *, master, open_entity_callback, **kwargs):
+        captured["entity_type"] = entity_type
+        captured["item"] = item
+        captured["master"] = master
+        captured["callback"] = open_entity_callback
+        captured["kwargs"] = kwargs
+        return _DummyWidget()
+
+    view = GMTableView.__new__(GMTableView)
+    expected_item = {
+        "Name": "Corporations Informations",
+        "Attachment": "assets/corp.png",
+    }
+    view._load_entity_item = lambda _entity_type, _name: expected_item
+
+    def callback(*args, **kwargs):
+        return None
+
+    view.open_entity_panel = callback
+    host = SimpleNamespace(
+        grid_rowconfigure=lambda *args, **kwargs: captured.setdefault(
+            "row", (args, kwargs)
+        ),
+        grid_columnconfigure=lambda *args, **kwargs: captured.setdefault(
+            "column", (args, kwargs)
+        ),
+    )
+
+    monkeypatch.setattr(gm_table_view_module, "build_scroll_host", _fake_scroll_host)
+    monkeypatch.setattr(gm_table_view_module, "GMTableAttachmentGallery", _DummyWidget)
+    attachment = object()
+    monkeypatch.setattr(
+        gm_table_view_module,
+        "collect_entity_attachments",
+        lambda _item: [attachment],
+    )
+    monkeypatch.setattr(
+        gm_table_view_module, "create_entity_detail_frame", _fake_factory
+    )
+
+    frame = GMTableView._build_entity_content(
+        view,
+        host,
+        {"entity_type": "Informations", "entity_name": "Corporations Informations"},
+    )
+
+    assert frame is scroll_host
+    assert captured["entity_type"] == "Informations"
+    assert captured["item"] is expected_item
+    assert captured["master"] is scroll_host
+    assert captured["callback"] is callback
+    assert captured["kwargs"] == {"spotlight_only": False, "show_spotlight": False}
+    assert captured["gallery_kwargs"] == {"attachments": [attachment]}
+
 def test_context_menu_handler_resolution_is_safe_without_gm_screen_api() -> None:
     """GM Table hosts without a context-menu API should not crash the detail factory."""
 
