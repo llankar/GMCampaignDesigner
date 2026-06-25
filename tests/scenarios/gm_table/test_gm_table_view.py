@@ -653,3 +653,142 @@ def test_filter_attachmentless_entity_panels_keeps_missing_entities_for_fallback
     filtered = GMTableView._filter_attachmentless_entity_panels(view, layout)
 
     assert filtered["panels"] == layout["panels"]
+
+
+def test_resolve_default_panel_size_supports_container_window() -> None:
+    """Container windows should open large enough to organize nested windows."""
+    assert resolve_default_panel_size("container_window") == (820, 580)
+
+
+def test_resolve_default_panel_size_supports_container_internal_panels() -> None:
+    """Container workspace cards should restore at their compact intended sizes."""
+    assert resolve_default_panel_size("container_card") == (360, 260)
+    assert resolve_default_panel_size("container_note") == (420, 300)
+
+
+def test_container_window_counts_existing_panels_without_serializing() -> None:
+    """Adding container content should avoid serializing every nested payload."""
+    from modules.scenarios.gm_table.container_window import GMTableContainerPage
+
+    captured = []
+
+    class _Workspace:
+        def list_panels(self, *, kinds=None, include_minimized=True):
+            assert kinds == {"container_card"}
+            assert include_minimized is True
+            return [{"panel_id": "one"}, {"panel_id": "two"}]
+
+        def serialize(self):  # pragma: no cover - should not be reached
+            raise AssertionError("add_window should not serialize workspace state")
+
+        def add_panel(self, definition, *, geometry=None):
+            captured.append(
+                (definition.kind, definition.title, definition.state, geometry)
+            )
+
+    page = GMTableContainerPage.__new__(GMTableContainerPage)
+    page.workspace = _Workspace()
+
+    GMTableContainerPage.add_window(page)
+
+    assert captured == [
+        (
+            "container_card",
+            "Window 3",
+            {"body": "Use this card to group related GM table material."},
+            {"width": 360, "height": 260},
+        )
+    ]
+
+
+def test_container_note_counts_existing_panels_without_serializing() -> None:
+    """Adding container notes should avoid serializing every nested payload."""
+    from modules.scenarios.gm_table.container_window import GMTableContainerPage
+
+    captured = []
+
+    class _Workspace:
+        def list_panels(self, *, kinds=None, include_minimized=True):
+            assert kinds == {"container_note"}
+            assert include_minimized is True
+            return [{"panel_id": "note-one"}]
+
+        def serialize(self):  # pragma: no cover - should not be reached
+            raise AssertionError("add_note should not serialize workspace state")
+
+        def add_panel(self, definition, *, geometry=None):
+            captured.append(
+                (definition.kind, definition.title, definition.state, geometry)
+            )
+
+    page = GMTableContainerPage.__new__(GMTableContainerPage)
+    page.workspace = _Workspace()
+
+    GMTableContainerPage.add_note(page)
+
+    assert captured == [
+        ("container_note", "Note 2", {"text": ""}, {"width": 420, "height": 300})
+    ]
+
+
+def test_container_window_restores_explicitly_empty_layout_without_seeding() -> None:
+    """A saved empty nested layout should not recreate starter cards on reload."""
+    from modules.scenarios.gm_table.container_window import (
+        CONTAINER_LAYOUT_STATE_KEY,
+        GMTableContainerPage,
+    )
+
+    calls = []
+    page = GMTableContainerPage.__new__(GMTableContainerPage)
+    page._initial_state = {CONTAINER_LAYOUT_STATE_KEY: {"panels": []}}
+    page.workspace = SimpleNamespace(
+        restore=lambda layout: calls.append(("restore", layout))
+    )
+    page.add_window = lambda **kwargs: calls.append(("window", kwargs))
+    page.add_note = lambda **kwargs: calls.append(("note", kwargs))
+
+    GMTableContainerPage._restore_or_seed_layout(page)
+
+    assert calls == [("restore", {"panels": []})]
+
+
+def test_handle_add_option_creates_container_window_panel() -> None:
+    """Add menu container option should create the nested workspace panel."""
+    captured = []
+    view = GMTableView.__new__(GMTableView)
+    view._create_panel = lambda kind, title, state: captured.append(
+        (kind, title, state)
+    )
+
+    GMTableView._handle_add_option(view, "Container Window")
+
+    assert captured == [("container_window", "Container Window", {})]
+
+
+def test_mount_panel_content_builds_container_window(monkeypatch) -> None:
+    """Container panel should mount the modular nested workspace page."""
+    captured = {}
+
+    class _DummyContainerPage:
+        def __init__(self, parent, **kwargs) -> None:
+            captured["parent"] = parent
+            captured["kwargs"] = kwargs
+
+    monkeypatch.setattr(
+        gm_table_view_module, "GMTableContainerPage", _DummyContainerPage
+    )
+
+    view = GMTableView.__new__(GMTableView)
+    view._persist_layout = lambda: None
+    definition = gm_table_view_module.PanelDefinition(
+        panel_id="panel-container",
+        kind="container_window",
+        title="Container Window",
+        state={"container_layout": {"panels": []}},
+    )
+
+    mounted = GMTableView._mount_panel_content(view, object(), definition)
+
+    assert isinstance(mounted, _DummyContainerPage)
+    assert captured["kwargs"]["initial_state"] == {"container_layout": {"panels": []}}
+    assert captured["kwargs"]["on_layout_changed"] == view._persist_layout
