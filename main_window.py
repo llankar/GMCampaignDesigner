@@ -1479,6 +1479,25 @@ class MainWindow(ctk.CTk):
         ):
             self.current_gm_table = None
 
+    def refresh_gm_table_window_names(self) -> None:
+        """Refresh titles and switch labels in every open GM Table window."""
+        for table in GM_TABLES:
+            window = self._get_gm_table_window(table.table_id)
+            if window is None:
+                continue
+            table_name_store = GMTableLayoutStore()
+            view = getattr(window, "_gm_table_view", None)
+            if view is not None and hasattr(view, "refresh_table_names"):
+                view.layout_store = table_name_store
+                view.refresh_table_names()
+            else:
+                table_name = table_name_store.get_table_name(table.table_id)
+                try:
+                    window.title(f"GM Table - {table_name}")
+                    window._gm_table_name = table_name
+                except Exception:
+                    pass
+
     def _close_gm_table_window(self, table_id: str = DEFAULT_GM_TABLE_ID) -> None:
         """Close the detached GM Table window for a single table id if it is open."""
         table_id = self._normalize_gm_table_id(table_id)
