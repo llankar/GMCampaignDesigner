@@ -598,3 +598,58 @@ def test_hosted_page_keeps_already_managed_payload_in_place() -> None:
     GMTableHostedPage._grid_payload_if_needed(page)
 
     assert payload.grid_calls == []
+
+
+def test_filter_attachmentless_entity_panels_preserves_normal_entity_panels() -> None:
+    """Only attachment-only entity panels should be eligible for attachment filtering."""
+    view = GMTableView.__new__(GMTableView)
+    view._load_entity_item = lambda _entity_type, _name: {"Name": "No Media"}
+    layout = {
+        "panels": [
+            {
+                "panel_id": "normal-entity",
+                "kind": "entity",
+                "state": {"entity_type": "NPCs", "entity_name": "No Media"},
+            },
+            {
+                "panel_id": "attachment-gallery",
+                "kind": "entity",
+                "state": {
+                    "entity_type": "NPCs",
+                    "entity_name": "No Media",
+                    "attachment_only": True,
+                },
+            },
+        ]
+    }
+
+    filtered = GMTableView._filter_attachmentless_entity_panels(view, layout)
+
+    assert [panel["panel_id"] for panel in filtered["panels"]] == ["normal-entity"]
+
+
+def test_filter_attachmentless_entity_panels_keeps_missing_entities_for_fallback() -> None:
+    """Missing saved entities should remain so the unavailable fallback can explain it."""
+    view = GMTableView.__new__(GMTableView)
+
+    def _missing(_entity_type, _name):
+        raise KeyError("missing")
+
+    view._load_entity_item = _missing
+    layout = {
+        "panels": [
+            {
+                "panel_id": "missing-gallery",
+                "kind": "entity",
+                "state": {
+                    "entity_type": "NPCs",
+                    "entity_name": "Gone",
+                    "attachment_only": True,
+                },
+            }
+        ]
+    }
+
+    filtered = GMTableView._filter_attachmentless_entity_panels(view, layout)
+
+    assert filtered["panels"] == layout["panels"]
