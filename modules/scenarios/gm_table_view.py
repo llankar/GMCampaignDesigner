@@ -23,8 +23,8 @@ from modules.objects.object_shelf_panel import create_object_shelf_panel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
+from modules.scenarios.gm_table.table_name_labels import build_table_switch_labels
 from modules.scenarios.gm_table.table_registry import (
-    GM_TABLES,
     get_table_name,
     normalize_table_id,
 )
@@ -195,20 +195,40 @@ class GMTableView(ctk.CTkFrame):
         bar.grid(row=0, column=0, sticky="ew", padx=18, pady=10)
         bar.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(
-            bar,
+        title_frame = ctk.CTkFrame(bar, fg_color="transparent")
+        title_frame.grid(row=0, column=0, padx=18, pady=8, sticky="ew")
+        title_frame.grid_columnconfigure(0, weight=1)
+
+        self.title_label = ctk.CTkLabel(
+            title_frame,
             text=self.table_name,
             text_color=TABLE_PALETTE["text"],
             font=ctk.CTkFont(size=15, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, padx=18, pady=8, sticky="ew")
+        )
+        self.title_label.grid(row=0, column=0, sticky="ew")
+
+        ctk.CTkButton(
+            title_frame,
+            text="Rename",
+            width=86,
+            height=28,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=14,
+            command=self._open_rename_dialog,
+        ).grid(row=0, column=1, padx=(10, 0), sticky="e")
 
         actions = ctk.CTkFrame(bar, fg_color="transparent")
         actions.grid(row=0, column=1, padx=12, pady=8, sticky="e")
 
-        table_names = [table.name for table in GM_TABLES]
-        self._table_name_to_id = {table.name: table.table_id for table in GM_TABLES}
-        self.table_switch_var = tk.StringVar(value=self.table_name)
+        table_names, self._table_name_to_id, self._table_label_by_id = (
+            self._build_table_switch_options()
+        )
+        self.table_switch_var = tk.StringVar(
+            value=self._table_label_by_id.get(self.table_id, self.table_name)
+        )
         self.table_switch_menu = ctk.CTkOptionMenu(
             actions,
             values=table_names,
@@ -361,22 +381,98 @@ class GMTableView(ctk.CTkFrame):
             command=self.reset_table,
         ).pack(side="left")
 
+    def _build_table_switch_options(
+        self,
+    ) -> tuple[list[str], dict[str, str], dict[str, str]]:
+        """Build table switch labels from persisted names without using names as ids."""
+        return build_table_switch_labels(self.layout_store.get_table_name)
+
+    def refresh_table_names(self) -> None:
+        """Refresh this window after any GM Table name changes."""
+        self.table_name = self.layout_store.get_table_name(self.table_id)
+        if hasattr(self, "title_label"):
+            self.title_label.configure(text=self.table_name)
+        table_names, self._table_name_to_id, self._table_label_by_id = (
+            self._build_table_switch_options()
+        )
+        if hasattr(self, "table_switch_menu"):
+            self.table_switch_menu.configure(values=table_names)
+        if hasattr(self, "table_switch_var"):
+            self.table_switch_var.set(
+                self._table_label_by_id.get(self.table_id, self.table_name)
+            )
+        self._update_toplevel_title()
+
+    def _update_toplevel_title(self) -> None:
+        """Update the detached window title when this view is hosted in one."""
+        try:
+            top = self.winfo_toplevel()
+            top.title(f"GM Table - {self.table_name}")
+            top._gm_table_name = self.table_name
+        except Exception:
+            pass
+
+    def _open_rename_dialog(self) -> None:
+        """Open a small dialog for editing this table display name."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Rename GM Table")
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        dialog.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(dialog, text="Table name").grid(
+            row=0, column=0, padx=18, pady=(18, 6), sticky="w"
+        )
+        name_var = tk.StringVar(value=self.table_name)
+        entry = ctk.CTkEntry(dialog, textvariable=name_var, width=260)
+        entry.grid(row=1, column=0, padx=18, pady=(0, 14), sticky="ew")
+
+        buttons = ctk.CTkFrame(dialog, fg_color="transparent")
+        buttons.grid(row=2, column=0, padx=18, pady=(0, 18), sticky="e")
+
+        def save() -> None:
+            self.rename_table(name_var.get())
+            dialog.destroy()
+
+        ctk.CTkButton(buttons, text="Cancel", width=90, command=dialog.destroy).pack(
+            side="left", padx=(0, 8)
+        )
+        ctk.CTkButton(buttons, text="Save", width=90, command=save).pack(side="left")
+        entry.bind("<Return>", lambda _event: save())
+        entry.bind("<Escape>", lambda _event: dialog.destroy())
+        entry.focus_set()
+        entry.select_range(0, "end")
+
+    def rename_table(self, name: str) -> None:
+        """Persist this table display name and refresh every open GM Table window."""
+        self.layout_store.save_table_name(self.table_id, name)
+        self.refresh_table_names()
+        root_app = self._root_app
+        if root_app is not None and hasattr(root_app, "refresh_gm_table_window_names"):
+            root_app.refresh_gm_table_window_names()
+
     def _handle_table_switch(self, table_name: str) -> None:
         """Request that the application opens or focuses another GM Table."""
         table_id = self._table_name_to_id.get(table_name)
         if table_id is None:
-            self.table_switch_var.set(self.table_name)
+            self.table_switch_var.set(
+                self._table_label_by_id.get(self.table_id, self.table_name)
+            )
             return
 
         if table_id == self.table_id:
             return
 
         if self._on_switch_table is None:
-            self.table_switch_var.set(self.table_name)
+            self.table_switch_var.set(
+                self._table_label_by_id.get(self.table_id, self.table_name)
+            )
             return
 
         self._on_switch_table(table_id)
-        self.table_switch_var.set(self.table_name)
+        self.table_switch_var.set(
+            self._table_label_by_id.get(self.table_id, self.table_name)
+        )
 
     def _build_fog_menu(self) -> tk.Menu:
         """Build tabletop fog actions for the active map-capable panel."""
@@ -899,7 +995,9 @@ class GMTableView(ctk.CTkFrame):
                 )
             if kind == "handouts":
                 scenario_name = str(definition.state.get("scenario_name") or "").strip()
-                scenario_item = self._load_scenario_item(scenario_name) if scenario_name else {}
+                scenario_item = (
+                    self._load_scenario_item(scenario_name) if scenario_name else {}
+                )
                 return GMTableHandoutsPage(
                     parent,
                     scenario_name=scenario_name,
@@ -1228,7 +1326,6 @@ class GMTableView(ctk.CTkFrame):
             geometry=self._preferred_entity_geometry(entity_type),
         )
 
-
     def _load_scenario_item(self, scenario_name: str) -> dict:
         """Resolve a scenario by title/name for scenario-specific panels."""
         if not scenario_name:
@@ -1259,7 +1356,9 @@ class GMTableView(ctk.CTkFrame):
         ) -> None:
             del selected_type
             popup.destroy()
-            scenario_title = self._entity_label("Scenarios", item, fallback=selected_name)
+            scenario_title = self._entity_label(
+                "Scenarios", item, fallback=selected_name
+            )
             if panel_kind == "scene_flow":
                 self._create_panel(
                     "scene_flow",
