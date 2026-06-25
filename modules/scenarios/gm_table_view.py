@@ -33,6 +33,7 @@ from modules.scenarios.gm_table.attachments import (
     entity_has_attachments,
 )
 from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
+from modules.scenarios.gm_table.container_window import GMTableContainerPage
 from modules.scenarios.gm_table.pages import (
     GMTableAttachmentGallery,
     GMTableHostedPage,
@@ -146,6 +147,7 @@ class GMTableView(ctk.CTkFrame):
             "Image Library",
             "Image from Library",
             "Handouts",
+            "Container Window",
             "Loot Generator",
             "Object Shelf",
             "Whiteboard",
@@ -804,6 +806,28 @@ class GMTableView(ctk.CTkFrame):
         if kind == "world_map" and hasattr(payload, "open_player_display"):
             payload.open_player_display()
 
+    def _apply_fog_action(self, action: str) -> None:
+        """Route fog controls to the active map-capable tabletop panel."""
+        _panel_id, _kind, payload = self._resolve_tabletop_context()
+        if payload is None:
+            messagebox.showinfo("GM Table", "Open a map panel before using fog tools.")
+            return
+        if action == "clear" and hasattr(payload, "clear_fog"):
+            payload.clear_fog()
+            return
+        if action == "reset" and hasattr(payload, "reset_fog"):
+            payload.reset_fog()
+            return
+        if action == "undo" and hasattr(payload, "undo_fog"):
+            payload.undo_fog()
+            return
+        if hasattr(payload, "_set_fog"):
+            payload._set_fog(action)
+            return
+        messagebox.showinfo(
+            "GM Table", "The active map panel does not support fog tools."
+        )
+
     def _handle_add_option(self, option: str) -> None:
         """Route add-menu options."""
         if option == "Campaign Dashboard":
@@ -826,6 +850,9 @@ class GMTableView(ctk.CTkFrame):
             return
         if option == "Handouts":
             self._open_scenario_selection_for_panel("handouts")
+            return
+        if option == "Container Window":
+            self._create_panel("container_window", "Container Window", {})
             return
         if option == "Loot Generator":
             self._create_panel("loot_generator", "Loot Generator", {})
@@ -928,6 +955,12 @@ class GMTableView(ctk.CTkFrame):
                     wrappers=self.wrappers,
                     map_wrapper=self.map_wrapper,
                     initial_state=definition.state,
+                )
+            if kind == "container_window":
+                return GMTableContainerPage(
+                    parent,
+                    initial_state=definition.state,
+                    on_layout_changed=self._persist_layout,
                 )
             if kind == "loot_generator":
                 return GMTableHostedPage(
