@@ -508,16 +508,32 @@ def screenshot_app_views():
     class DocsLayoutStore:
         """Keep GM Table screenshots deterministic and side-effect free."""
 
+        def get_table_layout(self, _table_id):
+            """Return empty table layout."""
+            return {}
+
+        def save_table_layout(self, _table_id, _layout):
+            """Ignore persisted table layouts."""
+            return None
+
+        def clear_table_layout(self, _table_id):
+            """Ignore cleared table layouts."""
+            return None
+
+        def get_table_name(self, _table_id):
+            """Return the default docs table name."""
+            return "Main"
+
         def get_scenario_layout(self, _scenario_name):
-            """Return empty layout."""
+            """Return empty legacy scenario layout."""
             return {}
 
         def save_scenario_layout(self, _scenario_name, _layout):
-            """Ignore persisted layouts."""
+            """Ignore persisted legacy scenario layouts."""
             return None
 
         def clear_scenario_layout(self, _scenario_name):
-            """Ignore cleared layouts."""
+            """Ignore cleared legacy scenario layouts."""
             return None
 
     class DocsSelectionStore:
