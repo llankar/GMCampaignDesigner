@@ -524,17 +524,6 @@ def screenshot_app_views():
             """Return the default docs table name."""
             return "Main"
 
-        def get_scenario_layout(self, _scenario_name):
-            """Return empty legacy scenario layout."""
-            return {}
-
-        def save_scenario_layout(self, _scenario_name, _layout):
-            """Ignore persisted legacy scenario layouts."""
-            return None
-
-        def clear_scenario_layout(self, _scenario_name):
-            """Ignore cleared legacy scenario layouts."""
-            return None
 
     class DocsSelectionStore:
         """Avoid persisting campaign overview selection state during doc generation."""

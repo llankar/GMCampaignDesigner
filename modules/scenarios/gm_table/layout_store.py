@@ -88,31 +88,6 @@ class GMTableLayoutStore:
             tables.pop(normalized_id, None)
             self._write()
 
-    def get_scenario_layout(self, scenario_title: str) -> dict[str, Any]:
-        """Return the saved layout for a scenario."""
-        if not scenario_title:
-            return {}
-        layout = self.data.get("scenarios", {}).get(scenario_title) or {}
-        if not isinstance(layout, dict):
-            return {}
-        return self._deep_copy(layout)
-
-    def save_scenario_layout(self, scenario_title: str, layout: dict[str, Any]) -> None:
-        """Persist a scenario layout."""
-        if not scenario_title:
-            return
-        self.data.setdefault("scenarios", {})[scenario_title] = self._deep_copy(layout or {})
-        self._write()
-
-    def clear_scenario_layout(self, scenario_title: str) -> None:
-        """Delete a scenario layout."""
-        if not scenario_title:
-            return
-        scenarios = self.data.setdefault("scenarios", {})
-        if scenario_title in scenarios:
-            scenarios.pop(scenario_title, None)
-            self._write()
-
     def get_table_name(self, table_id: str) -> str:
         """Return a custom table name or the registered default for ``table_id``."""
         normalized_id = normalize_table_id(table_id)

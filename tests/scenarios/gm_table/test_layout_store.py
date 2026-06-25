@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import json
+
 from modules.scenarios.gm_table.layout_store import GMTableLayoutStore
 
 
-def test_layout_store_round_trips_scenario_layout(monkeypatch, tmp_path) -> None:
-    """Scenario layouts should persist across store instances."""
+def test_layout_store_round_trips_table_layout_with_metadata(monkeypatch, tmp_path) -> None:
+    """Table layouts should persist across store instances."""
     monkeypatch.setattr(
         "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
         lambda: str(tmp_path),
     )
 
     first = GMTableLayoutStore()
-    first.save_scenario_layout(
-        "Night Run",
+    first.save_table_layout(
+        "table_1",
         {
             "panels": [
                 {
@@ -28,25 +30,25 @@ def test_layout_store_round_trips_scenario_layout(monkeypatch, tmp_path) -> None
     )
 
     second = GMTableLayoutStore()
-    loaded = second.get_scenario_layout("Night Run")
+    loaded = second.get_table_layout("table_1")
 
     assert loaded["panels"][0]["title"] == "Session Notes"
     assert loaded["panels"][0]["state"]["text"] == "Track the clues"
 
 
-def test_layout_store_can_clear_layout(monkeypatch, tmp_path) -> None:
-    """Layouts should be removable per scenario."""
+def test_layout_store_can_clear_table_layout_with_metadata(monkeypatch, tmp_path) -> None:
+    """Layouts should be removable per table."""
     monkeypatch.setattr(
         "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
         lambda: str(tmp_path),
     )
 
     store = GMTableLayoutStore()
-    store.save_scenario_layout("Night Run", {"panels": [{"panel_id": "p1", "kind": "note", "title": "A", "state": {}}]})
-    store.clear_scenario_layout("Night Run")
+    store.save_table_layout("table_1", {"panels": [{"panel_id": "p1", "kind": "note", "title": "A", "state": {}}]})
+    store.clear_table_layout("table_1")
 
     reloaded = GMTableLayoutStore()
-    assert reloaded.get_scenario_layout("Night Run") == {}
+    assert reloaded.get_table_layout("table_1") == {}
 
 
 def test_layout_store_round_trips_camera_and_bookmarks(monkeypatch, tmp_path) -> None:
@@ -66,9 +68,9 @@ def test_layout_store_round_trips_camera_and_bookmarks(monkeypatch, tmp_path) ->
         ],
         "panels": [],
     }
-    store.save_scenario_layout("Night Run", payload)
+    store.save_table_layout("table_1", payload)
 
-    loaded = GMTableLayoutStore().get_scenario_layout("Night Run")
+    loaded = GMTableLayoutStore().get_table_layout("table_1")
 
     assert loaded["camera"] == payload["camera"]
     assert loaded["home_camera"] == payload["home_camera"]
@@ -129,6 +131,46 @@ def test_layout_store_can_clear_table_layout(monkeypatch, tmp_path) -> None:
     store.clear_table_layout("table_4")
 
     assert GMTableLayoutStore().get_table_layout("table_4") == {}
+
+
+def test_layout_store_preserves_legacy_scenarios_block(monkeypatch, tmp_path) -> None:
+    """Legacy scenario layouts should remain available in memory for migration."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+    layout_path = tmp_path / GMTableLayoutStore.FILE_NAME
+    layout_path.write_text(
+        json.dumps(
+            {
+                "tables": {"table_1": {"panels": []}},
+                "global": {},
+                "scenarios": {"Night Run": {"panels": [{"panel_id": "legacy"}]}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    store = GMTableLayoutStore()
+
+    assert store.data["scenarios"]["Night Run"]["panels"][0]["panel_id"] == "legacy"
+
+
+def test_layout_store_reads_bare_legacy_scenario_mapping(monkeypatch, tmp_path) -> None:
+    """Very old bare scenario mappings should still load for migration."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+    layout_path = tmp_path / GMTableLayoutStore.FILE_NAME
+    layout_path.write_text(
+        json.dumps({"Night Run": {"panels": [{"panel_id": "legacy"}]}}),
+        encoding="utf-8",
+    )
+
+    store = GMTableLayoutStore()
+
+    assert store.data["scenarios"]["Night Run"]["panels"][0]["panel_id"] == "legacy"
 
 
 def test_layout_store_persists_custom_table_names(monkeypatch, tmp_path) -> None:
