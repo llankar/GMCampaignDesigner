@@ -30,13 +30,20 @@ class GMTableContainerPage(ctk.CTkFrame):
         master,
         *,
         initial_state: dict | None = None,
+        add_menu_options: list | None = None,
+        on_add_panel=None,
+        panel_builder=None,
         on_layout_changed=None,
     ) -> None:
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._initial_state = initial_state or {}
+        self._add_menu_options = add_menu_options or []
+        self._on_add_panel = on_add_panel
+        self._panel_builder = panel_builder
         self._on_layout_changed = on_layout_changed
+        self._add_menu = self._build_add_menu()
         self._build_toolbar()
         self.workspace = GMTableWorkspace(
             self,
@@ -69,6 +76,10 @@ class GMTableContainerPage(ctk.CTkFrame):
         actions = ctk.CTkFrame(toolbar, fg_color="transparent")
         actions.grid(row=0, column=1, sticky="e", padx=8, pady=6)
 
+        self.add_panel_button = self._accent_button(
+            actions, "+ Add Panel", self._show_add_menu
+        )
+        self.add_panel_button.pack(side="left", padx=(0, 6))
         self._add_button(actions, "New Window", self.add_window).pack(
             side="left", padx=(0, 6)
         )
@@ -80,6 +91,54 @@ class GMTableContainerPage(ctk.CTkFrame):
             side="left", padx=(0, 6)
         )
         self._add_button(actions, "Restore", self.restore_windows).pack(side="left")
+
+    def _build_add_menu(self):
+        """Build the same add-panel menu used by the main GM Table toolbar."""
+        import tkinter as tk
+
+        menu = tk.Menu(self, tearoff=0)
+        for option in self._add_menu_options:
+            if option == "separator":
+                menu.add_separator()
+                continue
+            if isinstance(option, tuple):
+                label, command = option
+                menu.add_command(label=label, command=command)
+                continue
+            menu.add_command(
+                label=option,
+                command=lambda value=option: self._handle_add_panel_option(value),
+            )
+        return menu
+
+    def _show_add_menu(self) -> None:
+        """Open the add-panel menu under the container toolbar button."""
+        x = self.add_panel_button.winfo_rootx()
+        y = self.add_panel_button.winfo_rooty() + self.add_panel_button.winfo_height()
+        try:
+            self._add_menu.tk_popup(x, y)
+        finally:
+            self._add_menu.grab_release()
+
+    def _handle_add_panel_option(self, option: str) -> None:
+        """Route main-table add-panel choices into this nested workspace."""
+        if callable(self._on_add_panel):
+            self._on_add_panel(option, self.workspace)
+
+    @staticmethod
+    def _accent_button(master, text: str, command):
+        """Create the highlighted add-panel toolbar button."""
+        return ctk.CTkButton(
+            master,
+            text=text,
+            width=112,
+            height=28,
+            fg_color=TABLE_PALETTE["accent"],
+            hover_color="#D97706",
+            text_color="#10131B",
+            corner_radius=14,
+            command=command,
+        )
 
     @staticmethod
     def _add_button(master, text: str, command):
@@ -174,6 +233,14 @@ class GMTableContainerPage(ctk.CTkFrame):
                 session_controls_enabled=False,
                 scenario_actions_enabled=False,
             )
+        if definition.kind == "container_card":
+            return GMTableContainerCard(
+                parent,
+                title=definition.title,
+                body=str(definition.state.get("body") or ""),
+            )
+        if callable(self._panel_builder):
+            return self._panel_builder(parent, definition)
         return GMTableContainerCard(
             parent,
             title=definition.title,
