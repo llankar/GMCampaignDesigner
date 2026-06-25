@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable
 
 import customtkinter as ctk
+from PIL import Image
 
+from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.portrait_helper import resolve_portrait_candidate
 from modules.image_assets import ImageAssetsService
+from modules.scenarios.gm_table.attachments import EntityAttachment
 from modules.ui.image_library.browser_panel import ImageBrowserPanel
 from modules.ui.image_library.result_card import ImageResult
 from modules.ui.image_library.toolbar import ToolbarState
+
+IMAGE_PANEL_SIZE = (520, 390)
 
 
 class GMTableHostedPage(ctk.CTkFrame):
@@ -88,10 +95,121 @@ class GMTableNotePage(ctk.CTkFrame):
         return {"text": self.textbox.get("1.0", "end-1c")}
 
 
+class GMTableImagePage(ctk.CTkFrame):
+    """Display one image as a resizable GM Table window."""
+
+    def __init__(self, master, *, image_path: str, title: str = "Image") -> None:
+        super().__init__(master, fg_color="transparent")
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self._image_path = str(image_path or "").strip()
+        self._title = str(title or Path(self._image_path).name or "Image")
+        self._ctk_image: ctk.CTkImage | None = None
+        self._source_image: Image.Image | None = None
+
+        ctk.CTkLabel(
+            self,
+            text=self._title,
+            font=ctk.CTkFont(size=16, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+
+        self.image_label = ctk.CTkLabel(self, text="Loading image…", anchor="center")
+        self.image_label.grid(row=1, column=0, sticky="nsew")
+        self.bind("<Configure>", self._refresh_image, add="+")
+        self._load_image()
+
+    def _resolve_image_path(self) -> str | None:
+        return resolve_portrait_candidate(
+            self._image_path, ConfigHelper.get_campaign_dir()
+        )
+
+    def _load_image(self) -> None:
+        resolved = self._resolve_image_path()
+        if not resolved:
+            self.image_label.configure(
+                text=f"Image not found:\n{self._image_path}", image=None
+            )
+            return
+        try:
+            self._source_image = Image.open(resolved).convert("RGBA")
+        except Exception as exc:
+            self.image_label.configure(text=f"Unable to load image:\n{exc}", image=None)
+            return
+        self._refresh_image()
+
+    def _refresh_image(self, _event=None) -> None:
+        if self._source_image is None:
+            return
+        width = max(160, int(self.winfo_width() or IMAGE_PANEL_SIZE[0]) - 24)
+        height = max(120, int(self.winfo_height() or IMAGE_PANEL_SIZE[1]) - 58)
+        render = self._source_image.copy()
+        render.thumbnail((width, height), Image.Resampling.LANCZOS)
+        if render.width <= 0 or render.height <= 0:
+            return
+        self._ctk_image = ctk.CTkImage(
+            light_image=render, dark_image=render, size=render.size
+        )
+        self.image_label.configure(text="", image=self._ctk_image)
+
+    def get_state(self) -> dict:
+        return {"image_path": self._image_path, "image_title": self._title}
+
+
+class GMTableAttachmentGallery(ctk.CTkFrame):
+    """Compact gallery for entity attachments on the GM Table."""
+
+    def __init__(self, master, *, attachments: list[EntityAttachment]) -> None:
+        super().__init__(master, fg_color="transparent")
+        self._images: list[ctk.CTkImage] = []
+        self.grid_columnconfigure(0, weight=1)
+        title = f"Attachments ({len(attachments)})"
+        ctk.CTkLabel(
+            self, text=title, font=ctk.CTkFont(size=15, weight="bold"), anchor="w"
+        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.grid(row=1, column=0, sticky="ew")
+        for index, attachment in enumerate(attachments):
+            card = ctk.CTkFrame(body, corner_radius=12)
+            card.grid(row=index // 2, column=index % 2, sticky="ew", padx=6, pady=6)
+            card.grid_columnconfigure(0, weight=1)
+            if attachment.is_image and attachment.resolved_path:
+                self._add_image_preview(card, attachment)
+            else:
+                ctk.CTkLabel(card, text="📎", font=ctk.CTkFont(size=28)).grid(
+                    row=0, column=0, pady=(10, 2)
+                )
+            ctk.CTkLabel(
+                card, text=attachment.label, wraplength=220, justify="center"
+            ).grid(row=1, column=0, padx=10, pady=(2, 10), sticky="ew")
+
+    def _add_image_preview(self, parent, attachment: EntityAttachment) -> None:
+        try:
+            image = Image.open(attachment.resolved_path).convert("RGBA")
+            image.thumbnail((220, 150), Image.Resampling.LANCZOS)
+            ctk_image = ctk.CTkImage(
+                light_image=image, dark_image=image, size=image.size
+            )
+            self._images.append(ctk_image)
+            ctk.CTkLabel(parent, text="", image=ctk_image).grid(
+                row=0, column=0, padx=10, pady=(10, 2)
+            )
+        except Exception:
+            ctk.CTkLabel(parent, text="🖼", font=ctk.CTkFont(size=28)).grid(
+                row=0, column=0, pady=(10, 2)
+            )
+
+
 class GMTableImageLibraryPage(ctk.CTkFrame):
     """Embedded shared image library browser."""
 
-    def __init__(self, master, *, initial_state: dict | None = None) -> None:
+    def __init__(
+        self,
+        master,
+        *,
+        initial_state: dict | None = None,
+        on_attach_to_table: Callable[[ImageResult], None] | None = None,
+    ) -> None:
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -109,6 +227,7 @@ class GMTableImageLibraryPage(ctk.CTkFrame):
                 size_label=str(state.get("size_label") or "Medium"),
                 sort_label=str(state.get("sort_label") or "Newest"),
             ),
+            on_attach_to_entity=on_attach_to_table,
             on_toolbar_state_changed=self._on_toolbar_state_changed,
         )
         self._panel.grid(row=0, column=0, sticky="nsew")
@@ -118,7 +237,11 @@ class GMTableImageLibraryPage(ctk.CTkFrame):
         """Fetch and map image records for the browser."""
         toolbar_state = self._panel.toolbar.state
         selected_folder = (toolbar_state.folder_name or "").strip()
-        filters = {"source_folder_names": [selected_folder]} if selected_folder and selected_folder != "All" else None
+        filters = (
+            {"source_folder_names": [selected_folder]}
+            if selected_folder and selected_folder != "All"
+            else None
+        )
         rows, _total = self._service.search_images(
             query=toolbar_state.query,
             filters=filters,

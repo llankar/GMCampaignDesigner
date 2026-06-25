@@ -55,6 +55,7 @@ DEFAULT_PANEL_SIZES = {
     "world_map": (860, 620),
     "map_tool": (900, 640),
     "scene_flow": (860, 600),
+    "image": (620, 520),
     "image_library": (860, 580),
     "handouts": (760, 560),
     "ambiance": (820, 580),
