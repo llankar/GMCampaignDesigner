@@ -2972,6 +2972,9 @@ class MainWindow(ctk.CTk):
                 detail_container,
                 table_id=table_id,
                 table_name=table_name,
+                on_switch_table=lambda target_table_id: self.open_gm_table(
+                    table_id=target_table_id
+                ),
                 root_app=self,
                 layout_store=layout_store,
             )
