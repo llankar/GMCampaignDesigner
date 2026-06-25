@@ -23,7 +23,11 @@ from modules.objects.object_shelf_panel import create_object_shelf_panel
 from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
-from modules.scenarios.gm_table.table_registry import get_table_name, normalize_table_id
+from modules.scenarios.gm_table.table_registry import (
+    GM_TABLES,
+    get_table_name,
+    normalize_table_id,
+)
 from modules.scenarios.gm_table.attachments import (
     collect_entity_attachments,
     entity_has_attachments,
@@ -78,6 +82,7 @@ class GMTableView(ctk.CTkFrame):
         *,
         table_id: str,
         table_name: str,
+        on_switch_table=None,
         root_app=None,
         layout_store: GMTableLayoutStore | None = None,
     ) -> None:
@@ -92,6 +97,7 @@ class GMTableView(ctk.CTkFrame):
         )
         self.scenario = {}
         self.scenario_name = ""
+        self._on_switch_table = on_switch_table
         self._root_app = root_app
         self.layout_store = layout_store or GMTableLayoutStore()
         self._layout_settle_scheduler = LayoutSettleScheduler(self)
@@ -199,6 +205,27 @@ class GMTableView(ctk.CTkFrame):
 
         actions = ctk.CTkFrame(bar, fg_color="transparent")
         actions.grid(row=0, column=1, padx=12, pady=8, sticky="e")
+
+        table_names = [table.name for table in GM_TABLES]
+        self._table_name_to_id = {table.name: table.table_id for table in GM_TABLES}
+        self.table_switch_var = tk.StringVar(value=self.table_name)
+        self.table_switch_menu = ctk.CTkOptionMenu(
+            actions,
+            values=table_names,
+            variable=self.table_switch_var,
+            width=132,
+            height=30,
+            fg_color=TABLE_PALETTE["table_chip"],
+            button_color=TABLE_PALETTE["accent"],
+            button_hover_color="#D97706",
+            dropdown_fg_color=TABLE_PALETTE["table_alt"],
+            dropdown_hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            dropdown_text_color=TABLE_PALETTE["text"],
+            corner_radius=14,
+            command=self._handle_table_switch,
+        )
+        self.table_switch_menu.pack(side="left", padx=(0, 10))
 
         self.add_button = ctk.CTkButton(
             actions,
@@ -333,6 +360,23 @@ class GMTableView(ctk.CTkFrame):
             corner_radius=14,
             command=self.reset_table,
         ).pack(side="left")
+
+    def _handle_table_switch(self, table_name: str) -> None:
+        """Request that the application opens or focuses another GM Table."""
+        table_id = self._table_name_to_id.get(table_name)
+        if table_id is None:
+            self.table_switch_var.set(self.table_name)
+            return
+
+        if table_id == self.table_id:
+            return
+
+        if self._on_switch_table is None:
+            self.table_switch_var.set(self.table_name)
+            return
+
+        self._on_switch_table(table_id)
+        self.table_switch_var.set(self.table_name)
 
     def _build_fog_menu(self) -> tk.Menu:
         """Build tabletop fog actions for the active map-capable panel."""

@@ -260,12 +260,23 @@ class _FakeFrame:
 class _FakeGMTableView:
     """Fake GM Table view mounted inside the detached window."""
 
-    def __init__(self, master, *, table_id, table_name, root_app):
+    def __init__(
+        self,
+        master,
+        *,
+        table_id,
+        table_name,
+        on_switch_table=None,
+        root_app,
+        layout_store=None,
+    ):
         """Initialize the _FakeGMTableView instance."""
         self.master = master
         self.table_id = table_id
         self.table_name = table_name
+        self.on_switch_table = on_switch_table
         self.root_app = root_app
+        self.layout_store = layout_store
         self.opened_entities = []
         self.pack_calls = []
         self.after_idle_callbacks = []
@@ -363,6 +374,35 @@ def test_open_gm_table_reuses_an_existing_detached_window(monkeypatch):
     assert gm_window.geometry_calls == []
     assert gm_window.minsize_calls == []
     assert window.current_gm_table.table_id == "table_1"
+
+
+def test_gm_table_switch_callback_opens_other_table_without_closing_current(monkeypatch):
+    """The table switch callback should open a separate table window."""
+    window = MainWindow.__new__(MainWindow)
+    window.entity_wrappers = {}
+    window._gm_table_windows = {}
+    window.current_gm_table = None
+    window._gm_mode = False
+
+    import modules.scenarios.gm_table_view as gm_table_view_module
+
+    monkeypatch.setattr(main_window.ctk, "CTkToplevel", _FakeToplevel)
+    monkeypatch.setattr(main_window.ctk, "CTkFrame", _FakeFrame)
+    monkeypatch.setattr(gm_table_view_module, "GMTableView", _FakeGMTableView)
+
+    main_window_ref = MainWindow.open_gm_table(window, table_id="table_1")
+    table_one_view = main_window_ref._gm_table_view
+
+    table_two_window = table_one_view.on_switch_table("table_2")
+
+    assert main_window_ref.destroy_calls == 0
+    assert main_window_ref is window._gm_table_windows["table_1"]
+    assert table_two_window is window._gm_table_windows["table_2"]
+    assert table_two_window.title_text == "GM Table - Table2"
+    assert table_two_window._gm_table_view.table_id == "table_2"
+    assert table_two_window._gm_table_view.table_name == "Table2"
+    assert table_two_window._gm_table_view.on_switch_table is not None
+    assert window.current_gm_table is table_two_window._gm_table_view
 
 
 def test_gm_table_window_close_clears_tracked_references(monkeypatch):
