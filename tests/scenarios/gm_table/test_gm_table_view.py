@@ -338,7 +338,9 @@ def test_build_object_entity_content_uses_scrollable_full_detail(monkeypatch) ->
     assert frame.pack_calls == [{"fill": "both", "expand": True}]
 
 
-def test_build_entity_content_with_attachments_hides_portrait_spotlight(monkeypatch) -> None:
+def test_build_entity_content_with_attachments_hides_portrait_spotlight(
+    monkeypatch,
+) -> None:
     """Attachment-backed evidence cards should show attachments without an empty portrait panel."""
     captured = {}
 
@@ -409,6 +411,7 @@ def test_build_entity_content_with_attachments_hides_portrait_spotlight(monkeypa
     assert captured["callback"] is callback
     assert captured["kwargs"] == {"spotlight_only": False, "show_spotlight": False}
     assert captured["gallery_kwargs"] == {"attachments": [attachment]}
+
 
 def test_context_menu_handler_resolution_is_safe_without_gm_screen_api() -> None:
     """GM Table hosts without a context-menu API should not crash the detail factory."""
@@ -1023,3 +1026,60 @@ def test_mount_panel_content_builds_container_window(monkeypatch) -> None:
     assert isinstance(mounted, _DummyContainerPage)
     assert captured["kwargs"]["initial_state"] == {"container_layout": {"panels": []}}
     assert captured["kwargs"]["on_layout_changed"] == view._persist_layout
+
+
+def test_open_or_focus_scenario_board_reuses_existing_panel() -> None:
+    """Scenario Board helper should avoid duplicate panels for the same scenario."""
+    calls = []
+    workspace = SimpleNamespace(
+        serialize=lambda: {
+            "panels": [
+                {
+                    "panel_id": "board-1",
+                    "kind": "scenario_board",
+                    "state": {"scenario_name": "Night Run"},
+                }
+            ]
+        },
+        bring_to_front=lambda panel_id: calls.append(("front", panel_id)),
+        ensure_panel_minimum_size=lambda panel_id, width, height: calls.append(
+            ("ensure", panel_id, width, height)
+        ),
+    )
+    view = GMTableView.__new__(GMTableView)
+    view.workspace = workspace
+
+    panel_id = GMTableView.open_or_focus_scenario_board(view, "night run")
+
+    assert panel_id == "board-1"
+    assert calls == [("front", "board-1"), ("ensure", "board-1", 900, 680)]
+
+
+def test_launch_scenario_bundle_opens_maps_and_entities() -> None:
+    """Launching a resolved bundle should route through deduplicating helpers."""
+    calls = []
+    view = GMTableView.__new__(GMTableView)
+    view.open_or_focus_map_panel = lambda name=None: calls.append(("map", name))
+    view.open_or_focus_world_map = lambda name=None: calls.append(("world", name))
+    view.open_or_focus_entity_panel = lambda entity_type, name: calls.append(
+        (entity_type, name)
+    )
+    bundle = gm_table_view_module.ScenarioBundle(
+        scenario_title="Night Run",
+        scene_title="Cold Open",
+        npcs=("Fixer",),
+        villains=("Boss",),
+        places=("Docks",),
+        maps=("Docks Map",),
+        world_maps=("City Map",),
+    )
+
+    GMTableView.launch_scenario_bundle(view, bundle)
+
+    assert calls == [
+        ("map", "Docks Map"),
+        ("world", "City Map"),
+        ("NPCs", "Fixer"),
+        ("Villains", "Boss"),
+        ("Places", "Docks"),
+    ]
