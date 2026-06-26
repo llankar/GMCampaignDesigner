@@ -34,6 +34,7 @@ from modules.scenarios.gm_table.attachments import (
     entity_has_attachments,
 )
 from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
+from modules.scenarios.gm_table.scenario_board import ScenarioBoardPanel, ScenarioBundle
 from modules.scenarios.gm_table.container_window import GMTableContainerPage
 from modules.scenarios.gm_table.pages import (
     GMTableAttachmentGallery,
@@ -144,6 +145,7 @@ class GMTableView(ctk.CTkFrame):
             "Campaign Dashboard",
             "World Map",
             "Map Tool",
+            "Scenario Board",
             "Scene Flow",
             "Image Library",
             "Image from Library",
@@ -854,6 +856,61 @@ class GMTableView(ctk.CTkFrame):
             self._panel_state(map_name=target_map),
         )
 
+    def open_or_focus_world_map(self, map_name: str | None = None) -> str | None:
+        """Public Scenario Board helper for opening or focusing the world map panel."""
+        return self._focus_or_open_world_map_panel(map_name)
+
+    def open_or_focus_map_panel(self, map_name: str | None = None) -> str | None:
+        """Public Scenario Board helper for opening or focusing a scene map panel."""
+        return self._focus_or_open_map_tool_panel(map_name)
+
+    def open_or_focus_entity_panel(self, entity_type: str, name: str) -> None:
+        """Public Scenario Board helper for deduplicated entity panels."""
+        self.open_entity_panel(entity_type, name)
+
+    def launch_scenario_bundle(self, bundle: ScenarioBundle) -> None:
+        """Open the active scene's resolved bundle onto the GM Table."""
+        if bundle.maps:
+            self.open_or_focus_map_panel(bundle.maps[0])
+        if bundle.world_maps:
+            self.open_or_focus_world_map(bundle.world_maps[0])
+        for entity_type, names in (
+            ("NPCs", bundle.npcs),
+            ("Villains", bundle.villains),
+            ("Places", bundle.places),
+        ):
+            for name in names:
+                self.open_or_focus_entity_panel(entity_type, name)
+
+    def open_or_focus_scenario_board(
+        self, scenario_name: str, *, workspace: GMTableWorkspace | None = None
+    ) -> str:
+        """Open one Scenario Board per scenario and focus it when already present."""
+        target_workspace = workspace or self.workspace
+        normalized = self._normalize_entity_name(scenario_name)
+        for panel in target_workspace.serialize().get("panels", []):
+            state = panel.get("state") or {}
+            if (
+                panel.get("kind") == "scenario_board"
+                and self._normalize_entity_name(state.get("scenario_name"))
+                == normalized
+            ):
+                panel_id = str(panel.get("panel_id"))
+                target_workspace.bring_to_front(panel_id)
+                width, height = resolve_default_panel_size("scenario_board")
+                target_workspace.ensure_panel_minimum_size(panel_id, width, height)
+                return panel_id
+
+        title = str(scenario_name or "").strip() or "Untitled Scenario"
+        width, height = resolve_default_panel_size("scenario_board")
+        return self._create_panel_in_workspace(
+            "scenario_board",
+            f"Scenario Board: {title}",
+            {"scenario_name": title},
+            geometry={"width": width, "height": height},
+            workspace=workspace,
+        )
+
     def _open_player_view_for_active_panel(self) -> None:
         """Open the player display for the active scene map."""
         panel_id, kind, payload = self._resolve_tabletop_context(prefer_world_map=True)
@@ -909,6 +966,15 @@ class GMTableView(ctk.CTkFrame):
         if option == "Map Tool":
             self._create_panel_in_workspace(
                 "map_tool", "Map Tool", {}, workspace=workspace
+            )
+            return
+        if option == "Scenario Board":
+            (
+                self._open_scenario_selection_for_panel("scenario_board")
+                if workspace is None
+                else self._open_scenario_selection_for_panel(
+                    "scenario_board", workspace=workspace
+                )
             )
             return
         if option == "Scene Flow":
@@ -1039,6 +1105,14 @@ class GMTableView(ctk.CTkFrame):
                             (getattr(payload, "current_map", None) or {}).get("Name")
                         )
                     ),
+                )
+            if kind == "scenario_board":
+                return GMTableHostedPage(
+                    parent,
+                    builder=lambda host: self._build_scenario_board_content(
+                        host, definition.state
+                    ),
+                    state_getter=lambda payload: payload.get_state(),
                 )
             if kind == "scene_flow":
                 return GMTableHostedPage(
@@ -1237,6 +1311,26 @@ class GMTableView(ctk.CTkFrame):
         widget = create_scene_flow_frame(
             host,
             scenario_title=state.get("scenario_title") or "",
+        )
+        widget.grid(row=0, column=0, sticky="nsew")
+        return widget
+
+    def _build_scenario_board_content(self, host, state: dict):
+        """Build the scenario board page."""
+        scenario_name = str(state.get("scenario_name") or "").strip()
+        scenario_item = self._load_scenario_item(scenario_name) if scenario_name else {}
+        widget = ScenarioBoardPanel(
+            host,
+            scenario_name=scenario_name,
+            scenario_item=scenario_item,
+            open_entity_callback=self.open_or_focus_entity_panel,
+            launch_bundle_callback=self.launch_scenario_bundle,
+            open_scene_map_callback=self.open_or_focus_map_panel,
+            open_world_map_callback=self.open_or_focus_world_map,
+            wrappers=self.wrappers,
+            map_wrapper=self.map_wrapper,
+            initial_state=state,
+            on_state_changed=self._persist_layout,
         )
         widget.grid(row=0, column=0, sticky="nsew")
         return widget
@@ -1530,6 +1624,9 @@ class GMTableView(ctk.CTkFrame):
                     {"scenario_title": scenario_title},
                     workspace=workspace,
                 )
+                return
+            if panel_kind == "scenario_board":
+                self.open_or_focus_scenario_board(scenario_title, workspace=workspace)
                 return
             if panel_kind == "handouts":
                 self._create_panel_in_selection_workspace(

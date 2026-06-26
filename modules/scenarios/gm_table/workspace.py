@@ -55,6 +55,7 @@ DEFAULT_PANEL_SIZES = {
     "campaign_dashboard": (780, 560),
     "world_map": (860, 620),
     "map_tool": (900, 640),
+    "scenario_board": (900, 680),
     "scene_flow": (860, 600),
     "image": (620, 520),
     "image_library": (860, 580),
