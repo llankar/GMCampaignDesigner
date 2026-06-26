@@ -3030,6 +3030,11 @@ class MainWindow(ctk.CTk):
             window.title(f"GM Table - {table_name}")
             self._maximize_detached_window(window)
             self._focus_detached_window(window)
+            try:
+                window.attributes("-topmost", True)
+                window.after(800, lambda: window.attributes("-topmost", False))
+            except Exception:
+                pass
 
             def _on_close():
                 """Handle GM Table close."""
