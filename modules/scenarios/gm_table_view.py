@@ -43,6 +43,7 @@ from modules.scenarios.gm_table.pages import (
     GMTableImagePage,
     GMTableNotePage,
 )
+from modules.scenarios.gm_table.reveal import reveal_entity, reveal_image, reveal_map_payload
 from modules.scenarios.session_notes import SessionControlsCallbacks
 from modules.scenarios.gm_table.workspace import (
     PanelDefinition,
@@ -177,6 +178,7 @@ class GMTableView(ctk.CTkFrame):
             on_panel_build=self._mount_panel_content,
             on_layout_changed=self._persist_layout,
             map_tool_window_provider=self._get_map_tool_window,
+            on_reveal_requested=self._reveal_panel,
         )
         self.workspace.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
 
@@ -927,6 +929,55 @@ class GMTableView(ctk.CTkFrame):
         if kind == "world_map" and hasattr(payload, "open_player_display"):
             payload.open_player_display()
 
+    def _reveal_panel(
+        self,
+        panel_id: str,
+        workspace: GMTableWorkspace | None = None,
+    ) -> None:
+        """Reveal the requested GM Table panel to the player-facing display."""
+        target_workspace = workspace or self.workspace
+        definition = target_workspace.get_panel_definition(panel_id)
+        if definition is None:
+            messagebox.showinfo("Reveal", "This panel is no longer available.")
+            return
+
+        payload = self._unwrap_hosted_payload(target_workspace.get_panel_payload(panel_id))
+        kind = definition.kind
+        state = definition.state if isinstance(definition.state, dict) else {}
+
+        if kind == "image":
+            path = str(state.get("image_path") or "").strip()
+            title = str(state.get("image_title") or definition.title or "Image").strip()
+            reveal_image(path, title=title)
+            return
+
+        if kind in MAP_PANEL_KINDS:
+            reveal_map_payload(payload, title=definition.title)
+            return
+
+        if kind == "entity":
+            entity_type = str(state.get("entity_type") or "").strip()
+            entity_name = str(state.get("entity_name") or definition.title or "").strip()
+            try:
+                item = self._load_entity_item(entity_type, entity_name)
+            except Exception as exc:
+                messagebox.showwarning("Reveal", f"Unable to load entity for reveal:\n{exc}")
+                return
+            reveal_entity(entity_type, item, title=self._entity_label(entity_type, item, fallback=entity_name))
+            return
+
+        if hasattr(payload, "reveal") and callable(payload.reveal):
+            payload.reveal()
+            return
+
+        messagebox.showinfo("Reveal", "This panel does not support player reveal.")
+
+    @staticmethod
+    def _unwrap_hosted_payload(payload: object) -> object:
+        """Return the inner widget/controller for hosted GM Table pages."""
+        inner = getattr(payload, "_payload", None)
+        return inner if inner is not None else payload
+
     def _apply_fog_action(self, action: str) -> None:
         """Route fog controls to the active map-capable tabletop panel."""
         _panel_id, _kind, payload = self._resolve_tabletop_context()
@@ -1159,6 +1210,7 @@ class GMTableView(ctk.CTkFrame):
                     ),
                     panel_builder=self._mount_panel_content,
                     on_layout_changed=self._persist_layout,
+                    on_reveal_requested=self._reveal_panel,
                 )
             if kind == "loot_generator":
                 return GMTableHostedPage(

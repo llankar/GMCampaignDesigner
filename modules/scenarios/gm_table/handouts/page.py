@@ -9,11 +9,11 @@ import customtkinter as ctk
 from PIL import Image
 
 from modules.scenarios.gm_table.handouts.service import HandoutItem, collect_scenario_handouts
+from modules.scenarios.gm_table.reveal import reveal_handout
 from modules.ui.image_viewer import (
     DEFAULT_REVEAL_ANIMATION,
     REVEAL_ANIMATION_OPTIONS,
     normalize_reveal_animation,
-    show_portrait,
 )
 
 _CARD_WIDTH = 148
@@ -64,6 +64,7 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         self._thumbnail_cache: dict[str, tuple[float, ctk.CTkImage]] = {}
         self._placeholder_thumb = self._build_placeholder_thumb()
         self._column_count = 1
+        self._card_menu = tk.Menu(self, tearoff=0)
 
         title = "Handouts"
         if self._scenario_name:
@@ -253,13 +254,44 @@ class GMTableHandoutsPage(ctk.CTkFrame):
             font=ctk.CTkFont(size=10),
         ).grid(row=3, column=0, sticky="ew", padx=7, pady=(0, 4))
 
+        ctk.CTkButton(
+            card,
+            text="Reveal",
+            width=70,
+            height=24,
+            fg_color="#1F6F86",
+            hover_color="#2589A4",
+            text_color="#F8FAFC",
+            corner_radius=8,
+            command=lambda item=handout: self._open_handout(item),
+        ).grid(row=4, column=0, sticky="w", padx=7, pady=(0, 7))
+
         self._bind_click_recursive(card, lambda _event, item=handout: self._open_handout(item))
+        self._bind_context_menu_recursive(card, handout)
         return card
 
     def _bind_click_recursive(self, widget, callback) -> None:
+        if isinstance(widget, ctk.CTkButton):
+            return
         widget.bind("<Button-1>", callback)
         for child in widget.winfo_children():
             self._bind_click_recursive(child, callback)
+
+    def _bind_context_menu_recursive(self, widget, handout: HandoutItem) -> None:
+        widget.bind("<Button-3>", lambda event, item=handout: self._show_handout_menu(event, item), add="+")
+        for child in widget.winfo_children():
+            self._bind_context_menu_recursive(child, handout)
+
+    def _show_handout_menu(self, event, handout: HandoutItem) -> str:
+        """Open a handout context menu with player reveal actions."""
+        menu = self._card_menu
+        menu.delete(0, "end")
+        menu.add_command(label="Reveal", command=lambda item=handout: self._open_handout(item))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+        return "break"
 
     def _get_thumbnail(self, resolved_path: str) -> tuple[ctk.CTkImage, bool]:
         candidate = Path(resolved_path)
@@ -312,11 +344,23 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         self._selected_id = handout.id
         self._status_var.set("")
         self._highlight_selected()
-        show_portrait(
-            resolved_path,
-            title=handout.title,
-            subtitle=handout.subtitle,
-            animation=self._selected_animation(),
+        reveal_handout(handout, animation=self._selected_animation())
+
+    def reveal(self) -> None:
+        """Reveal the selected handout from the workspace panel action."""
+        handout = self._selected_handout()
+        if handout is None:
+            self._status_var.set("Select a handout to reveal first.")
+            return
+        self._open_handout(handout)
+
+    def _selected_handout(self) -> HandoutItem | None:
+        """Return the currently selected handout, if it still exists."""
+        if not self._selected_id:
+            return None
+        return next(
+            (handout for handout in self._handouts if handout.id == self._selected_id),
+            None,
         )
 
     def _highlight_selected(self) -> None:

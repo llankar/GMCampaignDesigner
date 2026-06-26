@@ -35,7 +35,7 @@ class _Widget:
     def grid_propagate(self, _flag: bool) -> None:
         return None
 
-    def bind(self, event, callback) -> None:
+    def bind(self, event, callback, **_kwargs) -> None:
         self.bindings[event] = callback
 
     def winfo_children(self):
@@ -134,7 +134,7 @@ def test_render_grid_builds_compact_cards_for_collected_handouts() -> None:
     assert set(view._visible_cards.keys()) == {"one", "two", "three"}
 
 
-def test_clicking_card_opens_portrait_with_expected_path_title_and_subtitle(monkeypatch) -> None:
+def test_clicking_card_reveals_handout_with_expected_path_title_subtitle_and_animation(monkeypatch) -> None:
     image_path = Path("handouts") / "kara.png"
     handout = _item(str(image_path), title="Kara Voss")
 
@@ -143,11 +143,11 @@ def test_clicking_card_opens_portrait_with_expected_path_title_and_subtitle(monk
     monkeypatch.setattr(page_module.ctk, "CTkFont", lambda **_kwargs: object())
 
     shown = []
-    monkeypatch.setattr(
-        page_module,
-        "show_portrait",
-        lambda path, title=None, subtitle=None, animation=None: shown.append((path, title, subtitle, animation)),
-    )
+
+    def _fake_reveal(revealed_handout, *, animation=None):
+        shown.append((revealed_handout.path, revealed_handout.title, revealed_handout.subtitle, animation))
+
+    monkeypatch.setattr(page_module, "reveal_handout", _fake_reveal)
     monkeypatch.setattr(page_module.Path, "exists", lambda self: True)
 
     view = page_module.GMTableHandoutsPage.__new__(page_module.GMTableHandoutsPage)
@@ -160,7 +160,7 @@ def test_clicking_card_opens_portrait_with_expected_path_title_and_subtitle(monk
     card = page_module.GMTableHandoutsPage._build_card(view, _GridFrame(), replace(handout))
     card.bindings["<Button-1>"](None)
 
-    assert shown == [(str(Path(image_path).resolve()), "Kara Voss", "NPC", "drift_up")]
+    assert shown == [(str(image_path), "Kara Voss", "NPC", "drift_up")]
     assert view._selected_id == handout.id
 
 

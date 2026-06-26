@@ -85,7 +85,7 @@ def test_open_handout_shows_warning_without_blocking_when_file_is_missing() -> N
     assert triggered == ["render"]
 
 
-def test_open_handout_uses_image_viewer_for_existing_file(monkeypatch) -> None:
+def test_open_handout_reveals_existing_file_with_expected_metadata(monkeypatch) -> None:
     real_path = Path("handouts") / "existing.png"
     handout = _build_item(str(real_path))
 
@@ -96,11 +96,10 @@ def test_open_handout_uses_image_viewer_for_existing_file(monkeypatch) -> None:
     view._animation_var = _StringVarStub("Curtain")
     view._highlight_selected = lambda: calls.append("highlight")
 
-    monkeypatch.setattr(
-        page_module,
-        "show_portrait",
-        lambda path, title=None, subtitle=None, animation=None: calls.append((path, title, subtitle, animation)),
-    )
+    def _fake_reveal(revealed_handout, *, animation=None):
+        calls.append((revealed_handout.path, revealed_handout.title, revealed_handout.subtitle, animation))
+
+    monkeypatch.setattr(page_module, "reveal_handout", _fake_reveal)
 
     original_exists = page_module.Path.exists
     page_module.Path.exists = lambda self: True
@@ -111,7 +110,7 @@ def test_open_handout_uses_image_viewer_for_existing_file(monkeypatch) -> None:
 
     assert view._selected_id == handout.id
     assert calls[0] == "highlight"
-    assert calls[1] == (str(Path(real_path).resolve()), "Kara Voss", "NPC", "curtain")
+    assert calls[1] == (str(real_path), "Kara Voss", "NPC", "curtain")
 
 
 def test_get_state_includes_selected_animation() -> None:

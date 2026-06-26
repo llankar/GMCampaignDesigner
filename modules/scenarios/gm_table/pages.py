@@ -17,6 +17,7 @@ from modules.helpers.logging_helper import log_exception, log_info, log_warning
 from modules.helpers.portrait_helper import resolve_portrait_candidate
 from modules.image_assets import ImageAssetsService
 from modules.scenarios.gm_table.attachments import EntityAttachment
+from modules.scenarios.gm_table.reveal import reveal_image
 from modules.scenarios.session_notes import SessionControls, SessionControlsCallbacks
 from modules.ui.image_library.browser_panel import ImageBrowserPanel
 from modules.ui.image_library.result_card import ImageResult
@@ -180,12 +181,23 @@ class GMTableImagePage(ctk.CTkFrame):
         self._ctk_image: ctk.CTkImage | None = None
         self._source_image: Image.Image | None = None
 
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        header.grid_columnconfigure(0, weight=1)
+
         ctk.CTkLabel(
-            self,
+            header,
             text=self._title,
             font=ctk.CTkFont(size=16, weight="bold"),
             anchor="w",
-        ).grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        ).grid(row=0, column=0, sticky="ew")
+        ctk.CTkButton(
+            header,
+            text="Reveal",
+            width=82,
+            height=28,
+            command=self.reveal,
+        ).grid(row=0, column=1, sticky="e", padx=(8, 0))
 
         self.image_label = ctk.CTkLabel(self, text="Loading image…", anchor="center")
         self.image_label.grid(row=1, column=0, sticky="nsew")
@@ -227,6 +239,10 @@ class GMTableImagePage(ctk.CTkFrame):
 
     def get_state(self) -> dict:
         return {"image_path": self._image_path, "image_title": self._title}
+
+    def reveal(self):
+        """Reveal this image to the player-facing display."""
+        return reveal_image(self._image_path, title=self._title)
 
 
 class GMTableAttachmentGallery(ctk.CTkFrame):

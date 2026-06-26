@@ -2071,7 +2071,16 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
     def _set_navigation_enabled(self, enabled: bool):  # pragma: no cover - UI interaction
         """Set navigation enabled."""
         state = "normal" if enabled else "disabled"
-        for btn in (self.back_btn, self.next_btn, self.finish_btn, self.cancel_btn, self.story_forge_btn):
+        button_names = (
+            "back_btn",
+            "next_btn",
+            "finish_btn",
+            "cancel_btn",
+            "story_forge_btn",
+        )
+        for btn in (getattr(self, name, None) for name in button_names):
+            if btn is None:
+                continue
             try:
                 # Keep navigation enabled resilient if this step fails.
                 if btn.winfo_exists():
@@ -2176,21 +2185,26 @@ class ScenarioBuilderWizard(ctk.CTkToplevel):
             payload[field] = list(dict.fromkeys(self.wizard_state.get(field, [])))
         sync_graph = bool(self.wizard_state.get("ScenarioCharacterGraphSync"))
 
+        button_names = (
+            "back_btn",
+            "next_btn",
+            "finish_btn",
+            "cancel_btn",
+            "story_forge_btn",
+        )
         buttons = {
-            self.back_btn: self.back_btn.cget("state"),
-            self.next_btn: self.next_btn.cget("state"),
-            self.finish_btn: self.finish_btn.cget("state"),
-            self.cancel_btn: self.cancel_btn.cget("state"),
-            self.story_forge_btn: self.story_forge_btn.cget("state"),
+            btn: btn.cget("state")
+            for btn in (getattr(self, name, None) for name in button_names)
+            if btn is not None
         }
         for btn in buttons:
             btn.configure(state="disabled")
 
         try:
             # Keep finish resilient if this step fails.
-            if self.mode == "embedded":
+            if getattr(self, "mode", "standalone") == "embedded":
                 # Handle the branch where mode == 'embedded'.
-                if self.persist_on_finish:
+                if getattr(self, "persist_on_finish", False):
                     # Continue with this path when persist on finish is set.
                     persisted, _ = self._persist_scenario_payload(title, payload)
                     if not persisted:
