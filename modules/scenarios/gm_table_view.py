@@ -25,6 +25,7 @@ from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
 from modules.scenarios.gm_table.table_name_labels import build_table_switch_labels
 from modules.scenarios.gm_table.table_registry import (
+    DEFAULT_GM_TABLE_ID,
     get_table_name,
     normalize_table_id,
 )
@@ -521,6 +522,21 @@ class GMTableView(ctk.CTkFrame):
 
     def _seed_default_panels(self) -> None:
         """Build the default table workspace without binding it to a scenario."""
+        table_id = normalize_table_id(getattr(self, "table_id", DEFAULT_GM_TABLE_ID))
+        if table_id != DEFAULT_GM_TABLE_ID:
+            self._create_panel(
+                "note",
+                f"{self.table_name} Notes",
+                {
+                    "text": (
+                        "Use this side table for notes, maps, handouts, "
+                        "or temporary planning."
+                    )
+                },
+                geometry={"x": 24, "y": 24, "width": 520, "height": 360},
+            )
+            return
+
         self._create_panel(
             "campaign_dashboard",
             "Campaign Dashboard",
