@@ -522,6 +522,43 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     }
 
 
+def test_restore_or_seed_layout_restores_annotation_only_desks() -> None:
+    """Saved desk text/drawings should restore even when no panels are present."""
+    layout = {
+        "desk_annotations": [
+            {"type": "text", "x": 20, "y": 40, "text": "Clue here"},
+            {"type": "stroke", "points": [(1, 2), (3, 4)]},
+        ],
+        "panels": [],
+    }
+    restored = []
+    seeded = []
+    view = GMTableView.__new__(GMTableView)
+    view.table_id = "table_1"
+    view.layout_store = SimpleNamespace(get_table_layout=lambda _table_id: layout)
+    view._filter_attachmentless_entity_panels = lambda saved_layout: saved_layout
+    view.workspace = SimpleNamespace(
+        restore=lambda saved_layout: restored.append(saved_layout)
+    )
+    view._seed_default_panels = lambda: seeded.append(True)
+
+    GMTableView._restore_or_seed_layout(view)
+
+    assert restored == [layout]
+    assert seeded == []
+    assert view._workspace_loaded is True
+
+
+def test_has_saved_workspace_content_includes_desk_annotations() -> None:
+    """Annotation-only layouts should count as restorable table content."""
+    assert GMTableView._has_saved_workspace_content(
+        {"desk_annotations": [{"type": "text"}]}
+    )
+    assert not GMTableView._has_saved_workspace_content(
+        {"desk_annotations": [], "panels": []}
+    )
+
+
 def test_seed_default_panels_opens_table_level_panels() -> None:
     """Starter tabletop should not bind the primary table identity to a scenario."""
     captured = []
