@@ -520,9 +520,10 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
 
 
 def test_seed_default_panels_opens_table_level_panels() -> None:
-    """Starter tabletop should not bind the table identity to a scenario."""
+    """Starter tabletop should not bind the primary table identity to a scenario."""
     captured = []
     view = GMTableView.__new__(GMTableView)
+    view.table_id = "table_1"
     view.table_name = "Main"
     view._create_panel = lambda kind, title, state, *, geometry=None: captured.append(
         (kind, title, state, geometry)
@@ -542,6 +543,33 @@ def test_seed_default_panels_opens_table_level_panels() -> None:
             "Main Notes",
             {"text": ""},
             {"x": 948, "y": 24, "width": 520, "height": 520},
+        ),
+    ]
+
+
+def test_seed_default_panels_keeps_secondary_tables_lightweight() -> None:
+    """Secondary tables should not start with the campaign dashboard."""
+    captured = []
+    view = GMTableView.__new__(GMTableView)
+    view.table_id = "table_2"
+    view.table_name = "Table2"
+    view._create_panel = lambda kind, title, state, *, geometry=None: captured.append(
+        (kind, title, state, geometry)
+    )
+
+    GMTableView._seed_default_panels(view)
+
+    assert captured == [
+        (
+            "note",
+            "Table2 Notes",
+            {
+                "text": (
+                    "Use this side table for notes, maps, handouts, "
+                    "or temporary planning."
+                )
+            },
+            {"x": 24, "y": 24, "width": 520, "height": 360},
         ),
     ]
 
