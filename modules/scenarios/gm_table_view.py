@@ -30,6 +30,7 @@ from modules.scenarios.gm_table.table_registry import (
     get_table_name,
     normalize_table_id,
 )
+from modules.scenarios.gm_table.annotations import ask_desk_annotation_style
 from modules.scenarios.gm_table.attachments import (
     collect_entity_attachments,
     entity_has_attachments,
@@ -306,6 +307,19 @@ class GMTableView(ctk.CTkFrame):
         )
         self.add_button.pack(side="left", padx=(0, 10))
 
+        self.layout_tools_button = ctk.CTkButton(
+            actions,
+            text="Arrange Desk",
+            width=122,
+            height=30,
+            fg_color=TABLE_PALETTE["accent"],
+            hover_color="#D97706",
+            text_color="#10131B",
+            corner_radius=14,
+            command=self._show_layout_tools_menu,
+        )
+        self.layout_tools_button.pack(side="left", padx=(0, 10))
+
         ctk.CTkButton(
             actions,
             text="Map Tool",
@@ -320,7 +334,7 @@ class GMTableView(ctk.CTkFrame):
 
         ctk.CTkButton(
             actions,
-            text="Player View",
+            text="WorldMap",
             width=116,
             height=30,
             fg_color=TABLE_PALETTE["table_chip"],
@@ -342,19 +356,6 @@ class GMTableView(ctk.CTkFrame):
             command=self._open_panel_search,
         ).pack(side="left", padx=(0, 10))
 
-        self.layout_tools_button = ctk.CTkButton(
-            actions,
-            text="Arrange Desk",
-            width=122,
-            height=30,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=14,
-            command=self._show_layout_tools_menu,
-        )
-        self.layout_tools_button.pack(side="left", padx=(0, 10))
-
         ctk.CTkButton(
             actions,
             text="Draw",
@@ -364,7 +365,7 @@ class GMTableView(ctk.CTkFrame):
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
-            command=lambda: self.workspace.set_desk_annotation_tool("draw"),
+            command=lambda: self._activate_desk_annotation_tool("draw"),
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
@@ -376,7 +377,7 @@ class GMTableView(ctk.CTkFrame):
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
-            command=lambda: self.workspace.set_desk_annotation_tool("text"),
+            command=lambda: self._activate_desk_annotation_tool("text"),
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
@@ -402,6 +403,19 @@ class GMTableView(ctk.CTkFrame):
             corner_radius=14,
             command=self.reset_table,
         ).pack(side="left")
+
+
+    def _activate_desk_annotation_tool(self, tool: str) -> None:
+        """Ask for annotation styling before arming a desk drawing tool."""
+        current_styles = getattr(self.workspace, "_desk_annotation_styles", {})
+        style = ask_desk_annotation_style(
+            self,
+            tool=tool,
+            initial_style=current_styles.get(tool, {}) if isinstance(current_styles, dict) else {},
+        )
+        if style is None:
+            return
+        self.workspace.set_desk_annotation_tool(tool, style)
 
     def _build_table_switch_options(
         self,

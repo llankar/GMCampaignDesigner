@@ -1401,6 +1401,10 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._desk_annotation_tool: str | None = None
         self._desk_annotations: list[dict[str, object]] = []
         self._desk_draw_points: list[tuple[float, float]] = []
+        self._desk_annotation_styles = {
+            "draw": {"fill": "#1F2937", "width": 3},
+            "text": {"fill": "#241A10", "font_size": 18},
+        }
         self._drag_controller = GMTableDragController(
             should_block_middle_drag=self._pointer_is_inside_map_tool
         )
@@ -1700,10 +1704,12 @@ class GMTableWorkspace(ctk.CTkFrame):
         except Exception:
             pass
 
-    def set_desk_annotation_tool(self, tool: str | None) -> None:
-        """Activate a one-shot desk annotation tool."""
+    def set_desk_annotation_tool(self, tool: str | None, style: dict | None = None) -> None:
+        """Activate a one-shot desk annotation tool with optional style choices."""
         normalized = str(tool or "").strip().lower()
         self._desk_annotation_tool = normalized if normalized in {"draw", "text"} else None
+        if self._desk_annotation_tool and isinstance(style, dict):
+            self._desk_annotation_styles[self._desk_annotation_tool].update(style)
         try:
             if self._desk_annotation_tool == "draw":
                 cursor = "pencil"
@@ -1738,7 +1744,8 @@ class GMTableWorkspace(ctk.CTkFrame):
                         "x": world_x,
                         "y": world_y,
                         "text": text,
-                        "fill": "#241A10",
+                        "fill": self._desk_annotation_styles["text"].get("fill", "#241A10"),
+                        "font_size": self._desk_annotation_styles["text"].get("font_size", 18),
                     }
                 )
                 self._redraw_desk_annotations()
@@ -1767,8 +1774,8 @@ class GMTableWorkspace(ctk.CTkFrame):
                 {
                     "type": "stroke",
                     "points": list(self._desk_draw_points),
-                    "fill": "#1F2937",
-                    "width": 3,
+                    "fill": self._desk_annotation_styles["draw"].get("fill", "#1F2937"),
+                    "width": self._desk_annotation_styles["draw"].get("width", 3),
                 }
             )
             self._schedule_layout_changed()
@@ -1802,7 +1809,11 @@ class GMTableWorkspace(ctk.CTkFrame):
                     text=str(item.get("text") or ""),
                     fill=str(item.get("fill") or "#241A10"),
                     anchor="nw",
-                    font=("Comic Sans MS", max(12, int(18 * zoom)), "bold"),
+                    font=(
+                        "Comic Sans MS",
+                        max(8, int(_coerce_float(item.get("font_size"), 18) * zoom)),
+                        "bold",
+                    ),
                     tags=("desk_annotation",),
                 )
             elif item.get("type") == "stroke":
@@ -1829,8 +1840,8 @@ class GMTableWorkspace(ctk.CTkFrame):
             if len(coords) >= 4:
                 canvas.create_line(
                     *coords,
-                    fill="#111827",
-                    width=max(1, int(3 * zoom)),
+                    fill=str(self._desk_annotation_styles["draw"].get("fill", "#111827")),
+                    width=max(1, int(_coerce_float(self._desk_annotation_styles["draw"].get("width"), 3) * zoom)),
                     smooth=True,
                     capstyle="round",
                     joinstyle="round",
