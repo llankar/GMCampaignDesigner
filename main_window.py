@@ -1441,7 +1441,7 @@ class MainWindow(ctk.CTk):
 
         try:
             window.attributes("-topmost", True)
-            window.after_idle(lambda: window.attributes("-topmost", False))
+            window.after(1200, lambda: window.attributes("-topmost", False))
         except Exception as exc:
             log_warning(
                 f"Unable to toggle detached window topmost state: {exc}",
@@ -3032,7 +3032,7 @@ class MainWindow(ctk.CTk):
             self._focus_detached_window(window)
             try:
                 window.attributes("-topmost", True)
-                window.after(800, lambda: window.attributes("-topmost", False))
+                window.after(1200, lambda: window.attributes("-topmost", False))
             except Exception:
                 pass
 
