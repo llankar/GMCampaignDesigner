@@ -60,6 +60,30 @@ def test_build_scenario_board_data_extracts_scenes_sections_and_links() -> None:
     assert data.linked_entities["Places"] == ("Docks",)
 
 
+def test_build_scenario_board_data_decodes_serialized_rich_text_payloads() -> None:
+    """Scenario Board should render rich-text payloads as readable plain text."""
+    data = build_scenario_board_data(
+        {
+            "Title": "Payload Run",
+            "Summary": "{'text': 'Readable summary.', 'formatting': {'bold': []}}",
+            "Secrets": {"text": "Readable secret.", "formatting": {"italic": []}},
+            "Scenes": [
+                {
+                    "Title": "Dict Scene",
+                    "Text": "{'text': 'Plain scene body.', 'formatting': {'bold': []}}",
+                },
+                r'{"text":"Inline Scene\nScene from JSON payload.","formatting":{"italic":[]}}',
+            ],
+        }
+    )
+
+    assert data.summary == "Readable summary."
+    assert data.secrets == "Readable secret."
+    assert data.scenes[0].body == "Plain scene body."
+    assert data.scenes[0].intro_text == "Plain scene body."
+    assert data.scenes[1].title == "Inline Scene"
+    assert data.scenes[1].body == "Scene from JSON payload."
+
 def test_scenario_board_has_dedicated_default_panel_size() -> None:
     """The scenario board should open as a large planning panel."""
     assert resolve_default_panel_size("scenario_board") == (900, 680)

@@ -165,14 +165,9 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         self._card_title(card, title).grid(
             row=0, column=0, sticky="ew", padx=12, pady=(10, 4)
         )
-        ctk.CTkLabel(
-            card,
-            text=text,
-            text_color=TABLE_PALETTE["text"],
-            justify="left",
-            wraplength=760,
-            anchor="w",
-        ).grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 12))
+        self._wrapped_label(card, text).grid(
+            row=1, column=0, sticky="ew", padx=12, pady=(0, 12)
+        )
         return row + 1
 
     def _add_entities_card(self, parent, row: int, data: ScenarioBoardData) -> int:
@@ -232,14 +227,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             self._scene_buttons[scene.index] = button
             inner_row = 1
             if scene.intro_text:
-                ctk.CTkLabel(
-                    card,
-                    text=scene.intro_text,
-                    text_color=TABLE_PALETTE["text"],
-                    justify="left",
-                    wraplength=760,
-                    anchor="w",
-                ).grid(
+                self._wrapped_label(card, scene.intro_text).grid(
                     row=inner_row,
                     column=0,
                     columnspan=2,
@@ -266,13 +254,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 parts.append(f"{label}: {', '.join(values)}")
         if not parts:
             return row
-        ctk.CTkLabel(
-            parent,
-            text="  •  ".join(parts),
-            text_color=TABLE_PALETTE["muted"],
-            justify="left",
-            wraplength=760,
-            anchor="w",
+        self._wrapped_label(
+            parent, "  •  ".join(parts), text_color=TABLE_PALETTE["muted"]
         ).grid(row=row, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 8))
         return row + 1
 
@@ -292,14 +275,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             else str(section.get("raw_text") or "").strip()
         )
         if text:
-            ctk.CTkLabel(
-                parent,
-                text=text,
-                text_color=TABLE_PALETTE["text"],
-                justify="left",
-                wraplength=760,
-                anchor="w",
-            ).grid(
+            self._wrapped_label(parent, text).grid(
                 row=row + 1, column=0, columnspan=2, sticky="ew", padx=18, pady=(0, 4)
             )
             return row + 2
@@ -412,6 +388,32 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         except (TypeError, ValueError):
             return None
         return index if index > 0 else None
+
+    @staticmethod
+    def _wrapped_label(
+        parent,
+        text: str,
+        *,
+        text_color: str | None = None,
+        horizontal_padding: int = 36,
+    ) -> ctk.CTkLabel:
+        """Create a label whose wrap length follows the available card width."""
+        label = ctk.CTkLabel(
+            parent,
+            text=text,
+            text_color=text_color or TABLE_PALETTE["text"],
+            justify="left",
+            wraplength=760,
+            anchor="w",
+        )
+
+        def update_wraplength(event=None) -> None:
+            width = getattr(event, "width", 0) or parent.winfo_width()
+            label.configure(wraplength=max(240, width - horizontal_padding))
+
+        parent.bind("<Configure>", update_wraplength, add="+")
+        label.after_idle(update_wraplength)
+        return label
 
     @staticmethod
     def _card(parent) -> ctk.CTkFrame:
