@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import ast
 import json
 from typing import Any, Iterable, Mapping
 
@@ -51,9 +52,42 @@ class ScenarioBoardData:
     linked_entities: dict[str, tuple[str, ...]]
 
 
+def _parse_serialized_payload(value: str) -> Any | None:
+    """Decode JSON/Python literal rich-text payloads stored as strings."""
+    text = value.strip()
+    if not text or text[0] not in "[{":
+        return None
+    for parser in (json.loads, ast.literal_eval):
+        try:
+            parsed = parser(text)
+        except (ValueError, SyntaxError, TypeError, json.JSONDecodeError):
+            continue
+        if isinstance(parsed, (dict, list, tuple)):
+            return parsed
+    return None
+
+
 def _clean_text(value: Any) -> str:
-    """Return a display-safe string without leading or trailing whitespace."""
-    return str(value or "").strip()
+    """Return display-safe plain text for raw and rich-text payloads."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        parsed = _parse_serialized_payload(value)
+        if parsed is not None:
+            return _clean_text(parsed)
+        return value.strip()
+    if isinstance(value, Mapping):
+        text_value = value.get("text")
+        if text_value is None:
+            text_value = value.get("Text")
+        if text_value is not None:
+            return _clean_text(text_value)
+        return ""
+    if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray)):
+        return "\n".join(
+            part for entry in value if (part := _clean_text(entry))
+        ).strip()
+    return str(value).strip()
 
 
 def _maybe_json_list(value: str) -> list[Any] | None:
@@ -84,7 +118,7 @@ def normalize_list_field(value: Any) -> tuple[str, ...]:
             if part.strip()
         )
     if isinstance(value, dict):
-        for key in ("Title", "Name", "title", "name"):
+        for key in ("Title", "Name", "title", "name", "text", "Text"):
             label = _clean_text(value.get(key))
             if label:
                 return (label,)
@@ -94,7 +128,7 @@ def normalize_list_field(value: Any) -> tuple[str, ...]:
         for entry in value:
             if isinstance(entry, dict):
                 label = ""
-                for key in ("Title", "Name", "title", "name"):
+                for key in ("Title", "Name", "title", "name", "text", "Text"):
                     label = _clean_text(entry.get(key))
                     if label:
                         break
