@@ -34,6 +34,7 @@ class GMTableContainerPage(ctk.CTkFrame):
         on_add_panel=None,
         panel_builder=None,
         on_layout_changed=None,
+        on_reveal_requested=None,
     ) -> None:
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(1, weight=1)
@@ -43,12 +44,14 @@ class GMTableContainerPage(ctk.CTkFrame):
         self._on_add_panel = on_add_panel
         self._panel_builder = panel_builder
         self._on_layout_changed = on_layout_changed
+        self._on_reveal_requested = on_reveal_requested
         self._add_menu = self._build_add_menu()
         self._build_toolbar()
         self.workspace = GMTableWorkspace(
             self,
             on_panel_build=self._mount_container_panel,
             on_layout_changed=self._handle_workspace_changed,
+            on_reveal_requested=self._handle_reveal_requested,
         )
         self.workspace.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         self.after_idle(self._restore_or_seed_layout)
@@ -171,6 +174,11 @@ class GMTableContainerPage(ctk.CTkFrame):
         """Bubble nested layout changes up to the outer GM Table."""
         if callable(self._on_layout_changed):
             self._on_layout_changed()
+
+    def _handle_reveal_requested(self, panel_id: str) -> None:
+        """Bubble nested reveal requests with the nested workspace context."""
+        if callable(self._on_reveal_requested):
+            self._on_reveal_requested(panel_id, self.workspace)
 
     def _create_internal_panel(
         self,

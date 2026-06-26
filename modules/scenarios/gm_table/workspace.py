@@ -31,6 +31,7 @@ from modules.scenarios.gm_table.panel_depth_styles import (
     PanelDepthStyle,
     resolve_panel_depth_style,
 )
+from modules.scenarios.gm_table.reveal import is_reveal_supported
 
 
 TABLE_PALETTE = {
@@ -540,6 +541,7 @@ class GMTablePanel(ctk.CTkFrame):
         on_snap_preview_changed: Callable[[str, str | None], None],
         on_toggle_maximize: Callable[[str], None],
         on_window_action: Callable[[str, str], None],
+        on_reveal_requested: Callable[[str], None] | None = None,
     ) -> None:
         self._skin = resolve_panel_skin(definition.kind, definition.state)
         self._skin_name = self._skin.name
@@ -574,6 +576,7 @@ class GMTablePanel(ctk.CTkFrame):
         self._on_snap_preview_changed = on_snap_preview_changed
         self._on_toggle_maximize = on_toggle_maximize
         self._on_window_action = on_window_action
+        self._on_reveal_requested = on_reveal_requested
         self._drag_origin: tuple[int, int, int, int] | None = None
         self._resize_origin: tuple[int, int, dict[str, int], str] | None = None
         self._restore_geometry: dict[str, int] | None = None
@@ -1145,6 +1148,9 @@ class GMTablePanel(ctk.CTkFrame):
         self._on_focus(self.definition.panel_id)
         menu = self._actions_menu
         menu.delete(0, "end")
+        if is_reveal_supported(self.definition.kind, self.definition.state):
+            menu.add_command(label="Reveal", command=self._dispatch_reveal)
+            menu.add_separator()
         menu.add_command(label="Restore", command=lambda: self._dispatch_window_action("restore"))
         menu.add_command(label="Minimize", command=lambda: self._dispatch_window_action("minimize"))
         maximize_label = "Restore Size" if self._layout_mode in SNAP_LAYOUT_MODES else "Maximize"
@@ -1163,6 +1169,12 @@ class GMTablePanel(ctk.CTkFrame):
             menu.tk_popup(x, y)
         finally:
             menu.grab_release()
+
+    def _dispatch_reveal(self) -> None:
+        """Forward a player reveal request to the workspace owner."""
+        self._on_focus(self.definition.panel_id)
+        if self._on_reveal_requested is not None:
+            self._on_reveal_requested(self.definition.panel_id)
 
     def _refresh_window_controls(self) -> None:
         """Refresh control labels for the current layout mode."""
@@ -1331,11 +1343,13 @@ class GMTableWorkspace(ctk.CTkFrame):
         on_panel_build: Callable[[ctk.CTkFrame, PanelDefinition], object],
         on_layout_changed: Callable[[], None] | None = None,
         map_tool_window_provider: Callable[[], object | None] | None = None,
+        on_reveal_requested: Callable[[str], None] | None = None,
     ) -> None:
         super().__init__(master, fg_color=TABLE_PALETTE["table_bg"], corner_radius=28)
         self._build_panel = on_panel_build
         self._layout_changed_callback = on_layout_changed
         self._map_tool_window_provider = map_tool_window_provider
+        self._reveal_requested_callback = on_reveal_requested
         self._panels: dict[str, GMTablePanel] = {}
         self._definitions: dict[str, PanelDefinition] = {}
         self._panel_payloads: dict[str, object] = {}
@@ -2347,6 +2361,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             on_snap_preview_changed=self.preview_snap_target,
             on_toggle_maximize=self.toggle_panel_maximize,
             on_window_action=self.handle_window_action,
+            on_reveal_requested=self._handle_reveal_requested,
         )
         panel.attach_depth_layers(self._create_panel_depth_layers(panel))
         self._apply_floating_geometry(panel, world_geometry)
@@ -2406,6 +2421,11 @@ class GMTableWorkspace(ctk.CTkFrame):
         if action == "restore_all":
             self.restore_all_panels()
             return
+
+    def _handle_reveal_requested(self, panel_id: str) -> None:
+        """Dispatch a reveal request for one panel payload."""
+        if self._reveal_requested_callback is not None:
+            self._reveal_requested_callback(panel_id)
 
     def preview_snap_target(self, panel_id: str, mode: str | None) -> None:
         """Show a restrained preview rectangle for the requested snap target."""
