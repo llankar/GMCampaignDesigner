@@ -24,6 +24,7 @@ from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
 from modules.scenarios.gm_table.table_name_labels import build_table_switch_labels
+from modules.scenarios.gm_table.organization.search_dialog import GMTablePanelSearchDialog
 from modules.scenarios.gm_table.table_registry import (
     DEFAULT_GM_TABLE_ID,
     get_table_name,
@@ -42,6 +43,7 @@ from modules.scenarios.gm_table.pages import (
     GMTableImageLibraryPage,
     GMTableImagePage,
     GMTableNotePage,
+    GMTableStickyNotePage,
 )
 from modules.scenarios.gm_table.reveal import reveal_entity, reveal_image, reveal_map_payload
 from modules.scenarios.session_notes import SessionControlsCallbacks
@@ -160,11 +162,23 @@ class GMTableView(ctk.CTkFrame):
             *ENTITY_TYPES,
             "Puzzle Display",
             "Note Tab",
+            "Sticky Note",
             "Character Graph",
             "Scenario Graph Editor",
             "separator",
             ("Save Table Layout", self.save_layout_now),
+            ("Search Panels", self._open_panel_search),
             ("Tile Panels", self._tile_panels),
+            ("Align Left", lambda: self.workspace.align_panels("left")),
+            ("Align Top", lambda: self.workspace.align_panels("top")),
+            ("Align Center", lambda: self.workspace.align_panels("center_x")),
+            ("Make Same Width", lambda: self.workspace.make_panels_same_size("width")),
+            ("Make Same Height", lambda: self.workspace.make_panels_same_size("height")),
+            ("Snap to Grid", lambda: self.workspace.snap_panels_to_grid()),
+            ("Distribute Horizontally", lambda: self.workspace.distribute_panels("horizontal")),
+            ("Distribute Vertically", lambda: self.workspace.distribute_panels("vertical")),
+            ("Cluster Sticky Notes by Tag", lambda: self.workspace.cluster_sticky_notes("tag")),
+            ("Cluster Sticky Notes by Color", lambda: self.workspace.cluster_sticky_notes("color")),
             ("Spread on Desk", self._spread_panels_on_desk),
             ("Cascade Panels", self._cascade_panels),
             ("Restore Minimized Panels", self._restore_all_panels),
@@ -290,6 +304,18 @@ class GMTableView(ctk.CTkFrame):
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
             command=self._open_player_view_for_active_panel,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Search",
+            width=92,
+            height=30,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=14,
+            command=self._open_panel_search,
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
@@ -589,6 +615,10 @@ class GMTableView(ctk.CTkFrame):
         self.workspace.clear()
         self.layout_store.clear_table_layout(self.table_id)
         self._seed_default_panels()
+
+    def _open_panel_search(self) -> None:
+        """Open panel search and jump dialog."""
+        GMTablePanelSearchDialog(self, workspace=self.workspace)
 
     def _tile_panels(self) -> None:
         """Tile panels into a readable layout."""
@@ -1095,6 +1125,14 @@ class GMTableView(ctk.CTkFrame):
                 else self._open_puzzle_selection(workspace=workspace)
             )
             return
+        if option == "Sticky Note":
+            self._create_panel_in_workspace(
+                "sticky_note",
+                "Sticky Note",
+                {"title": "", "body": "", "text": "", "color": "Yellow", "tags": [], "vote_marker": "", "pinned": False},
+                workspace=workspace,
+            )
+            return
         if option == "Note Tab":
             existing_notes = [
                 panel
@@ -1267,6 +1305,8 @@ class GMTableView(ctk.CTkFrame):
                     parent,
                     builder=lambda host: self._build_scenario_graph_content(host),
                 )
+            if kind == "sticky_note":
+                return GMTableStickyNotePage(parent, initial_state=definition.state)
             if kind == "note":
                 return GMTableNotePage(
                     parent,
