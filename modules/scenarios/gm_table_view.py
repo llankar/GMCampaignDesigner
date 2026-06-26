@@ -564,11 +564,24 @@ class GMTableView(ctk.CTkFrame):
         """Restore saved workspace or create a starter tabletop."""
         layout = self.layout_store.get_table_layout(self.table_id)
         layout = self._filter_attachmentless_entity_panels(layout)
-        if layout.get("panels"):
+        if self._has_saved_workspace_content(layout):
             self.workspace.restore(layout)
         else:
             self._seed_default_panels()
         self._workspace_loaded = True
+
+    @staticmethod
+    def _has_saved_workspace_content(layout: dict) -> bool:
+        """Return whether a saved desk has any restorable panels or annotations."""
+        if not isinstance(layout, dict):
+            return False
+        for key in ("panels", "desk_annotations", "bookmarks"):
+            value = layout.get(key)
+            if isinstance(value, list) and value:
+                return True
+        return isinstance(layout.get("camera"), dict) or isinstance(
+            layout.get("home_camera"), dict
+        )
 
     def _filter_attachmentless_entity_panels(self, layout: dict) -> dict:
         """Drop only saved attachment-gallery panels that no longer have attachments."""
