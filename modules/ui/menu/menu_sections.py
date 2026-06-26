@@ -30,9 +30,15 @@ class TopLevelMenuSpec:
     groups: list[MenuGroupSpec] = field(default_factory=list)
 
 
-def _command(label: str, command: Callable[[], None], *, shortcut: str = "", icon_key: str | None = None) -> MenuCommandSpec:
+def _command(label: str, command: Callable[[], None] | None, *, shortcut: str = "", icon_key: str | None = None) -> MenuCommandSpec:
     """Internal helper for command."""
     return MenuCommandSpec(label=label, command=command, shortcut=shortcut, icon_key=icon_key)
+
+
+def _optional_command(app, name: str) -> Callable[[], None] | None:
+    """Return an optional app command without making menu construction brittle."""
+    command = getattr(app, name, None)
+    return command if callable(command) else None
 
 
 def _shortcut_text(shortcut: str) -> str:
@@ -133,7 +139,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                         _command("Scenario Graph", app.open_scenario_graph_editor, icon_key="scenario_graph"),
                         _command("Scene Flow Viewer", app.open_scene_flow_viewer, icon_key="scene_flow_viewer"),
                         _command("Create Random Table", app.open_random_table_editor, icon_key="create_random_table"),
-                        _command("Verify Campaign ", app.open_hierarchy_validation, icon_key="campaign_graph"),
+                        _command("Verify Campaign", _optional_command(app, "open_hierarchy_validation"), icon_key="campaign_graph"),
                     ],
                 ),
             ],

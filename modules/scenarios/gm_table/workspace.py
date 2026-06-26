@@ -32,6 +32,17 @@ from modules.scenarios.gm_table.panel_depth_styles import (
     resolve_panel_depth_style,
 )
 from modules.scenarios.gm_table.reveal import is_reveal_supported
+from modules.scenarios.gm_table.organization.alignment import (
+    align_geometries,
+    distribute_geometries,
+    eligible_panel_records,
+    same_size_geometries,
+    snap_geometries_to_grid,
+)
+from modules.scenarios.gm_table.organization.sticky_notes import (
+    cluster_group_geometries,
+    group_sticky_notes,
+)
 
 
 TABLE_PALETTE = {
@@ -74,6 +85,7 @@ DEFAULT_PANEL_SIZES = {
     "character_graph": (860, 620),
     "scenario_graph": (860, 620),
     "note": (520, 360),
+    "sticky_note": (360, 300),
 }
 
 PANEL_MARGIN = 12
@@ -152,6 +164,7 @@ SNAP_COMPLEMENT_MODES = {
     "bottom": "top",
 }
 WORKSPACE_STATE_KEYS = {
+    "locked",
     "height",
     "layout_mode",
     "minimized_restore_mode",
@@ -604,6 +617,7 @@ class GMTablePanel(ctk.CTkFrame):
         self._build_physical_header(self._skin)
 
         self._actions_menu = tk.Menu(self, tearoff=0)
+        self._locked = bool(definition.state.get("locked", False))
 
         self.body = ctk.CTkFrame(self, fg_color="transparent")
         self.body.grid(row=1, column=self._content_column, sticky="nsew", padx=10, pady=(6, 10))
@@ -633,6 +647,17 @@ class GMTablePanel(ctk.CTkFrame):
             self._bind_focus(widget)
         self._install_drag_bindings()
         self._install_resize_bindings()
+        self._refresh_window_controls()
+
+    @property
+    def locked(self) -> bool:
+        """Return whether panel organization mutations are locked."""
+        return self._locked
+
+    def set_locked(self, locked: bool) -> None:
+        """Toggle protection against drag, resize, close, and bulk layout."""
+        self._locked = bool(locked)
+        self.definition.state["locked"] = self._locked
         self._refresh_window_controls()
 
     def attach_depth_layers(self, layers: list[ctk.CTkFrame]) -> None:
@@ -1128,6 +1153,8 @@ class GMTablePanel(ctk.CTkFrame):
     def serialize_layout_state(self) -> dict[str, object]:
         """Return panel layout metadata for persistence."""
         payload: dict[str, object] = {"layout_mode": self._layout_mode}
+        if self._locked:
+            payload["locked"] = True
         if self._restore_geometry:
             payload["restore_geometry"] = {
                 "world_x": self._restore_geometry["x"],
@@ -1151,6 +1178,9 @@ class GMTablePanel(ctk.CTkFrame):
         if is_reveal_supported(self.definition.kind, self.definition.state):
             menu.add_command(label="Reveal", command=self._dispatch_reveal)
             menu.add_separator()
+        lock_label = "Unlock Panel" if self._locked else "Lock Panel"
+        menu.add_command(label=lock_label, command=lambda: self._dispatch_window_action("toggle_lock"))
+        menu.add_separator()
         menu.add_command(label="Restore", command=lambda: self._dispatch_window_action("restore"))
         menu.add_command(label="Minimize", command=lambda: self._dispatch_window_action("minimize"))
         maximize_label = "Restore Size" if self._layout_mode in SNAP_LAYOUT_MODES else "Maximize"
@@ -1161,7 +1191,7 @@ class GMTablePanel(ctk.CTkFrame):
         menu.add_command(label="Tile Windows", command=lambda: self._dispatch_window_action("tile_all"))
         menu.add_command(label="Restore All", command=lambda: self._dispatch_window_action("restore_all"))
         menu.add_separator()
-        menu.add_command(label="Close", command=lambda: self._on_close(self.definition.panel_id))
+        menu.add_command(label="Close", command=lambda: self._on_close(self.definition.panel_id), state=("disabled" if self._locked else "normal"))
 
         x = self.actions_button.winfo_rootx()
         y = self.actions_button.winfo_rooty() + self.actions_button.winfo_height()
@@ -1179,11 +1209,13 @@ class GMTablePanel(ctk.CTkFrame):
     def _refresh_window_controls(self) -> None:
         """Refresh control labels for the current layout mode."""
         maximize_label = "↙" if self._layout_mode in SNAP_LAYOUT_MODES else "□"
-        self.maximize_button.configure(text=maximize_label)
+        self.maximize_button.configure(text=maximize_label, state=("disabled" if self._locked else "normal"))
+        self.close_button.configure(state=("disabled" if self._locked else "normal"))
+        self.resize_handle.configure(text=("🔒" if self._locked else "//"))
 
     def _start_drag(self, event) -> None:
         """Start moving a panel."""
-        if self._layout_mode == "minimized":
+        if self._layout_mode == "minimized" or self._locked:
             return
         self._on_focus(self.definition.panel_id)
         self._on_snap_preview_changed(self.definition.panel_id, None)
@@ -1234,7 +1266,7 @@ class GMTablePanel(ctk.CTkFrame):
 
     def _start_resize(self, event, direction: str = "se") -> None:
         """Start resizing a panel."""
-        if self._layout_mode == "minimized":
+        if self._layout_mode == "minimized" or self._locked:
             return
         self._on_focus(self.definition.panel_id)
         self._on_snap_preview_changed(self.definition.panel_id, None)
@@ -2218,6 +2250,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                     "definition": definition,
                     "payload": self._panel_payloads.get(panel_id),
                     "layout_mode": panel.layout_mode,
+                    "locked": getattr(panel, "locked", False),
                 }
             )
         return records
@@ -2285,6 +2318,9 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def remove_panel(self, panel_id: str) -> None:
         """Close a panel."""
+        panel = self._panels.get(panel_id)
+        if panel is not None and getattr(panel, "locked", False):
+            return
         panel = self._panels.pop(panel_id, None)
         self._definitions.pop(panel_id, None)
         self._z_order = [value for value in self._z_order if value != panel_id]
@@ -2395,6 +2431,14 @@ class GMTableWorkspace(ctk.CTkFrame):
     def handle_window_action(self, panel_id: str, action: str) -> None:
         """Dispatch a panel window action."""
         if action.startswith("snap:"):
+            return
+        panel = self._panels.get(panel_id)
+        if action == "toggle_lock":
+            if panel is not None:
+                panel.set_locked(not getattr(panel, "locked", False))
+                self._schedule_layout_changed()
+            return
+        if panel is not None and getattr(panel, "locked", False) and action in {"minimize", "toggle_maximize", "close_others", "cascade_all", "tile_all"}:
             return
         if action == "restore":
             self.restore_panel(panel_id)
@@ -2527,10 +2571,106 @@ class GMTableWorkspace(ctk.CTkFrame):
             return candidate_id
         return None
 
+
+    def jump_to_panel(self, panel_id: str) -> bool:
+        """Focus and restore a panel from search/navigation tools."""
+        panel = self._panels.get(panel_id)
+        if panel is None:
+            return False
+        if panel.layout_mode == "minimized":
+            self.restore_panel(panel_id, focus=False)
+        self.bring_to_front(panel_id)
+        panel = self._panels.get(panel_id)
+        if panel is None:
+            return False
+        geometry = panel.floating_geometry_snapshot()
+        surface_w, surface_h = self._surface_geometry()
+        zoom = max(CAMERA_MIN_ZOOM, float(getattr(self, "_camera_zoom", 1.0)))
+        self._camera_x = float(geometry["x"]) - (surface_w / 2.0 - int(geometry["width"]) / 2.0) / zoom
+        self._camera_y = float(geometry["y"]) - (surface_h / 2.0 - int(geometry["height"]) / 2.0) / zoom
+        self._reproject_floating_panels()
+        self._refresh_navigation_hud()
+        self._refresh_minimap()
+        self._schedule_layout_changed()
+        return True
+
+    def set_panel_locked(self, panel_id: str, locked: bool) -> None:
+        """Set the locked flag for a panel and persist it."""
+        panel = self._panels.get(panel_id)
+        if panel is None:
+            return
+        panel.set_locked(locked)
+        self._schedule_layout_changed()
+
+    def align_panels(self, edge: str) -> None:
+        """Align all visible unlocked panels to an edge or center axis."""
+        records = eligible_panel_records(self.list_panels(include_minimized=False))
+        if len(records) < 2:
+            return
+        geometries = [r["panel"].floating_geometry_snapshot() for r in records]
+        for record, geometry in zip(records, align_geometries(geometries, edge), strict=False):
+            panel = record["panel"]
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        self._schedule_layout_changed()
+
+    def distribute_panels(self, axis: str) -> None:
+        """Distribute all visible unlocked panels along one axis."""
+        records = eligible_panel_records(self.list_panels(include_minimized=False))
+        if len(records) < 3:
+            return
+        geometries = [r["panel"].floating_geometry_snapshot() for r in records]
+        for record, geometry in zip(records, distribute_geometries(geometries, axis), strict=False):
+            panel = record["panel"]
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        self._schedule_layout_changed()
+
+    def make_panels_same_size(self, dimension: str) -> None:
+        """Resize visible unlocked panels to the largest peer dimension."""
+        records = eligible_panel_records(self.list_panels(include_minimized=False))
+        if len(records) < 2:
+            return
+        geometries = [r["panel"].floating_geometry_snapshot() for r in records]
+        for record, geometry in zip(records, same_size_geometries(geometries, dimension), strict=False):
+            panel = record["panel"]
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        self._schedule_layout_changed()
+
+    def snap_panels_to_grid(self, grid_size: int = 24) -> None:
+        """Snap visible unlocked panel origins to the workspace grid."""
+        records = eligible_panel_records(self.list_panels(include_minimized=False))
+        if not records:
+            return
+        geometries = [r["panel"].floating_geometry_snapshot() for r in records]
+        for record, geometry in zip(records, snap_geometries_to_grid(geometries, grid_size), strict=False):
+            panel = record["panel"]
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        self._schedule_layout_changed()
+
+    def cluster_sticky_notes(self, by: str = "tag") -> None:
+        """Cluster visible unlocked sticky notes by tag or color."""
+        records = eligible_panel_records(self.list_panels(kinds={"sticky_note"}, include_minimized=False))
+        groups = group_sticky_notes(records, by)
+        if not groups:
+            return
+        anchor = records[0]["panel"].floating_geometry_snapshot()
+        placements = cluster_group_geometries(groups, start_x=float(anchor["x"]), start_y=float(anchor["y"]))
+        for record in records:
+            geometry = placements.get(record["panel_id"])
+            if geometry is None:
+                continue
+            panel = record["panel"]
+            panel.clear_layout_mode()
+            self._apply_floating_geometry(panel, geometry)
+        self._schedule_layout_changed()
+
     def minimize_panel(self, panel_id: str) -> None:
         """Minimize a panel into the workspace tray."""
         panel = self._panels.get(panel_id)
-        if panel is None or panel.layout_mode == "minimized":
+        if panel is None or panel.layout_mode == "minimized" or getattr(panel, "locked", False):
             return
         panel.minimize()
         self._apply_focus_state(self._last_visible_panel_id(exclude=panel_id))
@@ -2540,7 +2680,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         """Restore a minimized, snapped, or maximized panel."""
         self.clear_snap_preview()
         panel = self._panels.get(panel_id)
-        if panel is None:
+        if panel is None or getattr(panel, "locked", False):
             return
         if panel.layout_mode == "minimized":
             surface_w, surface_h = self._surface_geometry()
@@ -2580,7 +2720,8 @@ class GMTableWorkspace(ctk.CTkFrame):
     def close_other_panels(self, panel_id: str) -> None:
         """Close every panel except the target panel."""
         for candidate_id in list(self._z_order):
-            if candidate_id != panel_id:
+            candidate = self._panels.get(candidate_id)
+            if candidate_id != panel_id and not (candidate and getattr(candidate, "locked", False)):
                 self.remove_panel(candidate_id)
         if panel_id in self._panels:
             self.bring_to_front(panel_id)
@@ -2637,7 +2778,7 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def auto_arrange(self) -> None:
         """Tile visible panels across the surface."""
-        visible_ids = self._visible_panel_ids()
+        visible_ids = [panel_id for panel_id in self._visible_panel_ids() if not getattr(self._panels.get(panel_id), "locked", False)]
         if not visible_ids:
             return
         self.update_idletasks()
@@ -2685,7 +2826,7 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def cascade_panels(self) -> None:
         """Cascade visible panels diagonally like classic desktop windows."""
-        visible_ids = self._visible_panel_ids()
+        visible_ids = [panel_id for panel_id in self._visible_panel_ids() if not getattr(self._panels.get(panel_id), "locked", False)]
         if not visible_ids:
             return
         surface_w, surface_h = self._surface_geometry()
@@ -2718,7 +2859,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         floating_ids = [
             panel_id
             for panel_id in self._visible_panel_ids()
-            if self._panels[panel_id].layout_mode == "floating"
+            if self._panels[panel_id].layout_mode == "floating" and not getattr(self._panels[panel_id], "locked", False)
         ]
         if not floating_ids:
             return
@@ -2909,11 +3050,14 @@ class GMTableWorkspace(ctk.CTkFrame):
         panels.sort(key=lambda item: int((item.get("state") or {}).get("z", 0)))
         for item in panels:
             state = dict(item.get("state") or {})
+            panel_state = _payload_state(state)
+            if state.get("locked", False):
+                panel_state["locked"] = True
             definition = PanelDefinition(
                 panel_id=str(item.get("panel_id") or ""),
                 kind=str(item.get("kind") or "entity"),
                 title=str(item.get("title") or "Panel"),
-                state=_payload_state(state),
+                state=panel_state,
             )
             if not definition.panel_id:
                 continue

@@ -9,6 +9,7 @@ import sys
 from typing import Callable
 
 import customtkinter as ctk
+import tkinter as tk
 from PIL import Image
 from tkinter import messagebox
 
@@ -397,3 +398,72 @@ class GMTableImageLibraryPage(ctk.CTkFrame):
             "size_label": state.size_label,
             "sort_label": state.sort_label,
         }
+
+
+class GMTableStickyNotePage(ctk.CTkFrame):
+    """Persistent sticky-note panel with title, body, tags, and vote marker."""
+
+    COLORS = {
+        "Yellow": "#FFF3A3",
+        "Pink": "#FFD1DC",
+        "Blue": "#CFE8FF",
+        "Green": "#D8F8D8",
+        "Purple": "#E7D7FF",
+    }
+
+    def __init__(self, master, *, initial_state: dict | None = None) -> None:
+        from modules.scenarios.gm_table.organization.sticky_notes import normalize_tags
+
+        state = initial_state or {}
+        color_name = str(state.get("color") or "Yellow")
+        self._color_name = color_name if color_name in self.COLORS else "Yellow"
+        super().__init__(master, fg_color=self.COLORS[self._color_name])
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self._pinned_var = tk.BooleanVar(value=bool(state.get("pinned", False)))
+        self._color_var = tk.StringVar(value=self._color_name)
+        self._title_var = tk.StringVar(value=str(state.get("title") or ""))
+        self._tags_var = tk.StringVar(value=", ".join(normalize_tags(state.get("tags"))))
+        self._vote_marker_var = tk.StringVar(value=str(state.get("vote_marker") or state.get("vote_count") or ""))
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
+        header.grid_columnconfigure(0, weight=1)
+        self.title_entry = ctk.CTkEntry(header, textvariable=self._title_var, placeholder_text="Title", fg_color="#FFF8CC", text_color="#201A12")
+        self.title_entry.grid(row=0, column=0, sticky="ew")
+        self._color_menu = ctk.CTkOptionMenu(header, values=list(self.COLORS), width=110, variable=self._color_var, command=self._set_color)
+        self._color_menu.grid(row=0, column=1, padx=(8, 0), sticky="e")
+        ctk.CTkCheckBox(header, text="Pinned", variable=self._pinned_var, text_color="#2B2118", width=80).grid(row=0, column=2, padx=(8, 0), sticky="e")
+
+        meta = ctk.CTkFrame(self, fg_color="transparent")
+        meta.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
+        meta.grid_columnconfigure(0, weight=1)
+        self.tags_entry = ctk.CTkEntry(meta, textvariable=self._tags_var, placeholder_text="tags: clue, npc", fg_color="#FFF8CC", text_color="#201A12")
+        self.tags_entry.grid(row=0, column=0, sticky="ew")
+        self.vote_entry = ctk.CTkEntry(meta, textvariable=self._vote_marker_var, placeholder_text="votes/count", width=96, fg_color="#FFF8CC", text_color="#201A12")
+        self.vote_entry.grid(row=0, column=1, padx=(8, 0), sticky="e")
+
+        self.textbox = ctk.CTkTextbox(self, wrap="word", fg_color=self.COLORS.get(self._color_name, self.COLORS["Yellow"]), text_color="#201A12")
+        self.textbox.grid(row=2, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        body = str(state.get("body") if state.get("body") is not None else state.get("text") or "")
+        if body:
+            self.textbox.insert("1.0", body)
+
+    def _set_color(self, color_name: str) -> None:
+        self._color_name = color_name if color_name in self.COLORS else "Yellow"
+        color = self.COLORS[self._color_name]
+        self.configure(fg_color=color)
+        self.textbox.configure(fg_color=color)
+
+    def get_state(self) -> dict:
+        """Return serializable sticky-note state."""
+        from modules.scenarios.gm_table.organization.sticky_notes import normalize_tags, sticky_note_state
+
+        return sticky_note_state(
+            title=self._title_var.get(),
+            body=self.textbox.get("1.0", "end-1c"),
+            color=self._color_name,
+            tags=normalize_tags(self._tags_var.get()),
+            vote_marker=self._vote_marker_var.get(),
+            pinned=bool(self._pinned_var.get()),
+        )
