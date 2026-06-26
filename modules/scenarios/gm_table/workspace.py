@@ -1398,6 +1398,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._minimap_projection: dict[str, float] | None = None
         self._surface_pan_binding_target = None
         self._surface_pan_binding_ids: dict[str, str] = {}
+        self._desk_annotation_tool: str | None = None
+        self._desk_annotations: list[dict[str, object]] = []
+        self._desk_draw_points: list[tuple[float, float]] = []
         self._drag_controller = GMTableDragController(
             should_block_middle_drag=self._pointer_is_inside_map_tool
         )
@@ -1681,6 +1684,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         texture_canvas = getattr(self, "_desk_texture_canvas", None)
         if texture_canvas is not None:
             widgets.insert(1, texture_canvas)
+            texture_canvas.bind("<ButtonPress-1>", self._start_desk_annotation, add="+")
+            texture_canvas.bind("<B1-Motion>", self._drag_desk_annotation, add="+")
+            texture_canvas.bind("<ButtonRelease-1>", self._finish_desk_annotation, add="+")
         for widget in widgets:
             widget.bind("<ButtonPress-1>", self._start_surface_pan, add="+")
             widget.bind("<B1-Motion>", self._pan_surface_to, add="+")
@@ -1693,6 +1699,144 @@ class GMTableWorkspace(ctk.CTkFrame):
             self.surface.configure(cursor="fleur")
         except Exception:
             pass
+
+    def set_desk_annotation_tool(self, tool: str | None) -> None:
+        """Activate a one-shot desk annotation tool."""
+        normalized = str(tool or "").strip().lower()
+        self._desk_annotation_tool = normalized if normalized in {"draw", "text"} else None
+        try:
+            if self._desk_annotation_tool == "draw":
+                cursor = "pencil"
+            elif self._desk_annotation_tool == "text":
+                cursor = "xterm"
+            else:
+                cursor = "fleur"
+            self.surface.configure(cursor=cursor)
+            self._desk_texture_canvas.configure(cursor=cursor)
+        except Exception:
+            pass
+
+    def clear_desk_annotations(self) -> None:
+        """Remove all writing and sketches drawn directly on the desk."""
+        self._desk_annotations = []
+        self._redraw_desk_annotations()
+        self._schedule_layout_changed()
+
+    def _start_desk_annotation(self, event) -> str | None:
+        """Begin drawing or place text on the desk texture."""
+        if self._desk_annotation_tool == "text":
+            text = simpledialog.askstring(
+                "Desk Text",
+                "Write on the desk:",
+                parent=self.winfo_toplevel(),
+            )
+            if text:
+                world_x, world_y = self._screen_to_world(event.x, event.y)
+                self._desk_annotations.append(
+                    {
+                        "type": "text",
+                        "x": world_x,
+                        "y": world_y,
+                        "text": text,
+                        "fill": "#241A10",
+                    }
+                )
+                self._redraw_desk_annotations()
+                self._schedule_layout_changed()
+            self.set_desk_annotation_tool(None)
+            return "break"
+        if self._desk_annotation_tool == "draw":
+            self._desk_draw_points = [self._screen_to_world(event.x, event.y)]
+            return "break"
+        return None
+
+    def _drag_desk_annotation(self, event) -> str | None:
+        """Append freehand drawing points while the draw tool is active."""
+        if self._desk_annotation_tool != "draw" or not self._desk_draw_points:
+            return None
+        self._desk_draw_points.append(self._screen_to_world(event.x, event.y))
+        self._redraw_desk_annotations(preview_points=self._desk_draw_points)
+        return "break"
+
+    def _finish_desk_annotation(self, _event) -> str | None:
+        """Persist the active freehand stroke."""
+        if self._desk_annotation_tool != "draw" or not self._desk_draw_points:
+            return None
+        if len(self._desk_draw_points) > 1:
+            self._desk_annotations.append(
+                {
+                    "type": "stroke",
+                    "points": list(self._desk_draw_points),
+                    "fill": "#1F2937",
+                    "width": 3,
+                }
+            )
+            self._schedule_layout_changed()
+        self._desk_draw_points = []
+        self._redraw_desk_annotations()
+        return "break"
+
+    def _project_world_point(self, point: tuple[float, float]) -> tuple[float, float]:
+        """Project a world coordinate into desk canvas coordinates."""
+        zoom = max(CAMERA_MIN_ZOOM, float(getattr(self, "_camera_zoom", 1.0)))
+        return (
+            (_coerce_float(point[0]) - _coerce_float(getattr(self, "_camera_x", 0.0))) * zoom,
+            (_coerce_float(point[1]) - _coerce_float(getattr(self, "_camera_y", 0.0))) * zoom,
+        )
+
+    def _redraw_desk_annotations(
+        self, *, preview_points: list[tuple[float, float]] | None = None
+    ) -> None:
+        """Redraw persisted desk writing over the texture and below panels."""
+        canvas = getattr(self, "_desk_texture_canvas", None)
+        if canvas is None:
+            return
+        canvas.delete("desk_annotation")
+        zoom = max(CAMERA_MIN_ZOOM, float(getattr(self, "_camera_zoom", 1.0)))
+        for item in self._desk_annotations:
+            if item.get("type") == "text":
+                x, y = self._project_world_point((_coerce_float(item.get("x")), _coerce_float(item.get("y"))))
+                canvas.create_text(
+                    x,
+                    y,
+                    text=str(item.get("text") or ""),
+                    fill=str(item.get("fill") or "#241A10"),
+                    anchor="nw",
+                    font=("Comic Sans MS", max(12, int(18 * zoom)), "bold"),
+                    tags=("desk_annotation",),
+                )
+            elif item.get("type") == "stroke":
+                points = item.get("points") or []
+                coords: list[float] = []
+                for point in points:
+                    x, y = self._project_world_point(tuple(point))
+                    coords.extend([x, y])
+                if len(coords) >= 4:
+                    canvas.create_line(
+                        *coords,
+                        fill=str(item.get("fill") or "#1F2937"),
+                        width=max(1, int(_coerce_float(item.get("width"), 3) * zoom)),
+                        smooth=True,
+                        capstyle="round",
+                        joinstyle="round",
+                        tags=("desk_annotation",),
+                    )
+        if preview_points:
+            coords = []
+            for point in preview_points:
+                x, y = self._project_world_point(point)
+                coords.extend([x, y])
+            if len(coords) >= 4:
+                canvas.create_line(
+                    *coords,
+                    fill="#111827",
+                    width=max(1, int(3 * zoom)),
+                    smooth=True,
+                    capstyle="round",
+                    joinstyle="round",
+                    tags=("desk_annotation",),
+                )
+        canvas.tag_raise("desk_annotation")
 
     def _bind_workspace_middle_pan(self) -> None:
         """Bind middle-button camera pan to the containing window."""
@@ -1874,6 +2018,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 canvas.configure(bg=TABLE_PALETTE["table_bg"])
             except Exception:
                 pass
+        self._redraw_desk_annotations()
         self._raise_workspace_overlays()
 
     def _refresh_navigation_hud(self) -> None:
@@ -3028,6 +3173,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             "camera": self._camera_snapshot(),
             "home_camera": dict(getattr(self, "_home_camera", self._camera_snapshot())),
             "bookmarks": [dict(bookmark) for bookmark in getattr(self, "_bookmarks", [])],
+            "desk_annotations": list(getattr(self, "_desk_annotations", [])),
             "panels": panels,
         }
 
@@ -3045,6 +3191,11 @@ class GMTableWorkspace(ctk.CTkFrame):
             _normalize_bookmark(str(bookmark.get("name") or "Bookmark"), bookmark)
             for bookmark in list(payload.get("bookmarks") or [])
             if isinstance(bookmark, dict)
+        ]
+        self._desk_annotations = [
+            dict(annotation)
+            for annotation in list(payload.get("desk_annotations") or [])
+            if isinstance(annotation, dict)
         ]
         panels = [item for item in list(payload.get("panels") or []) if isinstance(item, dict)]
         panels.sort(key=lambda item: int((item.get("state") or {}).get("z", 0)))

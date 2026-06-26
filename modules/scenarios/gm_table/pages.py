@@ -417,8 +417,8 @@ class GMTableStickyNotePage(ctk.CTkFrame):
         state = initial_state or {}
         color_name = str(state.get("color") or "Yellow")
         self._color_name = color_name if color_name in self.COLORS else "Yellow"
-        super().__init__(master, fg_color=self.COLORS[self._color_name])
-        self.grid_rowconfigure(2, weight=1)
+        super().__init__(master, fg_color=self.COLORS[self._color_name], corner_radius=0)
+        self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self._pinned_var = tk.BooleanVar(value=bool(state.get("pinned", False)))
         self._color_var = tk.StringVar(value=self._color_name)
@@ -426,25 +426,34 @@ class GMTableStickyNotePage(ctk.CTkFrame):
         self._tags_var = tk.StringVar(value=", ".join(normalize_tags(state.get("tags"))))
         self._vote_marker_var = tk.StringVar(value=str(state.get("vote_marker") or state.get("vote_count") or ""))
 
+        tape = ctk.CTkLabel(
+            self,
+            text="",
+            height=18,
+            fg_color="#F7E08A",
+            corner_radius=3,
+        )
+        tape.grid(row=0, column=0, padx=72, pady=(6, 0), sticky="ew")
+
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
+        header.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 4))
         header.grid_columnconfigure(0, weight=1)
-        self.title_entry = ctk.CTkEntry(header, textvariable=self._title_var, placeholder_text="Title", fg_color="#FFF8CC", text_color="#201A12")
+        self.title_entry = ctk.CTkEntry(header, textvariable=self._title_var, placeholder_text="Title", fg_color="#FFF7BD", text_color="#201A12")
         self.title_entry.grid(row=0, column=0, sticky="ew")
         self._color_menu = ctk.CTkOptionMenu(header, values=list(self.COLORS), width=110, variable=self._color_var, command=self._set_color)
         self._color_menu.grid(row=0, column=1, padx=(8, 0), sticky="e")
         ctk.CTkCheckBox(header, text="Pinned", variable=self._pinned_var, text_color="#2B2118", width=80).grid(row=0, column=2, padx=(8, 0), sticky="e")
 
         meta = ctk.CTkFrame(self, fg_color="transparent")
-        meta.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 4))
+        meta.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
         meta.grid_columnconfigure(0, weight=1)
-        self.tags_entry = ctk.CTkEntry(meta, textvariable=self._tags_var, placeholder_text="tags: clue, npc", fg_color="#FFF8CC", text_color="#201A12")
+        self.tags_entry = ctk.CTkEntry(meta, textvariable=self._tags_var, placeholder_text="tags: clue, npc", fg_color="#FFF7BD", text_color="#201A12")
         self.tags_entry.grid(row=0, column=0, sticky="ew")
-        self.vote_entry = ctk.CTkEntry(meta, textvariable=self._vote_marker_var, placeholder_text="votes/count", width=96, fg_color="#FFF8CC", text_color="#201A12")
+        self.vote_entry = ctk.CTkEntry(meta, textvariable=self._vote_marker_var, placeholder_text="votes/count", width=96, fg_color="#FFF7BD", text_color="#201A12")
         self.vote_entry.grid(row=0, column=1, padx=(8, 0), sticky="e")
 
         self.textbox = ctk.CTkTextbox(self, wrap="word", fg_color=self.COLORS.get(self._color_name, self.COLORS["Yellow"]), text_color="#201A12")
-        self.textbox.grid(row=2, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        self.textbox.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 12))
         body = str(state.get("body") if state.get("body") is not None else state.get("text") or "")
         if body:
             self.textbox.insert("1.0", body)

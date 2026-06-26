@@ -185,7 +185,31 @@ class GMTableView(ctk.CTkFrame):
             ("Reset Table", self.reset_table),
             ("Open Chatbot", self.open_chatbot),
         ]
+        self._layout_tools_options = [
+            ("Save Table Layout", self.save_layout_now),
+            ("Search Panels", self._open_panel_search),
+            ("Tile Panels", self._tile_panels),
+            ("Align Left", lambda: self.workspace.align_panels("left")),
+            ("Align Top", lambda: self.workspace.align_panels("top")),
+            ("Align Center", lambda: self.workspace.align_panels("center_x")),
+            ("Make Same Width", lambda: self.workspace.make_panels_same_size("width")),
+            ("Make Same Height", lambda: self.workspace.make_panels_same_size("height")),
+            ("Snap to Grid", lambda: self.workspace.snap_panels_to_grid()),
+            ("Distribute Horizontally", lambda: self.workspace.distribute_panels("horizontal")),
+            ("Distribute Vertically", lambda: self.workspace.distribute_panels("vertical")),
+            ("Cluster Sticky Notes by Tag", lambda: self.workspace.cluster_sticky_notes("tag")),
+            ("Cluster Sticky Notes by Color", lambda: self.workspace.cluster_sticky_notes("color")),
+            ("Spread on Desk", self._spread_panels_on_desk),
+            ("Cascade Panels", self._cascade_panels),
+            ("Restore Minimized Panels", self._restore_all_panels),
+            ("Reset Table", self.reset_table),
+        ]
+        self._add_menu_options = [
+            option for option in self._add_menu_options
+            if not isinstance(option, tuple)
+        ]
         self._add_menu = self._build_add_menu()
+        self._layout_tools_menu = self._build_layout_tools_menu()
         self._build_toolbar()
         self.workspace = GMTableWorkspace(
             self,
@@ -318,52 +342,41 @@ class GMTableView(ctk.CTkFrame):
             command=self._open_panel_search,
         ).pack(side="left", padx=(0, 10))
 
-        ctk.CTkButton(
+        self.layout_tools_button = ctk.CTkButton(
             actions,
-            text="Tile",
-            width=84,
+            text="Arrange Desk",
+            width=122,
             height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
-            command=self._tile_panels,
+            command=self._show_layout_tools_menu,
+        )
+        self.layout_tools_button.pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="Draw",
+            width=78,
+            height=30,
+            fg_color=TABLE_PALETTE["table_chip"],
+            hover_color="#283146",
+            text_color=TABLE_PALETTE["text"],
+            corner_radius=14,
+            command=lambda: self.workspace.set_desk_annotation_tool("draw"),
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
             actions,
-            text="Spread on Desk",
-            width=132,
+            text="Desk Text",
+            width=104,
             height=30,
             fg_color=TABLE_PALETTE["table_chip"],
             hover_color="#283146",
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
-            command=self._spread_panels_on_desk,
-        ).pack(side="left", padx=(0, 10))
-
-        ctk.CTkButton(
-            actions,
-            text="Cascade",
-            width=94,
-            height=30,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=14,
-            command=self._cascade_panels,
-        ).pack(side="left", padx=(0, 10))
-
-        ctk.CTkButton(
-            actions,
-            text="Restore All",
-            width=118,
-            height=30,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=14,
-            command=self._restore_all_panels,
+            command=lambda: self.workspace.set_desk_annotation_tool("text"),
         ).pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
@@ -504,6 +517,25 @@ class GMTableView(ctk.CTkFrame):
                 command=lambda value=option: self._handle_add_option(value),
             )
         return menu
+
+
+    def _build_layout_tools_menu(self) -> tk.Menu:
+        """Build the desk arrangement menu kept separate from Add Panel."""
+        menu = tk.Menu(self, tearoff=0)
+        for label, command in self._layout_tools_options:
+            menu.add_command(label=label, command=command)
+        menu.add_separator()
+        menu.add_command(label="Clear Desk Drawing", command=lambda: self.workspace.clear_desk_annotations())
+        return menu
+
+    def _show_layout_tools_menu(self) -> None:
+        """Open the desk arrangement menu under its toolbar button."""
+        x = self.layout_tools_button.winfo_rootx()
+        y = self.layout_tools_button.winfo_rooty() + self.layout_tools_button.winfo_height()
+        try:
+            self._layout_tools_menu.tk_popup(x, y)
+        finally:
+            self._layout_tools_menu.grab_release()
 
     def _show_add_menu(self) -> None:
         """Open the add menu under the toolbar button."""
