@@ -1708,11 +1708,11 @@ class GMTableWorkspace(ctk.CTkFrame):
             pass
 
     def set_desk_annotation_tool(self, tool: str | None, style: dict | None = None) -> None:
-        """Activate a one-shot desk annotation tool with optional style choices."""
+        """Activate a desk annotation tool with optional style choices."""
         normalized = str(tool or "").strip().lower()
         self._desk_annotation_tool = normalized if normalized in {"draw", "text"} else None
         if self._desk_annotation_tool and isinstance(style, dict):
-            self._desk_annotation_styles[self._desk_annotation_tool].update(style)
+            self.configure_desk_annotation_style(self._desk_annotation_tool, style)
         try:
             if self._desk_annotation_tool == "draw":
                 cursor = "pencil"
@@ -1724,6 +1724,14 @@ class GMTableWorkspace(ctk.CTkFrame):
             self._desk_texture_canvas.configure(cursor=cursor)
         except Exception:
             pass
+
+
+    def configure_desk_annotation_style(self, tool: str, style: dict | None) -> None:
+        """Update saved style choices for a desk annotation tool."""
+        normalized = str(tool or "").strip().lower()
+        if normalized not in {"draw", "text"} or not isinstance(style, dict):
+            return
+        self._desk_annotation_styles[normalized].update(style)
 
     def clear_desk_annotations(self) -> None:
         """Remove all writing and sketches drawn directly on the desk."""
@@ -3224,11 +3232,13 @@ class GMTableWorkspace(ctk.CTkFrame):
             for bookmark in list(payload.get("bookmarks") or [])
             if isinstance(bookmark, dict)
         ]
-        self._desk_annotations = [
-            dict(annotation)
-            for annotation in list(payload.get("desk_annotations") or [])
-            if isinstance(annotation, dict)
-        ]
+        self._desk_annotations = serializable_desk_annotations(
+            [
+                dict(annotation)
+                for annotation in list(payload.get("desk_annotations") or [])
+                if isinstance(annotation, dict)
+            ]
+        )
         panels = [item for item in list(payload.get("panels") or []) if isinstance(item, dict)]
         panels.sort(key=lambda item: int((item.get("state") or {}).get("z", 0)))
         for item in panels:
@@ -3286,3 +3296,5 @@ class GMTableWorkspace(ctk.CTkFrame):
                 )
                 panel._refresh_window_controls()
         self.clamp_panels()
+        self.after_idle(self._refresh_desk_texture)
+        self.after_idle(self._redraw_desk_annotations)
