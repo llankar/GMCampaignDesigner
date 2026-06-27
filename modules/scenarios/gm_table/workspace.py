@@ -43,6 +43,9 @@ from modules.scenarios.gm_table.organization.sticky_notes import (
     cluster_group_geometries,
     group_sticky_notes,
 )
+from modules.scenarios.gm_table.annotation_persistence import (
+    serializable_desk_annotations,
+)
 
 
 TABLE_PALETTE = {
@@ -1725,8 +1728,7 @@ class GMTableWorkspace(ctk.CTkFrame):
     def clear_desk_annotations(self) -> None:
         """Remove all writing and sketches drawn directly on the desk."""
         self._desk_annotations = []
-        self._redraw_desk_annotations()
-        self._schedule_layout_changed()
+        self._commit_desk_annotation_change()
 
     def _start_desk_annotation(self, event) -> str | None:
         """Begin drawing or place text on the desk texture."""
@@ -1748,8 +1750,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                         "font_size": self._desk_annotation_styles["text"].get("font_size", 18),
                     }
                 )
-                self._redraw_desk_annotations()
-                self._schedule_layout_changed()
+                self._commit_desk_annotation_change()
             self.set_desk_annotation_tool(None)
             return "break"
         if self._desk_annotation_tool == "draw":
@@ -1778,10 +1779,28 @@ class GMTableWorkspace(ctk.CTkFrame):
                     "width": self._desk_annotation_styles["draw"].get("width", 3),
                 }
             )
-            self._schedule_layout_changed()
+            self._commit_desk_annotation_change()
         self._desk_draw_points = []
         self._redraw_desk_annotations()
         return "break"
+
+    def _commit_desk_annotation_change(self) -> None:
+        """Redraw desk annotations and persist them immediately.
+
+        Desk writing can be the only content on a GM Table, and users often close
+        or switch tables right after drawing. Persist synchronously here instead
+        of relying only on the regular debounced panel-layout callback.
+        """
+        self._desk_annotations = serializable_desk_annotations(self._desk_annotations)
+        self._redraw_desk_annotations()
+        if self._save_job is not None:
+            try:
+                self.after_cancel(self._save_job)
+            except Exception:
+                pass
+            self._save_job = None
+        if self._layout_changed_callback is not None and not self._disposed:
+            self._layout_changed_callback()
 
     def _project_world_point(self, point: tuple[float, float]) -> tuple[float, float]:
         """Project a world coordinate into desk canvas coordinates."""
@@ -3184,7 +3203,9 @@ class GMTableWorkspace(ctk.CTkFrame):
             "camera": self._camera_snapshot(),
             "home_camera": dict(getattr(self, "_home_camera", self._camera_snapshot())),
             "bookmarks": [dict(bookmark) for bookmark in getattr(self, "_bookmarks", [])],
-            "desk_annotations": list(getattr(self, "_desk_annotations", [])),
+            "desk_annotations": serializable_desk_annotations(
+                getattr(self, "_desk_annotations", [])
+            ),
             "panels": panels,
         }
 
