@@ -30,7 +30,7 @@ from modules.scenarios.gm_table.table_registry import (
     get_table_name,
     normalize_table_id,
 )
-from modules.scenarios.gm_table.annotations import ask_desk_annotation_style
+from modules.scenarios.gm_table.annotations import DeskAnnotationToolbar
 from modules.scenarios.gm_table.attachments import (
     collect_entity_attachments,
     entity_has_attachments,
@@ -112,6 +112,7 @@ class GMTableView(ctk.CTkFrame):
         self.layout_store = layout_store or GMTableLayoutStore()
         self._layout_settle_scheduler = LayoutSettleScheduler(self)
         self._workspace_loaded = False
+        self._save_feedback_job: str | None = None
         self._templates = {
             "Campaigns": load_entity_template("campaigns"),
             "Scenarios": load_entity_template("scenarios"),
@@ -245,6 +246,7 @@ class GMTableView(ctk.CTkFrame):
         title_frame = ctk.CTkFrame(bar, fg_color="transparent")
         title_frame.grid(row=0, column=0, padx=18, pady=8, sticky="ew")
         title_frame.grid_columnconfigure(0, weight=1)
+        title_frame.grid_columnconfigure(1, weight=0)
 
         self.title_label = ctk.CTkLabel(
             title_frame,
@@ -254,6 +256,15 @@ class GMTableView(ctk.CTkFrame):
             anchor="w",
         )
         self.title_label.grid(row=0, column=0, sticky="ew")
+
+        self.save_feedback_label = ctk.CTkLabel(
+            title_frame,
+            text="",
+            text_color=TABLE_PALETTE["danger"],
+            font=ctk.CTkFont(size=12, weight="bold"),
+            anchor="e",
+        )
+        self.save_feedback_label.grid(row=0, column=1, padx=(10, 0), sticky="e")
 
         ctk.CTkButton(
             title_frame,
@@ -265,7 +276,7 @@ class GMTableView(ctk.CTkFrame):
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
             command=self._open_rename_dialog,
-        ).grid(row=0, column=1, padx=(10, 0), sticky="e")
+        ).grid(row=0, column=2, padx=(10, 0), sticky="e")
 
         actions = ctk.CTkFrame(bar, fg_color="transparent")
         actions.grid(row=0, column=1, padx=12, pady=8, sticky="e")
@@ -356,29 +367,14 @@ class GMTableView(ctk.CTkFrame):
             command=self._open_panel_search,
         ).pack(side="left", padx=(0, 10))
 
-        ctk.CTkButton(
+        self.annotation_toolbar = DeskAnnotationToolbar(
             actions,
-            text="Draw",
-            width=78,
-            height=30,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=14,
-            command=lambda: self._activate_desk_annotation_tool("draw"),
-        ).pack(side="left", padx=(0, 10))
-
-        ctk.CTkButton(
-            actions,
-            text="Desk Text",
-            width=104,
-            height=30,
-            fg_color=TABLE_PALETTE["table_chip"],
-            hover_color="#283146",
-            text_color=TABLE_PALETTE["text"],
-            corner_radius=14,
-            command=lambda: self._activate_desk_annotation_tool("text"),
-        ).pack(side="left", padx=(0, 10))
+            palette=TABLE_PALETTE,
+            on_tool_selected=self._activate_desk_annotation_tool,
+            on_style_changed=self._update_desk_annotation_style,
+            on_clear=lambda: self.workspace.clear_desk_annotations(),
+        )
+        self.annotation_toolbar.pack(side="left", padx=(0, 10))
 
         ctk.CTkButton(
             actions,
@@ -406,16 +402,21 @@ class GMTableView(ctk.CTkFrame):
 
 
     def _activate_desk_annotation_tool(self, tool: str) -> None:
-        """Ask for annotation styling before arming a desk drawing tool."""
-        current_styles = getattr(self.workspace, "_desk_annotation_styles", {})
-        style = ask_desk_annotation_style(
-            self,
-            tool=tool,
-            initial_style=current_styles.get(tool, {}) if isinstance(current_styles, dict) else {},
-        )
-        if style is None:
-            return
+        """Arm a desk annotation tool immediately using inline toolbar styling."""
+        toolbar = getattr(self, "annotation_toolbar", None)
+        if toolbar is not None:
+            toolbar.set_active_tool(tool)
+            style = toolbar.style_for_tool(tool)
+        else:
+            style = None
         self.workspace.set_desk_annotation_tool(tool, style)
+
+    def _update_desk_annotation_style(self, tool: str, style: dict[str, object]) -> None:
+        """Apply inline annotation style changes without interrupting the active tool."""
+        workspace = getattr(self, "workspace", None)
+        if workspace is None:
+            return
+        workspace.configure_desk_annotation_style(tool, style)
 
     def _build_table_switch_options(
         self,
@@ -647,22 +648,39 @@ class GMTableView(ctk.CTkFrame):
             "gm_table_layout", self._save_layout_snapshot
         )
 
-    def _save_layout_snapshot(self) -> None:
+    def _save_layout_snapshot(self) -> bool:
         """Write the latest workspace snapshot to storage."""
         try:
             self.layout_store.save_table_layout(
                 self.table_id, self.workspace.serialize()
             )
+            return True
         except Exception as exc:
             log_warning(
                 f"Unable to save GM Table layout: {exc}",
                 func_name="GMTableView._save_layout_snapshot",
             )
+            return False
 
     def save_layout_now(self) -> None:
-        """Persist immediately and notify the user."""
-        self._save_layout_snapshot()
-        messagebox.showinfo("GM Table", f"Layout saved for '{self.table_name}'.")
+        """Persist immediately and show inline save feedback."""
+        if self._save_layout_snapshot():
+            self._show_save_feedback(f"Saved {self.table_name}")
+        else:
+            self._show_save_feedback("Save failed")
+
+    def _show_save_feedback(self, message: str) -> None:
+        """Display compact save confirmation beside the table title."""
+        label = getattr(self, "save_feedback_label", None)
+        if label is None:
+            return
+        label.configure(text=message)
+        if hasattr(self, "_save_feedback_job") and self._save_feedback_job is not None:
+            try:
+                self.after_cancel(self._save_feedback_job)
+            except Exception:
+                pass
+        self._save_feedback_job = self.after(2200, lambda: label.configure(text=""))
 
     def reset_table(self) -> None:
         """Reset the table workspace to the starter layout."""

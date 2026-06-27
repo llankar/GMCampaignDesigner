@@ -83,7 +83,7 @@ class DeskAnnotationStyleDialog(ctk.CTkToplevel):
         ).grid(row=0, column=0, padx=(14, 10), pady=(14, 8), sticky="w")
         self.color_preview = ctk.CTkButton(
             container,
-            text=self.color_var.get(),
+            text="Selected",
             width=132,
             height=30,
             fg_color=self.color_var.get(),
@@ -163,7 +163,7 @@ class DeskAnnotationStyleDialog(ctk.CTkToplevel):
         if color:
             normalized = _normalize_hex_color(color, self.color_var.get())
             self.color_var.set(normalized)
-            self.color_preview.configure(text=normalized, fg_color=normalized, hover_color=normalized)
+            self.color_preview.configure(text="Selected", fg_color=normalized, hover_color=normalized)
 
     def _apply(self) -> None:
         self.result = {"fill": self.color_var.get()}

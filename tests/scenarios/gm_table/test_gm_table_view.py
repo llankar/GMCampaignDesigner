@@ -1171,3 +1171,31 @@ def test_workspace_commits_desk_annotation_changes_immediately() -> None:
         "redraw",
         [{"type": "stroke", "points": [[1.0, 2.0], [3.0, 4.0]], "fill": "#111827"}],
     ]
+
+
+def test_save_layout_now_reports_failed_save_feedback() -> None:
+    """Manual save feedback should not claim success when persistence fails."""
+    view = GMTableView.__new__(GMTableView)
+    view.table_name = "Main Desk"
+    view._save_layout_snapshot = lambda: False
+
+    messages = []
+    view._show_save_feedback = messages.append
+
+    GMTableView.save_layout_now(view)
+
+    assert messages == ["Save failed"]
+
+
+def test_save_layout_now_reports_successful_save_feedback() -> None:
+    """Manual save feedback should confirm the named table only after success."""
+    view = GMTableView.__new__(GMTableView)
+    view.table_name = "Main Desk"
+    view._save_layout_snapshot = lambda: True
+
+    messages = []
+    view._show_save_feedback = messages.append
+
+    GMTableView.save_layout_now(view)
+
+    assert messages == ["Saved Main Desk"]
