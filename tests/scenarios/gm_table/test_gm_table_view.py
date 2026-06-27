@@ -1120,3 +1120,54 @@ def test_launch_scenario_bundle_opens_maps_and_entities() -> None:
         ("Villains", "Boss"),
         ("Places", "Docks"),
     ]
+
+
+def test_workspace_serializes_json_safe_desk_annotations() -> None:
+    """Desk drawings should be stored as JSON-safe coordinate lists."""
+    from modules.scenarios.gm_table.annotation_persistence import (
+        serializable_desk_annotations,
+    )
+
+    assert serializable_desk_annotations(
+        [
+            {
+                "type": "stroke",
+                "points": [(1, 2), ("3.5", "4.5")],
+                "fill": "#111827",
+                "width": 3,
+            },
+            {"type": "text", "x": 10, "y": 20, "text": "Saved note"},
+        ]
+    ) == [
+        {
+            "type": "stroke",
+            "points": [[1.0, 2.0], [3.5, 4.5]],
+            "fill": "#111827",
+            "width": 3,
+        },
+        {"type": "text", "x": 10, "y": 20, "text": "Saved note"},
+    ]
+
+
+def test_workspace_commits_desk_annotation_changes_immediately() -> None:
+    """Annotation-only desks should not wait for a debounced panel save."""
+    from modules.scenarios.gm_table.workspace import GMTableWorkspace
+
+    callbacks = []
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace._desk_annotations = [
+        {"type": "stroke", "points": [(1, 2), (3, 4)], "fill": "#111827"}
+    ]
+    workspace._save_job = None
+    workspace._disposed = False
+    workspace._layout_changed_callback = lambda: callbacks.append(
+        list(workspace._desk_annotations)
+    )
+    workspace._redraw_desk_annotations = lambda: callbacks.append("redraw")
+
+    GMTableWorkspace._commit_desk_annotation_change(workspace)
+
+    assert callbacks == [
+        "redraw",
+        [{"type": "stroke", "points": [[1.0, 2.0], [3.0, 4.0]], "fill": "#111827"}],
+    ]
