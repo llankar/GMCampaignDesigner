@@ -22,10 +22,20 @@ from modules.generic.ambiance_wallpaper_bundle import (
     load_wallpaper_manifest,
     merge_wallpaper_bundle,
 )
-from modules.generic.cross_campaign_bundle_extras import collect_full_campaign_extra_files
+from modules.generic.cross_campaign_bundle_extras import (
+    collect_full_campaign_extra_files,
+)
+from modules.generic.cross_campaign_gm_tables import (
+    export_gm_virtual_tables,
+    load_bundled_gm_virtual_tables,
+    merge_gm_virtual_tables,
+)
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.config_helper import ConfigHelper
-from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
+from modules.helpers.portrait_helper import (
+    parse_portrait_value,
+    serialize_portrait_value,
+)
 from modules.helpers.logging_helper import (
     log_exception,
     log_module_import,
@@ -38,7 +48,16 @@ log_module_import(__name__)
 BUNDLE_VERSION = 1
 
 
-PORTRAIT_ENTITY_TYPES = {"npcs", "objects", "pcs", "creatures", "places", "clues", "factions", "villains"}
+PORTRAIT_ENTITY_TYPES = {
+    "npcs",
+    "objects",
+    "pcs",
+    "creatures",
+    "places",
+    "clues",
+    "factions",
+    "villains",
+}
 AUDIO_ENTITY_TYPES = {"npcs", "pcs", "creatures", "places", "villains"}
 ATTACHMENT_FIELDS = {
     "clues": "Attachment",
@@ -79,11 +98,15 @@ class BundleAnalysis:
     world_maps: Optional[Dict[str, dict]] = None
     systems: Optional[List[dict]] = None
     ambiance_wallpapers: Optional[List[dict]] = None
+    gm_virtual_tables: Optional[dict] = None
 
 
 def _resolve_active_campaign() -> CampaignDatabase:
     """Resolve active campaign."""
-    db_path_value = ConfigHelper.get("Database", "path", fallback="default_campaign.db") or "default_campaign.db"
+    db_path_value = (
+        ConfigHelper.get("Database", "path", fallback="default_campaign.db")
+        or "default_campaign.db"
+    )
     db_path = Path(db_path_value)
     if not db_path.is_absolute():
         db_path = (Path(ConfigHelper.get_campaign_dir()) / db_path).resolve()
@@ -117,7 +140,11 @@ def list_sibling_campaigns(include_current: bool = False) -> List[CampaignDataba
             if db_path.resolve() == active.db_path.resolve():
                 continue
             candidates.append(
-                CampaignDatabase(name=f"{entry.name} ({db_path.name})", root=entry.resolve(), db_path=db_path.resolve())
+                CampaignDatabase(
+                    name=f"{entry.name} ({db_path.name})",
+                    root=entry.resolve(),
+                    db_path=db_path.resolve(),
+                )
             )
 
     if include_current:
@@ -131,7 +158,13 @@ def discover_databases_in_directory(directory: Path) -> List[CampaignDatabase]:
     db_files = list(directory.glob("*.db"))
     results: List[CampaignDatabase] = []
     for db_path in db_files:
-        results.append(CampaignDatabase(name=f"{directory.name} ({db_path.name})", root=directory, db_path=db_path.resolve()))
+        results.append(
+            CampaignDatabase(
+                name=f"{directory.name} ({db_path.name})",
+                root=directory,
+                db_path=db_path.resolve(),
+            )
+        )
     return results
 
 
@@ -156,13 +189,17 @@ def load_entities(entity_type: str, db_path: Path) -> List[dict]:
         raise
 
 
-def save_entities(entity_type: str, db_path: Path, items: List[dict], *, replace: bool = True) -> None:
+def save_entities(
+    entity_type: str, db_path: Path, items: List[dict], *, replace: bool = True
+) -> None:
     """Save entities."""
     wrapper = GenericModelWrapper(entity_type, db_path=str(db_path))
     wrapper.save_items(items, replace=replace)
 
 
-def _load_full_campaign_records(source_campaign: CampaignDatabase, selected_for_bundle: dict) -> None:
+def _load_full_campaign_records(
+    source_campaign: CampaignDatabase, selected_for_bundle: dict
+) -> None:
     """Backfill all known entity records for full-campaign exports.
 
     Explicit selections are authoritative: if a type is already present in
@@ -172,7 +209,9 @@ def _load_full_campaign_records(source_campaign: CampaignDatabase, selected_for_
         if entity_type in selected_for_bundle:
             continue
         try:
-            selected_for_bundle[entity_type] = load_entities(entity_type, source_campaign.db_path)
+            selected_for_bundle[entity_type] = load_entities(
+                entity_type, source_campaign.db_path
+            )
         except sqlite3.OperationalError as exc:
             if not _is_missing_table_error(exc):
                 raise
@@ -184,8 +223,7 @@ def _load_full_campaign_records(source_campaign: CampaignDatabase, selected_for_
 
 def _ensure_campaign_systems_table(conn: sqlite3.Connection) -> None:
     """Ensure campaign systems table."""
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS campaign_systems (
             slug TEXT PRIMARY KEY,
             label TEXT NOT NULL,
@@ -193,8 +231,7 @@ def _ensure_campaign_systems_table(conn: sqlite3.Connection) -> None:
             supported_faces_json TEXT,
             analyzer_config_json TEXT
         )
-        """
-    )
+        """)
 
 
 def _load_campaign_systems(db_path: Path) -> List[dict]:
@@ -205,13 +242,11 @@ def _load_campaign_systems(db_path: Path) -> List[dict]:
     conn.row_factory = sqlite3.Row
     try:
         # Keep campaign systems resilient if this step fails.
-        cursor = conn.execute(
-            """
+        cursor = conn.execute("""
             SELECT slug, label, default_formula, supported_faces_json, analyzer_config_json
             FROM campaign_systems
             ORDER BY slug
-            """
-        )
+            """)
         return [dict(row) for row in cursor.fetchall()]
     except sqlite3.OperationalError as exc:
         if "no such table" in str(exc).lower():
@@ -235,7 +270,9 @@ def _determine_record_key(record: dict) -> str:
     return str(record.get("rowid") or record.get("_id") or id(record))
 
 
-def _collect_portraits(entity_type: str, record: dict, campaign_dir: Path) -> List[AssetReference]:
+def _collect_portraits(
+    entity_type: str, record: dict, campaign_dir: Path
+) -> List[AssetReference]:
     """Collect portraits."""
     portraits = parse_portrait_value(record.get("Portrait"))
     collected: List[AssetReference] = []
@@ -262,7 +299,9 @@ def _collect_portraits(entity_type: str, record: dict, campaign_dir: Path) -> Li
     return collected
 
 
-def _collect_audio_asset(entity_type: str, record: dict, campaign_dir: Path) -> Optional[AssetReference]:
+def _collect_audio_asset(
+    entity_type: str, record: dict, campaign_dir: Path
+) -> Optional[AssetReference]:
     """Collect audio asset."""
     raw_value = record.get("Audio")
     normalized = normalize_audio_reference(raw_value)
@@ -320,7 +359,9 @@ def _collect_attachment_asset(
     )
 
 
-def _collect_image_library_assets(entity_type: str, record: dict, campaign_dir: Path) -> List[AssetReference]:
+def _collect_image_library_assets(
+    entity_type: str, record: dict, campaign_dir: Path
+) -> List[AssetReference]:
     """Collect image-library assets."""
     collected: List[AssetReference] = []
     seen_absolute_paths: set[str] = set()
@@ -409,7 +450,9 @@ def save_world_map_store(campaign_dir: Optional[Path], maps: Dict[str, dict]) ->
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"maps": maps}
-        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
     except Exception as exc:
         log_warning(
             f"Failed to save world map store at {path}: {exc}",
@@ -417,7 +460,9 @@ def save_world_map_store(campaign_dir: Optional[Path], maps: Dict[str, dict]) ->
         )
 
 
-def _collect_world_map_entries(records: Iterable[dict], campaign_dir: Path) -> Dict[str, dict]:
+def _collect_world_map_entries(
+    records: Iterable[dict], campaign_dir: Path
+) -> Dict[str, dict]:
     """Collect world map entries."""
     store = load_world_map_store(campaign_dir)
     if not store:
@@ -454,7 +499,12 @@ def _rewrite_world_map_entries(
                 # Process each token from tokens.
                 if not isinstance(token, dict):
                     continue
-                for field in ("portrait_path", "image_path", "token_image", "video_path"):
+                for field in (
+                    "portrait_path",
+                    "image_path",
+                    "token_image",
+                    "video_path",
+                ):
                     # Process each field while updating rewrite world map entries.
                     value = token.get(field)
                     if isinstance(value, str) and value in replacements:
@@ -560,7 +610,10 @@ def _collect_token_assets(record: dict, campaign_dir: Path) -> Iterable[AssetRef
         # Process each token from tokens.
         if not isinstance(token, dict):
             continue
-        for field, asset_type in ("image_path", "token_image"), ("video_path", "token_video"):
+        for field, asset_type in ("image_path", "token_image"), (
+            "video_path",
+            "token_video",
+        ):
             # Process each (field, asset_type) while updating token assets.
             path_value = token.get(field)
             if not path_value:
@@ -584,7 +637,9 @@ def _collect_token_assets(record: dict, campaign_dir: Path) -> Iterable[AssetRef
     return assets
 
 
-def collect_assets(entity_type: str, records: Iterable[dict], campaign_dir: Path) -> List[AssetReference]:
+def collect_assets(
+    entity_type: str, records: Iterable[dict], campaign_dir: Path
+) -> List[AssetReference]:
     """Collect assets."""
     collected: List[AssetReference] = []
     if entity_type == "maps":
@@ -596,7 +651,9 @@ def collect_assets(entity_type: str, records: Iterable[dict], campaign_dir: Path
     if entity_type in IMAGE_LIBRARY_ENTITY_TYPES:
         # Handle the branch where entity_type is in IMAGE_LIBRARY_ENTITY_TYPES.
         for record in records:
-            collected.extend(_collect_image_library_assets(entity_type, record, campaign_dir))
+            collected.extend(
+                _collect_image_library_assets(entity_type, record, campaign_dir)
+            )
         return collected
 
     attachment_field = ATTACHMENT_FIELDS.get(entity_type)
@@ -611,7 +668,9 @@ def collect_assets(entity_type: str, records: Iterable[dict], campaign_dir: Path
                 collected.append(audio)
         if attachment_field:
             # Continue with this path when attachment field is set.
-            attachment = _collect_attachment_asset(entity_type, record, campaign_dir, attachment_field)
+            attachment = _collect_attachment_asset(
+                entity_type, record, campaign_dir, attachment_field
+            )
             if attachment:
                 collected.append(attachment)
     return collected
@@ -644,6 +703,7 @@ def export_bundle(
     include_database: bool = False,
     include_systems: bool = True,
     include_random_tables: bool = False,
+    gm_virtual_tables: Optional[List[dict]] = None,
     progress_callback=None,
 ) -> dict:
     """Export bundle."""
@@ -655,7 +715,9 @@ def export_bundle(
     if include_database and not source_campaign.db_path.exists():
         raise FileNotFoundError(source_campaign.db_path)
 
-    selected_for_bundle = {entity: list(records) for entity, records in selected_records.items()}
+    selected_for_bundle = {
+        entity: list(records) for entity, records in selected_records.items()
+    }
     if include_database:
         _load_full_campaign_records(source_campaign, selected_for_bundle)
 
@@ -720,7 +782,9 @@ def export_bundle(
                 )
 
             if entity_type == "maps":
-                bundled_world_maps.update(_collect_world_map_entries(records, source_campaign.root))
+                bundled_world_maps.update(
+                    _collect_world_map_entries(records, source_campaign.root)
+                )
 
         if include_database or include_random_tables:
             extra_files = collect_full_campaign_extra_files(source_campaign.root)
@@ -745,6 +809,10 @@ def export_bundle(
                     }
                 )
 
+        export_gm_virtual_tables(
+            source_campaign.root, gm_virtual_tables or [], temp_root, manifest
+        )
+
         if include_systems:
             # Continue with this path when include systems is set.
             systems = _load_campaign_systems(source_campaign.db_path)
@@ -760,7 +828,9 @@ def export_bundle(
             # Continue with this path when bundled world maps is set.
             world_map_path = temp_root / "data" / "world_maps.json"
             with world_map_path.open("w", encoding="utf-8") as fh:
-                json.dump({"maps": bundled_world_maps}, fh, indent=2, ensure_ascii=False)
+                json.dump(
+                    {"maps": bundled_world_maps}, fh, indent=2, ensure_ascii=False
+                )
             manifest["world_maps"] = {
                 "count": len(bundled_world_maps),
                 "data_path": "data/world_maps.json",
@@ -784,7 +854,8 @@ def export_bundle(
                     "file_name": source_campaign.db_path.name,
                     "relative_path": f"database/{source_campaign.db_path.name}",
                     "size": int(stat.st_size),
-                    "modified_at": datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
+                    "modified_at": datetime.utcfromtimestamp(stat.st_mtime).isoformat()
+                    + "Z",
                 }
             except Exception as exc:
                 log_exception(
@@ -794,7 +865,9 @@ def export_bundle(
                 raise
         _call_progress(progress_callback, "Writing bundle archive...", 0.8)
         archive_path = temp_root / "manifest.json"
-        archive_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+        archive_path.write_text(
+            json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
 
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for file_path in temp_root.rglob("*"):
@@ -918,7 +991,9 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
         world_maps: Dict[str, dict] = {}
         if isinstance(world_maps_manifest, dict):
             # Handle the branch where isinstance(world_maps_manifest, dict).
-            data_file = world_maps_manifest.get("data_path") or world_maps_manifest.get("path")
+            data_file = world_maps_manifest.get("data_path") or world_maps_manifest.get(
+                "path"
+            )
             if data_file:
                 # Continue with this path when data file is set.
                 file_path = temp_dir / data_file
@@ -926,7 +1001,11 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
                     try:
                         # Keep analyze bundle resilient if this step fails.
                         payload = json.loads(file_path.read_text(encoding="utf-8"))
-                        maps = payload.get("maps") if isinstance(payload, dict) else payload
+                        maps = (
+                            payload.get("maps")
+                            if isinstance(payload, dict)
+                            else payload
+                        )
                         if isinstance(maps, dict):
                             world_maps = maps
                     except json.JSONDecodeError as exc:
@@ -939,7 +1018,9 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
         systems: Optional[List[dict]] = None
         if isinstance(systems_manifest, dict):
             # Handle the branch where isinstance(systems_manifest, dict).
-            data_file = systems_manifest.get("data_path") or systems_manifest.get("path")
+            data_file = systems_manifest.get("data_path") or systems_manifest.get(
+                "path"
+            )
             if data_file:
                 # Continue with this path when data file is set.
                 file_path = temp_dir / data_file
@@ -956,6 +1037,7 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
                         )
 
         ambiance_wallpapers = load_wallpaper_manifest(temp_dir, manifest)
+        gm_virtual_tables = load_bundled_gm_virtual_tables(temp_dir, manifest)
 
         return BundleAnalysis(
             manifest=manifest,
@@ -967,13 +1049,16 @@ def analyze_bundle(bundle_path: Path, target_db: Path) -> BundleAnalysis:
             world_maps=world_maps or None,
             systems=systems,
             ambiance_wallpapers=ambiance_wallpapers or None,
+            gm_virtual_tables=gm_virtual_tables,
         )
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise
 
 
-def _determine_target_path(asset_type: str, original_path: str, campaign_dir: Path) -> Tuple[Path, str]:
+def _determine_target_path(
+    asset_type: str, original_path: str, campaign_dir: Path
+) -> Tuple[Path, str]:
     """Internal helper for determine target path."""
     original = (original_path or "").replace("\\", "/")
     name = Path(original).name or "asset"
@@ -1083,6 +1168,9 @@ def apply_import_for_entity_types(
             "ambiance_wallpapers_imported": 0,
             "ambiance_wallpapers_updated": 0,
             "ambiance_wallpapers_skipped": 0,
+            "gm_virtual_tables_imported": 0,
+            "gm_virtual_tables_updated": 0,
+            "gm_virtual_tables_skipped": 0,
         }
 
     filtered_data = {
@@ -1096,7 +1184,9 @@ def apply_import_for_entity_types(
         if entity_type in selected_types
     }
     filtered_assets = [
-        asset for asset in analysis.assets if str(asset.get("entity_type") or "") in selected_types
+        asset
+        for asset in analysis.assets
+        if str(asset.get("entity_type") or "") in selected_types
     ]
     filtered_world_maps = analysis.world_maps if "maps" in selected_types else None
 
@@ -1110,6 +1200,7 @@ def apply_import_for_entity_types(
         world_maps=filtered_world_maps,
         systems=None,
         ambiance_wallpapers=analysis.ambiance_wallpapers,
+        gm_virtual_tables=None,
     )
     return apply_import(
         filtered_analysis,
@@ -1156,7 +1247,9 @@ def apply_import(
                 )
                 continue
             target_path, relative = _determine_target_path(
-                asset.get("asset_type", ""), asset.get("original_path", ""), target_campaign.root
+                asset.get("asset_type", ""),
+                asset.get("original_path", ""),
+                target_campaign.root,
             )
             try:
                 shutil.copy2(source, target_path)
@@ -1166,7 +1259,11 @@ def apply_import(
                     f"Failed to copy asset {source}: {exc}",
                     func_name="modules.generic.cross_campaign_asset_service.apply_import",
                 )
-            _call_progress(progress_callback, f"Copying assets ({index}/{total_assets})", index / total_assets)
+            _call_progress(
+                progress_callback,
+                f"Copying assets ({index}/{total_assets})",
+                index / total_assets,
+            )
 
         for entity_type, records in analysis.data_by_type.items():
             # Process each (entity_type, records) from analysis.data_by_type.items().
@@ -1196,12 +1293,19 @@ def apply_import(
                     merged[key] = updated_record
                     summary["imported"] += 1
 
-            save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+            save_entities(
+                entity_type,
+                target_campaign.db_path,
+                list(merged.values()),
+                replace=False,
+            )
 
         imported_extra_files = 0
         skipped_extra_files = 0
         for extra_entry in analysis.manifest.get("extra_files") or []:
-            relative_path = str(extra_entry.get("relative_path") or "").replace("\\", "/").strip()
+            relative_path = (
+                str(extra_entry.get("relative_path") or "").replace("\\", "/").strip()
+            )
             bundle_rel = str(extra_entry.get("bundle_path") or "").strip()
             if not relative_path or not bundle_rel:
                 continue
@@ -1250,7 +1354,9 @@ def apply_import(
                 conn.row_factory = sqlite3.Row
                 existing_slugs = {
                     row["slug"]
-                    for row in conn.execute("SELECT slug FROM campaign_systems").fetchall()
+                    for row in conn.execute(
+                        "SELECT slug FROM campaign_systems"
+                    ).fetchall()
                     if row["slug"]
                 }
                 for system in analysis.systems:
@@ -1273,7 +1379,13 @@ def apply_import(
                             SET label = ?, default_formula = ?, supported_faces_json = ?, analyzer_config_json = ?
                             WHERE slug = ?
                             """,
-                            (label, default_formula, supported_faces_json, analyzer_config_json, slug),
+                            (
+                                label,
+                                default_formula,
+                                supported_faces_json,
+                                analyzer_config_json,
+                                slug,
+                            ),
                         )
                         summary["systems_updated"] += 1
                     else:
@@ -1283,7 +1395,13 @@ def apply_import(
                                 slug, label, default_formula, supported_faces_json, analyzer_config_json
                             ) VALUES (?, ?, ?, ?, ?)
                             """,
-                            (slug, label, default_formula, supported_faces_json, analyzer_config_json),
+                            (
+                                slug,
+                                label,
+                                default_formula,
+                                supported_faces_json,
+                                analyzer_config_json,
+                            ),
                         )
                         summary["systems_imported"] += 1
                 conn.commit()
@@ -1291,7 +1409,9 @@ def apply_import(
                 conn.close()
 
         if analysis.world_maps:
-            rewritten_world_maps = _rewrite_world_map_entries(analysis.world_maps, replacements)
+            rewritten_world_maps = _rewrite_world_map_entries(
+                analysis.world_maps, replacements
+            )
             _merge_world_map_entries(target_campaign.root, rewritten_world_maps)
 
         wallpaper_summary = merge_wallpaper_bundle(
@@ -1301,6 +1421,13 @@ def apply_import(
             overwrite=overwrite,
         )
         summary.update(wallpaper_summary)
+
+        gm_table_summary = merge_gm_virtual_tables(
+            target_campaign.root,
+            analysis.gm_virtual_tables,
+            overwrite=overwrite,
+        )
+        summary.update(gm_table_summary)
     finally:
         shutil.rmtree(analysis.temp_dir, ignore_errors=True)
 
@@ -1338,7 +1465,9 @@ def install_full_campaign_bundle(
 
         relative_path = str(database_entry.get("relative_path") or "").strip()
         if not relative_path:
-            relative_path = database_entry.get("path") or database_entry.get("file_name") or ""
+            relative_path = (
+                database_entry.get("path") or database_entry.get("file_name") or ""
+            )
         if not relative_path:
             raise ValueError("Bundle database entry is missing a path")
 
@@ -1346,7 +1475,9 @@ def install_full_campaign_bundle(
         if not db_source.exists():
             raise FileNotFoundError(db_source)
 
-        db_name = str(database_entry.get("file_name") or Path(relative_path).name or "campaign.db")
+        db_name = str(
+            database_entry.get("file_name") or Path(relative_path).name or "campaign.db"
+        )
 
         if not target_dir.exists():
             target_dir.mkdir(parents=True, exist_ok=True)
@@ -1374,9 +1505,17 @@ def install_full_campaign_bundle(
                 )
                 continue
 
-            original_path = str(asset.get("original_path") or "").replace("\\", "/").strip()
-            relative_parts = [part for part in Path(original_path).parts if part not in ("", ".", "..")]
-            relative = Path(*relative_parts) if relative_parts else Path(source_asset.name)
+            original_path = (
+                str(asset.get("original_path") or "").replace("\\", "/").strip()
+            )
+            relative_parts = [
+                part
+                for part in Path(original_path).parts
+                if part not in ("", ".", "..")
+            ]
+            relative = (
+                Path(*relative_parts) if relative_parts else Path(source_asset.name)
+            )
             destination = (target_root / relative).resolve()
             if not str(destination).startswith(str(target_root)):
                 destination = target_root / source_asset.name
@@ -1400,7 +1539,9 @@ def install_full_campaign_bundle(
         extra_offset = len(assets)
         for index, extra_entry in enumerate(extra_files, start=1):
             bundle_rel = str(extra_entry.get("bundle_path") or "").strip()
-            relative_path = str(extra_entry.get("relative_path") or "").replace("\\", "/").strip()
+            relative_path = (
+                str(extra_entry.get("relative_path") or "").replace("\\", "/").strip()
+            )
             if not bundle_rel or not relative_path:
                 continue
             source_extra = (temp_dir / bundle_rel).resolve()
@@ -1434,8 +1575,12 @@ def install_full_campaign_bundle(
 
         install_wallpaper_bundle(temp_dir, target_root, manifest)
 
-        campaign_name = str(manifest.get("source_campaign", {}).get("name") or target_dir.name)
-        return CampaignDatabase(name=campaign_name, root=target_dir, db_path=db_destination)
+        campaign_name = str(
+            manifest.get("source_campaign", {}).get("name") or target_dir.name
+        )
+        return CampaignDatabase(
+            name=campaign_name, root=target_dir, db_path=db_destination
+        )
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -1459,14 +1604,20 @@ def apply_direct_copy(
     world_map_entries: Dict[str, dict] = {}
     map_records = selected_records.get("maps")
     if map_records:
-        world_map_entries = _collect_world_map_entries(map_records, source_campaign.root)
+        world_map_entries = _collect_world_map_entries(
+            map_records, source_campaign.root
+        )
 
     total_assets = len(asset_refs) or 1
     for index, asset in enumerate(asset_refs, start=1):
         # Process each (index, asset) from enumerate(asset_refs, start=1).
         original = asset.original_path
         if original in replacements:
-            _call_progress(progress_callback, f"Copying assets ({index}/{total_assets})", index / total_assets)
+            _call_progress(
+                progress_callback,
+                f"Copying assets ({index}/{total_assets})",
+                index / total_assets,
+            )
             continue
         target_path, relative = _determine_target_path(
             asset.asset_type, asset.original_path, target_campaign.root
@@ -1480,7 +1631,11 @@ def apply_direct_copy(
                 f"Failed to copy asset {asset.absolute_path}: {exc}",
                 func_name="modules.generic.cross_campaign_asset_service.apply_direct_copy",
             )
-        _call_progress(progress_callback, f"Copying assets ({index}/{total_assets})", index / total_assets)
+        _call_progress(
+            progress_callback,
+            f"Copying assets ({index}/{total_assets})",
+            index / total_assets,
+        )
 
     for entity_type, records in selected_records.items():
         # Process each (entity_type, records) from selected_records.items().
@@ -1510,10 +1665,14 @@ def apply_direct_copy(
                 merged[key] = updated_record
                 summary["imported"] += 1
 
-        save_entities(entity_type, target_campaign.db_path, list(merged.values()), replace=False)
+        save_entities(
+            entity_type, target_campaign.db_path, list(merged.values()), replace=False
+        )
 
     if world_map_entries:
-        rewritten_world_maps = _rewrite_world_map_entries(world_map_entries, replacements)
+        rewritten_world_maps = _rewrite_world_map_entries(
+            world_map_entries, replacements
+        )
         _merge_world_map_entries(target_campaign.root, rewritten_world_maps)
 
     _call_progress(progress_callback, "Copy complete", 1.0)
@@ -1589,7 +1748,11 @@ def _rewrite_record_paths(
         if replacement:
             relative_replacement = str(Path(replacement).as_posix())
             updated["RelativePath"] = relative_replacement
-            campaign_root = target_campaign_root.resolve() if target_campaign_root else _resolve_campaign_dir(None)
+            campaign_root = (
+                target_campaign_root.resolve()
+                if target_campaign_root
+                else _resolve_campaign_dir(None)
+            )
             updated["Path"] = str((campaign_root / relative_replacement).resolve())
             updated["SourceRoot"] = str(campaign_root)
 

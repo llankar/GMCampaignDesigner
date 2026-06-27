@@ -1,5 +1,6 @@
 """Regression tests for cross campaign asset service."""
 
+import json
 import shutil
 import sqlite3
 import sys
@@ -48,7 +49,9 @@ def test_analyze_bundle_rejects_unsafe_zip_member_path(tmp_path):
     assert not (tmp_path / "escape.txt").exists()
 
 
-def test_analyze_bundle_ignores_unsafe_or_malformed_ambiance_wallpaper_entries(tmp_path):
+def test_analyze_bundle_ignores_unsafe_or_malformed_ambiance_wallpaper_entries(
+    tmp_path,
+):
     """Wallpaper bundle metadata should sanitize relative paths and tolerate malformed numbers."""
     bundle_path = tmp_path / "wallpapers.zip"
     with zipfile.ZipFile(bundle_path, "w") as zf:
@@ -63,7 +66,7 @@ def test_analyze_bundle_ignores_unsafe_or_malformed_ambiance_wallpaper_entries(t
                 '{"id": "safe", "relative_path": "nested/sky.png", "filename": "sky.png", '
                 '"created_at": "not-a-float"},'
                 '{"id": "unsafe", "relative_path": "../escape.png", "filename": "escape.png"}'
-                ']}'
+                "]}"
             ),
         )
 
@@ -189,7 +192,9 @@ def test_rewrite_record_paths_updates_image_library_fields(tmp_path):
     assert updated["SourceRoot"] == str(target_campaign_root)
 
 
-def test_export_bundle_full_campaign_includes_image_assets_even_without_selection(tmp_path, monkeypatch):
+def test_export_bundle_full_campaign_includes_image_assets_even_without_selection(
+    tmp_path, monkeypatch
+):
     """Full campaign exports should still include image library records/assets."""
     campaign_root = tmp_path / "source_campaign"
     campaign_root.mkdir(parents=True, exist_ok=True)
@@ -199,20 +204,33 @@ def test_export_bundle_full_campaign_includes_image_assets_even_without_selectio
     image_file.parent.mkdir(parents=True, exist_ok=True)
     image_file.write_bytes(b"forest-bytes")
 
-    source_campaign = CampaignDatabase(name="Source", root=campaign_root, db_path=db_path)
+    source_campaign = CampaignDatabase(
+        name="Source", root=campaign_root, db_path=db_path
+    )
     destination = tmp_path / "bundle.zip"
 
     def fake_load_entities(entity_type, _db_path):
         if entity_type == "image_assets":
-            return [{"Name": "Forest Tile", "RelativePath": "assets/image_library/tiles/forest.png"}]
+            return [
+                {
+                    "Name": "Forest Tile",
+                    "RelativePath": "assets/image_library/tiles/forest.png",
+                }
+            ]
         return []
 
-    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities
+    )
 
-    manifest = export_bundle(destination, source_campaign, selected_records={}, include_database=True)
+    manifest = export_bundle(
+        destination, source_campaign, selected_records={}, include_database=True
+    )
 
     assert manifest["entities"]["image_assets"]["count"] == 1
-    assert any(asset.get("asset_type") == "image_library" for asset in manifest["assets"])
+    assert any(
+        asset.get("asset_type") == "image_library" for asset in manifest["assets"]
+    )
 
 
 def test_export_bundle_full_campaign_keeps_explicit_selections(tmp_path, monkeypatch):
@@ -237,7 +255,9 @@ def test_export_bundle_full_campaign_keeps_explicit_selections(tmp_path, monkeyp
         "modules.generic.cross_campaign_asset_service.list_known_entities",
         lambda: ["villains", "campaigns"],
     )
-    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities
+    )
 
     manifest = export_bundle(
         tmp_path / "bundle.zip",
@@ -256,7 +276,9 @@ def test_export_bundle_full_campaign_keeps_explicit_selections(tmp_path, monkeyp
     assert "Database Villain" not in villains
 
 
-def test_export_bundle_full_campaign_skips_missing_backfill_tables(tmp_path, monkeypatch):
+def test_export_bundle_full_campaign_skips_missing_backfill_tables(
+    tmp_path, monkeypatch
+):
     """Missing tables during full-campaign backfill should not stop later entity types."""
     campaign_root = tmp_path / "source_campaign"
     campaign_root.mkdir(parents=True, exist_ok=True)
@@ -277,7 +299,9 @@ def test_export_bundle_full_campaign_skips_missing_backfill_tables(tmp_path, mon
         "modules.generic.cross_campaign_asset_service.list_known_entities",
         lambda: ["missing_entities", "campaigns"],
     )
-    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities
+    )
 
     manifest = export_bundle(
         tmp_path / "bundle.zip",
@@ -291,7 +315,9 @@ def test_export_bundle_full_campaign_skips_missing_backfill_tables(tmp_path, mon
     assert manifest["entities"]["campaigns"]["count"] == 1
 
 
-def test_export_bundle_full_campaign_loads_all_known_entities_and_villain_media(tmp_path, monkeypatch):
+def test_export_bundle_full_campaign_loads_all_known_entities_and_villain_media(
+    tmp_path, monkeypatch
+):
     """Full campaign exports should backfill every known entity type and villain media."""
     campaign_root = tmp_path / "source_campaign"
     campaign_root.mkdir(parents=True, exist_ok=True)
@@ -319,7 +345,12 @@ def test_export_bundle_full_campaign_loads_all_known_entities_and_villain_media(
         ],
         "campaigns": [{"Name": "Embers of Dusk"}],
         "scenarios": [{"Name": "The First Spark"}],
-        "image_assets": [{"Name": "Forest Tile", "RelativePath": "assets/image_library/tiles/forest.png"}],
+        "image_assets": [
+            {
+                "Name": "Forest Tile",
+                "RelativePath": "assets/image_library/tiles/forest.png",
+            }
+        ],
         "maps": [{"Name": "Cavern"}],
     }
 
@@ -330,7 +361,9 @@ def test_export_bundle_full_campaign_loads_all_known_entities_and_villain_media(
         "modules.generic.cross_campaign_asset_service.list_known_entities",
         lambda: ["villains", "campaigns", "scenarios", "image_assets", "maps"],
     )
-    monkeypatch.setattr("modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities)
+    monkeypatch.setattr(
+        "modules.generic.cross_campaign_asset_service.load_entities", fake_load_entities
+    )
 
     manifest = export_bundle(
         tmp_path / "bundle.zip",
@@ -345,7 +378,8 @@ def test_export_bundle_full_campaign_loads_all_known_entities_and_villain_media(
     villain_assets = {
         asset["asset_type"]: asset
         for asset in manifest["assets"]
-        if asset["entity_type"] == "villains" and asset["record_key"] == "The Ashen Lich"
+        if asset["entity_type"] == "villains"
+        and asset["record_key"] == "The Ashen Lich"
     }
     assert villain_assets["portrait"]["original_path"] == "portraits/villains/lich.png"
     assert villain_assets["audio"]["original_path"] == "audio/villains/lich_theme.mp3"
@@ -362,23 +396,31 @@ def test_install_full_campaign_bundle_restores_random_tables_files(tmp_path):
     source_root.mkdir(parents=True, exist_ok=True)
     db_path = source_root / "campaign.db"
     sqlite3.connect(db_path).close()
-    random_tables_file = source_root / "static" / "data" / "random_tables" / "encounters.json"
+    random_tables_file = (
+        source_root / "static" / "data" / "random_tables" / "encounters.json"
+    )
     random_tables_file.parent.mkdir(parents=True, exist_ok=True)
     random_tables_file.write_text('{"categories": []}', encoding="utf-8")
 
     source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
     bundle_path = tmp_path / "full_bundle.zip"
-    export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
+    export_bundle(
+        bundle_path, source_campaign, selected_records={}, include_database=True
+    )
 
     target_root = tmp_path / "installed_campaign"
     installed = install_full_campaign_bundle(bundle_path, target_root)
 
-    restored_random_table = installed.root / "static" / "data" / "random_tables" / "encounters.json"
+    restored_random_table = (
+        installed.root / "static" / "data" / "random_tables" / "encounters.json"
+    )
     assert restored_random_table.exists()
     assert restored_random_table.read_text(encoding="utf-8") == '{"categories": []}'
 
 
-def test_install_full_campaign_bundle_restores_campaign_custom_random_tables_file(tmp_path):
+def test_install_full_campaign_bundle_restores_campaign_custom_random_tables_file(
+    tmp_path,
+):
     """Installing a full campaign bundle should restore campaign custom random tables JSON."""
     source_root = tmp_path / "source"
     source_root.mkdir(parents=True, exist_ok=True)
@@ -390,9 +432,14 @@ def test_install_full_campaign_bundle_restores_campaign_custom_random_tables_fil
 
     source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
     bundle_path = tmp_path / "full_bundle.zip"
-    manifest = export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
+    manifest = export_bundle(
+        bundle_path, source_campaign, selected_records={}, include_database=True
+    )
     extra_files = manifest.get("extra_files") or []
-    assert any(entry.get("relative_path") == "campaign_custom_tables.json" for entry in extra_files)
+    assert any(
+        entry.get("relative_path") == "campaign_custom_tables.json"
+        for entry in extra_files
+    )
 
     target_root = tmp_path / "installed_campaign"
     installed = install_full_campaign_bundle(bundle_path, target_root)
@@ -418,8 +465,12 @@ def test_install_full_campaign_bundle_restores_custom_templates(tmp_path):
 
     source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
     bundle_path = tmp_path / "full_bundle.zip"
-    manifest = export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
-    extra_paths = {entry.get("relative_path") for entry in manifest.get("extra_files") or []}
+    manifest = export_bundle(
+        bundle_path, source_campaign, selected_records={}, include_database=True
+    )
+    extra_paths = {
+        entry.get("relative_path") for entry in manifest.get("extra_files") or []
+    }
 
     assert "templates/custom_entities.json" in extra_paths
     assert "templates/rivals_template.json" in extra_paths
@@ -430,9 +481,15 @@ def test_install_full_campaign_bundle_restores_custom_templates(tmp_path):
     restored_custom_entities = installed.root / "templates" / "custom_entities.json"
     restored_rivals_template = installed.root / "templates" / "rivals_template.json"
     assert restored_custom_entities.exists()
-    assert restored_custom_entities.read_text(encoding="utf-8") == '{"entities": ["rivals"]}'
+    assert (
+        restored_custom_entities.read_text(encoding="utf-8")
+        == '{"entities": ["rivals"]}'
+    )
     assert restored_rivals_template.exists()
-    assert restored_rivals_template.read_text(encoding="utf-8") == '{"name": "Rivals", "fields": []}'
+    assert (
+        restored_rivals_template.read_text(encoding="utf-8")
+        == '{"name": "Rivals", "fields": []}'
+    )
 
 
 def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_path):
@@ -458,7 +515,9 @@ def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_p
 
     source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
     bundle_path = tmp_path / "full_bundle.zip"
-    export_bundle(bundle_path, source_campaign, selected_records={}, include_database=True)
+    export_bundle(
+        bundle_path, source_campaign, selected_records={}, include_database=True
+    )
 
     target_root = tmp_path / "installed_campaign"
     installed = install_full_campaign_bundle(bundle_path, target_root)
@@ -469,13 +528,25 @@ def test_install_full_campaign_bundle_restores_maptools_and_gm_table_files(tmp_p
     restored_world_map_data = installed.root / "world_maps" / "world_map_data.json"
 
     assert restored_gm_layouts.exists()
-    assert restored_gm_layouts.read_text(encoding="utf-8") == '{"layouts": {"Default": {"tabs": []}}}'
+    assert (
+        restored_gm_layouts.read_text(encoding="utf-8")
+        == '{"layouts": {"Default": {"tabs": []}}}'
+    )
     assert restored_clue_positions.exists()
-    assert restored_clue_positions.read_text(encoding="utf-8") == '{"Clue A": {"x": 10, "y": 20}}'
+    assert (
+        restored_clue_positions.read_text(encoding="utf-8")
+        == '{"Clue A": {"x": 10, "y": 20}}'
+    )
     assert restored_clue_links.exists()
-    assert restored_clue_links.read_text(encoding="utf-8") == '[{"source": "A", "target": "B"}]'
+    assert (
+        restored_clue_links.read_text(encoding="utf-8")
+        == '[{"source": "A", "target": "B"}]'
+    )
     assert restored_world_map_data.exists()
-    assert restored_world_map_data.read_text(encoding="utf-8") == '{"maps": {"City": {"tokens": []}}}'
+    assert (
+        restored_world_map_data.read_text(encoding="utf-8")
+        == '{"maps": {"City": {"tokens": []}}}'
+    )
 
 
 def test_export_bundle_asset_mode_can_include_random_tables_files(tmp_path):
@@ -485,7 +556,9 @@ def test_export_bundle_asset_mode_can_include_random_tables_files(tmp_path):
     db_path = source_root / "campaign.db"
     sqlite3.connect(db_path).close()
 
-    random_tables_file = source_root / "static" / "data" / "random_tables" / "encounters.json"
+    random_tables_file = (
+        source_root / "static" / "data" / "random_tables" / "encounters.json"
+    )
     random_tables_file.parent.mkdir(parents=True, exist_ok=True)
     random_tables_file.write_text('{"categories": []}', encoding="utf-8")
 
@@ -500,7 +573,10 @@ def test_export_bundle_asset_mode_can_include_random_tables_files(tmp_path):
     )
 
     extra_files = manifest.get("extra_files") or []
-    assert any(entry.get("relative_path") == "static/data/random_tables/encounters.json" for entry in extra_files)
+    assert any(
+        entry.get("relative_path") == "static/data/random_tables/encounters.json"
+        for entry in extra_files
+    )
 
 
 def test_apply_import_restores_extra_files_for_asset_bundle(tmp_path):
@@ -510,7 +586,9 @@ def test_apply_import_restores_extra_files_for_asset_bundle(tmp_path):
     db_path = source_root / "campaign.db"
     sqlite3.connect(db_path).close()
 
-    random_tables_file = source_root / "static" / "data" / "random_tables" / "encounters.json"
+    random_tables_file = (
+        source_root / "static" / "data" / "random_tables" / "encounters.json"
+    )
     random_tables_file.parent.mkdir(parents=True, exist_ok=True)
     random_tables_file.write_text('{"categories": []}', encoding="utf-8")
 
@@ -528,7 +606,9 @@ def test_apply_import_restores_extra_files_for_asset_bundle(tmp_path):
     target_root.mkdir(parents=True, exist_ok=True)
     target_db = target_root / "campaign.db"
     sqlite3.connect(target_db).close()
-    target_campaign = CampaignDatabase(name="Target", root=target_root, db_path=target_db)
+    target_campaign = CampaignDatabase(
+        name="Target", root=target_root, db_path=target_db
+    )
 
     analysis = analyze_bundle(bundle_path, target_campaign.db_path)
     summary = apply_import(analysis, target_campaign, overwrite=True)
@@ -570,7 +650,9 @@ def test_export_bundle_includes_ambiance_wallpaper_files_and_metadata(tmp_path):
     source_campaign = CampaignDatabase(name="Source", root=source_root, db_path=db_path)
     bundle_path = tmp_path / "wallpapers.zip"
 
-    manifest = export_bundle(bundle_path, source_campaign, selected_records={}, include_database=False)
+    manifest = export_bundle(
+        bundle_path, source_campaign, selected_records={}, include_database=False
+    )
 
     section = manifest["ambiance_wallpapers"]
     assert section["count"] == 1
@@ -590,7 +672,12 @@ def test_apply_import_restores_ambiance_wallpaper_media_and_index(tmp_path):
     sqlite3.connect(db_path).close()
     item, _media = _write_wallpaper(source_root)
     bundle_path = tmp_path / "wallpapers.zip"
-    export_bundle(bundle_path, CampaignDatabase("Source", source_root, db_path), {}, include_database=False)
+    export_bundle(
+        bundle_path,
+        CampaignDatabase("Source", source_root, db_path),
+        {},
+        include_database=False,
+    )
 
     target_root = tmp_path / "target"
     target_root.mkdir(parents=True, exist_ok=True)
@@ -619,7 +706,12 @@ def test_apply_import_skips_or_overwrites_existing_ambiance_wallpapers(tmp_path)
     sqlite3.connect(db_path).close()
     item, _media = _write_wallpaper(source_root, content=b"new")
     bundle_path = tmp_path / "wallpapers.zip"
-    export_bundle(bundle_path, CampaignDatabase("Source", source_root, db_path), {}, include_database=False)
+    export_bundle(
+        bundle_path,
+        CampaignDatabase("Source", source_root, db_path),
+        {},
+        include_database=False,
+    )
 
     target_root = tmp_path / "target"
     target_root.mkdir(parents=True, exist_ok=True)
@@ -629,27 +721,33 @@ def test_apply_import_skips_or_overwrites_existing_ambiance_wallpapers(tmp_path)
     existing_media = target_store.wallpapers_dir / item.relative_path
     existing_media.parent.mkdir(parents=True, exist_ok=True)
     existing_media.write_bytes(b"old")
-    target_store.save([
-        WallpaperLibraryItem(
-            id="existing-id",
-            relative_path=item.relative_path,
-            filename=item.filename,
-            media_type="image",
-            width=100,
-            height=100,
-            filesize=3,
-            created_at=1.0,
-            tags=("old",),
-        )
-    ])
+    target_store.save(
+        [
+            WallpaperLibraryItem(
+                id="existing-id",
+                relative_path=item.relative_path,
+                filename=item.filename,
+                media_type="image",
+                width=100,
+                height=100,
+                filesize=3,
+                created_at=1.0,
+                tags=("old",),
+            )
+        ]
+    )
     target_campaign = CampaignDatabase("Target", target_root, target_db)
 
-    skip_summary = apply_import(analyze_bundle(bundle_path, target_db), target_campaign, overwrite=False)
+    skip_summary = apply_import(
+        analyze_bundle(bundle_path, target_db), target_campaign, overwrite=False
+    )
     assert existing_media.read_bytes() == b"old"
     assert target_store.load()[0].id == "existing-id"
     assert skip_summary["ambiance_wallpapers_skipped"] == 1
 
-    overwrite_summary = apply_import(analyze_bundle(bundle_path, target_db), target_campaign, overwrite=True)
+    overwrite_summary = apply_import(
+        analyze_bundle(bundle_path, target_db), target_campaign, overwrite=True
+    )
     loaded = target_store.load()
     assert existing_media.read_bytes() == b"new"
     assert len(loaded) == 1
@@ -666,10 +764,93 @@ def test_install_full_campaign_bundle_restores_ambiance_wallpapers(tmp_path):
     sqlite3.connect(db_path).close()
     item, _media = _write_wallpaper(source_root)
     bundle_path = tmp_path / "full_wallpapers.zip"
-    export_bundle(bundle_path, CampaignDatabase("Source", source_root, db_path), {}, include_database=True)
+    export_bundle(
+        bundle_path,
+        CampaignDatabase("Source", source_root, db_path),
+        {},
+        include_database=True,
+    )
 
     installed = install_full_campaign_bundle(bundle_path, tmp_path / "installed")
 
     store = CampaignWallpaperIndexStore(str(installed.root))
     assert (store.wallpapers_dir / item.relative_path).read_bytes() == b"sky"
     assert store.load()[0].id == item.id
+
+
+def test_export_bundle_full_campaign_restores_gm_virtual_table_layouts(tmp_path):
+    """Full campaign bundles should carry GM virtual table layout persistence."""
+    source_root = tmp_path / "source"
+    source_root.mkdir(parents=True, exist_ok=True)
+    db_path = source_root / "campaign.db"
+    sqlite3.connect(db_path).close()
+    gm_tables = source_root / "gm_table_layouts.json"
+    gm_tables.write_text(
+        '{"tables": {"table_1": {"panels": [{"panel_id": "notes"}]}}, "global": {"table_names": {"table_1": "War Room"}}}',
+        encoding="utf-8",
+    )
+
+    bundle_path = tmp_path / "full_bundle.zip"
+    manifest = export_bundle(
+        bundle_path,
+        CampaignDatabase(name="Source", root=source_root, db_path=db_path),
+        selected_records={},
+        include_database=True,
+    )
+
+    assert any(
+        entry.get("relative_path") == "gm_table_layouts.json"
+        for entry in manifest.get("extra_files") or []
+    )
+
+    target_root = tmp_path / "installed_campaign"
+    installed = install_full_campaign_bundle(bundle_path, target_root)
+
+    restored = installed.root / "gm_table_layouts.json"
+    assert restored.exists()
+    assert '"War Room"' in restored.read_text(encoding="utf-8")
+
+
+def test_export_and_import_selected_gm_virtual_tables(tmp_path):
+    """Selected GM virtual tables should export/import independently from entity rows."""
+    source_root = tmp_path / "source"
+    target_root = tmp_path / "target"
+    source_root.mkdir(parents=True, exist_ok=True)
+    target_root.mkdir(parents=True, exist_ok=True)
+    source_db = source_root / "campaign.db"
+    target_db = target_root / "campaign.db"
+    sqlite3.connect(source_db).close()
+    sqlite3.connect(target_db).close()
+
+    bundle_path = tmp_path / "gm_tables.zip"
+    manifest = export_bundle(
+        bundle_path,
+        CampaignDatabase(name="Source", root=source_root, db_path=source_db),
+        selected_records={},
+        include_database=False,
+        gm_virtual_tables=[
+            {
+                "TableId": "table_1",
+                "Name": "War Room",
+                "Layout": {"panels": [{"panel_id": "notes", "kind": "note"}]},
+            }
+        ],
+    )
+
+    assert manifest["gm_virtual_tables"]["count"] == 1
+    with zipfile.ZipFile(bundle_path, "r") as zf:
+        assert "data/gm_virtual_tables.json" in zf.namelist()
+
+    analysis = analyze_bundle(bundle_path, target_db)
+    summary = apply_import(
+        analysis,
+        CampaignDatabase(name="Target", root=target_root, db_path=target_db),
+        overwrite=True,
+    )
+
+    restored = json.loads(
+        (target_root / "gm_table_layouts.json").read_text(encoding="utf-8")
+    )
+    assert restored["tables"]["table_1"]["panels"][0]["panel_id"] == "notes"
+    assert restored["global"]["table_names"]["table_1"] == "War Room"
+    assert summary["gm_virtual_tables_imported"] == 1
