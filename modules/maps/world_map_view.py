@@ -190,6 +190,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._portrait_photo: ImageTk.PhotoImage | None = None
         self._portrait_placeholder: Image.Image | None = None
         self._inspector_token: dict | None = None
+        self._inspector_visible = False
         self._entity_tab_images: list[ctk.CTkImage] = []
         self._notes_textbox: ctk.CTkTextbox | None = None
         self._notes_status_label: ctk.CTkLabel | None = None
@@ -248,6 +249,7 @@ class WorldMapPanel(ctk.CTkFrame):
         workspace.grid_rowconfigure(0, weight=1)
         workspace.grid_columnconfigure(0, weight=1)
         workspace.grid_columnconfigure(1, weight=0, minsize=380)
+        self._workspace = workspace
 
         self.canvas_container = ctk.CTkFrame(workspace, fg_color=self.CANVAS_BG, corner_radius=18)
         self.canvas_container.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
@@ -569,6 +571,8 @@ class WorldMapPanel(ctk.CTkFrame):
         )
         self.current_map_name = None
         self.current_world_map = None
+        self.selected_token = None
+        self._clear_inspector()
         self._update_map_tool_button_state()
 
     def _resolve_initial_map(self) -> str | None:
@@ -1088,6 +1092,7 @@ class WorldMapPanel(ctk.CTkFrame):
             return
 
         self.canvas.delete("all")
+        self._clear_token_canvas_references()
         self.mask_id = None
         base_w, base_h = self.base_image.size
         if base_w <= 0 or base_h <= 0:
@@ -1125,6 +1130,12 @@ class WorldMapPanel(ctk.CTkFrame):
             self._draw_token(token)
 
         self._update_player_display()
+
+    def _clear_token_canvas_references(self) -> None:
+        """Drop stale canvas item references before rebuilding the scene."""
+        for token in self.tokens:
+            token.pop("canvas_ids", None)
+            token.pop("tk_image", None)
 
     def _apply_pending_view_state(self, base_scale: float, base_w: int, base_h: int) -> None:
         """Apply pending view state."""
@@ -1785,6 +1796,9 @@ class WorldMapPanel(ctk.CTkFrame):
             self._fog_rect_start_world = self._fog_event_to_world(event)
             clear_fog_rectangle_preview(self)
             return "break"
+        if not self._event_targets_token(event):
+            self.selected_token = None
+            self._clear_inspector()
         return None
 
     def _on_canvas_drag(self, event) -> str | None:
@@ -1875,8 +1889,54 @@ class WorldMapPanel(ctk.CTkFrame):
         if hasattr(self, "open_map_tool_button"):
             self.open_map_tool_button.configure(state=map_state)
 
+    def _show_inspector_panel(self) -> None:
+        """Show the right inspector panel when a map entity is selected."""
+        if self._inspector_visible:
+            return
+        if hasattr(self, "_workspace"):
+            self._workspace.grid_columnconfigure(1, weight=0, minsize=380)
+        if hasattr(self, "canvas_container"):
+            self.canvas_container.grid_configure(padx=(0, 12))
+        if hasattr(self, "inspector_container"):
+            self.inspector_container.grid()
+        self._inspector_visible = True
+
+    def _hide_inspector_panel(self) -> None:
+        """Hide the right inspector panel when no map entity is selected."""
+        if not self._inspector_visible and not getattr(self, "inspector_container", None):
+            return
+        if hasattr(self, "inspector_container"):
+            self.inspector_container.grid_remove()
+        if hasattr(self, "_workspace"):
+            self._workspace.grid_columnconfigure(1, weight=0, minsize=0)
+        if hasattr(self, "canvas_container"):
+            self.canvas_container.grid_configure(padx=0)
+        self._inspector_visible = False
+
+    def _event_targets_token(self, event) -> bool:
+        """Return True when the canvas event currently points at an entity token."""
+        if event is None or not getattr(self, "canvas", None):
+            return False
+        try:
+            current_ids = set(self.canvas.find_withtag("current"))
+            if not current_ids:
+                current_ids = set(self.canvas.find_overlapping(event.x, event.y, event.x, event.y))
+        except tk.TclError:
+            return False
+
+        if not current_ids:
+            return False
+
+        for token in self.tokens:
+            if token.get("type") == MEASUREMENT_ITEM_TYPE:
+                continue
+            if current_ids.intersection(token.get("canvas_ids") or ()):
+                return True
+        return False
+
     def _clear_inspector(self) -> None:
         """Clear inspector."""
+        self.selected_token = None
         self.title_label.configure(text="World Map")
         self.subtitle_label.configure(text="Select an entity to view its synthesis.")
         self._set_portrait_image(None)
@@ -1902,9 +1962,11 @@ class WorldMapPanel(ctk.CTkFrame):
         self._update_visibility_button(None)
         self._set_quick_actions_state(False)
         self._configure_inspector_actions(None)
+        self._hide_inspector_panel()
 
     def _show_entity_synthesis(self, token: dict) -> None:
         """Show entity synthesis."""
+        self._show_inspector_panel()
         record = token.get("record") or {}
         entity_type = token.get("entity_type", "Entity")
         name = token.get("entity_id", "Unnamed")
@@ -1929,6 +1991,7 @@ class WorldMapPanel(ctk.CTkFrame):
 
     def _show_map_hint(self, token: dict) -> None:
         """Show map hint."""
+        self._show_inspector_panel()
         map_name = token.get("linked_map") or token.get("entity_id") or "Nested Map"
         entry = self.world_maps.get(map_name, {})
         wrapper_record = self.maps_wrapper_data.get(map_name, {})
