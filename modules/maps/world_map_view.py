@@ -194,6 +194,7 @@ class WorldMapPanel(ctk.CTkFrame):
         self._entity_tab_images: list[ctk.CTkImage] = []
         self._notes_textbox: ctk.CTkTextbox | None = None
         self._notes_status_label: ctk.CTkLabel | None = None
+        self._token_press_handled = False
 
         self.color_swatch_button: ctk.CTkButton | None = None
         self.zoom = 1.0
@@ -1548,23 +1549,25 @@ class WorldMapPanel(ctk.CTkFrame):
     # ------------------------------------------------------------------
     # Token interactions
     # ------------------------------------------------------------------
-    def _on_token_press(self, event, token: dict) -> None:
+    def _on_token_press(self, event, token: dict) -> str | None:
         """Handle token press."""
         if event is None:
-            return
+            return None
         if self.fog_mode:
             return "break"
+        self._token_press_handled = True
         self.selected_token = token
         token["drag_anchor"] = (event.x, event.y)
         if token.get("type") == "map":
             self._show_map_hint(token)
         else:
             self._show_entity_synthesis(token)
+        return "break"
 
-    def _on_token_drag(self, event, token: dict) -> None:
+    def _on_token_drag(self, event, token: dict) -> str | None:
         """Handle token drag."""
         if event is None or "drag_anchor" not in token or not self.render_params:
-            return
+            return None
         if self.fog_mode:
             return "break"
         scale, offset_x, offset_y, base_w, base_h = self.render_params
@@ -1574,18 +1577,21 @@ class WorldMapPanel(ctk.CTkFrame):
         dx = x - token["drag_anchor"][0]
         dy = y - token["drag_anchor"][1]
         if abs(dx) < 1 and abs(dy) < 1:
-            return
+            return "break"
         token["drag_anchor"] = (x, y)
         for cid in token.get("canvas_ids", []):
             self.canvas.move(cid, dx, dy)
         token["x_norm"] = (x - offset_x) / (base_w * scale)
         token["y_norm"] = (y - offset_y) / (base_h * scale)
-    def _on_token_release(self, _event, token: dict) -> None:
+        return "break"
+
+    def _on_token_release(self, _event, token: dict) -> str:
         """Handle token release."""
         if self.fog_mode:
             return "break"
         token.pop("drag_anchor", None)
         self._persist_tokens()
+        return "break"
 
     def _on_token_double_click(self, _event, token: dict) -> None:
         """Handle token double click."""
@@ -1779,6 +1785,9 @@ class WorldMapPanel(ctk.CTkFrame):
 
     def _on_canvas_press(self, event) -> str | None:
         """Handle canvas press."""
+        if getattr(self, "_token_press_handled", False):
+            self._token_press_handled = False
+            return "break"
         if self.measure_mode:
             self._measurement_start_world = self._event_to_world_pixels(event)
             self._clear_measurement_preview()
