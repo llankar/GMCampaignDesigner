@@ -76,9 +76,10 @@ ENTITY_TYPES = (
     "Clues",
     "Informations",
     "Puzzles",
+    "Books",
 )
 
-TITLE_KEY_ENTITY_TYPES = {"Scenarios", "Informations"}
+TITLE_KEY_ENTITY_TYPES = {"Scenarios", "Informations", "Books"}
 MAP_PANEL_KINDS = {"world_map", "map_tool"}
 
 
@@ -128,6 +129,7 @@ class GMTableView(ctk.CTkFrame):
             "Informations": load_entity_template("informations"),
             "Puzzles": load_entity_template("puzzles"),
             "Objects": load_entity_template("objects"),
+            "Books": load_entity_template("books"),
             "Maps": load_entity_template("maps"),
         }
         self.wrappers = {
@@ -144,6 +146,7 @@ class GMTableView(ctk.CTkFrame):
             "Informations": GenericModelWrapper("informations"),
             "Puzzles": GenericModelWrapper("puzzles"),
             "Objects": GenericModelWrapper("objects"),
+            "Books": GenericModelWrapper("books"),
         }
         self.map_wrapper = GenericModelWrapper("maps")
 
@@ -158,8 +161,6 @@ class GMTableView(ctk.CTkFrame):
             "Handouts",
             "Fixed Table",
             "Toggle Fixed Table",
-            "PDF Viewer",
-            "Open PDF",
             "Add to Fixed Table",
             "Container Window",
             "Loot Generator",
@@ -1603,6 +1604,9 @@ class GMTableView(ctk.CTkFrame):
             )
         attachments = collect_entity_attachments(item)
 
+        if entity_type == "Books":
+            return self._build_book_content(host, item)
+
         if attachments:
             host.grid_rowconfigure(0, weight=1)
             host.grid_columnconfigure(0, weight=1)
@@ -1644,6 +1648,48 @@ class GMTableView(ctk.CTkFrame):
         )
         frame.grid(row=0, column=0, sticky="nsew")
         return frame
+
+
+    def _build_book_content(self, host, item: dict):
+        """Build a readable book panel with the linked PDF beside its details."""
+        host.grid_rowconfigure(0, weight=1)
+        host.grid_columnconfigure(0, weight=2)
+        host.grid_columnconfigure(1, weight=3)
+
+        details_host = build_scroll_host(host)
+        details_host.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        detail_frame = create_entity_detail_frame(
+            "Books",
+            item,
+            master=details_host,
+            open_entity_callback=self.open_entity_panel,
+            spotlight_only=False,
+            show_spotlight=False,
+        )
+        detail_frame.pack(fill="both", expand=True, padx=8, pady=8)
+
+        attachment = str(item.get("Attachment") or "").strip()
+        if attachment:
+            viewer = PDFViewerFrame(
+                host,
+                pdf_path=attachment,
+                attachment_path=attachment,
+                title=self._entity_label("Books", item, fallback="Book"),
+                initial_state={"current_page": 1, "zoom": 1.25},
+                on_state_changed=self._persist_layout,
+            )
+            viewer.grid(row=0, column=1, sticky="nsew")
+            return viewer
+
+        missing = ctk.CTkFrame(host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=14)
+        missing.grid(row=0, column=1, sticky="nsew")
+        ctk.CTkLabel(
+            missing,
+            text="No linked PDF attachment for this book.",
+            text_color=TABLE_PALETTE["muted"],
+            wraplength=360,
+        ).pack(expand=True, padx=24, pady=24)
+        return missing
 
     def _build_unavailable_entity_content(
         self, host, *, entity_type: str | None, entity_name: str | None

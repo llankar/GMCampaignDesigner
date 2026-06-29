@@ -52,6 +52,11 @@ class PDFViewerFrame(ctk.CTkFrame):
         ybar = ctk.CTkScrollbar(body, orientation="vertical", command=self.canvas.yview); ybar.grid(row=0, column=1, sticky="ns")
         xbar = ctk.CTkScrollbar(body, orientation="horizontal", command=self.canvas.xview); xbar.grid(row=1, column=0, sticky="ew")
         self.canvas.configure(yscrollcommand=ybar.set, xscrollcommand=xbar.set)
+        self.canvas.bind("<MouseWheel>", self._on_mousewheel, add="+")
+        self.canvas.bind("<Shift-MouseWheel>", self._on_shift_mousewheel, add="+")
+        self.canvas.bind("<Control-MouseWheel>", self._on_ctrl_mousewheel, add="+")
+        self.canvas.bind("<Button-4>", lambda _event: self.canvas.yview_scroll(-3, "units"), add="+")
+        self.canvas.bind("<Button-5>", lambda _event: self.canvas.yview_scroll(3, "units"), add="+")
         self.loading_label = ctk.CTkLabel(body, text="Loading page...")
 
     def open_pdf(self, pdf_path: str, *, initial_page: int = 1, zoom: float | None = None) -> None:
@@ -105,6 +110,20 @@ class PDFViewerFrame(ctk.CTkFrame):
         self._page_image = ImageTk.PhotoImage(image)
         self.canvas.delete("page"); self.canvas.create_image(0, 0, image=self._page_image, anchor="nw", tags="page")
         self.canvas.configure(scrollregion=(0, 0, image.width, image.height))
+    def _on_mousewheel(self, event) -> str:
+        direction = -1 if event.delta > 0 else 1
+        self.canvas.yview_scroll(direction * 3, "units")
+        return "break"
+
+    def _on_shift_mousewheel(self, event) -> str:
+        direction = -1 if event.delta > 0 else 1
+        self.canvas.xview_scroll(direction * 3, "units")
+        return "break"
+
+    def _on_ctrl_mousewheel(self, event) -> str:
+        self.adjust_zoom(0.1 if event.delta > 0 else -0.1)
+        return "break"
+
     def discard_stale_render_for_test(self, token: int) -> bool:
         return token != self._render_token
     def get_state(self) -> dict[str, Any]:
