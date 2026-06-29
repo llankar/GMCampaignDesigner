@@ -9,6 +9,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 import fitz
 from PIL import ImageTk
+from modules.books.pdf_viewer_panel import PDFViewerFrame
 
 from modules.books.pdf_processing import (
     extract_images_with_names,

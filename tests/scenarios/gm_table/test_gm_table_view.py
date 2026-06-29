@@ -1199,3 +1199,37 @@ def test_save_layout_now_reports_successful_save_feedback() -> None:
     GMTableView.save_layout_now(view)
 
     assert messages == ["Saved Main Desk"]
+
+
+def test_add_menu_options_include_fixed_table_static() -> None:
+    """The add menu source includes fixed table entry points."""
+    source = gm_table_view_module.__file__
+    text = open(source, encoding="utf-8").read()
+    assert '"Fixed Table"' in text
+    assert '"Toggle Fixed Table"' in text
+    assert '"Add to Fixed Table"' in text
+
+
+def test_add_menu_options_include_pdf_viewer_static() -> None:
+    """The add menu source includes embedded PDF entry points."""
+    text = open(gm_table_view_module.__file__, encoding="utf-8").read()
+    assert '"PDF Viewer"' in text
+    assert '"Open PDF"' in text
+
+
+def test_handle_add_option_routes_fixed_table_toggle() -> None:
+    view = GMTableView.__new__(GMTableView)
+    calls = []
+    view.workspace = SimpleNamespace(toggle_fixed_overlay=lambda: calls.append("toggle"))
+    GMTableView._handle_add_option(view, "Toggle Fixed Table")
+    assert calls == ["toggle"]
+
+
+def test_handle_add_option_creates_pdf_viewer_panel(monkeypatch) -> None:
+    view = GMTableView.__new__(GMTableView)
+    created = []
+    monkeypatch.setattr(gm_table_view_module.filedialog, "askopenfilename", lambda **_: "/tmp/rules.pdf")
+    view._create_panel_in_workspace = lambda kind, title, state, workspace=None: created.append((kind, title, state))
+    GMTableView._handle_add_option(view, "Open PDF")
+    assert created[0][0] == "pdf_viewer"
+    assert created[0][2]["current_page"] == 1

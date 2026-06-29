@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import filedialog, messagebox
 from uuid import uuid4
 
 import customtkinter as ctk
 
+from modules.books.pdf_viewer_panel import PDFViewerFrame
 from modules.characters.character_graph_editor import CharacterGraphEditor
 from modules.generic.detail_ui import build_scroll_host
 from modules.generic.entity_detail_factory import create_entity_detail_frame
@@ -155,6 +156,11 @@ class GMTableView(ctk.CTkFrame):
             "Image Library",
             "Image from Library",
             "Handouts",
+            "Fixed Table",
+            "Toggle Fixed Table",
+            "PDF Viewer",
+            "Open PDF",
+            "Add to Fixed Table",
             "Container Window",
             "Loot Generator",
             "Object Shelf",
@@ -1165,6 +1171,15 @@ class GMTableView(ctk.CTkFrame):
                 )
             )
             return
+        if option in {"Fixed Table", "Toggle Fixed Table"}:
+            self.workspace.toggle_fixed_overlay()
+            return
+        if option in {"PDF Viewer", "Open PDF"}:
+            self._open_pdf_for_table(workspace=workspace)
+            return
+        if option == "Add to Fixed Table":
+            self._add_active_panel_to_fixed_table()
+            return
         if option == "Container Window":
             self._create_panel_in_workspace(
                 "container_window", "Container Window", {}, workspace=workspace
@@ -1241,6 +1256,32 @@ class GMTableView(ctk.CTkFrame):
             )
             return
 
+
+    def _open_pdf_for_table(self, *, workspace: GMTableWorkspace | None = None) -> None:
+        """Prompt for a PDF and add it as an embedded GM Table panel."""
+        pdf_path = filedialog.askopenfilename(
+            title="Open PDF",
+            filetypes=(("PDF files", "*.pdf"), ("All files", "*.*")),
+        )
+        if not pdf_path:
+            return
+        title = pdf_path.rsplit("/", 1)[-1] or "PDF Viewer"
+        self._create_panel_in_workspace(
+            "pdf_viewer",
+            title,
+            {"pdf_path": pdf_path, "attachment_path": pdf_path, "current_page": 1, "zoom": 1.25},
+            workspace=workspace,
+        )
+
+    def _add_active_panel_to_fixed_table(self) -> None:
+        """Pin the active regular panel payload into the viewport-fixed table."""
+        panel_id = self.workspace.get_active_panel_id(include_minimized=False)
+        definition = self.workspace.get_panel_definition(panel_id) if panel_id else None
+        if definition is None:
+            self.workspace.toggle_fixed_overlay()
+            return
+        self.workspace.add_to_fixed_overlay(definition.kind, definition.title, dict(definition.state or {}))
+
     def _mount_panel_content(self, parent: ctk.CTkFrame, definition: PanelDefinition):
         """Build the page hosted inside a floating panel."""
         kind = definition.kind
@@ -1289,6 +1330,12 @@ class GMTableView(ctk.CTkFrame):
                     state_getter=lambda _payload: self._panel_state(
                         scenario_title=definition.state.get("scenario_title")
                     ),
+                )
+            if kind == "pdf_viewer":
+                return GMTableHostedPage(
+                    parent,
+                    builder=lambda host: self._build_pdf_viewer_content(host, definition.state),
+                    state_getter=lambda payload: payload.get_state(),
                 )
             if kind == "image_library":
                 return GMTableImageLibraryPage(
@@ -1430,6 +1477,19 @@ class GMTableView(ctk.CTkFrame):
             "Session settings are scenario-specific. Open a scenario GM screen to adjust "
             "timer offsets and accessibility settings.",
         )
+
+    def _build_pdf_viewer_content(self, host, state: dict):
+        """Build an embedded PDF viewer panel."""
+        widget = PDFViewerFrame(
+            host,
+            pdf_path=str((state or {}).get("pdf_path") or (state or {}).get("attachment_path") or ""),
+            attachment_path=str((state or {}).get("attachment_path") or ""),
+            title=str((state or {}).get("book_title") or "PDF Viewer"),
+            initial_state=state or {},
+            on_state_changed=self._persist_layout,
+        )
+        widget.grid(row=0, column=0, sticky="nsew")
+        return widget
 
     def _build_dashboard_content(self, host):
         """Build the campaign dashboard page."""
