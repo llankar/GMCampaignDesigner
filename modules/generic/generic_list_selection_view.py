@@ -43,11 +43,14 @@ class GenericListSelectionView(ctk.CTkFrame):
         self.filtered_items = self.items.copy()
         # Use the first field that is not "Portrait" as the unique field
         self.unique_field = next((f["name"] for f in self.template["fields"] if f["name"] != "Portrait"), None)
-        # Extra columns: all fields except "Portrait" and the unique field
+        # Extra columns: all compact fields except binary/large text payloads and the unique field.
+        # Book records can contain full extracted PDF text, and rendering that into
+        # a Treeview row makes the picker feel frozen before the list appears.
+        hidden_fields = {"Portrait", "ExtractedText", "ExtractedPages"}
         self.columns = [
             f["name"]
             for f in self.template["fields"]
-            if f["name"] not in ["Portrait", self.unique_field]
+            if f["name"] not in hidden_fields and f["name"] != self.unique_field
         ]
 
         # --- Create Search Bar ---
@@ -273,8 +276,9 @@ class GenericListSelectionView(ctk.CTkFrame):
 
     def _resolve_entity_name(self, item):
         """Resolve entity name."""
-        is_scenario = str(self.entity_type or "").strip().lower() == "scenarios"
-        primary_key, fallback_key = ("Title", "Name") if is_scenario else ("Name", "Title")
+        title_first_types = {"scenarios", "informations", "books"}
+        is_title_first = str(self.entity_type or "").strip().lower() in title_first_types
+        primary_key, fallback_key = ("Title", "Name") if is_title_first else ("Name", "Title")
         entity_name = str(item.get(primary_key) or item.get(fallback_key) or "").strip()
         return entity_name or "Unnamed"
 

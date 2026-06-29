@@ -64,7 +64,10 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget(); return
         width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
         self.configure(width=width)
-        self.place(x=0, y=0, relheight=1.0)
+        # The overlay is placed in viewport coordinates, so explicitly update the
+        # place width; configure(width=...) alone leaves the previous requested
+        # size in effect on some Tk/CustomTkinter builds.
+        self.place(x=0, y=0, width=width, relheight=1.0)
         if self._state.collapsed:
             self.content.grid_remove(); self.resize_handle.grid_remove(); self.tab_button.configure(text="›")
         else:
@@ -86,9 +89,24 @@ class FixedOverlayView(ctk.CTkFrame):
             ctk.CTkLabel(frame, text=item.title, text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4))
             body = ctk.CTkFrame(frame, fg_color="transparent")
             body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+            body.grid_rowconfigure(0, weight=1)
+            body.grid_columnconfigure(0, weight=1)
             frame.grid_rowconfigure(1, weight=1)
             payload = self._panel_builder(body, SimpleNamespace(panel_id=item.item_id, kind=item.kind, title=item.title, state=item.state))
+            self._mount_payload_widget(body, payload)
             self._payloads[item.item_id] = payload
+
+    @staticmethod
+    def _mount_payload_widget(host: ctk.CTkFrame, payload: object) -> None:
+        """Grid directly-returned widgets so fixed-table items render like panels."""
+        if not isinstance(payload, tk.Widget):
+            return
+        try:
+            if payload.master is not host or payload.winfo_manager():
+                return
+            payload.grid(row=0, column=0, sticky="nsew")
+        except Exception:
+            return
 
     def _start_resize(self, event) -> str:
         self._resize_start_x = int(event.x_root)
