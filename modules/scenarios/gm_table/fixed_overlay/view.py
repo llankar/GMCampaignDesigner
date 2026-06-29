@@ -24,16 +24,24 @@ class FixedOverlayView(ctk.CTkFrame):
         self._on_changed = on_changed
         self._state = FixedOverlayState()
         self._payloads: dict[str, object] = {}
+        self._resize_start_x = 0
+        self._resize_start_width = 0
         self._build_shell()
         self.apply_state(self._state)
 
     def _build_shell(self) -> None:
         self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=0)
         self.grid_rowconfigure(0, weight=1)
         self.tab_button = ctk.CTkButton(self, text="›", width=TAB_WIDTH, corner_radius=0, fg_color=TABLE_PALETTE["accent"], hover_color="#D97706", text_color="#111827", command=self.toggle_collapsed)
         self.tab_button.grid(row=0, column=0, sticky="ns")
         self.content = ctk.CTkFrame(self, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0)
         self.content.grid(row=0, column=1, sticky="nsew")
+        self.resize_handle = ctk.CTkFrame(self, width=8, fg_color=TABLE_PALETTE["panel_focus"], cursor="sb_h_double_arrow")
+        self.resize_handle.grid(row=0, column=2, sticky="ns")
+        self.resize_handle.bind("<ButtonPress-1>", self._start_resize, add="+")
+        self.resize_handle.bind("<B1-Motion>", self._drag_resize, add="+")
+        self.resize_handle.bind("<ButtonRelease-1>", self._finish_resize, add="+")
         self.content.grid_rowconfigure(1, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
         header = ctk.CTkFrame(self.content, fg_color=TABLE_PALETTE["table_alt"], corner_radius=0)
@@ -58,9 +66,9 @@ class FixedOverlayView(ctk.CTkFrame):
         self.configure(width=width)
         self.place(x=0, y=0, relheight=1.0)
         if self._state.collapsed:
-            self.content.grid_remove(); self.tab_button.configure(text="›")
+            self.content.grid_remove(); self.resize_handle.grid_remove(); self.tab_button.configure(text="›")
         else:
-            self.content.grid(); self.tab_button.configure(text="‹")
+            self.content.grid(); self.resize_handle.grid(); self.tab_button.configure(text="‹")
         self.lift()
 
     def _refresh_items(self) -> None:
@@ -81,6 +89,21 @@ class FixedOverlayView(ctk.CTkFrame):
             frame.grid_rowconfigure(1, weight=1)
             payload = self._panel_builder(body, SimpleNamespace(panel_id=item.item_id, kind=item.kind, title=item.title, state=item.state))
             self._payloads[item.item_id] = payload
+
+    def _start_resize(self, event) -> str:
+        self._resize_start_x = int(event.x_root)
+        self._resize_start_width = int(self._state.width)
+        return "break"
+
+    def _drag_resize(self, event) -> str:
+        delta = int(event.x_root) - self._resize_start_x
+        self._state.width = max(280, min(1100, self._resize_start_width + delta))
+        self._refresh_geometry()
+        return "break"
+
+    def _finish_resize(self, _event) -> str:
+        self._changed()
+        return "break"
 
     def expand(self) -> None:
         self._state.collapsed = False; self._refresh_geometry(); self._changed()
