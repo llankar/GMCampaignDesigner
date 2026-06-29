@@ -204,3 +204,51 @@ def test_layout_store_clears_default_table_names_from_global(monkeypatch, tmp_pa
 
     assert GMTableLayoutStore().get_table_name("table_5") == "Table5"
     assert GMTableLayoutStore().get_global_setting("table_names") == {}
+
+
+def test_layout_store_round_trips_fixed_overlay_state(monkeypatch, tmp_path) -> None:
+    """Fixed overlay state should persist separately from regular panels."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+    payload = {
+        "panels": [],
+        "fixed_overlay": {
+            "visible": True,
+            "collapsed": False,
+            "width": 380,
+            "anchor": "left",
+            "selected_item_ids": ["fixed-1"],
+            "items": [{"item_id": "fixed-1", "kind": "note", "title": "Pinned Table", "state": {"text": "A"}}],
+        },
+    }
+    store = GMTableLayoutStore()
+    store.save_table_layout("table_1", payload)
+    assert GMTableLayoutStore().get_table_layout("table_1")["fixed_overlay"] == payload["fixed_overlay"]
+
+
+def test_layout_store_round_trips_pdf_viewer_panel_state(monkeypatch, tmp_path) -> None:
+    """PDF viewer panel state should remain JSON-safe."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+    payload = {"panels": [{"panel_id": "pdf-1", "kind": "pdf_viewer", "title": "Rules", "state": {"pdf_path": "rules.pdf", "current_page": 3, "zoom": 1.5}}]}
+    store = GMTableLayoutStore(); store.save_table_layout("table_1", payload)
+    assert GMTableLayoutStore().get_table_layout("table_1")["panels"][0]["state"]["current_page"] == 3
+
+
+def test_layout_store_uses_atomic_write_for_table_layouts(monkeypatch, tmp_path) -> None:
+    """Layout writes should replace a temp file atomically."""
+    monkeypatch.setattr(
+        "modules.scenarios.gm_table.layout_store.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
+    calls = []
+    real_replace = __import__("os").replace
+    def capture_replace(src, dst):
+        calls.append((src, dst)); real_replace(src, dst)
+    monkeypatch.setattr("modules.scenarios.gm_table.layout_store.os.replace", capture_replace)
+    GMTableLayoutStore().save_table_layout("table_1", {"panels": []})
+    assert calls and calls[0][0].endswith("gm_table_layouts.json.tmp")

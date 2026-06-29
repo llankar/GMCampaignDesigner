@@ -46,6 +46,7 @@ from modules.scenarios.gm_table.organization.sticky_notes import (
 from modules.scenarios.gm_table.annotation_persistence import (
     serializable_desk_annotations,
 )
+from modules.scenarios.gm_table.fixed_overlay import FixedOverlayController
 
 
 TABLE_PALETTE = {
@@ -75,6 +76,7 @@ DEFAULT_PANEL_SIZES = {
     "image": (620, 520),
     "image_library": (860, 580),
     "handouts": (760, 560),
+    "pdf_viewer": (780, 620),
     "container_window": (820, 580),
     "container_card": (360, 260),
     "container_note": (420, 300),
@@ -1546,6 +1548,12 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._tray_button_widgets: list[ctk.CTkButton] = []
         self.tray_buttons.bind("<Configure>", self._layout_minimized_tray_buttons, add="+")
 
+        self.fixed_overlay = FixedOverlayController(
+            self.surface,
+            panel_builder=self._build_panel,
+            on_changed=self._schedule_layout_changed,
+        )
+
         self._empty_state = ctk.CTkLabel(
             self.surface,
             text="Use + Add Panel to start building the table.",
@@ -2348,6 +2356,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
         self.clear_snap_preview()
         self.clamp_panels()
+        self._raise_workspace_overlays()
 
     def _apply_focus_state(self, panel_id: str | None) -> None:
         """Refresh visual focus across all panels."""
@@ -2385,6 +2394,12 @@ class GMTableWorkspace(ctk.CTkFrame):
                 widget.lift()
             except Exception:
                 continue
+        fixed_overlay = getattr(self, "fixed_overlay", None)
+        if fixed_overlay is not None:
+            try:
+                fixed_overlay.lift()
+            except Exception:
+                pass
 
     def _visible_panel_ids(self) -> list[str]:
         """Return visible panels in z-order."""
@@ -2785,6 +2800,24 @@ class GMTableWorkspace(ctk.CTkFrame):
         panel.set_locked(locked)
         self._schedule_layout_changed()
 
+
+    def _is_layout_mutable_panel(self, panel: object | None) -> bool:
+        """Return True for regular world-space panels that bulk layout tools may move."""
+        return panel is not None and not getattr(panel, "locked", False) and panel is not getattr(self, "fixed_overlay", None)
+
+    def toggle_fixed_overlay(self) -> None:
+        """Open or collapse the viewport-fixed table overlay."""
+        self.fixed_overlay.toggle()
+        self._raise_workspace_overlays()
+        self._schedule_layout_changed()
+
+    def add_to_fixed_overlay(self, kind: str, title: str, state: dict | None = None) -> str:
+        """Pin a JSON-safe panel item into the fixed table overlay."""
+        item_id = self.fixed_overlay.add_panel_item(kind, title, state or {})
+        self._raise_workspace_overlays()
+        self._schedule_layout_changed()
+        return item_id
+
     def align_panels(self, edge: str) -> None:
         """Align all visible unlocked panels to an edge or center axis."""
         records = eligible_panel_records(self.list_panels(include_minimized=False))
@@ -2961,7 +2994,7 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def auto_arrange(self) -> None:
         """Tile visible panels across the surface."""
-        visible_ids = [panel_id for panel_id in self._visible_panel_ids() if not getattr(self._panels.get(panel_id), "locked", False)]
+        visible_ids = [panel_id for panel_id in self._visible_panel_ids() if self._is_layout_mutable_panel(self._panels.get(panel_id))]
         if not visible_ids:
             return
         self.update_idletasks()
@@ -3009,7 +3042,7 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def cascade_panels(self) -> None:
         """Cascade visible panels diagonally like classic desktop windows."""
-        visible_ids = [panel_id for panel_id in self._visible_panel_ids() if not getattr(self._panels.get(panel_id), "locked", False)]
+        visible_ids = [panel_id for panel_id in self._visible_panel_ids() if self._is_layout_mutable_panel(self._panels.get(panel_id))]
         if not visible_ids:
             return
         surface_w, surface_h = self._surface_geometry()
@@ -3215,6 +3248,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 getattr(self, "_desk_annotations", [])
             ),
             "panels": panels,
+            "fixed_overlay": self.fixed_overlay.serialize() if hasattr(self, "fixed_overlay") else {},
         }
 
     def restore(self, layout: dict[str, object] | None) -> None:
@@ -3239,6 +3273,8 @@ class GMTableWorkspace(ctk.CTkFrame):
                 if isinstance(annotation, dict)
             ]
         )
+        if hasattr(self, "fixed_overlay"):
+            self.fixed_overlay.restore(payload.get("fixed_overlay") if isinstance(payload.get("fixed_overlay"), dict) else None)
         panels = [item for item in list(payload.get("panels") or []) if isinstance(item, dict)]
         panels.sort(key=lambda item: int((item.get("state") or {}).get("z", 0)))
         for item in panels:

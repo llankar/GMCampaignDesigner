@@ -54,8 +54,12 @@ class GMTableLayoutStore:
     def _write(self) -> None:
         """Persist data to disk."""
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
-        with open(self.path, "w", encoding="utf-8") as handle:
+        tmp_path = f"{self.path}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as handle:
             json.dump(self.data, handle, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, self.path)
         log_info(
             f"GM Table layouts saved to {self.path}",
             func_name="GMTableLayoutStore._write",
