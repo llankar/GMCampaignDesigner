@@ -19,7 +19,7 @@ class FixedOverlayView(ctk.CTkFrame):
     """Collapsible viewport overlay anchored to the left edge of the GM Table."""
 
     def __init__(self, master, *, panel_builder, on_changed=None):
-        super().__init__(master, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
+        super().__init__(master, width=TAB_WIDTH, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
         self._state = FixedOverlayState()
@@ -56,7 +56,7 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget(); return
         width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
         self.configure(width=width)
-        self.place(x=0, y=0, relheight=1.0, width=width)
+        self.place(x=0, y=0, relheight=1.0)
         if self._state.collapsed:
             self.content.grid_remove(); self.tab_button.configure(text="›")
         else:
