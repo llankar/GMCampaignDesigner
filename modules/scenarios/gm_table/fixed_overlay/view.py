@@ -67,9 +67,7 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget(); return
         width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
         self.configure(width=width)
-        # CustomTkinter widgets reject explicit width/height values in place();
-        # set the requested width on the widget itself and let place use it.
-        self.place(x=0, y=0, relheight=1.0)
+        FixedOverlayView._place_with_width(self, width)
         if self._state.collapsed:
             self.content.grid_remove()
             self.resize_handle.grid_remove()
@@ -81,6 +79,16 @@ class FixedOverlayView(ctk.CTkFrame):
             self.tab_button.grid(row=0, column=2, sticky="ns")
             self.tab_button.configure(text=EXPANDED_TAB_TEXT)
         self.lift()
+
+
+    def _place_with_width(self, width: int) -> None:
+        """Place the overlay with an explicit width for reliable geometry."""
+        options = {"x": 0, "y": 0, "width": width, "relheight": 1.0}
+        place_configure = getattr(self, "place_configure", None)
+        if callable(place_configure):
+            place_configure(**options)
+            return
+        self.place(**options)
 
     def _refresh_items(self) -> None:
         for child in list(self.items_host.winfo_children()):
