@@ -1588,15 +1588,60 @@ class GMTableView(ctk.CTkFrame):
                 f"Unable to build GM Table panel '{definition.title}': {exc}",
                 func_name="GMTableView._mount_panel_content",
             )
+            return self._build_panel_fallback(parent, definition, exc)
 
-        fallback = ctk.CTkLabel(
-            parent,
-            text=f"Panel unavailable: {definition.title}",
+        return self._build_panel_fallback(parent, definition)
+
+    def _build_panel_fallback(
+        self,
+        parent: ctk.CTkFrame,
+        definition: PanelDefinition,
+        exc: Exception | None = None,
+    ) -> ctk.CTkFrame:
+        """Render a concise diagnostic when a GM Table panel cannot load."""
+        fallback = ctk.CTkFrame(parent, fg_color=TABLE_PALETTE["panel_alt"])
+        fallback.grid_columnconfigure(0, weight=1)
+
+        lines = [
+            f"Panel: {definition.title}",
+            f"Kind: {definition.kind}",
+        ]
+        if exc is not None:
+            lines.append(f"Error: {self._sanitize_panel_error(exc)}")
+        if self._panel_needs_attachment_hint(definition):
+            lines.append(
+                "Hint: check the book Attachment path and the active campaign."
+            )
+
+        label = ctk.CTkLabel(
+            fallback,
+            text="\n".join(lines),
             text_color=TABLE_PALETTE["text"],
             justify="left",
+            anchor="w",
+            wraplength=520,
         )
+        label.grid(row=0, column=0, sticky="ew", padx=14, pady=14)
         fallback.grid(row=0, column=0, sticky="nsew")
         return fallback
+
+    @staticmethod
+    def _sanitize_panel_error(exc: Exception) -> str:
+        """Return a short, single-line error summary safe for panel UI."""
+        message = " ".join(str(exc).split())
+        if not message:
+            message = exc.__class__.__name__
+        max_length = 140
+        if len(message) > max_length:
+            message = f"{message[: max_length - 1].rstrip()}…"
+        return message
+
+    @staticmethod
+    def _panel_needs_attachment_hint(definition: PanelDefinition) -> bool:
+        """Return whether a failed panel likely depends on book/entity attachments."""
+        if definition.kind == "book":
+            return True
+        return definition.kind == "entity"
 
     def _handle_note_session_action(self) -> None:
         """Explain why scenario session actions are disabled on global notes."""
