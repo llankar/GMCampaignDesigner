@@ -67,9 +67,9 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget(); return
         width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
         self.configure(width=width)
-        # Keep CustomTkinter's configured width in sync, but make the place
-        # manager's explicit width the source of truth for visible geometry.
-        self.place(x=0, y=0, width=width, relheight=1.0)
+        # CustomTkinter widgets reject explicit width/height values in place();
+        # set the requested width on the widget itself and let place use it.
+        self.place(x=0, y=0, relheight=1.0)
         if self._state.collapsed:
             self.content.grid_remove()
             self.resize_handle.grid_remove()
