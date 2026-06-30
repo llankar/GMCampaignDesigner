@@ -42,11 +42,15 @@ class TransparentOverlayWindow:
         self.window.configure(background=TRANSPARENT_COLOR)
         self.window.transient(master.winfo_toplevel())
         self.support = self._configure_transparency()
+        # Keep the full-window host painted with Tk's transparent color.
+        # Opaque overlay chrome belongs on the controls/cards themselves; if the
+        # root shell uses the blended panel background it covers the entire
+        # Toplevel and defeats the transparent-color window configuration.
         self.shell = ctk.CTkFrame(
             self.window,
-            fg_color=background,
+            fg_color=TRANSPARENT_COLOR,
             corner_radius=0,
-            border_width=1,
+            border_width=0,
         )
         self.shell.place(x=0, y=0, relheight=1.0, relwidth=1.0)
         self._bind_anchor_events()
@@ -81,7 +85,10 @@ class TransparentOverlayWindow:
     def configure(self, **kwargs: object) -> None:
         if "width" in kwargs:
             self._width = max(1, int(kwargs["width"] or 1))
-        self.shell.configure(**{k: v for k, v in kwargs.items() if k != "width"})
+        shell_kwargs = {k: v for k, v in kwargs.items() if k != "width"}
+        if "fg_color" in shell_kwargs:
+            shell_kwargs["fg_color"] = TRANSPARENT_COLOR
+        self.shell.configure(**shell_kwargs)
 
     def place_configure(self, **kwargs: object) -> None:
         self._place_options.update(kwargs)
