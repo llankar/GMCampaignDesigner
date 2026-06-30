@@ -19,6 +19,20 @@ from modules.scenarios.gm_table.fixed_overlay.view import (
 )
 
 
+
+
+def _expected_place_options(width: int) -> dict[str, object]:
+    return {
+        "x": 0,
+        "y": 0,
+        "relx": 0,
+        "rely": 0,
+        "width": width,
+        "relwidth": 0,
+        "relheight": 1.0,
+    }
+
+
 class _FakeGridWidget:
     def __init__(
         self, name: str = "widget", call_order: list[str] | None = None
@@ -100,7 +114,7 @@ def test_refresh_geometry_places_expanded_width() -> None:
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == 420
-    assert overlay.place_calls == [{"x": 0, "y": 0, "width": 420, "relheight": 1.0}]
+    assert overlay.place_calls == [_expected_place_options(420)]
     assert overlay.content.shown is True
     assert overlay.resize_handle.shown is True
     assert overlay.tab_button.options["text"] == EXPANDED_TAB_TEXT
@@ -121,9 +135,7 @@ def test_refresh_geometry_uses_tab_width_when_collapsed() -> None:
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == TAB_WIDTH
-    assert overlay.place_calls == [
-        {"x": 0, "y": 0, "width": TAB_WIDTH, "relheight": 1.0}
-    ]
+    assert overlay.place_calls == [_expected_place_options(TAB_WIDTH)]
     assert overlay.content.removed is True
     assert overlay.resize_handle.removed is True
     assert overlay.tab_button.options["text"] == COLLAPSED_TAB_TEXT
@@ -147,7 +159,7 @@ def test_refresh_geometry_preserves_placed_width_across_toggles() -> None:
     overlay._state.collapsed = False
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
     assert overlay.configured_width == 420
-    assert overlay.place_calls[-1] == {"x": 0, "y": 0, "width": 420, "relheight": 1.0}
+    assert overlay.place_calls[-1] == _expected_place_options(420)
     assert overlay.call_order[-6:] == [
         "content.grid",
         "resize_handle.grid",

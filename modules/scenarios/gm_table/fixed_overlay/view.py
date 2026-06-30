@@ -190,7 +190,15 @@ class FixedOverlayView(ctk.CTkFrame):
 
     def _place_with_width(self, width: int) -> None:
         """Place the overlay with an explicit width for reliable geometry."""
-        options = {"x": 0, "y": 0, "width": width, "relheight": 1.0}
+        options = {
+            "x": 0,
+            "y": 0,
+            "relx": 0,
+            "rely": 0,
+            "width": width,
+            "relwidth": 0,
+            "relheight": 1.0,
+        }
         place_configure = getattr(self, "place_configure", None)
         if callable(place_configure):
             place_configure(**options)
