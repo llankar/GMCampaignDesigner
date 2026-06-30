@@ -4,13 +4,10 @@ import tkinter as tk
 from types import SimpleNamespace
 import customtkinter as ctk
 
-TABLE_PALETTE = {
-    "table_bg": "#11141E", "table_alt": "#171C29", "table_line": "#2D364B",
-    "table_chip": "#20283A", "panel_bg": "#0F1523", "panel_alt": "#171F30",
-    "panel_border": "#34405A", "panel_focus": "#7DD3FC", "text": "#F4F7FB",
-    "muted": "#9EABC2", "accent": "#F59E0B", "accent_soft": "#453116", "danger": "#F87171",
-}
+from modules.helpers import theme_manager
+
 from .models import FixedOverlayItem, FixedOverlayState
+from .theme import get_fixed_overlay_palette
 
 TAB_WIDTH = 28
 COLLAPSED_TAB_TEXT = "›"
@@ -24,14 +21,14 @@ MIN_ITEM_HEIGHT = 140
 ITEM_CHROME_WIDTH = 48
 OVERLAY_SURFACE_COLOR = "transparent"
 OVERLAY_ITEM_COLOR = "transparent"
-OVERLAY_ITEM_BORDER_COLOR = "#2D364B"
 
 
 class FixedOverlayView(ctk.CTkFrame):
     """Collapsible viewport overlay anchored to the left edge of the GM Table."""
 
     def __init__(self, master, *, panel_builder, on_changed=None, on_add_requested=None):
-        super().__init__(master, width=TAB_WIDTH, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
+        self._palette = get_fixed_overlay_palette()
+        super().__init__(master, width=TAB_WIDTH, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0, border_width=1, border_color=self._palette["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
         self._on_add_requested = on_add_requested
@@ -39,6 +36,7 @@ class FixedOverlayView(ctk.CTkFrame):
         self._payloads: dict[str, object] = {}
         self._item_frames: dict[str, tk.Widget] = {}
         self._item_bodies: dict[str, tk.Widget] = {}
+        self._theme_unsub = theme_manager.register_theme_change_listener(self._on_theme_changed)
         self._resize_start_x = 0
         self._resize_start_width = 0
         self._item_resize_context: dict[str, int] | None = None
@@ -52,9 +50,9 @@ class FixedOverlayView(ctk.CTkFrame):
         self.grid_rowconfigure(0, weight=1)
         self.content = ctk.CTkFrame(self, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0)
         self.content.grid(row=0, column=0, sticky="nsew")
-        self.resize_handle = ctk.CTkFrame(self, width=8, fg_color=TABLE_PALETTE["panel_focus"], cursor="sb_h_double_arrow")
+        self.resize_handle = ctk.CTkFrame(self, width=8, fg_color=self._palette["panel_focus"], cursor="sb_h_double_arrow")
         self.resize_handle.grid(row=0, column=1, sticky="ns")
-        self.tab_button = ctk.CTkButton(self, text=COLLAPSED_TAB_TEXT, width=TAB_WIDTH, corner_radius=0, fg_color=TABLE_PALETTE["accent"], hover_color="#D97706", text_color="#111827", command=self.toggle_collapsed)
+        self.tab_button = ctk.CTkButton(self, text=COLLAPSED_TAB_TEXT, width=TAB_WIDTH, corner_radius=0, fg_color=self._palette["accent"], hover_color=self._palette["accent_hover"], text_color=self._palette["button_text_on_accent"], command=self.toggle_collapsed)
         self.tab_button.grid(row=0, column=2, sticky="ns")
         self.resize_handle.bind("<ButtonPress-1>", self._start_resize, add="+")
         self.resize_handle.bind("<B1-Motion>", self._drag_resize, add="+")
@@ -64,14 +62,34 @@ class FixedOverlayView(ctk.CTkFrame):
         header = ctk.CTkFrame(self.content, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(header, text="Fixed Table", text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=8)
+        ctk.CTkLabel(header, text="Fixed Table", text_color=self._palette["text"], font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=8)
         self.add_button = ctk.CTkButton(header, text="+ Add", width=68, command=self._request_add)
         self.add_button.grid(row=0, column=1, padx=(0, 6), pady=6)
         ctk.CTkButton(header, text="‹", width=32, command=self.collapse).grid(row=0, column=2, padx=(0, 8), pady=6)
         self.items_host = ctk.CTkScrollableFrame(self.content, fg_color=OVERLAY_SURFACE_COLOR)
         self.items_host.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
-        self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=TABLE_PALETTE["muted"], wraplength=300)
+        self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=self._palette["muted"], wraplength=300)
         self.empty_label.pack(fill="x", padx=8, pady=12)
+
+
+    def _on_theme_changed(self, theme: str) -> None:
+        """Refresh fixed-overlay chrome colors after the global theme changes."""
+        self._palette = get_fixed_overlay_palette(theme)
+        self.configure(border_color=self._palette["panel_focus"])
+        self.resize_handle.configure(fg_color=self._palette["panel_focus"])
+        self.tab_button.configure(
+            fg_color=self._palette["accent"],
+            hover_color=self._palette["accent_hover"],
+            text_color=self._palette["button_text_on_accent"],
+        )
+        self._refresh_items()
+
+    def destroy(self) -> None:
+        """Release the theme listener before destroying the overlay."""
+        if self._theme_unsub is not None:
+            self._theme_unsub()
+            self._theme_unsub = None
+        super().destroy()
 
     def apply_state(self, state: FixedOverlayState) -> None:
         self._state = state
@@ -119,7 +137,7 @@ class FixedOverlayView(ctk.CTkFrame):
         self._item_frames.clear()
         self._item_bodies.clear()
         if not self._state.items:
-            self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=TABLE_PALETTE["muted"], wraplength=300)
+            self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=self._palette["muted"], wraplength=300)
             self.empty_label.pack(fill="x", padx=8, pady=12)
             return
         for item in self._state.items:
@@ -128,7 +146,7 @@ class FixedOverlayView(ctk.CTkFrame):
                 self.items_host,
                 fg_color=OVERLAY_ITEM_COLOR,
                 border_width=1,
-                border_color=OVERLAY_ITEM_BORDER_COLOR,
+                border_color=self._palette["panel_border"],
                 corner_radius=12,
                 width=item_width,
                 height=item_height,
@@ -143,16 +161,16 @@ class FixedOverlayView(ctk.CTkFrame):
             header = ctk.CTkFrame(frame, fg_color="transparent")
             header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4), columnspan=2)
             header.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(header, text=item.title, text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, sticky="ew")
+            ctk.CTkLabel(header, text=item.title, text_color=self._palette["text"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, sticky="ew")
             actions = ctk.CTkFrame(header, fg_color="transparent")
             actions.grid(row=0, column=1, sticky="e", padx=(8, 0))
             ctk.CTkButton(
                 actions,
                 text="Remove",
                 width=72,
-                fg_color=TABLE_PALETTE["danger"],
-                hover_color="#DC2626",
-                text_color="#111827",
+                fg_color=self._palette["danger"],
+                hover_color=self._palette["danger_hover"],
+                text_color=self._palette["button_text_on_accent"],
                 command=lambda item_id=item.item_id: self._remove_item(item_id),
             ).grid(row=0, column=0, sticky="e")
 
@@ -167,8 +185,8 @@ class FixedOverlayView(ctk.CTkFrame):
                 width=22,
                 height=22,
                 cursor="bottom_right_corner",
-                text_color=TABLE_PALETTE["muted"],
-                fg_color=TABLE_PALETTE["table_chip"],
+                text_color=self._palette["muted"],
+                fg_color=self._palette["table_chip"],
                 corner_radius=8,
             )
             resize_handle.grid(row=2, column=1, sticky="se", padx=(0, 8), pady=(0, 8))
