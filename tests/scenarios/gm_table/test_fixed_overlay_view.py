@@ -57,8 +57,6 @@ class _FakeFixedOverlay:
         self.configured_width = kwargs.get("width")
 
     def place(self, **kwargs: object) -> None:
-        if "width" in kwargs or "height" in kwargs:
-            raise AssertionError("FixedOverlayView.place() must not receive width/height")
         self.place_calls.append(kwargs)
 
     def place_forget(self) -> None:
@@ -68,13 +66,13 @@ class _FakeFixedOverlay:
         self.lifted = True
 
 
-def test_refresh_geometry_configures_width_without_place_dimensions() -> None:
+def test_refresh_geometry_places_expanded_width() -> None:
     overlay = _FakeFixedOverlay()
 
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == 420
-    assert overlay.place_calls == [{"x": 0, "y": 0, "relheight": 1.0}]
+    assert overlay.place_calls == [{"x": 0, "y": 0, "width": 420, "relheight": 1.0}]
     assert overlay.content.shown is True
     assert overlay.resize_handle.shown is True
     assert overlay.tab_button.options["text"] == EXPANDED_TAB_TEXT
@@ -90,11 +88,35 @@ def test_refresh_geometry_uses_tab_width_when_collapsed() -> None:
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == TAB_WIDTH
-    assert overlay.place_calls == [{"x": 0, "y": 0, "relheight": 1.0}]
+    assert overlay.place_calls == [{"x": 0, "y": 0, "width": TAB_WIDTH, "relheight": 1.0}]
     assert overlay.content.removed is True
     assert overlay.resize_handle.removed is True
     assert overlay.tab_button.options["text"] == COLLAPSED_TAB_TEXT
     assert overlay.tab_button.grid_info()["column"] == 2
+    assert overlay.tab_button.removed is False
+
+
+def test_refresh_geometry_preserves_placed_width_across_toggles() -> None:
+    overlay = _FakeFixedOverlay()
+
+    FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
+    assert overlay.place_calls[-1]["width"] == 420
+
+    overlay._state.collapsed = True
+    FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
+    assert overlay.place_calls[-1]["width"] == TAB_WIDTH
+    assert overlay.content.removed is True
+    assert overlay.resize_handle.removed is True
+    assert overlay.tab_button.removed is False
+
+    overlay._state.collapsed = False
+    FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
+    assert overlay.place_calls[-1]["width"] == 420
+    assert overlay.content.grid_info() == {"row": 0, "column": 0, "sticky": "nsew"}
+    assert overlay.resize_handle.grid_info() == {"row": 0, "column": 1, "sticky": "ns"}
+    assert overlay.tab_button.grid_info() == {"row": 0, "column": 2, "sticky": "ns"}
+    assert overlay.content.removed is False
+    assert overlay.resize_handle.removed is False
     assert overlay.tab_button.removed is False
 
 
