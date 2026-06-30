@@ -13,15 +13,21 @@ from modules.scenarios.gm_table.fixed_overlay.view import (
 
 
 class _FakeGridWidget:
-    def __init__(self) -> None:
+    def __init__(self, name: str = "widget", call_order: list[str] | None = None) -> None:
+        self.name = name
+        self.call_order = call_order
         self.removed = False
         self.shown = False
         self.grid_options: dict[str, object] = {}
 
     def grid_remove(self) -> None:
+        if self.call_order is not None:
+            self.call_order.append(f"{self.name}.grid_remove")
         self.removed = True
 
     def grid(self, **kwargs: object) -> None:
+        if self.call_order is not None:
+            self.call_order.append(f"{self.name}.grid")
         self.shown = True
         self.removed = False
         self.grid_options.update(kwargs)
@@ -31,32 +37,38 @@ class _FakeGridWidget:
 
 
 class _FakeButton(_FakeGridWidget):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, name: str = "button", call_order: list[str] | None = None) -> None:
+        super().__init__(name, call_order)
         self.options: dict[str, object] = {}
 
     def configure(self, **kwargs: object) -> None:
+        if self.call_order is not None:
+            self.call_order.append(f"{self.name}.configure:{kwargs.get('text')}")
         self.options.update(kwargs)
 
 
 class _FakeFixedOverlay:
     def __init__(self) -> None:
         self._state = FixedOverlayState(width=420, collapsed=False, visible=True)
-        self.content = _FakeGridWidget()
+        self.call_order: list[str] = []
+        self.content = _FakeGridWidget("content", self.call_order)
         self.content.grid(row=0, column=0, sticky="nsew")
-        self.resize_handle = _FakeGridWidget()
+        self.resize_handle = _FakeGridWidget("resize_handle", self.call_order)
         self.resize_handle.grid(row=0, column=1, sticky="ns")
-        self.tab_button = _FakeButton()
+        self.tab_button = _FakeButton("tab_button", self.call_order)
         self.tab_button.grid(row=0, column=2, sticky="ns")
+        self.call_order.clear()
         self.configured_width = None
         self.place_calls: list[dict[str, object]] = []
         self.hidden = False
         self.lifted = False
 
     def configure(self, **kwargs: object) -> None:
+        self.call_order.append(f"configure:{kwargs.get('width')}")
         self.configured_width = kwargs.get("width")
 
     def place(self, **kwargs: object) -> None:
+        self.call_order.append(f"place:{kwargs.get('width')}")
         self.place_calls.append(kwargs)
 
     def place_forget(self) -> None:
@@ -112,6 +124,15 @@ def test_refresh_geometry_preserves_placed_width_across_toggles() -> None:
     overlay._state.collapsed = False
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
     assert overlay.configured_width == 420
+    assert overlay.place_calls[-1] == {"x": 0, "y": 0, "width": 420, "relheight": 1.0}
+    assert overlay.call_order[-6:] == [
+        "content.grid",
+        "resize_handle.grid",
+        "tab_button.grid",
+        f"tab_button.configure:{EXPANDED_TAB_TEXT}",
+        "configure:420",
+        "place:420",
+    ]
     assert overlay.content.grid_info() == {"row": 0, "column": 0, "sticky": "nsew"}
     assert overlay.resize_handle.grid_info() == {"row": 0, "column": 1, "sticky": "ns"}
     assert overlay.tab_button.grid_info() == {"row": 0, "column": 2, "sticky": "ns"}

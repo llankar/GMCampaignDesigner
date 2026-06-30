@@ -64,10 +64,11 @@ class FixedOverlayView(ctk.CTkFrame):
 
     def _refresh_geometry(self) -> None:
         if not self._state.visible:
-            self.place_forget(); return
+            self.place_forget()
+            return
+
         width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
-        self.configure(width=width)
-        FixedOverlayView._place_with_width(self, width)
+
         if self._state.collapsed:
             self.content.grid_remove()
             self.resize_handle.grid_remove()
@@ -78,6 +79,9 @@ class FixedOverlayView(ctk.CTkFrame):
             self.resize_handle.grid(row=0, column=1, sticky="ns")
             self.tab_button.grid(row=0, column=2, sticky="ns")
             self.tab_button.configure(text=EXPANDED_TAB_TEXT)
+
+        self.configure(width=width)
+        FixedOverlayView._place_with_width(self, width)
         self.lift()
 
 
