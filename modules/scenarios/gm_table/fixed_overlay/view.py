@@ -109,15 +109,41 @@ class FixedOverlayView(ctk.CTkFrame):
             frame = ctk.CTkFrame(self.items_host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=12)
             frame.pack(fill="both", expand=True, padx=4, pady=6)
             frame.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(frame, text=item.title, text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4))
+            frame.grid_columnconfigure(1, weight=0)
+
+            header = ctk.CTkFrame(frame, fg_color="transparent")
+            header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4), columnspan=2)
+            header.grid_columnconfigure(0, weight=1)
+            ctk.CTkLabel(header, text=item.title, text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(weight="bold"), anchor="w").grid(row=0, column=0, sticky="ew")
+            actions = ctk.CTkFrame(header, fg_color="transparent")
+            actions.grid(row=0, column=1, sticky="e", padx=(8, 0))
+            ctk.CTkButton(
+                actions,
+                text="Remove",
+                width=72,
+                fg_color=TABLE_PALETTE["danger"],
+                hover_color="#DC2626",
+                text_color="#111827",
+                command=lambda item_id=item.item_id: self._remove_item(item_id),
+            ).grid(row=0, column=0, sticky="e")
+
             body = ctk.CTkFrame(frame, fg_color="transparent")
-            body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+            body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8), columnspan=2)
             body.grid_rowconfigure(0, weight=1)
             body.grid_columnconfigure(0, weight=1)
             frame.grid_rowconfigure(1, weight=1)
             payload = self._panel_builder(body, SimpleNamespace(panel_id=item.item_id, kind=item.kind, title=item.title, state=item.state))
             self._mount_payload_widget(body, payload)
             self._payloads[item.item_id] = payload
+
+    def _remove_item(self, item_id: str) -> None:
+        before_count = len(self._state.items)
+        self._state.items = [item for item in self._state.items if item.item_id != item_id]
+        if len(self._state.items) == before_count:
+            return
+        self._payloads.pop(item_id, None)
+        self._refresh_items()
+        self._changed()
 
     @staticmethod
     def _mount_payload_widget(host: ctk.CTkFrame, payload: object) -> None:
