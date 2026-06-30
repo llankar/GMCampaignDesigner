@@ -82,6 +82,41 @@ ENTITY_TYPES = (
 TITLE_KEY_ENTITY_TYPES = {"Scenarios", "Informations", "Books"}
 MAP_PANEL_KINDS = {"world_map", "map_tool"}
 
+FIXED_OVERLAY_ADD_OPTIONS = (
+    "Pin Active Panel",
+    "Campaign Dashboard",
+    "World Map",
+    "Map Tool",
+    "Image Library",
+    "Container Window",
+    "Loot Generator",
+    "Object Shelf",
+    "Whiteboard",
+    "Random Tables",
+    "Plot Twists",
+    "Puzzle Display",
+    "Note Tab",
+    "Sticky Note",
+    "Character Graph",
+    "Scenario Graph Editor",
+)
+
+FIXED_OVERLAY_DIRECT_PANEL_OPTIONS = {
+    "Campaign Dashboard": ("campaign_dashboard", "Campaign Dashboard", {}),
+    "World Map": ("world_map", "World Map", {}),
+    "Map Tool": ("map_tool", "Map Tool", {}),
+    "Image Library": ("image_library", "Image Library", {}),
+    "Container Window": ("container_window", "Container Window", {}),
+    "Loot Generator": ("loot_generator", "Loot Generator", {}),
+    "Object Shelf": ("object_shelf", "Object Shelf", {}),
+    "Whiteboard": ("whiteboard", "Whiteboard", {}),
+    "Random Tables": ("random_tables", "Random Tables", {}),
+    "Plot Twists": ("plot_twists", "Plot Twists", {}),
+    "Puzzle Display": ("puzzle_display", "Puzzle Display", {}),
+    "Character Graph": ("character_graph", "Character Graph", {}),
+    "Scenario Graph Editor": ("scenario_graph", "Scenario Graph", {}),
+}
+
 
 class GMTableView(ctk.CTkFrame):
     """Freeform GM workspace with draggable panels."""
@@ -219,6 +254,7 @@ class GMTableView(ctk.CTkFrame):
         ]
         self._add_menu = self._build_add_menu()
         self._layout_tools_menu = self._build_layout_tools_menu()
+        self._fixed_overlay_add_menu = self._build_fixed_overlay_add_menu()
         self._build_toolbar()
         self.workspace = GMTableWorkspace(
             self,
@@ -226,6 +262,7 @@ class GMTableView(ctk.CTkFrame):
             on_layout_changed=self._persist_layout,
             map_tool_window_provider=self._get_map_tool_window,
             on_reveal_requested=self._reveal_panel,
+            on_fixed_overlay_add_requested=self._show_fixed_overlay_add_menu,
         )
         self.workspace.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
 
@@ -541,6 +578,24 @@ class GMTableView(ctk.CTkFrame):
         return menu
 
 
+    def _build_fixed_overlay_add_menu(self) -> tk.Menu:
+        """Build the fixed overlay add menu from supported GM desk panel options."""
+        menu = tk.Menu(self, tearoff=0)
+        for option in FIXED_OVERLAY_ADD_OPTIONS:
+            if option == "Pin Active Panel":
+                menu.add_command(
+                    label="Pin Active Panel",
+                    command=self._add_active_panel_to_fixed_table,
+                )
+                menu.add_separator()
+                continue
+            menu.add_command(
+                label=option,
+                command=lambda value=option: self._handle_fixed_overlay_add_option(value),
+            )
+        return menu
+
+
     def _build_layout_tools_menu(self) -> tk.Menu:
         """Build the desk arrangement menu kept separate from Add Panel."""
         menu = tk.Menu(self, tearoff=0)
@@ -558,6 +613,20 @@ class GMTableView(ctk.CTkFrame):
             self._layout_tools_menu.tk_popup(x, y)
         finally:
             self._layout_tools_menu.grab_release()
+
+    def _show_fixed_overlay_add_menu(self, source_widget: object) -> None:
+        """Open the fixed-overlay add menu beside the overlay's internal add button."""
+        try:
+            x = source_widget.winfo_rootx()
+            y = source_widget.winfo_rooty() + source_widget.winfo_height()
+        except Exception:
+            x = self.winfo_rootx()
+            y = self.winfo_rooty()
+        try:
+            self._fixed_overlay_add_menu.tk_popup(x, y)
+        finally:
+            self._fixed_overlay_add_menu.grab_release()
+
 
     def _show_add_menu(self) -> None:
         """Open the add menu under the toolbar button."""
@@ -1222,7 +1291,15 @@ class GMTableView(ctk.CTkFrame):
             self._create_panel_in_workspace(
                 "sticky_note",
                 "Sticky Note",
-                {"title": "", "body": "", "text": "", "color": "Yellow", "tags": [], "vote_marker": "", "pinned": False},
+                {
+                    "title": "",
+                    "body": "",
+                    "text": "",
+                    "color": "Yellow",
+                    "tags": [],
+                    "vote_marker": "",
+                    "pinned": False,
+                },
                 workspace=workspace,
             )
             return
@@ -1256,6 +1333,40 @@ class GMTableView(ctk.CTkFrame):
                 else self._open_entity_selection(option, workspace=workspace)
             )
             return
+
+
+    def _handle_fixed_overlay_add_option(self, option: str) -> None:
+        """Create supported panel payloads directly inside the fixed overlay."""
+        if option == "Note Tab":
+            existing_notes = [
+                item
+                for item in self.workspace.fixed_overlay.serialize().get("items", [])
+                if item.get("kind") == "note"
+            ]
+            self.workspace.add_to_fixed_overlay(
+                "note", f"Note {len(existing_notes) + 1}", {"text": ""}
+            )
+            return
+        if option == "Sticky Note":
+            self.workspace.add_to_fixed_overlay(
+                "sticky_note",
+                "Sticky Note",
+                {
+                    "title": "",
+                    "body": "",
+                    "text": "",
+                    "color": "Yellow",
+                    "tags": [],
+                    "vote_marker": "",
+                    "pinned": False,
+                },
+            )
+            return
+        panel = FIXED_OVERLAY_DIRECT_PANEL_OPTIONS.get(option)
+        if panel is None:
+            return
+        kind, title, state = panel
+        self.workspace.add_to_fixed_overlay(kind, title, dict(state))
 
 
     def _open_pdf_for_table(self, *, workspace: GMTableWorkspace | None = None) -> None:

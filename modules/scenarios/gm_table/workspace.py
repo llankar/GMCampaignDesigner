@@ -1383,12 +1383,14 @@ class GMTableWorkspace(ctk.CTkFrame):
         on_layout_changed: Callable[[], None] | None = None,
         map_tool_window_provider: Callable[[], object | None] | None = None,
         on_reveal_requested: Callable[[str], None] | None = None,
+        on_fixed_overlay_add_requested: Callable[[object], None] | None = None,
     ) -> None:
         super().__init__(master, fg_color=TABLE_PALETTE["table_bg"], corner_radius=28)
         self._build_panel = on_panel_build
         self._layout_changed_callback = on_layout_changed
         self._map_tool_window_provider = map_tool_window_provider
         self._reveal_requested_callback = on_reveal_requested
+        self._fixed_overlay_add_requested_callback = on_fixed_overlay_add_requested
         self._panels: dict[str, GMTablePanel] = {}
         self._definitions: dict[str, PanelDefinition] = {}
         self._panel_payloads: dict[str, object] = {}
@@ -1554,6 +1556,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             self.surface,
             panel_builder=self._build_panel,
             on_changed=self._schedule_layout_changed,
+            on_add_requested=self._request_fixed_overlay_add,
         )
 
         self._empty_state = ctk.CTkLabel(
@@ -1569,6 +1572,11 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._refresh_desk_texture()
         self._refresh_minimap()
         self._refresh_minimized_tray()
+
+    def _request_fixed_overlay_add(self, source_widget: object) -> None:
+        """Forward fixed-overlay add requests to the owning table view."""
+        if callable(self._fixed_overlay_add_requested_callback):
+            self._fixed_overlay_add_requested_callback(source_widget)
 
     def _schedule_layout_changed(self) -> None:
         """Debounce layout persistence."""

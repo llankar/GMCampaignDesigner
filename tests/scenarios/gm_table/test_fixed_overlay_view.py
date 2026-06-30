@@ -196,6 +196,9 @@ class _FakeShell:
     def collapse(self) -> None:
         pass
 
+    def _request_add(self) -> None:
+        pass
+
     def _start_resize(self, _event: object) -> str:
         return "break"
 
@@ -221,3 +224,18 @@ def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
     assert overlay.resize_handle.grid_info()["column"] == 1
     assert overlay.tab_button.grid_info()["column"] == 2
     assert overlay.tab_button.kwargs["text"] == COLLAPSED_TAB_TEXT
+    assert overlay.add_button.grid_info()["column"] == 1
+    assert overlay.add_button.kwargs["text"] == "+ Add"
+    assert overlay.add_button.kwargs["command"] == overlay._request_add
+
+
+def test_request_add_calls_callback_with_add_button() -> None:
+    calls: list[object] = []
+    overlay = SimpleNamespace(
+        _on_add_requested=lambda source: calls.append(source),
+        add_button=object(),
+    )
+
+    FixedOverlayView._request_add(overlay)  # type: ignore[arg-type]
+
+    assert calls == [overlay.add_button]

@@ -20,10 +20,11 @@ EXPANDED_TAB_TEXT = "‹"
 class FixedOverlayView(ctk.CTkFrame):
     """Collapsible viewport overlay anchored to the left edge of the GM Table."""
 
-    def __init__(self, master, *, panel_builder, on_changed=None):
+    def __init__(self, master, *, panel_builder, on_changed=None, on_add_requested=None):
         super().__init__(master, width=TAB_WIDTH, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
+        self._on_add_requested = on_add_requested
         self._state = FixedOverlayState()
         self._payloads: dict[str, object] = {}
         self._resize_start_x = 0
@@ -51,7 +52,9 @@ class FixedOverlayView(ctk.CTkFrame):
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(header, text="Fixed Table", text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=8)
-        ctk.CTkButton(header, text="‹", width=32, command=self.collapse).grid(row=0, column=1, padx=8, pady=6)
+        self.add_button = ctk.CTkButton(header, text="+ Add", width=68, command=self._request_add)
+        self.add_button.grid(row=0, column=1, padx=(0, 6), pady=6)
+        ctk.CTkButton(header, text="‹", width=32, command=self.collapse).grid(row=0, column=2, padx=(0, 8), pady=6)
         self.items_host = ctk.CTkScrollableFrame(self.content, fg_color=TABLE_PALETTE["panel_bg"])
         self.items_host.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
         self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=TABLE_PALETTE["muted"], wraplength=300)
@@ -163,5 +166,10 @@ class FixedOverlayView(ctk.CTkFrame):
         return self._state.to_dict()
     @property
     def collapsed(self) -> bool: return self._state.collapsed
+    def _request_add(self) -> None:
+        """Ask the owning GM Table view to show fixed-overlay add actions."""
+        if callable(self._on_add_requested):
+            self._on_add_requested(self.add_button)
+
     def _changed(self) -> None:
         if callable(self._on_changed): self._on_changed()
