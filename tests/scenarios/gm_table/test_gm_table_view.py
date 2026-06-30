@@ -522,6 +522,74 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     }
 
 
+def test_mount_panel_content_renders_entity_fallback_with_diagnostics(monkeypatch) -> None:
+    """Entity panel build failures should show concise troubleshooting context."""
+    captured = {"labels": []}
+
+    class _DummyFrame:
+        def __init__(self, parent, **kwargs) -> None:
+            captured["frame_parent"] = parent
+            captured["frame_kwargs"] = kwargs
+
+        def grid_columnconfigure(self, *args, **kwargs) -> None:
+            captured["grid_columnconfigure"] = (args, kwargs)
+
+        def grid(self, **kwargs) -> None:
+            captured["frame_grid"] = kwargs
+
+    class _DummyLabel:
+        def __init__(self, parent, **kwargs) -> None:
+            captured["label_parent"] = parent
+            captured["labels"].append(kwargs)
+
+        def grid(self, **kwargs) -> None:
+            captured["label_grid"] = kwargs
+
+    class _EagerHostedPage:
+        def __init__(self, _parent, *, builder, **_kwargs) -> None:
+            builder(object())
+
+    monkeypatch.setattr(gm_table_view_module.ctk, "CTkFrame", _DummyFrame)
+    monkeypatch.setattr(gm_table_view_module.ctk, "CTkLabel", _DummyLabel)
+    monkeypatch.setattr(gm_table_view_module, "GMTableHostedPage", _EagerHostedPage)
+    monkeypatch.setattr(
+        gm_table_view_module, "log_warning", lambda *args, **kwargs: None
+    )
+
+    view = GMTableView.__new__(GMTableView)
+
+    def _raise_entity_content(_host, _state):
+        raise RuntimeError("Attachment path missing for /tmp/secret.pdf\nplease reload")
+
+    view._build_entity_content = _raise_entity_content
+    definition = gm_table_view_module.PanelDefinition(
+        panel_id="panel-entity",
+        kind="entity",
+        title="Book: Lost Archive",
+        state={"entity_type": "Books", "entity_name": "Lost Archive"},
+    )
+
+    fallback = GMTableView._mount_panel_content(view, object(), definition)
+
+    label_text = captured["labels"][0]["text"]
+    assert isinstance(fallback, _DummyFrame)
+    assert "Panel: Book: Lost Archive" in label_text
+    assert "Kind: entity" in label_text
+    assert "Attachment path missing for /tmp/secret.pdf please reload" in label_text
+    assert "check the book Attachment path and the active campaign" in label_text
+    assert not label_text.startswith("Panel unavailable:")
+
+
+def test_sanitize_panel_error_keeps_message_short_and_single_line() -> None:
+    """Fallback errors should avoid noisy multiline trace-style content."""
+    message = GMTableView._sanitize_panel_error(
+        RuntimeError("first line\n" + "x" * 200)
+    )
+
+    assert "\n" not in message
+    assert len(message) <= 140
+    assert message.endswith("…")
+
 def test_restore_or_seed_layout_restores_annotation_only_desks() -> None:
     """Saved desk text/drawings should restore even when no panels are present."""
     layout = {
