@@ -22,18 +22,23 @@ DEFAULT_ITEM_HEIGHT = 260
 MIN_ITEM_WIDTH = 240
 MIN_ITEM_HEIGHT = 140
 ITEM_CHROME_WIDTH = 48
+OVERLAY_SURFACE_COLOR = "transparent"
+OVERLAY_ITEM_COLOR = "transparent"
+OVERLAY_ITEM_BORDER_COLOR = "#2D364B"
 
 
 class FixedOverlayView(ctk.CTkFrame):
     """Collapsible viewport overlay anchored to the left edge of the GM Table."""
 
     def __init__(self, master, *, panel_builder, on_changed=None, on_add_requested=None):
-        super().__init__(master, width=TAB_WIDTH, fg_color="transparent", corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
+        super().__init__(master, width=TAB_WIDTH, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
         self._on_add_requested = on_add_requested
         self._state = FixedOverlayState()
         self._payloads: dict[str, object] = {}
+        self._item_frames: dict[str, tk.Widget] = {}
+        self._item_bodies: dict[str, tk.Widget] = {}
         self._resize_start_x = 0
         self._resize_start_width = 0
         self._item_resize_context: dict[str, int] | None = None
@@ -45,7 +50,7 @@ class FixedOverlayView(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(2, weight=0)
         self.grid_rowconfigure(0, weight=1)
-        self.content = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        self.content = ctk.CTkFrame(self, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0)
         self.content.grid(row=0, column=0, sticky="nsew")
         self.resize_handle = ctk.CTkFrame(self, width=8, fg_color=TABLE_PALETTE["panel_focus"], cursor="sb_h_double_arrow")
         self.resize_handle.grid(row=0, column=1, sticky="ns")
@@ -56,14 +61,14 @@ class FixedOverlayView(ctk.CTkFrame):
         self.resize_handle.bind("<ButtonRelease-1>", self._finish_resize, add="+")
         self.content.grid_rowconfigure(1, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
-        header = ctk.CTkFrame(self.content, fg_color=TABLE_PALETTE["table_alt"], corner_radius=0)
+        header = ctk.CTkFrame(self.content, fg_color=OVERLAY_SURFACE_COLOR, corner_radius=0)
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(header, text="Fixed Table", text_color=TABLE_PALETTE["text"], font=ctk.CTkFont(size=13, weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=8)
         self.add_button = ctk.CTkButton(header, text="+ Add", width=68, command=self._request_add)
         self.add_button.grid(row=0, column=1, padx=(0, 6), pady=6)
         ctk.CTkButton(header, text="‹", width=32, command=self.collapse).grid(row=0, column=2, padx=(0, 8), pady=6)
-        self.items_host = ctk.CTkScrollableFrame(self.content, fg_color="transparent")
+        self.items_host = ctk.CTkScrollableFrame(self.content, fg_color=OVERLAY_SURFACE_COLOR)
         self.items_host.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
         self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=TABLE_PALETTE["muted"], wraplength=300)
         self.empty_label.pack(fill="x", padx=8, pady=12)
@@ -78,7 +83,7 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget()
             return
 
-        width = TAB_WIDTH if self._state.collapsed else self._preferred_overlay_width()
+        width = TAB_WIDTH if self._state.collapsed else FixedOverlayView._preferred_overlay_width(self)
 
         if self._state.collapsed:
             self.content.grid_remove()
@@ -111,18 +116,29 @@ class FixedOverlayView(ctk.CTkFrame):
         for child in list(self.items_host.winfo_children()):
             child.destroy()
         self._payloads.clear()
+        self._item_frames.clear()
+        self._item_bodies.clear()
         if not self._state.items:
             self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=TABLE_PALETTE["muted"], wraplength=300)
             self.empty_label.pack(fill="x", padx=8, pady=12)
             return
         for item in self._state.items:
             item_width, item_height = self._item_dimensions(item)
-            frame = ctk.CTkFrame(self.items_host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=12, width=item_width, height=item_height)
+            frame = ctk.CTkFrame(
+                self.items_host,
+                fg_color=OVERLAY_ITEM_COLOR,
+                border_width=1,
+                border_color=OVERLAY_ITEM_BORDER_COLOR,
+                corner_radius=12,
+                width=item_width,
+                height=item_height,
+            )
             frame.pack(fill="none", expand=False, padx=4, pady=6, anchor="nw")
             frame.grid_propagate(False)
             frame.grid_columnconfigure(0, weight=1)
             frame.grid_columnconfigure(1, weight=0)
             frame.grid_rowconfigure(1, weight=1)
+            self._item_frames[item.item_id] = frame
 
             header = ctk.CTkFrame(frame, fg_color="transparent")
             header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4), columnspan=2)
@@ -144,6 +160,7 @@ class FixedOverlayView(ctk.CTkFrame):
             body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8), columnspan=2)
             body.grid_rowconfigure(0, weight=1)
             body.grid_columnconfigure(0, weight=1)
+            self._item_bodies[item.item_id] = body
             resize_handle = ctk.CTkLabel(
                 frame,
                 text="↘",
@@ -226,11 +243,32 @@ class FixedOverlayView(ctk.CTkFrame):
         new_height = max(MIN_ITEM_HEIGHT, int(context["height"]) + delta_y)
         item.state["fixed_overlay_width"] = new_width
         item.state["fixed_overlay_height"] = new_height
-        item_frame = getattr(event.widget, "master", None)
-        if isinstance(item_frame, tk.Widget):
-            item_frame.configure(width=new_width, height=new_height)
+        self._resize_item_widgets(item.item_id, new_width, new_height)
         self._refresh_geometry()
         return "break"
+
+    def _resize_item_widgets(self, item_id: str, width: int, height: int) -> None:
+        """Resize the item shell and its payload host without rebuilding content."""
+        item_frame = self._item_frames.get(item_id)
+        if isinstance(item_frame, tk.Widget):
+            item_frame.configure(width=width, height=height)
+            try:
+                item_frame.pack_configure(fill="none", expand=False)
+            except Exception:
+                pass
+        body = self._item_bodies.get(item_id)
+        if isinstance(body, tk.Widget):
+            body.configure(width=max(MIN_ITEM_WIDTH, width - 16), height=max(1, height - 76))
+        payload = self._payloads.get(item_id)
+        if isinstance(payload, tk.Widget):
+            try:
+                payload.configure(width=max(MIN_ITEM_WIDTH, width - 16), height=max(1, height - 76))
+            except Exception:
+                pass
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
 
     def _finish_item_resize(self, _event) -> str:
         self._item_resize_context = None
