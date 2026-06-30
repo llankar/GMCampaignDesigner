@@ -15,13 +15,20 @@ from .models import FixedOverlayItem, FixedOverlayState
 TAB_WIDTH = 28
 COLLAPSED_TAB_TEXT = "›"
 EXPANDED_TAB_TEXT = "‹"
+MIN_OVERLAY_WIDTH = 280
+MAX_OVERLAY_WIDTH = 1100
+DEFAULT_ITEM_WIDTH = 340
+DEFAULT_ITEM_HEIGHT = 260
+MIN_ITEM_WIDTH = 240
+MIN_ITEM_HEIGHT = 140
+ITEM_CHROME_WIDTH = 48
 
 
 class FixedOverlayView(ctk.CTkFrame):
     """Collapsible viewport overlay anchored to the left edge of the GM Table."""
 
     def __init__(self, master, *, panel_builder, on_changed=None, on_add_requested=None):
-        super().__init__(master, width=TAB_WIDTH, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
+        super().__init__(master, width=TAB_WIDTH, fg_color="transparent", corner_radius=0, border_width=1, border_color=TABLE_PALETTE["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
         self._on_add_requested = on_add_requested
@@ -29,6 +36,7 @@ class FixedOverlayView(ctk.CTkFrame):
         self._payloads: dict[str, object] = {}
         self._resize_start_x = 0
         self._resize_start_width = 0
+        self._item_resize_context: dict[str, int] | None = None
         self._build_shell()
         self.apply_state(self._state)
 
@@ -37,7 +45,7 @@ class FixedOverlayView(ctk.CTkFrame):
         self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(2, weight=0)
         self.grid_rowconfigure(0, weight=1)
-        self.content = ctk.CTkFrame(self, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0)
+        self.content = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         self.content.grid(row=0, column=0, sticky="nsew")
         self.resize_handle = ctk.CTkFrame(self, width=8, fg_color=TABLE_PALETTE["panel_focus"], cursor="sb_h_double_arrow")
         self.resize_handle.grid(row=0, column=1, sticky="ns")
@@ -55,7 +63,7 @@ class FixedOverlayView(ctk.CTkFrame):
         self.add_button = ctk.CTkButton(header, text="+ Add", width=68, command=self._request_add)
         self.add_button.grid(row=0, column=1, padx=(0, 6), pady=6)
         ctk.CTkButton(header, text="‹", width=32, command=self.collapse).grid(row=0, column=2, padx=(0, 8), pady=6)
-        self.items_host = ctk.CTkScrollableFrame(self.content, fg_color=TABLE_PALETTE["panel_bg"])
+        self.items_host = ctk.CTkScrollableFrame(self.content, fg_color="transparent")
         self.items_host.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
         self.empty_label = ctk.CTkLabel(self.items_host, text="Pinned Table is empty. Use Add to Fixed Table.", text_color=TABLE_PALETTE["muted"], wraplength=300)
         self.empty_label.pack(fill="x", padx=8, pady=12)
@@ -70,7 +78,7 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget()
             return
 
-        width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
+        width = TAB_WIDTH if self._state.collapsed else self._preferred_overlay_width()
 
         if self._state.collapsed:
             self.content.grid_remove()
@@ -84,6 +92,8 @@ class FixedOverlayView(ctk.CTkFrame):
             self.tab_button.configure(text=EXPANDED_TAB_TEXT)
 
         self.configure(width=width)
+        if not self._state.collapsed:
+            self._state.width = width
         FixedOverlayView._place_with_width(self, width)
         self.lift()
 
@@ -106,10 +116,13 @@ class FixedOverlayView(ctk.CTkFrame):
             self.empty_label.pack(fill="x", padx=8, pady=12)
             return
         for item in self._state.items:
-            frame = ctk.CTkFrame(self.items_host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=12)
-            frame.pack(fill="both", expand=True, padx=4, pady=6)
+            item_width, item_height = self._item_dimensions(item)
+            frame = ctk.CTkFrame(self.items_host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=12, width=item_width, height=item_height)
+            frame.pack(fill="none", expand=False, padx=4, pady=6, anchor="nw")
+            frame.grid_propagate(False)
             frame.grid_columnconfigure(0, weight=1)
             frame.grid_columnconfigure(1, weight=0)
+            frame.grid_rowconfigure(1, weight=1)
 
             header = ctk.CTkFrame(frame, fg_color="transparent")
             header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4), columnspan=2)
@@ -131,7 +144,21 @@ class FixedOverlayView(ctk.CTkFrame):
             body.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8), columnspan=2)
             body.grid_rowconfigure(0, weight=1)
             body.grid_columnconfigure(0, weight=1)
-            frame.grid_rowconfigure(1, weight=1)
+            resize_handle = ctk.CTkLabel(
+                frame,
+                text="↘",
+                width=22,
+                height=22,
+                cursor="bottom_right_corner",
+                text_color=TABLE_PALETTE["muted"],
+                fg_color=TABLE_PALETTE["table_chip"],
+                corner_radius=8,
+            )
+            resize_handle.grid(row=2, column=1, sticky="se", padx=(0, 8), pady=(0, 8))
+            resize_handle.bind("<ButtonPress-1>", lambda event, item_id=item.item_id: self._start_item_resize(event, item_id), add="+")
+            resize_handle.bind("<B1-Motion>", lambda event, item_id=item.item_id: self._drag_item_resize(event, item_id), add="+")
+            resize_handle.bind("<ButtonRelease-1>", self._finish_item_resize, add="+")
+
             payload = self._panel_builder(body, SimpleNamespace(panel_id=item.item_id, kind=item.kind, title=item.title, state=item.state))
             self._mount_payload_widget(body, payload)
             self._payloads[item.item_id] = payload
@@ -157,6 +184,59 @@ class FixedOverlayView(ctk.CTkFrame):
         except Exception:
             return
 
+    def _preferred_overlay_width(self) -> int:
+        item_widths = [self._item_dimensions(item)[0] + ITEM_CHROME_WIDTH for item in self._state.items]
+        preferred = max([int(self._state.width or 360), *item_widths] or [360])
+        return max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, preferred))
+
+    @staticmethod
+    def _item_dimensions(item: FixedOverlayItem) -> tuple[int, int]:
+        state = item.state if isinstance(item.state, dict) else {}
+        width = int(state.get("fixed_overlay_width") or DEFAULT_ITEM_WIDTH)
+        height = int(state.get("fixed_overlay_height") or DEFAULT_ITEM_HEIGHT)
+        return max(MIN_ITEM_WIDTH, min(MAX_OVERLAY_WIDTH - ITEM_CHROME_WIDTH, width)), max(MIN_ITEM_HEIGHT, height)
+
+    def _find_item(self, item_id: str) -> FixedOverlayItem | None:
+        return next((item for item in self._state.items if item.item_id == item_id), None)
+
+    def _start_item_resize(self, event, item_id: str) -> str:
+        item = self._find_item(item_id)
+        if item is None:
+            return "break"
+        width, height = self._item_dimensions(item)
+        self._item_resize_context = {
+            "item_id": item_id,
+            "x": int(event.x_root),
+            "y": int(event.y_root),
+            "width": width,
+            "height": height,
+        }
+        return "break"
+
+    def _drag_item_resize(self, event, item_id: str) -> str:
+        context = self._item_resize_context
+        if not context or context.get("item_id") != item_id:
+            return "break"
+        item = self._find_item(item_id)
+        if item is None:
+            return "break"
+        delta_x = int(event.x_root) - int(context["x"])
+        delta_y = int(event.y_root) - int(context["y"])
+        new_width = max(MIN_ITEM_WIDTH, min(MAX_OVERLAY_WIDTH - ITEM_CHROME_WIDTH, int(context["width"]) + delta_x))
+        new_height = max(MIN_ITEM_HEIGHT, int(context["height"]) + delta_y)
+        item.state["fixed_overlay_width"] = new_width
+        item.state["fixed_overlay_height"] = new_height
+        item_frame = getattr(event.widget, "master", None)
+        if isinstance(item_frame, tk.Widget):
+            item_frame.configure(width=new_width, height=new_height)
+        self._refresh_geometry()
+        return "break"
+
+    def _finish_item_resize(self, _event) -> str:
+        self._item_resize_context = None
+        self._changed()
+        return "break"
+
     def _start_resize(self, event) -> str:
         self._resize_start_x = int(event.x_root)
         self._resize_start_width = int(self._state.width)
@@ -164,7 +244,7 @@ class FixedOverlayView(ctk.CTkFrame):
 
     def _drag_resize(self, event) -> str:
         delta = int(event.x_root) - self._resize_start_x
-        self._state.width = max(280, min(1100, self._resize_start_width + delta))
+        self._state.width = max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, self._resize_start_width + delta))
         self._refresh_geometry()
         return "break"
 
