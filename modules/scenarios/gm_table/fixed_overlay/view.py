@@ -10,6 +10,7 @@ from modules.helpers import theme_manager
 from .models import FixedOverlayItem, FixedOverlayState
 from .style import OVERLAY_OPACITY, blend_hex_color
 from .theme import get_fixed_overlay_palette
+from .overlay_window import TransparentOverlayWindow
 
 TAB_WIDTH = 28
 COLLAPSED_TAB_TEXT = "›"
@@ -24,21 +25,18 @@ MIN_ITEM_HEIGHT = 140
 ITEM_CHROME_WIDTH = 48
 
 
-class FixedOverlayView(ctk.CTkFrame):
+class FixedOverlayView:
     """Collapsible viewport overlay anchored to the left edge of the GM Table."""
 
     def __init__(
         self, master, *, panel_builder, on_changed=None, on_add_requested=None
     ):
         self._palette = get_fixed_overlay_palette()
-        super().__init__(
-            master,
-            width=TAB_WIDTH,
-            fg_color=self._overlay_surface_color(),
-            corner_radius=0,
-            border_width=1,
-            border_color=self._palette["panel_focus"],
+        self._overlay_layer = TransparentOverlayWindow(
+            master, background=self._overlay_surface_color()
         )
+        self._shell = self._overlay_layer.shell
+        self._shell.configure(border_color=self._palette["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
         self._on_add_requested = on_add_requested
@@ -68,23 +66,24 @@ class FixedOverlayView(ctk.CTkFrame):
         )
 
     def _build_shell(self) -> None:
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=0)
-        self.grid_columnconfigure(2, weight=0)
-        self.grid_rowconfigure(0, weight=1)
+        host = getattr(self, "_shell", self)
+        host.grid_columnconfigure(0, weight=1)
+        host.grid_columnconfigure(1, weight=0)
+        host.grid_columnconfigure(2, weight=0)
+        host.grid_rowconfigure(0, weight=1)
         self.content = ctk.CTkFrame(
-            self, fg_color=self._overlay_surface_color(), corner_radius=0
+            host, fg_color=self._overlay_surface_color(), corner_radius=0
         )
         self.content.grid(row=0, column=0, sticky="nsew")
         self.resize_handle = ctk.CTkFrame(
-            self,
+            host,
             width=8,
             fg_color=self._palette["panel_focus"],
             cursor="sb_h_double_arrow",
         )
         self.resize_handle.grid(row=0, column=1, sticky="ns")
         self.tab_button = ctk.CTkButton(
-            self,
+            host,
             text=COLLAPSED_TAB_TEXT,
             width=TAB_WIDTH,
             corner_radius=0,
@@ -153,7 +152,29 @@ class FixedOverlayView(ctk.CTkFrame):
         if self._theme_unsub is not None:
             self._theme_unsub()
             self._theme_unsub = None
-        super().destroy()
+        self._overlay_layer.destroy()
+
+    def configure(self, **kwargs: object) -> None:
+        self._overlay_layer.configure(**kwargs)
+
+    def place_configure(self, **kwargs: object) -> None:
+        self._overlay_layer.place_configure(**kwargs)
+
+    def place(self, **kwargs: object) -> None:
+        self._overlay_layer.place(**kwargs)
+
+    def place_forget(self) -> None:
+        self._overlay_layer.place_forget()
+
+    def lift(self) -> None:
+        self._overlay_layer.lift()
+
+    def update_idletasks(self) -> None:
+        self._overlay_layer.update_idletasks()
+
+    @property
+    def transparency_support(self):
+        return self._overlay_layer.support
 
     def apply_state(self, state: FixedOverlayState) -> None:
         self._state = state

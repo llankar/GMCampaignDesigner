@@ -336,3 +336,77 @@ def test_remove_item_ignores_unknown_item_without_change() -> None:
 
     assert [item.item_id for item in overlay._state.items] == ["keep"]
     assert changed_calls == []
+
+
+def test_fixed_overlay_state_serializes_geometry_and_items() -> None:
+    state = FixedOverlayState(
+        visible=True,
+        collapsed=False,
+        width=9999,
+        selected_item_ids=["item-a"],
+        items=[
+            FixedOverlayItem(
+                item_id="item-a",
+                kind="note",
+                title="Pinned Note",
+                state={"fixed_overlay_width": 512, "fixed_overlay_height": 384},
+            )
+        ],
+    )
+
+    payload = state.to_dict()
+
+    assert payload["collapsed"] is False
+    assert payload["width"] == 1100
+    assert payload["items"] == [
+        {
+            "item_id": "item-a",
+            "kind": "note",
+            "title": "Pinned Note",
+            "state": {"fixed_overlay_width": 512, "fixed_overlay_height": 384},
+        }
+    ]
+
+
+def test_item_dimensions_clamp_collapsed_and_expanded_geometry() -> None:
+    tiny = FixedOverlayItem(
+        item_id="tiny",
+        kind="note",
+        title="Tiny",
+        state={"fixed_overlay_width": 1, "fixed_overlay_height": 1},
+    )
+    huge = FixedOverlayItem(
+        item_id="huge",
+        kind="note",
+        title="Huge",
+        state={"fixed_overlay_width": 5000, "fixed_overlay_height": 900},
+    )
+
+    assert FixedOverlayView._item_dimensions(tiny) == (240, 140)
+    assert FixedOverlayView._item_dimensions(huge) == (1052, 900)
+
+
+class _AttributesFailWindow:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, ...]] = []
+
+    def attributes(self, *args: object) -> None:
+        self.calls.append(args)
+        raise fixed_overlay_view.tk.TclError("unsupported")
+
+
+def test_transparent_overlay_window_reports_graceful_fallback() -> None:
+    from modules.scenarios.gm_table.fixed_overlay.overlay_window import (
+        TransparentOverlayWindow,
+    )
+
+    fake = SimpleNamespace(window=_AttributesFailWindow())
+
+    support = TransparentOverlayWindow._configure_transparency(fake)  # type: ignore[arg-type]
+
+    assert support.mode == "fallback"
+    assert support.true_transparency is False
+    assert fake.window.calls == [
+        ("-transparentcolor", "#010203"),
+        ("-alpha", 0.98),
+    ]
