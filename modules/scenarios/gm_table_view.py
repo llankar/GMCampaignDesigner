@@ -25,7 +25,9 @@ from modules.puzzles.puzzle_display_window import create_puzzle_display_frame
 from modules.scenarios.gm_screen import CampaignDashboardPanel
 from modules.scenarios.gm_table import GMTableLayoutStore, GMTableWorkspace
 from modules.scenarios.gm_table.table_name_labels import build_table_switch_labels
-from modules.scenarios.gm_table.organization.search_dialog import GMTablePanelSearchDialog
+from modules.scenarios.gm_table.organization.search_dialog import (
+    GMTablePanelSearchDialog,
+)
 from modules.scenarios.gm_table.table_registry import (
     DEFAULT_GM_TABLE_ID,
     get_table_name,
@@ -47,7 +49,11 @@ from modules.scenarios.gm_table.pages import (
     GMTableNotePage,
     GMTableStickyNotePage,
 )
-from modules.scenarios.gm_table.reveal import reveal_entity, reveal_image, reveal_map_payload
+from modules.scenarios.gm_table.reveal import (
+    reveal_entity,
+    reveal_image,
+    reveal_map_payload,
+)
 from modules.scenarios.session_notes import SessionControlsCallbacks
 from modules.scenarios.gm_table.workspace import (
     PanelDefinition,
@@ -201,12 +207,27 @@ class GMTableView(ctk.CTkFrame):
             ("Align Top", lambda: self.workspace.align_panels("top")),
             ("Align Center", lambda: self.workspace.align_panels("center_x")),
             ("Make Same Width", lambda: self.workspace.make_panels_same_size("width")),
-            ("Make Same Height", lambda: self.workspace.make_panels_same_size("height")),
+            (
+                "Make Same Height",
+                lambda: self.workspace.make_panels_same_size("height"),
+            ),
             ("Snap to Grid", lambda: self.workspace.snap_panels_to_grid()),
-            ("Distribute Horizontally", lambda: self.workspace.distribute_panels("horizontal")),
-            ("Distribute Vertically", lambda: self.workspace.distribute_panels("vertical")),
-            ("Cluster Sticky Notes by Tag", lambda: self.workspace.cluster_sticky_notes("tag")),
-            ("Cluster Sticky Notes by Color", lambda: self.workspace.cluster_sticky_notes("color")),
+            (
+                "Distribute Horizontally",
+                lambda: self.workspace.distribute_panels("horizontal"),
+            ),
+            (
+                "Distribute Vertically",
+                lambda: self.workspace.distribute_panels("vertical"),
+            ),
+            (
+                "Cluster Sticky Notes by Tag",
+                lambda: self.workspace.cluster_sticky_notes("tag"),
+            ),
+            (
+                "Cluster Sticky Notes by Color",
+                lambda: self.workspace.cluster_sticky_notes("color"),
+            ),
             ("Spread on Desk", self._spread_panels_on_desk),
             ("Cascade Panels", self._cascade_panels),
             ("Restore Minimized Panels", self._restore_all_panels),
@@ -221,20 +242,34 @@ class GMTableView(ctk.CTkFrame):
             ("Align Top", lambda: self.workspace.align_panels("top")),
             ("Align Center", lambda: self.workspace.align_panels("center_x")),
             ("Make Same Width", lambda: self.workspace.make_panels_same_size("width")),
-            ("Make Same Height", lambda: self.workspace.make_panels_same_size("height")),
+            (
+                "Make Same Height",
+                lambda: self.workspace.make_panels_same_size("height"),
+            ),
             ("Snap to Grid", lambda: self.workspace.snap_panels_to_grid()),
-            ("Distribute Horizontally", lambda: self.workspace.distribute_panels("horizontal")),
-            ("Distribute Vertically", lambda: self.workspace.distribute_panels("vertical")),
-            ("Cluster Sticky Notes by Tag", lambda: self.workspace.cluster_sticky_notes("tag")),
-            ("Cluster Sticky Notes by Color", lambda: self.workspace.cluster_sticky_notes("color")),
+            (
+                "Distribute Horizontally",
+                lambda: self.workspace.distribute_panels("horizontal"),
+            ),
+            (
+                "Distribute Vertically",
+                lambda: self.workspace.distribute_panels("vertical"),
+            ),
+            (
+                "Cluster Sticky Notes by Tag",
+                lambda: self.workspace.cluster_sticky_notes("tag"),
+            ),
+            (
+                "Cluster Sticky Notes by Color",
+                lambda: self.workspace.cluster_sticky_notes("color"),
+            ),
             ("Spread on Desk", self._spread_panels_on_desk),
             ("Cascade Panels", self._cascade_panels),
             ("Restore Minimized Panels", self._restore_all_panels),
             ("Reset Table", self.reset_table),
         ]
         self._add_menu_options = [
-            option for option in self._add_menu_options
-            if not isinstance(option, tuple)
+            option for option in self._add_menu_options if not isinstance(option, tuple)
         ]
         self._add_menu = self._build_add_menu()
         self._layout_tools_menu = self._build_layout_tools_menu()
@@ -428,7 +463,6 @@ class GMTableView(ctk.CTkFrame):
             command=self.reset_table,
         ).pack(side="left")
 
-
     def _activate_desk_annotation_tool(self, tool: str) -> None:
         """Arm a desk annotation tool immediately using inline toolbar styling."""
         toolbar = getattr(self, "annotation_toolbar", None)
@@ -439,7 +473,9 @@ class GMTableView(ctk.CTkFrame):
             style = None
         self.workspace.set_desk_annotation_tool(tool, style)
 
-    def _update_desk_annotation_style(self, tool: str, style: dict[str, object]) -> None:
+    def _update_desk_annotation_style(
+        self, tool: str, style: dict[str, object]
+    ) -> None:
         """Apply inline annotation style changes without interrupting the active tool."""
         workspace = getattr(self, "workspace", None)
         if workspace is None:
@@ -561,7 +597,6 @@ class GMTableView(ctk.CTkFrame):
             )
         return menu
 
-
     def _build_fixed_overlay_add_menu(self) -> tk.Menu:
         """Build the fixed overlay add menu from supported GM desk panel options."""
         menu = tk.Menu(self, tearoff=0)
@@ -575,10 +610,11 @@ class GMTableView(ctk.CTkFrame):
                 continue
             menu.add_command(
                 label=option,
-                command=lambda value=option: self._handle_fixed_overlay_add_option(value),
+                command=lambda value=option: self._handle_fixed_overlay_add_option(
+                    value
+                ),
             )
         return menu
-
 
     def _build_layout_tools_menu(self) -> tk.Menu:
         """Build the desk arrangement menu kept separate from Add Panel."""
@@ -586,13 +622,19 @@ class GMTableView(ctk.CTkFrame):
         for label, command in self._layout_tools_options:
             menu.add_command(label=label, command=command)
         menu.add_separator()
-        menu.add_command(label="Clear Desk Drawing", command=lambda: self.workspace.clear_desk_annotations())
+        menu.add_command(
+            label="Clear Desk Drawing",
+            command=lambda: self.workspace.clear_desk_annotations(),
+        )
         return menu
 
     def _show_layout_tools_menu(self) -> None:
         """Open the desk arrangement menu under its toolbar button."""
         x = self.layout_tools_button.winfo_rootx()
-        y = self.layout_tools_button.winfo_rooty() + self.layout_tools_button.winfo_height()
+        y = (
+            self.layout_tools_button.winfo_rooty()
+            + self.layout_tools_button.winfo_height()
+        )
         try:
             self._layout_tools_menu.tk_popup(x, y)
         finally:
@@ -610,7 +652,6 @@ class GMTableView(ctk.CTkFrame):
             self._fixed_overlay_add_menu.tk_popup(x, y)
         finally:
             self._fixed_overlay_add_menu.grab_release()
-
 
     def _show_add_menu(self) -> None:
         """Open the add menu under the toolbar button."""
@@ -1139,7 +1180,9 @@ class GMTableView(ctk.CTkFrame):
             messagebox.showinfo("Reveal", "This panel is no longer available.")
             return
 
-        payload = self._unwrap_hosted_payload(target_workspace.get_panel_payload(panel_id))
+        payload = self._unwrap_hosted_payload(
+            target_workspace.get_panel_payload(panel_id)
+        )
         kind = definition.kind
         state = definition.state if isinstance(definition.state, dict) else {}
 
@@ -1155,13 +1198,21 @@ class GMTableView(ctk.CTkFrame):
 
         if kind == "entity":
             entity_type = str(state.get("entity_type") or "").strip()
-            entity_name = str(state.get("entity_name") or definition.title or "").strip()
+            entity_name = str(
+                state.get("entity_name") or definition.title or ""
+            ).strip()
             try:
                 item = self._load_entity_item(entity_type, entity_name)
             except Exception as exc:
-                messagebox.showwarning("Reveal", f"Unable to load entity for reveal:\n{exc}")
+                messagebox.showwarning(
+                    "Reveal", f"Unable to load entity for reveal:\n{exc}"
+                )
                 return
-            reveal_entity(entity_type, item, title=self._entity_label(entity_type, item, fallback=entity_name))
+            reveal_entity(
+                entity_type,
+                item,
+                title=self._entity_label(entity_type, item, fallback=entity_name),
+            )
             return
 
         if hasattr(payload, "reveal") and callable(payload.reveal):
@@ -1349,7 +1400,6 @@ class GMTableView(ctk.CTkFrame):
             )
             return
 
-
     def _handle_fixed_overlay_add_option(self, option: str) -> None:
         """Create supported panel payloads directly inside the fixed overlay."""
         if option == "Image from Library":
@@ -1392,7 +1442,6 @@ class GMTableView(ctk.CTkFrame):
         kind, title, state = panel
         self.workspace.add_to_fixed_overlay(kind, title, dict(state))
 
-
     def _open_pdf_for_table(self, *, workspace: GMTableWorkspace | None = None) -> None:
         """Prompt for a PDF and add it as an embedded GM Table panel."""
         pdf_path = filedialog.askopenfilename(
@@ -1405,7 +1454,12 @@ class GMTableView(ctk.CTkFrame):
         self._create_panel_in_workspace(
             "pdf_viewer",
             title,
-            {"pdf_path": pdf_path, "attachment_path": pdf_path, "current_page": 1, "zoom": 1.25},
+            {
+                "pdf_path": pdf_path,
+                "attachment_path": pdf_path,
+                "current_page": 1,
+                "zoom": 1.25,
+            },
             workspace=workspace,
         )
 
@@ -1416,7 +1470,9 @@ class GMTableView(ctk.CTkFrame):
         if definition is None:
             self.workspace.toggle_fixed_overlay()
             return
-        self.workspace.add_to_fixed_overlay(definition.kind, definition.title, dict(definition.state or {}))
+        self.workspace.add_to_fixed_overlay(
+            definition.kind, definition.title, dict(definition.state or {})
+        )
 
     def _mount_panel_content(self, parent: ctk.CTkFrame, definition: PanelDefinition):
         """Build the page hosted inside a floating panel."""
@@ -1470,7 +1526,9 @@ class GMTableView(ctk.CTkFrame):
             if kind == "pdf_viewer":
                 return GMTableHostedPage(
                     parent,
-                    builder=lambda host: self._build_pdf_viewer_content(host, definition.state),
+                    builder=lambda host: self._build_pdf_viewer_content(
+                        host, definition.state
+                    ),
                     state_getter=lambda payload: payload.get_state(),
                 )
             if kind == "image_library":
@@ -1663,7 +1721,11 @@ class GMTableView(ctk.CTkFrame):
         """Build an embedded PDF viewer panel."""
         widget = PDFViewerFrame(
             host,
-            pdf_path=str((state or {}).get("pdf_path") or (state or {}).get("attachment_path") or ""),
+            pdf_path=str(
+                (state or {}).get("pdf_path")
+                or (state or {}).get("attachment_path")
+                or ""
+            ),
             attachment_path=str((state or {}).get("attachment_path") or ""),
             title=str((state or {}).get("book_title") or "PDF Viewer"),
             initial_state=state or {},
@@ -1829,27 +1891,10 @@ class GMTableView(ctk.CTkFrame):
         frame.grid(row=0, column=0, sticky="nsew")
         return frame
 
-
     def _build_book_content(self, host, item: dict):
-        """Build a readable book panel with the linked PDF beside its details."""
+        """Build a book panel that shows only its attached readable document."""
         host.grid_rowconfigure(0, weight=1)
-        host.grid_columnconfigure(0, weight=2)
-        host.grid_columnconfigure(1, weight=3)
-
-        details_cell = ctk.CTkFrame(host, fg_color="transparent")
-        details_cell.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        details_cell.grid_rowconfigure(0, weight=1)
-        details_cell.grid_columnconfigure(0, weight=1)
-        details_host = build_scroll_host(details_cell)
-        detail_frame = create_entity_detail_frame(
-            "Books",
-            item,
-            master=details_host,
-            open_entity_callback=self.open_entity_panel,
-            spotlight_only=False,
-            show_spotlight=False,
-        )
-        detail_frame.pack(fill="both", expand=True, padx=8, pady=8)
+        host.grid_columnconfigure(0, weight=1)
 
         attachment = str(item.get("Attachment") or "").strip()
         if attachment:
@@ -1861,11 +1906,13 @@ class GMTableView(ctk.CTkFrame):
                 initial_state={"current_page": 1, "zoom": 1.25},
                 on_state_changed=self._persist_layout,
             )
-            viewer.grid(row=0, column=1, sticky="nsew")
+            viewer.grid(row=0, column=0, sticky="nsew")
             return viewer
 
-        missing = ctk.CTkFrame(host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=14)
-        missing.grid(row=0, column=1, sticky="nsew")
+        missing = ctk.CTkFrame(
+            host, fg_color=TABLE_PALETTE["panel_alt"], corner_radius=14
+        )
+        missing.grid(row=0, column=0, sticky="nsew")
         ctk.CTkLabel(
             missing,
             text="No linked PDF attachment for this book.",

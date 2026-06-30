@@ -522,7 +522,9 @@ def test_mount_panel_content_builds_handouts_page(monkeypatch) -> None:
     }
 
 
-def test_mount_panel_content_renders_entity_fallback_with_diagnostics(monkeypatch) -> None:
+def test_mount_panel_content_renders_entity_fallback_with_diagnostics(
+    monkeypatch,
+) -> None:
     """Entity panel build failures should show concise troubleshooting context."""
     captured = {"labels": []}
 
@@ -589,6 +591,7 @@ def test_sanitize_panel_error_keeps_message_short_and_single_line() -> None:
     assert "\n" not in message
     assert len(message) <= 140
     assert message.endswith("…")
+
 
 def test_restore_or_seed_layout_restores_annotation_only_desks() -> None:
     """Saved desk text/drawings should restore even when no panels are present."""
@@ -1278,6 +1281,55 @@ def test_add_menu_options_include_fixed_table_static() -> None:
     assert '"Add to Fixed Table"' in text
 
 
+def test_build_book_content_shows_only_attachment_viewer(monkeypatch) -> None:
+    """Book panels should expose only the attached readable document."""
+    view = GMTableView.__new__(GMTableView)
+    view._persist_layout = lambda: None
+    view._entity_label = lambda _entity_type, _item, fallback="Book": "Lost Archive"
+    created = []
+
+    class _DummyHost:
+        def grid_rowconfigure(self, *args, **kwargs) -> None:
+            created.append(("row", args, kwargs))
+
+        def grid_columnconfigure(self, *args, **kwargs) -> None:
+            created.append(("column", args, kwargs))
+
+    class _DummyViewer:
+        def __init__(self, parent, **kwargs) -> None:
+            created.append(("viewer", parent, kwargs))
+
+        def grid(self, **kwargs) -> None:
+            created.append(("grid", kwargs))
+
+    def _fail_detail(*_args, **_kwargs):
+        raise AssertionError("book details should not be rendered")
+
+    monkeypatch.setattr(gm_table_view_module, "PDFViewerFrame", _DummyViewer)
+    monkeypatch.setattr(
+        gm_table_view_module, "create_entity_detail_frame", _fail_detail
+    )
+    monkeypatch.setattr(gm_table_view_module, "build_scroll_host", _fail_detail)
+
+    host = _DummyHost()
+    result = GMTableView._build_book_content(
+        view,
+        host,
+        {
+            "Title": "Lost Archive",
+            "Attachment": "assets/books/lost.pdf",
+            "Notes": "secret",
+        },
+    )
+
+    assert isinstance(result, _DummyViewer)
+    viewer_call = next(call for call in created if call[0] == "viewer")
+    assert viewer_call[2]["pdf_path"] == "assets/books/lost.pdf"
+    assert viewer_call[2]["attachment_path"] == "assets/books/lost.pdf"
+    assert ("grid", {"row": 0, "column": 0, "sticky": "nsew"}) in created
+    assert all(call[0] != "column" or call[1][0] != 1 for call in created)
+
+
 def test_add_menu_options_include_pdf_viewer_static() -> None:
     """The add menu source includes embedded PDF entry points."""
     text = open(gm_table_view_module.__file__, encoding="utf-8").read()
@@ -1330,7 +1382,9 @@ def test_handle_fixed_overlay_add_option_routes_picker_items(monkeypatch) -> Non
 def test_handle_add_option_routes_fixed_table_toggle() -> None:
     view = GMTableView.__new__(GMTableView)
     calls = []
-    view.workspace = SimpleNamespace(toggle_fixed_overlay=lambda: calls.append("toggle"))
+    view.workspace = SimpleNamespace(
+        toggle_fixed_overlay=lambda: calls.append("toggle")
+    )
     GMTableView._handle_add_option(view, "Toggle Fixed Table")
     assert calls == ["toggle"]
 
@@ -1338,8 +1392,12 @@ def test_handle_add_option_routes_fixed_table_toggle() -> None:
 def test_handle_add_option_creates_pdf_viewer_panel(monkeypatch) -> None:
     view = GMTableView.__new__(GMTableView)
     created = []
-    monkeypatch.setattr(gm_table_view_module.filedialog, "askopenfilename", lambda **_: "/tmp/rules.pdf")
-    view._create_panel_in_workspace = lambda kind, title, state, workspace=None: created.append((kind, title, state))
+    monkeypatch.setattr(
+        gm_table_view_module.filedialog, "askopenfilename", lambda **_: "/tmp/rules.pdf"
+    )
+    view._create_panel_in_workspace = (
+        lambda kind, title, state, workspace=None: created.append((kind, title, state))
+    )
     GMTableView._handle_add_option(view, "Open PDF")
     assert created[0][0] == "pdf_viewer"
     assert created[0][2]["current_page"] == 1
