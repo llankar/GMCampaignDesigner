@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from modules.scenarios.gm_table.fixed_overlay.models import FixedOverlayState
+from modules.scenarios.gm_table.fixed_overlay.models import FixedOverlayItem, FixedOverlayState
 from modules.scenarios.gm_table.fixed_overlay import view as fixed_overlay_view
 from modules.scenarios.gm_table.fixed_overlay.view import (
     COLLAPSED_TAB_TEXT,
@@ -239,3 +239,40 @@ def test_request_add_calls_callback_with_add_button() -> None:
     FixedOverlayView._request_add(overlay)  # type: ignore[arg-type]
 
     assert calls == [overlay.add_button]
+
+
+def test_remove_item_deletes_item_and_persists_change() -> None:
+    changed_calls: list[str] = []
+    overlay = SimpleNamespace(
+        _state=FixedOverlayState(
+            items=[
+                FixedOverlayItem(item_id="keep", kind="note", title="Keep", state={"value": 1}),
+                FixedOverlayItem(item_id="remove", kind="note", title="Remove", state={"value": 2}),
+            ]
+        ),
+        _payloads={"keep": object(), "remove": object()},
+        _refresh_items=lambda: None,
+        _changed=lambda: changed_calls.append("changed"),
+    )
+
+    FixedOverlayView._remove_item(overlay, "remove")  # type: ignore[arg-type]
+
+    assert [item.item_id for item in overlay._state.items] == ["keep"]
+    assert "remove" not in overlay._payloads
+    assert changed_calls == ["changed"]
+    assert [item["item_id"] for item in FixedOverlayView.get_state(overlay)["items"]] == ["keep"]  # type: ignore[arg-type]
+
+
+def test_remove_item_ignores_unknown_item_without_change() -> None:
+    changed_calls: list[str] = []
+    overlay = SimpleNamespace(
+        _state=FixedOverlayState(items=[FixedOverlayItem(item_id="keep", kind="note", title="Keep")]),
+        _payloads={"keep": object()},
+        _refresh_items=lambda: None,
+        _changed=lambda: changed_calls.append("changed"),
+    )
+
+    FixedOverlayView._remove_item(overlay, "missing")  # type: ignore[arg-type]
+
+    assert [item.item_id for item in overlay._state.items] == ["keep"]
+    assert changed_calls == []
