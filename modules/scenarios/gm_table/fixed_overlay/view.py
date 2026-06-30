@@ -13,6 +13,8 @@ TABLE_PALETTE = {
 from .models import FixedOverlayItem, FixedOverlayState
 
 TAB_WIDTH = 28
+COLLAPSED_TAB_TEXT = "›"
+EXPANDED_TAB_TEXT = "‹"
 
 
 class FixedOverlayView(ctk.CTkFrame):
@@ -30,15 +32,16 @@ class FixedOverlayView(ctk.CTkFrame):
         self.apply_state(self._state)
 
     def _build_shell(self) -> None:
-        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(2, weight=0)
         self.grid_rowconfigure(0, weight=1)
-        self.tab_button = ctk.CTkButton(self, text="›", width=TAB_WIDTH, corner_radius=0, fg_color=TABLE_PALETTE["accent"], hover_color="#D97706", text_color="#111827", command=self.toggle_collapsed)
-        self.tab_button.grid(row=0, column=0, sticky="ns")
         self.content = ctk.CTkFrame(self, fg_color=TABLE_PALETTE["panel_bg"], corner_radius=0)
-        self.content.grid(row=0, column=1, sticky="nsew")
+        self.content.grid(row=0, column=0, sticky="nsew")
         self.resize_handle = ctk.CTkFrame(self, width=8, fg_color=TABLE_PALETTE["panel_focus"], cursor="sb_h_double_arrow")
-        self.resize_handle.grid(row=0, column=2, sticky="ns")
+        self.resize_handle.grid(row=0, column=1, sticky="ns")
+        self.tab_button = ctk.CTkButton(self, text=COLLAPSED_TAB_TEXT, width=TAB_WIDTH, corner_radius=0, fg_color=TABLE_PALETTE["accent"], hover_color="#D97706", text_color="#111827", command=self.toggle_collapsed)
+        self.tab_button.grid(row=0, column=2, sticky="ns")
         self.resize_handle.bind("<ButtonPress-1>", self._start_resize, add="+")
         self.resize_handle.bind("<B1-Motion>", self._drag_resize, add="+")
         self.resize_handle.bind("<ButtonRelease-1>", self._finish_resize, add="+")
@@ -69,9 +72,9 @@ class FixedOverlayView(ctk.CTkFrame):
         # anchors the overlay to the viewport edge and stretches it vertically.
         self.place(x=0, y=0, relheight=1.0)
         if self._state.collapsed:
-            self.content.grid_remove(); self.resize_handle.grid_remove(); self.tab_button.configure(text="›")
+            self.content.grid_remove(); self.resize_handle.grid_remove(); self.tab_button.configure(text=COLLAPSED_TAB_TEXT)
         else:
-            self.content.grid(); self.resize_handle.grid(); self.tab_button.configure(text="‹")
+            self.content.grid(); self.resize_handle.grid(); self.tab_button.configure(text=EXPANDED_TAB_TEXT)
         self.lift()
 
     def _refresh_items(self) -> None:
