@@ -10,7 +10,7 @@ from modules.helpers import theme_manager
 from .models import FixedOverlayItem, FixedOverlayState
 from .style import OVERLAY_OPACITY, blend_hex_color
 from .theme import get_fixed_overlay_palette
-from .overlay_window import TransparentOverlayWindow
+from .overlay_window import TRANSPARENT_COLOR, TransparentOverlayWindow
 
 TAB_WIDTH = 28
 COLLAPSED_TAB_TEXT = "›"
@@ -72,7 +72,7 @@ class FixedOverlayView:
         host.grid_columnconfigure(2, weight=0)
         host.grid_rowconfigure(0, weight=1)
         self.content = ctk.CTkFrame(
-            host, fg_color=self._overlay_surface_color(), corner_radius=0
+            host, fg_color=TRANSPARENT_COLOR, corner_radius=0
         )
         self.content.grid(row=0, column=0, sticky="nsew")
         self.resize_handle = ctk.CTkFrame(
@@ -99,7 +99,7 @@ class FixedOverlayView:
         self.content.grid_rowconfigure(1, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
         self.header = ctk.CTkFrame(
-            self.content, fg_color=self._overlay_surface_color(), corner_radius=0
+            self.content, fg_color=TRANSPARENT_COLOR, corner_radius=0
         )
         header = self.header
         header.grid(row=0, column=0, sticky="ew")
@@ -118,7 +118,7 @@ class FixedOverlayView:
             row=0, column=2, padx=(0, 8), pady=6
         )
         self.items_host = ctk.CTkScrollableFrame(
-            self.content, fg_color=self._overlay_surface_color()
+            self.content, fg_color=TRANSPARENT_COLOR
         )
         self.items_host.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
         self.empty_label = ctk.CTkLabel(
@@ -133,12 +133,12 @@ class FixedOverlayView:
         """Refresh fixed-overlay chrome colors after the global theme changes."""
         self._palette = get_fixed_overlay_palette(theme)
         self.configure(
-            fg_color=self._overlay_surface_color(),
+            fg_color=TRANSPARENT_COLOR,
             border_color=self._palette["panel_focus"],
         )
-        self.content.configure(fg_color=self._overlay_surface_color())
-        self.header.configure(fg_color=self._overlay_surface_color())
-        self.items_host.configure(fg_color=self._overlay_surface_color())
+        self.content.configure(fg_color=TRANSPARENT_COLOR)
+        self.header.configure(fg_color=TRANSPARENT_COLOR)
+        self.items_host.configure(fg_color=TRANSPARENT_COLOR)
         self.resize_handle.configure(fg_color=self._palette["panel_focus"])
         self.tab_button.configure(
             fg_color=self._palette["accent"],

@@ -410,3 +410,73 @@ def test_transparent_overlay_window_reports_graceful_fallback() -> None:
         ("-transparentcolor", "#010203"),
         ("-alpha", 0.98),
     ]
+
+
+def test_transparent_overlay_window_shell_uses_transparent_color(monkeypatch) -> None:
+    from modules.scenarios.gm_table.fixed_overlay import overlay_window
+
+    created_frames: list[object] = []
+
+    class FakeToplevel:
+        def withdraw(self) -> None:
+            pass
+
+        def overrideredirect(self, _value: bool) -> None:
+            pass
+
+        def configure(self, **kwargs: object) -> None:
+            self.configured = kwargs
+
+        def transient(self, _master: object) -> None:
+            pass
+
+        def attributes(self, *_args: object) -> None:
+            pass
+
+    class FakeMaster:
+        def winfo_toplevel(self) -> object:
+            return self
+
+        def bind(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+    class FakeFrame:
+        def __init__(self, master: object, **kwargs: object) -> None:
+            self.master = master
+            self.kwargs = kwargs
+            self.configure_calls: list[dict[str, object]] = []
+            created_frames.append(self)
+
+        def place(self, **kwargs: object) -> None:
+            self.place_options = kwargs
+
+        def configure(self, **kwargs: object) -> None:
+            self.configure_calls.append(kwargs)
+
+    monkeypatch.setattr(overlay_window.tk, "Toplevel", lambda _master: FakeToplevel())
+    monkeypatch.setattr(overlay_window.ctk, "CTkFrame", FakeFrame)
+
+    window = overlay_window.TransparentOverlayWindow(FakeMaster(), background="#ABCDEF")
+    window.configure(fg_color="#ABCDEF", border_color="#123456")
+
+    assert created_frames[0].kwargs["fg_color"] == overlay_window.TRANSPARENT_COLOR
+    assert created_frames[0].kwargs["border_width"] == 0
+    assert created_frames[0].configure_calls[-1]["fg_color"] == overlay_window.TRANSPARENT_COLOR
+    assert created_frames[0].configure_calls[-1]["border_color"] == "#123456"
+
+
+def test_build_shell_keeps_full_area_hosts_transparent(monkeypatch) -> None:
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFrame", _FakeCtkWidget)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkScrollableFrame", _FakeCtkWidget)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkButton", _FakeCtkButton)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkLabel", _FakeCtkWidget)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFont", lambda **kwargs: kwargs)
+    overlay = _FakeShell()
+
+    FixedOverlayView._build_shell(overlay)  # type: ignore[arg-type]
+
+    assert overlay.content.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
+    assert overlay.header.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
+    assert overlay.items_host.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
+    assert overlay.resize_handle.kwargs["fg_color"] == overlay._palette["panel_focus"]
+    assert overlay.tab_button.kwargs["fg_color"] == overlay._palette["accent"]
