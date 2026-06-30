@@ -84,7 +84,7 @@ class FixedOverlayView:
         self.resize_handle.grid(row=0, column=1, sticky="ns")
         self.tab_button = ctk.CTkButton(
             host,
-            text=COLLAPSED_TAB_TEXT,
+            text=EXPANDED_TAB_TEXT,
             width=TAB_WIDTH,
             corner_radius=0,
             fg_color=self._palette["accent"],

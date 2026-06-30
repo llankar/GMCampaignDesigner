@@ -37,7 +37,7 @@ class FixedOverlayItem:
 class FixedOverlayState:
     """Viewport-fixed overlay state; no Tk objects or world coordinates."""
     visible: bool = True
-    collapsed: bool = True
+    collapsed: bool = False
     width: int = 360
     anchor: str = "left"
     selected_item_ids: list[str] = field(default_factory=list)
@@ -59,7 +59,7 @@ class FixedOverlayState:
         items = [FixedOverlayItem.from_dict(item) for item in list(source.get("items") or []) if isinstance(item, dict)]
         return cls(
             visible=bool(source.get("visible", True)),
-            collapsed=bool(source.get("collapsed", True)),
+            collapsed=bool(source.get("collapsed", False)),
             width=max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, int(source.get("width") or DEFAULT_OVERLAY_WIDTH))),
             anchor="left",
             selected_item_ids=[str(value) for value in list(source.get("selected_item_ids") or [])],
