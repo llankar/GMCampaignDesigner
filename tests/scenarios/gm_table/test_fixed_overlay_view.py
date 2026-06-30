@@ -263,6 +263,13 @@ def test_fixed_overlay_style_blends_at_eighty_percent_opacity() -> None:
     assert blend_hex_color("#000000", "#FFFFFF", OVERLAY_OPACITY) == "#333333"
 
 
+def test_fixed_overlay_default_state_starts_expanded() -> None:
+    state = FixedOverlayState.from_dict(None)
+
+    assert state.visible is True
+    assert state.collapsed is False
+
+
 def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkScrollableFrame", _FakeCtkWidget)
@@ -277,7 +284,7 @@ def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
     assert overlay.content.grid_info()["column"] == 0
     assert overlay.resize_handle.grid_info()["column"] == 1
     assert overlay.tab_button.grid_info()["column"] == 2
-    assert overlay.tab_button.kwargs["text"] == COLLAPSED_TAB_TEXT
+    assert overlay.tab_button.kwargs["text"] == EXPANDED_TAB_TEXT
     assert overlay.add_button.grid_info()["column"] == 1
     assert overlay.add_button.kwargs["text"] == "+ Add"
     assert overlay.add_button.kwargs["command"] == overlay._request_add
