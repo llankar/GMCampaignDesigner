@@ -1836,8 +1836,11 @@ class GMTableView(ctk.CTkFrame):
         host.grid_columnconfigure(0, weight=2)
         host.grid_columnconfigure(1, weight=3)
 
-        details_host = build_scroll_host(host)
-        details_host.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        details_cell = ctk.CTkFrame(host, fg_color="transparent")
+        details_cell.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
+        details_cell.grid_rowconfigure(0, weight=1)
+        details_cell.grid_columnconfigure(0, weight=1)
+        details_host = build_scroll_host(details_cell)
         detail_frame = create_entity_detail_frame(
             "Books",
             item,
