@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from modules.scenarios.gm_table.fixed_overlay.models import FixedOverlayItem, FixedOverlayState
+from modules.scenarios.gm_table.fixed_overlay.models import (
+    FixedOverlayItem,
+    FixedOverlayState,
+)
 from modules.scenarios.gm_table.fixed_overlay import view as fixed_overlay_view
+from modules.scenarios.gm_table.fixed_overlay.style import (
+    OVERLAY_OPACITY,
+    blend_hex_color,
+)
 from modules.scenarios.gm_table.fixed_overlay.view import (
     COLLAPSED_TAB_TEXT,
     EXPANDED_TAB_TEXT,
@@ -13,7 +20,9 @@ from modules.scenarios.gm_table.fixed_overlay.view import (
 
 
 class _FakeGridWidget:
-    def __init__(self, name: str = "widget", call_order: list[str] | None = None) -> None:
+    def __init__(
+        self, name: str = "widget", call_order: list[str] | None = None
+    ) -> None:
         self.name = name
         self.call_order = call_order
         self.removed = False
@@ -37,7 +46,9 @@ class _FakeGridWidget:
 
 
 class _FakeButton(_FakeGridWidget):
-    def __init__(self, name: str = "button", call_order: list[str] | None = None) -> None:
+    def __init__(
+        self, name: str = "button", call_order: list[str] | None = None
+    ) -> None:
         super().__init__(name, call_order)
         self.options: dict[str, object] = {}
 
@@ -49,7 +60,12 @@ class _FakeButton(_FakeGridWidget):
 
 class _FakeFixedOverlay:
     def __init__(self) -> None:
-        self._state = FixedOverlayState(width=420, collapsed=False, visible=True)
+        self._state = FixedOverlayState(
+            width=420,
+            collapsed=False,
+            visible=True,
+            items=[FixedOverlayItem(item_id="item", kind="note", title="Note")],
+        )
         self.call_order: list[str] = []
         self.content = _FakeGridWidget("content", self.call_order)
         self.content.grid(row=0, column=0, sticky="nsew")
@@ -95,12 +111,19 @@ def test_refresh_geometry_places_expanded_width() -> None:
 
 def test_refresh_geometry_uses_tab_width_when_collapsed() -> None:
     overlay = _FakeFixedOverlay()
-    overlay._state = FixedOverlayState(width=420, collapsed=True, visible=True)
+    overlay._state = FixedOverlayState(
+        width=420,
+        collapsed=True,
+        visible=True,
+        items=[FixedOverlayItem(item_id="item", kind="note", title="Note")],
+    )
 
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == TAB_WIDTH
-    assert overlay.place_calls == [{"x": 0, "y": 0, "width": TAB_WIDTH, "relheight": 1.0}]
+    assert overlay.place_calls == [
+        {"x": 0, "y": 0, "width": TAB_WIDTH, "relheight": 1.0}
+    ]
     assert overlay.content.removed is True
     assert overlay.resize_handle.removed is True
     assert overlay.tab_button.options["text"] == COLLAPSED_TAB_TEXT
@@ -181,6 +204,17 @@ class _FakeCtkButton(_FakeCtkWidget):
 
 class _FakeShell:
     def __init__(self) -> None:
+        self._palette = {
+            "panel_bg": "#0F1523",
+            "panel_alt": "#171F30",
+            "table_bg": "#11141E",
+            "panel_focus": "#7DD3FC",
+            "accent": "#F59E0B",
+            "accent_hover": "#D97706",
+            "button_text_on_accent": "#F4F7FB",
+            "text": "#F4F7FB",
+            "muted": "#9EABC2",
+        }
         self.column_weights: dict[int, int] = {}
         self.row_weights: dict[int, int] = {}
 
@@ -199,6 +233,9 @@ class _FakeShell:
     def _request_add(self) -> None:
         pass
 
+    def _overlay_surface_color(self) -> str:
+        return fixed_overlay_view.FixedOverlayView._overlay_surface_color(self)
+
     def _start_resize(self, _event: object) -> str:
         return "break"
 
@@ -207,6 +244,11 @@ class _FakeShell:
 
     def _finish_resize(self, _event: object) -> str:
         return "break"
+
+
+def test_fixed_overlay_style_blends_at_ninety_percent_opacity() -> None:
+    assert OVERLAY_OPACITY == 0.90
+    assert blend_hex_color("#000000", "#FFFFFF", OVERLAY_OPACITY) == "#191919"
 
 
 def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
@@ -246,8 +288,12 @@ def test_remove_item_deletes_item_and_persists_change() -> None:
     overlay = SimpleNamespace(
         _state=FixedOverlayState(
             items=[
-                FixedOverlayItem(item_id="keep", kind="note", title="Keep", state={"value": 1}),
-                FixedOverlayItem(item_id="remove", kind="note", title="Remove", state={"value": 2}),
+                FixedOverlayItem(
+                    item_id="keep", kind="note", title="Keep", state={"value": 1}
+                ),
+                FixedOverlayItem(
+                    item_id="remove", kind="note", title="Remove", state={"value": 2}
+                ),
             ]
         ),
         _payloads={"keep": object(), "remove": object()},
@@ -266,7 +312,9 @@ def test_remove_item_deletes_item_and_persists_change() -> None:
 def test_remove_item_ignores_unknown_item_without_change() -> None:
     changed_calls: list[str] = []
     overlay = SimpleNamespace(
-        _state=FixedOverlayState(items=[FixedOverlayItem(item_id="keep", kind="note", title="Keep")]),
+        _state=FixedOverlayState(
+            items=[FixedOverlayItem(item_id="keep", kind="note", title="Keep")]
+        ),
         _payloads={"keep": object()},
         _refresh_items=lambda: None,
         _changed=lambda: changed_calls.append("changed"),
