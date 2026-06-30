@@ -12,8 +12,9 @@ from .theme import get_fixed_overlay_palette
 TAB_WIDTH = 28
 COLLAPSED_TAB_TEXT = "›"
 EXPANDED_TAB_TEXT = "‹"
-MIN_OVERLAY_WIDTH = 280
+MIN_OVERLAY_WIDTH = 180
 MAX_OVERLAY_WIDTH = 1100
+EMPTY_OVERLAY_WIDTH = 180
 DEFAULT_ITEM_WIDTH = 340
 DEFAULT_ITEM_HEIGHT = 260
 MIN_ITEM_WIDTH = 240
@@ -220,6 +221,8 @@ class FixedOverlayView(ctk.CTkFrame):
             return
 
     def _preferred_overlay_width(self) -> int:
+        if not self._state.items:
+            return EMPTY_OVERLAY_WIDTH
         item_widths = [self._item_dimensions(item)[0] + ITEM_CHROME_WIDTH for item in self._state.items]
         preferred = max([int(self._state.width or 360), *item_widths] or [360])
         return max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, preferred))

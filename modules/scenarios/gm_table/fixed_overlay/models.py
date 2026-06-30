@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+MIN_OVERLAY_WIDTH = 180
+MAX_OVERLAY_WIDTH = 1100
+DEFAULT_OVERLAY_WIDTH = 360
+
 
 def _json_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
@@ -43,7 +47,7 @@ class FixedOverlayState:
         return {
             "visible": bool(self.visible),
             "collapsed": bool(self.collapsed),
-            "width": max(260, min(1100, int(self.width or 360))),
+            "width": max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, int(self.width or DEFAULT_OVERLAY_WIDTH))),
             "anchor": self.anchor if self.anchor in {"left"} else "left",
             "selected_item_ids": [str(value) for value in self.selected_item_ids],
             "items": [item.to_dict() for item in self.items],
@@ -56,7 +60,7 @@ class FixedOverlayState:
         return cls(
             visible=bool(source.get("visible", True)),
             collapsed=bool(source.get("collapsed", True)),
-            width=max(260, min(1100, int(source.get("width") or 360))),
+            width=max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, int(source.get("width") or DEFAULT_OVERLAY_WIDTH))),
             anchor="left",
             selected_item_ids=[str(value) for value in list(source.get("selected_item_ids") or [])],
             items=[item for item in items if item.item_id],
