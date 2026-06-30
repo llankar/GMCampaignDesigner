@@ -83,36 +83,24 @@ TITLE_KEY_ENTITY_TYPES = {"Scenarios", "Informations", "Books"}
 MAP_PANEL_KINDS = {"world_map", "map_tool"}
 
 FIXED_OVERLAY_ADD_OPTIONS = (
-    "Pin Active Panel",
-    "Campaign Dashboard",
-    "World Map",
-    "Map Tool",
-    "Image Library",
-    "Container Window",
+    "Image from Library",
+    "Handouts",
     "Loot Generator",
-    "Object Shelf",
-    "Whiteboard",
-    "Random Tables",
-    "Plot Twists",
-    "Puzzle Display",
     "Note Tab",
     "Sticky Note",
     "Character Graph",
     "Scenario Graph Editor",
+    "Random Tables",
+    "Plot Twists",
+    "Campaign Dashboard",
+    "Books",
 )
 
 FIXED_OVERLAY_DIRECT_PANEL_OPTIONS = {
     "Campaign Dashboard": ("campaign_dashboard", "Campaign Dashboard", {}),
-    "World Map": ("world_map", "World Map", {}),
-    "Map Tool": ("map_tool", "Map Tool", {}),
-    "Image Library": ("image_library", "Image Library", {}),
-    "Container Window": ("container_window", "Container Window", {}),
     "Loot Generator": ("loot_generator", "Loot Generator", {}),
-    "Object Shelf": ("object_shelf", "Object Shelf", {}),
-    "Whiteboard": ("whiteboard", "Whiteboard", {}),
     "Random Tables": ("random_tables", "Random Tables", {}),
     "Plot Twists": ("plot_twists", "Plot Twists", {}),
-    "Puzzle Display": ("puzzle_display", "Puzzle Display", {}),
     "Character Graph": ("character_graph", "Character Graph", {}),
     "Scenario Graph Editor": ("scenario_graph", "Scenario Graph", {}),
 }
@@ -890,6 +878,37 @@ class GMTableView(ctk.CTkFrame):
         )
         dialog.title("Add Image to GM Table")
 
+    def _add_image_to_fixed_overlay_from_library_result(self, image_result) -> None:
+        """Create a fixed-overlay image item from an image-library selection."""
+        image_path = str(getattr(image_result, "path", "") or "").strip()
+        if not image_path:
+            messagebox.showerror("GM Table", "The selected image has no usable path.")
+            return
+        image_title = str(getattr(image_result, "name", "") or "").strip() or "Image"
+        self.workspace.add_to_fixed_overlay(
+            "image",
+            image_title,
+            {"image_path": image_path, "image_title": image_title},
+        )
+
+    def _open_image_library_for_fixed_overlay_image(self) -> None:
+        """Open the image library and add the selected image to the fixed overlay."""
+        try:
+            from modules.ui.image_library.dialogs.library_browser_dialog import (
+                ImageLibraryBrowserDialog,
+            )
+        except Exception as exc:
+            messagebox.showerror(
+                "Image Library", f"Image library is unavailable: {exc}"
+            )
+            return
+
+        dialog = ImageLibraryBrowserDialog(
+            self.winfo_toplevel(),
+            on_attach_to_entity=self._add_image_to_fixed_overlay_from_library_result,
+        )
+        dialog.title("Add Image to Fixed Table")
+
     def _preferred_entity_geometry(self, entity_type: str) -> dict[str, int]:
         """Return the default geometry for an entity panel."""
         width, height = resolve_default_panel_size(
@@ -1337,6 +1356,15 @@ class GMTableView(ctk.CTkFrame):
 
     def _handle_fixed_overlay_add_option(self, option: str) -> None:
         """Create supported panel payloads directly inside the fixed overlay."""
+        if option == "Image from Library":
+            self._open_image_library_for_fixed_overlay_image()
+            return
+        if option == "Handouts":
+            self._open_handouts_selection_for_fixed_overlay()
+            return
+        if option == "Books":
+            self._open_entity_selection_for_fixed_overlay("Books")
+            return
         if option == "Note Tab":
             existing_notes = [
                 item
@@ -2024,6 +2052,73 @@ class GMTableView(ctk.CTkFrame):
 
         view = GenericListSelectionView(
             popup, "Scenarios", wrapper, template, _open_selected
+        )
+        view.pack(fill="both", expand=True)
+
+    def _open_handouts_selection_for_fixed_overlay(self) -> None:
+        """Ask which scenario should power a fixed-overlay handouts item."""
+        wrapper = self.wrappers.get("Scenarios")
+        template = self._templates.get("Scenarios")
+        if wrapper is None or template is None:
+            messagebox.showerror("GM Table", "Scenarios are not available.")
+            return
+
+        popup = ctk.CTkToplevel(self)
+        popup.title("Select Scenario")
+        popup.geometry("1200x800")
+        popup.transient(self.winfo_toplevel())
+        popup.grab_set()
+        popup.focus_force()
+
+        def _open_selected(
+            selected_type: str, selected_name: str, item: dict | None = None
+        ) -> None:
+            del selected_type
+            popup.destroy()
+            scenario_title = self._entity_label(
+                "Scenarios", item, fallback=selected_name
+            )
+            self.workspace.add_to_fixed_overlay(
+                "handouts",
+                f"Handouts: {scenario_title}",
+                {"scenario_name": scenario_title},
+            )
+
+        view = GenericListSelectionView(
+            popup, "Scenarios", wrapper, template, _open_selected
+        )
+        view.pack(fill="both", expand=True)
+
+    def _open_entity_selection_for_fixed_overlay(self, entity_type: str) -> None:
+        """Open the generic picker for fixed-overlay entity-backed items."""
+        wrapper = self.wrappers.get(entity_type)
+        template = self._templates.get(entity_type)
+        if wrapper is None or template is None:
+            messagebox.showerror("GM Table", f"{entity_type} is not available.")
+            return
+        popup = ctk.CTkToplevel(self)
+        popup.title(f"Select {entity_type}")
+        popup.geometry("1200x800")
+        popup.transient(self.winfo_toplevel())
+        popup.grab_set()
+        popup.focus_force()
+
+        def _open_selected(
+            selected_type: str, selected_name: str, item: dict | None = None
+        ) -> None:
+            popup.destroy()
+            label = self._entity_label(selected_type, item, fallback=selected_name)
+            singular = (
+                selected_type[:-1] if selected_type.endswith("s") else selected_type
+            )
+            self.workspace.add_to_fixed_overlay(
+                "entity",
+                f"{singular}: {label}",
+                {"entity_type": selected_type, "entity_name": label},
+            )
+
+        view = GenericListSelectionView(
+            popup, entity_type, wrapper, template, _open_selected
         )
         view.pack(fill="both", expand=True)
 

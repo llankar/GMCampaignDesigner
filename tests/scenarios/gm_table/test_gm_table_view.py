@@ -1217,6 +1217,48 @@ def test_add_menu_options_include_pdf_viewer_static() -> None:
     assert '"Open PDF"' in text
 
 
+def test_fixed_overlay_add_options_match_requested_menu() -> None:
+    assert gm_table_view_module.FIXED_OVERLAY_ADD_OPTIONS == (
+        "Image from Library",
+        "Handouts",
+        "Loot Generator",
+        "Note Tab",
+        "Sticky Note",
+        "Character Graph",
+        "Scenario Graph Editor",
+        "Random Tables",
+        "Plot Twists",
+        "Campaign Dashboard",
+        "Books",
+    )
+
+
+def test_handle_fixed_overlay_add_option_routes_picker_items(monkeypatch) -> None:
+    view = GMTableView.__new__(GMTableView)
+    calls = []
+    monkeypatch.setattr(
+        view,
+        "_open_image_library_for_fixed_overlay_image",
+        lambda: calls.append("image"),
+    )
+    monkeypatch.setattr(
+        view,
+        "_open_handouts_selection_for_fixed_overlay",
+        lambda: calls.append("handouts"),
+    )
+    monkeypatch.setattr(
+        view,
+        "_open_entity_selection_for_fixed_overlay",
+        lambda entity_type: calls.append(entity_type),
+    )
+
+    GMTableView._handle_fixed_overlay_add_option(view, "Image from Library")
+    GMTableView._handle_fixed_overlay_add_option(view, "Handouts")
+    GMTableView._handle_fixed_overlay_add_option(view, "Books")
+
+    assert calls == ["image", "handouts", "Books"]
+
+
 def test_handle_add_option_routes_fixed_table_toggle() -> None:
     view = GMTableView.__new__(GMTableView)
     calls = []
