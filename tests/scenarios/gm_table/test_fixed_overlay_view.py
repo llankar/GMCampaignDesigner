@@ -72,7 +72,7 @@ def test_refresh_geometry_places_expanded_width() -> None:
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == 420
-    assert overlay.place_calls == [{"x": 0, "y": 0, "relheight": 1.0}]
+    assert overlay.place_calls == [{"x": 0, "y": 0, "width": 420, "relheight": 1.0}]
     assert overlay.content.shown is True
     assert overlay.resize_handle.shown is True
     assert overlay.tab_button.options["text"] == EXPANDED_TAB_TEXT
@@ -88,7 +88,7 @@ def test_refresh_geometry_uses_tab_width_when_collapsed() -> None:
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
 
     assert overlay.configured_width == TAB_WIDTH
-    assert overlay.place_calls == [{"x": 0, "y": 0, "relheight": 1.0}]
+    assert overlay.place_calls == [{"x": 0, "y": 0, "width": TAB_WIDTH, "relheight": 1.0}]
     assert overlay.content.removed is True
     assert overlay.resize_handle.removed is True
     assert overlay.tab_button.options["text"] == COLLAPSED_TAB_TEXT
