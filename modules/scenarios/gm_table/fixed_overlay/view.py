@@ -67,14 +67,19 @@ class FixedOverlayView(ctk.CTkFrame):
             self.place_forget(); return
         width = TAB_WIDTH if self._state.collapsed else int(self._state.width)
         self.configure(width=width)
-        # CustomTkinter requires fixed dimensions to be configured on the
-        # widget itself instead of supplied to place().  The place manager only
-        # anchors the overlay to the viewport edge and stretches it vertically.
-        self.place(x=0, y=0, relheight=1.0)
+        # Keep CustomTkinter's configured width in sync, but make the place
+        # manager's explicit width the source of truth for visible geometry.
+        self.place(x=0, y=0, width=width, relheight=1.0)
         if self._state.collapsed:
-            self.content.grid_remove(); self.resize_handle.grid_remove(); self.tab_button.configure(text=COLLAPSED_TAB_TEXT)
+            self.content.grid_remove()
+            self.resize_handle.grid_remove()
+            self.tab_button.grid(row=0, column=2, sticky="ns")
+            self.tab_button.configure(text=COLLAPSED_TAB_TEXT)
         else:
-            self.content.grid(); self.resize_handle.grid(); self.tab_button.configure(text=EXPANDED_TAB_TEXT)
+            self.content.grid(row=0, column=0, sticky="nsew")
+            self.resize_handle.grid(row=0, column=1, sticky="ns")
+            self.tab_button.grid(row=0, column=2, sticky="ns")
+            self.tab_button.configure(text=EXPANDED_TAB_TEXT)
         self.lift()
 
     def _refresh_items(self) -> None:
