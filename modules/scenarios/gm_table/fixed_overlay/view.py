@@ -54,13 +54,13 @@ class FixedOverlayView:
         self.apply_state(self._state)
 
     def _overlay_surface_color(self) -> str:
-        """Return the fixed overlay surface color blended at 90% opacity."""
+        """Return the fixed overlay surface color blended at 80% opacity."""
         return blend_hex_color(
             self._palette["panel_bg"], self._palette["table_bg"], OVERLAY_OPACITY
         )
 
     def _overlay_item_color(self) -> str:
-        """Return fixed item chrome blended at 90% opacity."""
+        """Return fixed item chrome blended at 80% opacity."""
         return blend_hex_color(
             self._palette["panel_alt"], self._palette["table_bg"], OVERLAY_OPACITY
         )
