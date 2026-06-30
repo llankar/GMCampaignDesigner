@@ -258,9 +258,9 @@ class _FakeShell:
         return "break"
 
 
-def test_fixed_overlay_style_blends_at_ninety_percent_opacity() -> None:
-    assert OVERLAY_OPACITY == 0.90
-    assert blend_hex_color("#000000", "#FFFFFF", OVERLAY_OPACITY) == "#191919"
+def test_fixed_overlay_style_blends_at_eighty_percent_opacity() -> None:
+    assert OVERLAY_OPACITY == 0.80
+    assert blend_hex_color("#000000", "#FFFFFF", OVERLAY_OPACITY) == "#333333"
 
 
 def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
@@ -408,7 +408,7 @@ def test_transparent_overlay_window_reports_graceful_fallback() -> None:
     assert support.true_transparency is False
     assert fake.window.calls == [
         ("-transparentcolor", "#010203"),
-        ("-alpha", 0.98),
+        ("-alpha", 0.80),
     ]
 
 

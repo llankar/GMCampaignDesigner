@@ -61,7 +61,7 @@ class TransparentOverlayWindow:
             return TransparencySupport("transparentcolor", True)
         except tk.TclError as exc:
             try:
-                self.window.attributes("-alpha", 0.98)
+                self.window.attributes("-alpha", 0.80)
                 return TransparencySupport("alpha", True, str(exc))
             except tk.TclError as alpha_exc:
                 return TransparencySupport("fallback", False, str(alpha_exc))

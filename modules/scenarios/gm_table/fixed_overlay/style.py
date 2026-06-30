@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-OVERLAY_OPACITY = 0.90
+OVERLAY_OPACITY = 0.80
 
 
 def blend_hex_color(
