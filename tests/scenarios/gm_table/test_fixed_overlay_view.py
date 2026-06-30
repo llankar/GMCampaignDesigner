@@ -139,7 +139,7 @@ def test_refresh_geometry_uses_tab_width_when_collapsed() -> None:
     assert overlay.content.removed is True
     assert overlay.resize_handle.removed is True
     assert overlay.tab_button.options["text"] == COLLAPSED_TAB_TEXT
-    assert overlay.tab_button.grid_info()["column"] == 2
+    assert overlay.tab_button.grid_info()["column"] == 0
     assert overlay.tab_button.removed is False
 
 
@@ -154,6 +154,7 @@ def test_refresh_geometry_preserves_placed_width_across_toggles() -> None:
     assert overlay.configured_width == TAB_WIDTH
     assert overlay.content.removed is True
     assert overlay.resize_handle.removed is True
+    assert overlay.tab_button.grid_info()["column"] == 0
     assert overlay.tab_button.removed is False
 
     overlay._state.collapsed = False
