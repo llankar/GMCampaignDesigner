@@ -195,7 +195,12 @@ class FixedOverlayView:
         if self._state.collapsed:
             self.content.grid_remove()
             self.resize_handle.grid_remove()
-            self.tab_button.grid(row=0, column=2, sticky="ns")
+            # When the overlay is narrowed to TAB_WIDTH, keep the expand handle
+            # in the first visible grid column. Leaving it in column 2 can push
+            # the button outside the clipped toplevel on some Tk/window-manager
+            # combinations, which makes the collapsed overlay look like it has
+            # no way to expand.
+            self.tab_button.grid(row=0, column=0, sticky="ns")
             self.tab_button.configure(text=COLLAPSED_TAB_TEXT)
         else:
             self.content.grid(row=0, column=0, sticky="nsew")
