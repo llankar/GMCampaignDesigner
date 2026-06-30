@@ -7,8 +7,13 @@ from .view import FixedOverlayView
 
 
 class FixedOverlayController:
-    def __init__(self, master, *, panel_builder, on_changed=None):
-        self.view = FixedOverlayView(master, panel_builder=panel_builder, on_changed=on_changed)
+    def __init__(self, master, *, panel_builder, on_changed=None, on_add_requested=None):
+        self.view = FixedOverlayView(
+            master,
+            panel_builder=panel_builder,
+            on_changed=on_changed,
+            on_add_requested=on_add_requested,
+        )
     def serialize(self) -> dict:
         return self.view.get_state()
     def restore(self, payload: dict | None) -> None:
