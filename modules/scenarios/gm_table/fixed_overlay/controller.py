@@ -24,5 +24,10 @@ class FixedOverlayController:
         item = FixedOverlayItem(item_id=f"fixed_{uuid4().hex}", kind=kind, title=title, state=dict(state or {}))
         self.view.add_item(item)
         return item.item_id
+    def refresh_geometry(self) -> None:
+        """Refresh the fixed overlay placement after its anchor geometry changes."""
+        self.view._refresh_geometry()
+
     def lift(self) -> None:
-        self.view._refresh_geometry(); self.view.lift()
+        self.refresh_geometry()
+        self.view.lift()
