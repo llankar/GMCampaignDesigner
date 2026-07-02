@@ -1555,6 +1555,7 @@ class GMTableView(ctk.CTkFrame):
                     wrappers=self.wrappers,
                     map_wrapper=self.map_wrapper,
                     initial_state=definition.state,
+                    on_reveal_complete=self._restore_fixed_overlay_after_reveal,
                 )
             if kind == "container_window":
                 return GMTableContainerPage(
@@ -2145,6 +2146,27 @@ class GMTableView(ctk.CTkFrame):
             popup, "Scenarios", wrapper, template, _open_selected
         )
         view.pack(fill="both", expand=True)
+
+    def _restore_fixed_overlay_after_reveal(self) -> None:
+        """Re-lift the fixed overlay after handout reveals create player windows."""
+        workspace = getattr(self, "workspace", None)
+        fixed_overlay = getattr(workspace, "fixed_overlay", None)
+        if fixed_overlay is None:
+            return
+
+        def _raise_overlay() -> None:
+            try:
+                fixed_overlay.refresh_geometry()
+                fixed_overlay.lift()
+            except Exception:
+                pass
+
+        _raise_overlay()
+        for delay_ms in (50, 200, 500):
+            try:
+                self.after(delay_ms, _raise_overlay)
+            except Exception:
+                break
 
     def _open_handouts_selection_for_fixed_overlay(self) -> None:
         """Ask which scenario should power a fixed-overlay handouts item."""

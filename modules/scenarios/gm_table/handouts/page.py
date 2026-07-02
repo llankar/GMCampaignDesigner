@@ -43,6 +43,7 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         wrappers: dict[str, object],
         map_wrapper: object,
         initial_state: dict | None = None,
+        on_reveal_complete=None,
     ) -> None:
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(3, weight=1)
@@ -53,6 +54,7 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         self._scenario_item = scenario_item if isinstance(scenario_item, dict) else {}
         self._wrappers = wrappers
         self._map_wrapper = map_wrapper
+        self._on_reveal_complete = on_reveal_complete
 
         self._query_var = tk.StringVar(value=str(state.get("query") or ""))
         self._status_var = tk.StringVar(value="")
@@ -344,7 +346,21 @@ class GMTableHandoutsPage(ctk.CTkFrame):
         self._selected_id = handout.id
         self._status_var.set("")
         self._highlight_selected()
-        reveal_handout(handout, animation=self._selected_animation())
+        try:
+            reveal_handout(handout, animation=self._selected_animation())
+        finally:
+            self._notify_reveal_complete()
+
+    def _notify_reveal_complete(self) -> None:
+        """Let the owner restore overlay z-order after a player reveal opens."""
+        callback = self._on_reveal_complete
+        if not callable(callback):
+            return
+        try:
+            callback()
+        except Exception:
+            # Reveals should remain resilient even if the parent table is closing.
+            pass
 
     def reveal(self) -> None:
         """Reveal the selected handout from the workspace panel action."""
