@@ -1392,6 +1392,8 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._reveal_requested_callback = on_reveal_requested
         self._fixed_overlay_add_requested_callback = on_fixed_overlay_add_requested
         self._fixed_overlay_surface_refresh_complete = False
+        self._fixed_overlay_startup_refresh_count = 0
+        self._fixed_overlay_startup_refresh_pending = False
         self._panels: dict[str, GMTablePanel] = {}
         self._definitions: dict[str, PanelDefinition] = {}
         self._panel_payloads: dict[str, object] = {}
@@ -1581,10 +1583,13 @@ class GMTableWorkspace(ctk.CTkFrame):
         if callable(self._fixed_overlay_add_requested_callback):
             self._fixed_overlay_add_requested_callback(source_widget)
 
-    def _refresh_fixed_overlay_after_surface_map(self) -> None:
-        """Refresh the fixed overlay once the table surface has real geometry."""
+    def _refresh_fixed_overlay_after_surface_map(self, *, scheduled: bool = False) -> None:
+        """Refresh the fixed overlay after the table surface has settled."""
         if self._disposed or self._fixed_overlay_surface_refresh_complete:
             return
+        if self._fixed_overlay_startup_refresh_pending and not scheduled:
+            return
+        self._fixed_overlay_startup_refresh_pending = False
         try:
             is_ready = (
                 self.surface.winfo_ismapped()
@@ -1595,16 +1600,37 @@ class GMTableWorkspace(ctk.CTkFrame):
             is_ready = False
 
         if not is_ready:
-            self.after(50, self._refresh_fixed_overlay_after_surface_map)
+            self._schedule_fixed_overlay_startup_refresh(50)
             return
 
-        self._fixed_overlay_surface_refresh_complete = True
         fixed_overlay = getattr(self, "fixed_overlay", None)
         if fixed_overlay is not None:
             try:
                 fixed_overlay.refresh_geometry()
+                fixed_overlay.lift()
             except Exception:
                 pass
+
+        self._fixed_overlay_startup_refresh_count += 1
+        refresh_delays_ms = (50, 150, 300)
+        if self._fixed_overlay_startup_refresh_count > len(refresh_delays_ms):
+            self._fixed_overlay_surface_refresh_complete = True
+            return
+        self._schedule_fixed_overlay_startup_refresh(
+            refresh_delays_ms[self._fixed_overlay_startup_refresh_count - 1]
+        )
+
+    def _schedule_fixed_overlay_startup_refresh(self, delay_ms: int) -> None:
+        """Schedule a bounded startup geometry refresh for the fixed overlay."""
+        if self._disposed or self._fixed_overlay_surface_refresh_complete:
+            return
+        if self._fixed_overlay_startup_refresh_pending:
+            return
+        self._fixed_overlay_startup_refresh_pending = True
+        self.after(
+            delay_ms,
+            lambda: self._refresh_fixed_overlay_after_surface_map(scheduled=True),
+        )
 
     def _schedule_layout_changed(self) -> None:
         """Debounce layout persistence."""
