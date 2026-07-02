@@ -35,6 +35,7 @@ class TransparentOverlayWindow:
         self.master = master
         self._width = 1
         self._visible = False
+        self._geometry_retry_id: str | None = None
         self._place_options: dict[str, object] = {}
         self.window = tk.Toplevel(master.winfo_toplevel())
         self.window.withdraw()
@@ -94,30 +95,62 @@ class TransparentOverlayWindow:
         self._place_options.update(kwargs)
         self._width = max(1, int(kwargs.get("width") or self._width))
         self._visible = True
-        self._apply_geometry()
-        self.window.deiconify()
+        if self._apply_geometry():
+            self.window.deiconify()
 
     def place(self, **kwargs: object) -> None:
         self.place_configure(**kwargs)
 
     def place_forget(self) -> None:
         self._visible = False
+        self._cancel_geometry_retry()
         self.window.withdraw()
 
-    def _apply_geometry(self) -> None:
+    def _cancel_geometry_retry(self) -> None:
+        if self._geometry_retry_id is None:
+            return
+        try:
+            self.master.after_cancel(self._geometry_retry_id)
+        except tk.TclError:
+            pass
+        self._geometry_retry_id = None
+
+    def _schedule_geometry_retry(self) -> None:
+        if not self._visible or self._geometry_retry_id is not None:
+            return
+        try:
+            self._geometry_retry_id = self.master.after(50, self._run_geometry_retry)
+        except tk.TclError:
+            self._geometry_retry_id = None
+
+    def _run_geometry_retry(self) -> None:
+        self._geometry_retry_id = None
+        if self._visible and self._apply_geometry():
+            self.window.deiconify()
+
+    def _apply_geometry(self) -> bool:
         try:
             self.master.update_idletasks()
+            mapped = bool(self.master.winfo_ismapped())
+            width = self.master.winfo_width()
+            height = self.master.winfo_height()
+            if not mapped or width <= 1 or height <= 1:
+                self._schedule_geometry_retry()
+                return False
             x = self.master.winfo_rootx() + int(self._place_options.get("x") or 0)
             y = self.master.winfo_rooty() + int(self._place_options.get("y") or 0)
-            height = max(1, self.master.winfo_height())
         except tk.TclError:
-            return
+            return False
+        self._cancel_geometry_retry()
         self.window.geometry(f"{self._width}x{height}+{x}+{y}")
+        return True
 
     def lift(self) -> None:
         self.window.lift()
 
     def destroy(self) -> None:
+        self._visible = False
+        self._cancel_geometry_retry()
         try:
             self.window.destroy()
         except tk.TclError:
