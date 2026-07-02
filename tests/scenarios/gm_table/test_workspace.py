@@ -1597,6 +1597,69 @@ def test_show_bookmark_menu_lists_bookmarks_without_submenus() -> None:
     assert workspace._bookmark_menu.release_count == 1
 
 
+def test_restore_forces_fixed_overlay_visible_without_dropping_saved_state() -> None:
+    """GM Table launch restores the fixed overlay visible with saved details intact."""
+    restored_payloads = []
+    calls = []
+
+    class _FakeFixedOverlay:
+        def restore(self, payload) -> None:
+            restored_payloads.append(payload)
+
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace.clear = lambda: None
+    workspace.clamp_panels = lambda: None
+    workspace.add_panel = lambda definition, *, geometry=None: _FakePanel(
+        geometry["width"],
+        geometry["height"],
+        x=int(geometry["x"]),
+        y=int(geometry["y"]),
+    )
+    workspace.after_idle = lambda callback: callback()
+    workspace._refresh_fixed_overlay_after_surface_map = lambda: calls.append("refresh")
+    workspace._sync_fixed_overlay_layer = lambda reason, *, allow_lift: calls.append(
+        (reason, allow_lift)
+    )
+    workspace.fixed_overlay = _FakeFixedOverlay()
+    saved_fixed_overlay = {
+        "visible": False,
+        "collapsed": True,
+        "width": 420,
+        "selected_item_ids": ["fixed_note"],
+        "items": [
+            {
+                "item_id": "fixed_note",
+                "kind": "note",
+                "title": "Pinned Note",
+                "state": {"text": "Keep me"},
+            }
+        ],
+    }
+
+    GMTableWorkspace.restore(
+        workspace, {"fixed_overlay": saved_fixed_overlay, "panels": []}
+    )
+
+    assert saved_fixed_overlay["visible"] is False
+    assert restored_payloads == [
+        {
+            "visible": True,
+            "collapsed": True,
+            "width": 420,
+            "selected_item_ids": ["fixed_note"],
+            "items": [
+                {
+                    "item_id": "fixed_note",
+                    "kind": "note",
+                    "title": "Pinned Note",
+                    "state": {"text": "Keep me"},
+                }
+            ],
+        }
+    ]
+    assert calls == ["refresh", ("fixed overlay restored", True)]
+
+
 def test_restore_defaults_home_camera_to_saved_camera_when_missing() -> None:
     """Legacy layouts with camera but no home camera should reuse the saved camera."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)

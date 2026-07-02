@@ -3361,7 +3361,15 @@ class GMTableWorkspace(ctk.CTkFrame):
             ]
         )
         if hasattr(self, "fixed_overlay"):
-            self.fixed_overlay.restore(payload.get("fixed_overlay") if isinstance(payload.get("fixed_overlay"), dict) else None)
+            saved_fixed_overlay = payload.get("fixed_overlay")
+            fixed_overlay_payload = (
+                dict(saved_fixed_overlay) if isinstance(saved_fixed_overlay, dict) else None
+            )
+            if fixed_overlay_payload is not None:
+                fixed_overlay_payload["visible"] = True
+            self.fixed_overlay.restore(fixed_overlay_payload)
+            self.after_idle(self._refresh_fixed_overlay_after_surface_map)
+            self._sync_fixed_overlay_layer("fixed overlay restored", allow_lift=True)
         panels = [item for item in list(payload.get("panels") or []) if isinstance(item, dict)]
         panels.sort(key=lambda item: int((item.get("state") or {}).get("z", 0)))
         for item in panels:
