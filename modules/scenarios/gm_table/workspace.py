@@ -1391,9 +1391,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._map_tool_window_provider = map_tool_window_provider
         self._reveal_requested_callback = on_reveal_requested
         self._fixed_overlay_add_requested_callback = on_fixed_overlay_add_requested
-        self._fixed_overlay_surface_refresh_complete = False
-        self._fixed_overlay_startup_refresh_count = 0
-        self._fixed_overlay_startup_refresh_pending = False
+        self._fixed_overlay_surface_refresh_job: str | None = None
         self._panels: dict[str, GMTablePanel] = {}
         self._definitions: dict[str, PanelDefinition] = {}
         self._panel_payloads: dict[str, object] = {}
@@ -1562,7 +1560,6 @@ class GMTableWorkspace(ctk.CTkFrame):
             on_add_requested=self._request_fixed_overlay_add,
         )
         self.after_idle(self._refresh_fixed_overlay_after_surface_map)
-        self.after(50, self._refresh_fixed_overlay_after_surface_map)
 
         self._empty_state = ctk.CTkLabel(
             self.surface,
@@ -1583,24 +1580,12 @@ class GMTableWorkspace(ctk.CTkFrame):
         if callable(self._fixed_overlay_add_requested_callback):
             self._fixed_overlay_add_requested_callback(source_widget)
 
-    def _refresh_fixed_overlay_after_surface_map(self, *, scheduled: bool = False) -> None:
-        """Refresh the fixed overlay after the table surface has settled."""
-        if self._disposed or self._fixed_overlay_surface_refresh_complete:
+    def _refresh_fixed_overlay_after_surface_map(self) -> None:
+        """Refresh the fixed overlay once the table surface has real geometry."""
+        self._fixed_overlay_surface_refresh_job = None
+        if self._disposed:
             return
-        if self._fixed_overlay_startup_refresh_pending and not scheduled:
-            return
-        self._fixed_overlay_startup_refresh_pending = False
-        try:
-            is_ready = (
-                self.surface.winfo_ismapped()
-                and self.surface.winfo_width() > 1
-                and self.surface.winfo_height() > 1
-            )
-        except Exception:
-            is_ready = False
-
-        if not is_ready:
-            self._schedule_fixed_overlay_startup_refresh(50)
+        if not self._surface_is_ready_for_fixed_overlay():
             return
 
         fixed_overlay = getattr(self, "fixed_overlay", None)
@@ -1611,25 +1596,31 @@ class GMTableWorkspace(ctk.CTkFrame):
             except Exception:
                 pass
 
-        self._fixed_overlay_startup_refresh_count += 1
-        refresh_delays_ms = (50, 150, 300)
-        if self._fixed_overlay_startup_refresh_count > len(refresh_delays_ms):
-            self._fixed_overlay_surface_refresh_complete = True
-            return
-        self._schedule_fixed_overlay_startup_refresh(
-            refresh_delays_ms[self._fixed_overlay_startup_refresh_count - 1]
-        )
+    def _surface_is_ready_for_fixed_overlay(self) -> bool:
+        """Return whether the surface is mapped with usable dimensions."""
+        try:
+            return (
+                self.surface.winfo_ismapped()
+                and self.surface.winfo_width() > 1
+                and self.surface.winfo_height() > 1
+            )
+        except Exception:
+            return False
 
-    def _schedule_fixed_overlay_startup_refresh(self, delay_ms: int) -> None:
-        """Schedule a bounded startup geometry refresh for the fixed overlay."""
-        if self._disposed or self._fixed_overlay_surface_refresh_complete:
+    def _schedule_fixed_overlay_surface_refresh(self, delay_ms: int = 30) -> None:
+        """Debounce fixed-overlay geometry refreshes from surface configure events."""
+        if self._disposed:
             return
-        if self._fixed_overlay_startup_refresh_pending:
+        if not self._surface_is_ready_for_fixed_overlay():
             return
-        self._fixed_overlay_startup_refresh_pending = True
-        self.after(
+        if self._fixed_overlay_surface_refresh_job is not None:
+            try:
+                self.after_cancel(self._fixed_overlay_surface_refresh_job)
+            except Exception:
+                pass
+        self._fixed_overlay_surface_refresh_job = self.after(
             delay_ms,
-            lambda: self._refresh_fixed_overlay_after_surface_map(scheduled=True),
+            self._refresh_fixed_overlay_after_surface_map,
         )
 
     def _schedule_layout_changed(self) -> None:
@@ -2406,6 +2397,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._refresh_empty_state()
         if self._disposed:
             return
+        self._schedule_fixed_overlay_surface_refresh()
         if self._surface_resize_job is not None:
             try:
                 self.after_cancel(self._surface_resize_job)
@@ -2625,6 +2617,12 @@ class GMTableWorkspace(ctk.CTkFrame):
             except Exception:
                 pass
             self._surface_resize_job = None
+        if self._fixed_overlay_surface_refresh_job is not None:
+            try:
+                self.after_cancel(self._fixed_overlay_surface_refresh_job)
+            except Exception:
+                pass
+            self._fixed_overlay_surface_refresh_job = None
         for panel_id in list(self._panels.keys()):
             self.remove_panel(panel_id)
 
