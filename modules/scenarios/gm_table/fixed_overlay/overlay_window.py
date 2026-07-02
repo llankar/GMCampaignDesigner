@@ -36,6 +36,7 @@ class TransparentOverlayWindow:
         self._width = 1
         self._visible = False
         self._geometry_retry_id: str | None = None
+        self._anchor_sync_id: str | None = None
         self._place_options: dict[str, object] = {}
         self._last_geometry_failure_reason = ""
         self._destroyed = False
@@ -70,16 +71,39 @@ class TransparentOverlayWindow:
                 return TransparencySupport("fallback", False, str(alpha_exc))
 
     def _bind_anchor_events(self) -> None:
-        for widget in {self.master, self.master.winfo_toplevel()}:
+        anchor_widgets = (self.master, self.master.winfo_toplevel())
+        anchor_events = ("<Map>", "<Visibility>", "<FocusIn>", "<Configure>")
+        bound_widget_ids: set[int] = set()
+        for widget in anchor_widgets:
+            widget_id = id(widget)
+            if widget_id in bound_widget_ids:
+                continue
+            bound_widget_ids.add(widget_id)
             try:
-                widget.bind("<Configure>", self._on_anchor_configure, add="+")
+                for event_name in anchor_events:
+                    widget.bind(event_name, self._on_anchor_visibility_event, add="+")
                 widget.bind("<Destroy>", self._on_anchor_destroy, add="+")
             except tk.TclError:
                 pass
 
-    def _on_anchor_configure(self, _event: object = None) -> None:
-        if self._visible:
-            self.ensure_visible()
+    def _on_anchor_visibility_event(self, _event: object = None) -> None:
+        if self._destroyed or not self._visible:
+            return
+        self._schedule_anchor_sync()
+
+    def _schedule_anchor_sync(self) -> None:
+        if self._destroyed or not self._visible or self._anchor_sync_id is not None:
+            return
+        try:
+            self._anchor_sync_id = self.master.after(16, self._run_anchor_sync)
+        except tk.TclError:
+            self._anchor_sync_id = None
+
+    def _run_anchor_sync(self) -> None:
+        self._anchor_sync_id = None
+        if self._destroyed or not self._visible:
+            return
+        self.ensure_visible()
 
     def _on_anchor_destroy(self, event: object = None) -> None:
         if event is not None and getattr(event, "widget", None) is self.master:
@@ -118,6 +142,7 @@ class TransparentOverlayWindow:
         """Mark the overlay hidden and withdraw the toplevel immediately."""
         self._visible = False
         self._cancel_geometry_retry()
+        self._cancel_anchor_sync()
         try:
             self.window.withdraw()
         except tk.TclError:
@@ -161,6 +186,15 @@ class TransparentOverlayWindow:
             return True
         self._schedule_geometry_retry()
         return False
+
+    def _cancel_anchor_sync(self) -> None:
+        if self._anchor_sync_id is None:
+            return
+        try:
+            self.master.after_cancel(self._anchor_sync_id)
+        except tk.TclError:
+            pass
+        self._anchor_sync_id = None
 
     def _cancel_geometry_retry(self) -> None:
         if self._geometry_retry_id is None:
@@ -214,6 +248,7 @@ class TransparentOverlayWindow:
         self._destroyed = True
         self._visible = False
         self._cancel_geometry_retry()
+        self._cancel_anchor_sync()
         try:
             self.window.destroy()
         except tk.TclError:

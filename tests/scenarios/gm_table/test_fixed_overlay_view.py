@@ -552,9 +552,67 @@ def _make_geometry_overlay(master: _GeometryMaster):
     overlay._visible = False
     overlay._destroyed = False
     overlay._geometry_retry_id = None
+    overlay._anchor_sync_id = None
     overlay._place_options = {"x": 3, "y": 4}
     overlay._last_geometry_failure_reason = ""
     return overlay
+
+
+
+class _AnchorBindingWidget:
+    def __init__(self) -> None:
+        self.bind_calls: list[tuple[str, object, str | None]] = []
+
+    def bind(self, event_name: str, callback: object, add: str | None = None) -> None:
+        self.bind_calls.append((event_name, callback, add))
+
+
+def test_bind_anchor_events_tracks_surface_and_toplevel_events() -> None:
+    from modules.scenarios.gm_table.fixed_overlay.overlay_window import (
+        TransparentOverlayWindow,
+    )
+
+    surface = _AnchorBindingWidget()
+    toplevel = _AnchorBindingWidget()
+    surface.winfo_toplevel = lambda: toplevel  # type: ignore[attr-defined]
+    overlay = TransparentOverlayWindow.__new__(TransparentOverlayWindow)
+    overlay.master = surface
+
+    TransparentOverlayWindow._bind_anchor_events(overlay)
+
+    expected_events = ["<Map>", "<Visibility>", "<FocusIn>", "<Configure>", "<Destroy>"]
+    assert [call[0] for call in surface.bind_calls] == expected_events
+    assert [call[0] for call in toplevel.bind_calls] == expected_events
+    assert all(call[2] == "+" for call in surface.bind_calls + toplevel.bind_calls)
+
+
+def test_anchor_visibility_event_debounces_geometry_sync_without_lift() -> None:
+    master = _GeometryMaster(mapped=True, width=300, height=200)
+    overlay = _make_geometry_overlay(master)
+    overlay._visible = True
+
+    overlay._on_anchor_visibility_event()
+    overlay._on_anchor_visibility_event()
+
+    assert overlay._anchor_sync_id == "retry-id"
+    assert len(master.retry_callbacks) == 1
+    master.retry_callbacks[0]()
+
+    assert overlay.window.geometry_calls == ["50x200+13+24"]
+    assert overlay.window.deiconify_calls == 1
+    assert not hasattr(overlay.window, "lift_calls")
+
+
+def test_anchor_visibility_event_ignores_hidden_or_destroyed_overlay() -> None:
+    master = _GeometryMaster(mapped=True, width=300, height=200)
+    overlay = _make_geometry_overlay(master)
+
+    overlay._on_anchor_visibility_event()
+    overlay._destroyed = True
+    overlay._visible = True
+    overlay._on_anchor_visibility_event()
+
+    assert master.retry_callbacks == []
 
 
 def test_place_configure_stores_geometry_without_mapping() -> None:
