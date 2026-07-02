@@ -352,8 +352,8 @@ class GMTableHandoutsPage(ctk.CTkFrame):
             self._notify_reveal_complete()
 
     def _notify_reveal_complete(self) -> None:
-        """Let the owner restore overlay z-order after a player reveal opens."""
-        callback = self._on_reveal_complete
+        """Let the owner refresh table overlay geometry after a player reveal opens."""
+        callback = getattr(self, "_on_reveal_complete", None)
         if not callable(callback):
             return
         try:

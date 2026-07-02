@@ -28,6 +28,10 @@ class FixedOverlayController:
         """Refresh the fixed overlay placement after its anchor geometry changes."""
         self.view._refresh_geometry()
 
+    def refresh_geometry_without_lift(self) -> None:
+        """Refresh overlay placement without raising it above other toplevels."""
+        self.view.refresh_geometry_without_lift()
+
     def lift(self) -> None:
         self.refresh_geometry()
         self.view.lift()
