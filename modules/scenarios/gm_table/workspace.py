@@ -1391,6 +1391,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._map_tool_window_provider = map_tool_window_provider
         self._reveal_requested_callback = on_reveal_requested
         self._fixed_overlay_add_requested_callback = on_fixed_overlay_add_requested
+        self._fixed_overlay_surface_refresh_complete = False
         self._panels: dict[str, GMTablePanel] = {}
         self._definitions: dict[str, PanelDefinition] = {}
         self._panel_payloads: dict[str, object] = {}
@@ -1558,6 +1559,8 @@ class GMTableWorkspace(ctk.CTkFrame):
             on_changed=self._schedule_layout_changed,
             on_add_requested=self._request_fixed_overlay_add,
         )
+        self.after_idle(self._refresh_fixed_overlay_after_surface_map)
+        self.after(50, self._refresh_fixed_overlay_after_surface_map)
 
         self._empty_state = ctk.CTkLabel(
             self.surface,
@@ -1577,6 +1580,31 @@ class GMTableWorkspace(ctk.CTkFrame):
         """Forward fixed-overlay add requests to the owning table view."""
         if callable(self._fixed_overlay_add_requested_callback):
             self._fixed_overlay_add_requested_callback(source_widget)
+
+    def _refresh_fixed_overlay_after_surface_map(self) -> None:
+        """Refresh the fixed overlay once the table surface has real geometry."""
+        if self._disposed or self._fixed_overlay_surface_refresh_complete:
+            return
+        try:
+            is_ready = (
+                self.surface.winfo_ismapped()
+                and self.surface.winfo_width() > 1
+                and self.surface.winfo_height() > 1
+            )
+        except Exception:
+            is_ready = False
+
+        if not is_ready:
+            self.after(50, self._refresh_fixed_overlay_after_surface_map)
+            return
+
+        self._fixed_overlay_surface_refresh_complete = True
+        fixed_overlay = getattr(self, "fixed_overlay", None)
+        if fixed_overlay is not None:
+            try:
+                fixed_overlay.refresh_geometry()
+            except Exception:
+                pass
 
     def _schedule_layout_changed(self) -> None:
         """Debounce layout persistence."""
