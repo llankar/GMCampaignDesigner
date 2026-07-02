@@ -37,6 +37,8 @@ class TransparentOverlayWindow:
         self._visible = False
         self._geometry_retry_id: str | None = None
         self._place_options: dict[str, object] = {}
+        self._last_geometry_failure_reason = ""
+        self._destroyed = False
         self.window = tk.Toplevel(master.winfo_toplevel())
         self.window.withdraw()
         self.window.overrideredirect(True)
@@ -77,7 +79,7 @@ class TransparentOverlayWindow:
 
     def _on_anchor_configure(self, _event: object = None) -> None:
         if self._visible:
-            self._apply_geometry()
+            self.ensure_visible()
 
     def _on_anchor_destroy(self, event: object = None) -> None:
         if event is not None and getattr(event, "widget", None) is self.master:
@@ -91,20 +93,74 @@ class TransparentOverlayWindow:
             shell_kwargs["fg_color"] = TRANSPARENT_COLOR
         self.shell.configure(**shell_kwargs)
 
+    @property
+    def last_geometry_failure_reason(self) -> str:
+        """Return the last reason geometry could not be applied safely."""
+        return self._last_geometry_failure_reason
+
     def place_configure(self, **kwargs: object) -> None:
+        """Store placement options without changing logical visibility."""
         self._place_options.update(kwargs)
         self._width = max(1, int(kwargs.get("width") or self._width))
-        self._visible = True
-        if self._apply_geometry():
-            self.window.deiconify()
 
     def place(self, **kwargs: object) -> None:
         self.place_configure(**kwargs)
 
     def place_forget(self) -> None:
+        self.hide()
+
+    def show(self) -> bool:
+        """Mark the overlay visible and map it once anchor geometry is ready."""
+        self._visible = True
+        return self.ensure_visible()
+
+    def hide(self) -> None:
+        """Mark the overlay hidden and withdraw the toplevel immediately."""
         self._visible = False
         self._cancel_geometry_retry()
-        self.window.withdraw()
+        try:
+            self.window.withdraw()
+        except tk.TclError:
+            pass
+
+    def is_geometry_ready(self) -> bool:
+        """Return whether the anchor can provide useful geometry right now."""
+        try:
+            self.master.update_idletasks()
+            mapped = bool(self.master.winfo_ismapped())
+            width = self.master.winfo_width()
+            height = self.master.winfo_height()
+        except tk.TclError as exc:
+            self._last_geometry_failure_reason = f"anchor unavailable: {exc}"
+            return False
+        if not mapped:
+            self._last_geometry_failure_reason = "anchor is unmapped"
+            return False
+        if width <= 1 or height <= 1:
+            self._last_geometry_failure_reason = (
+                f"anchor size is not ready: width={width}, height={height}"
+            )
+            return False
+        self._last_geometry_failure_reason = ""
+        return True
+
+    def sync_to_anchor(self) -> bool:
+        """Apply stored placement options to the toplevel geometry."""
+        return self._apply_geometry()
+
+    def ensure_visible(self) -> bool:
+        """Map the overlay when possible, retrying while its owner still exists."""
+        if not self._visible or self._destroyed:
+            return False
+        if self.sync_to_anchor():
+            try:
+                self.window.deiconify()
+            except tk.TclError as exc:
+                self._last_geometry_failure_reason = f"overlay unavailable: {exc}"
+                return False
+            return True
+        self._schedule_geometry_retry()
+        return False
 
     def _cancel_geometry_retry(self) -> None:
         if self._geometry_retry_id is None:
@@ -116,7 +172,7 @@ class TransparentOverlayWindow:
         self._geometry_retry_id = None
 
     def _schedule_geometry_retry(self) -> None:
-        if not self._visible or self._geometry_retry_id is not None:
+        if self._destroyed or not self._visible or self._geometry_retry_id is not None:
             return
         try:
             self._geometry_retry_id = self.master.after(50, self._run_geometry_retry)
@@ -125,8 +181,7 @@ class TransparentOverlayWindow:
 
     def _run_geometry_retry(self) -> None:
         self._geometry_retry_id = None
-        if self._visible and self._apply_geometry():
-            self.window.deiconify()
+        self.ensure_visible()
 
     def _apply_geometry(self) -> bool:
         try:
@@ -134,21 +189,29 @@ class TransparentOverlayWindow:
             mapped = bool(self.master.winfo_ismapped())
             width = self.master.winfo_width()
             height = self.master.winfo_height()
-            if not mapped or width <= 1 or height <= 1:
-                self._schedule_geometry_retry()
+            if not mapped:
+                self._last_geometry_failure_reason = "anchor is unmapped"
+                return False
+            if width <= 1 or height <= 1:
+                self._last_geometry_failure_reason = (
+                    f"anchor size is not ready: width={width}, height={height}"
+                )
                 return False
             x = self.master.winfo_rootx() + int(self._place_options.get("x") or 0)
             y = self.master.winfo_rooty() + int(self._place_options.get("y") or 0)
-        except tk.TclError:
+        except tk.TclError as exc:
+            self._last_geometry_failure_reason = f"anchor unavailable: {exc}"
             return False
         self._cancel_geometry_retry()
         self.window.geometry(f"{self._width}x{height}+{x}+{y}")
+        self._last_geometry_failure_reason = ""
         return True
 
     def lift(self) -> None:
         self.window.lift()
 
     def destroy(self) -> None:
+        self._destroyed = True
         self._visible = False
         self._cancel_geometry_retry()
         try:

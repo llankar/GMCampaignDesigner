@@ -166,6 +166,21 @@ class FixedOverlayView:
     def place_forget(self) -> None:
         self._overlay_layer.place_forget()
 
+    def show(self) -> bool:
+        return self._overlay_layer.show()
+
+    def hide(self) -> None:
+        self._overlay_layer.hide()
+
+    def sync_to_anchor(self) -> bool:
+        return self._overlay_layer.sync_to_anchor()
+
+    def ensure_visible(self) -> bool:
+        return self._overlay_layer.ensure_visible()
+
+    def is_geometry_ready(self) -> bool:
+        return self._overlay_layer.is_geometry_ready()
+
     def lift(self) -> None:
         self._overlay_layer.lift()
 
@@ -187,7 +202,11 @@ class FixedOverlayView:
 
     def _refresh_geometry(self, *, lift_overlay: bool = True) -> None:
         if not self._state.visible:
-            self.place_forget()
+            hide = getattr(self, "hide", None)
+            if callable(hide):
+                hide()
+            else:
+                self.place_forget()
             return
 
         width = (
@@ -216,6 +235,9 @@ class FixedOverlayView:
         if not self._state.collapsed:
             self._state.width = width
         FixedOverlayView._place_with_width(self, width)
+        ensure_visible = getattr(self, "ensure_visible", None)
+        if callable(ensure_visible) and not ensure_visible():
+            return
         if lift_overlay:
             self.lift()
 
@@ -233,8 +255,11 @@ class FixedOverlayView:
         place_configure = getattr(self, "place_configure", None)
         if callable(place_configure):
             place_configure(**options)
-            return
-        self.place(**options)
+        else:
+            self.place(**options)
+        sync_to_anchor = getattr(self, "sync_to_anchor", None)
+        if callable(sync_to_anchor):
+            sync_to_anchor()
 
     def _refresh_items(self) -> None:
         for child in list(self.items_host.winfo_children()):

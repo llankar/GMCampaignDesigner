@@ -488,3 +488,112 @@ def test_build_shell_keeps_full_area_hosts_transparent(monkeypatch) -> None:
     assert overlay.items_host.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
     assert overlay.resize_handle.kwargs["fg_color"] == overlay._palette["panel_focus"]
     assert overlay.tab_button.kwargs["fg_color"] == overlay._palette["accent"]
+
+
+class _GeometryMaster:
+    def __init__(self, *, mapped: bool, width: int, height: int) -> None:
+        self.mapped = mapped
+        self.width = width
+        self.height = height
+        self.retry_callbacks: list[object] = []
+        self.cancelled: list[object] = []
+
+    def update_idletasks(self) -> None:
+        pass
+
+    def winfo_ismapped(self) -> bool:
+        return self.mapped
+
+    def winfo_width(self) -> int:
+        return self.width
+
+    def winfo_height(self) -> int:
+        return self.height
+
+    def winfo_rootx(self) -> int:
+        return 10
+
+    def winfo_rooty(self) -> int:
+        return 20
+
+    def after(self, _delay: int, callback: object) -> str:
+        self.retry_callbacks.append(callback)
+        return "retry-id"
+
+    def after_cancel(self, retry_id: object) -> None:
+        self.cancelled.append(retry_id)
+
+
+class _GeometryWindow:
+    def __init__(self) -> None:
+        self.geometry_calls: list[str] = []
+        self.deiconify_calls = 0
+        self.withdraw_calls = 0
+
+    def geometry(self, value: str) -> None:
+        self.geometry_calls.append(value)
+
+    def deiconify(self) -> None:
+        self.deiconify_calls += 1
+
+    def withdraw(self) -> None:
+        self.withdraw_calls += 1
+
+
+def _make_geometry_overlay(master: _GeometryMaster):
+    from modules.scenarios.gm_table.fixed_overlay.overlay_window import (
+        TransparentOverlayWindow,
+    )
+
+    overlay = TransparentOverlayWindow.__new__(TransparentOverlayWindow)
+    overlay.master = master
+    overlay.window = _GeometryWindow()
+    overlay._width = 50
+    overlay._visible = False
+    overlay._destroyed = False
+    overlay._geometry_retry_id = None
+    overlay._place_options = {"x": 3, "y": 4}
+    overlay._last_geometry_failure_reason = ""
+    return overlay
+
+
+def test_place_configure_stores_geometry_without_mapping() -> None:
+    master = _GeometryMaster(mapped=True, width=300, height=200)
+    overlay = _make_geometry_overlay(master)
+
+    overlay.place_configure(width=70, x=5)
+
+    assert overlay._visible is False
+    assert overlay.window.deiconify_calls == 0
+    assert overlay._place_options["x"] == 5
+    assert overlay._width == 70
+
+
+def test_ensure_visible_retries_until_anchor_geometry_is_ready() -> None:
+    master = _GeometryMaster(mapped=False, width=1, height=1)
+    overlay = _make_geometry_overlay(master)
+
+    assert overlay.show() is False
+    assert overlay._visible is True
+    assert overlay.window.deiconify_calls == 0
+    assert overlay._geometry_retry_id == "retry-id"
+    assert overlay.last_geometry_failure_reason == "anchor is unmapped"
+
+    master.mapped = True
+    master.width = 300
+    master.height = 200
+    overlay._run_geometry_retry()
+
+    assert overlay.window.geometry_calls == ["50x200+13+24"]
+    assert overlay.window.deiconify_calls == 1
+    assert overlay.last_geometry_failure_reason == ""
+
+
+def test_ensure_visible_stops_retrying_after_destroy() -> None:
+    master = _GeometryMaster(mapped=False, width=1, height=1)
+    overlay = _make_geometry_overlay(master)
+    overlay._visible = True
+    overlay._destroyed = True
+
+    assert overlay.ensure_visible() is False
+    assert master.retry_callbacks == []
