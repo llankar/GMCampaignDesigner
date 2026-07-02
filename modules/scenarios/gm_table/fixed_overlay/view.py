@@ -181,7 +181,11 @@ class FixedOverlayView:
         self._refresh_items()
         self._refresh_geometry()
 
-    def _refresh_geometry(self) -> None:
+    def refresh_geometry_without_lift(self) -> None:
+        """Refresh placement without changing global window stacking order."""
+        self._refresh_geometry(lift_overlay=False)
+
+    def _refresh_geometry(self, *, lift_overlay: bool = True) -> None:
         if not self._state.visible:
             self.place_forget()
             return
@@ -212,7 +216,8 @@ class FixedOverlayView:
         if not self._state.collapsed:
             self._state.width = width
         FixedOverlayView._place_with_width(self, width)
-        self.lift()
+        if lift_overlay:
+            self.lift()
 
     def _place_with_width(self, width: int) -> None:
         """Place the overlay with an explicit width for reliable geometry."""
