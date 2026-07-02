@@ -1587,14 +1587,44 @@ class GMTableWorkspace(ctk.CTkFrame):
             return
         if not self._surface_is_ready_for_fixed_overlay():
             return
+        self._sync_fixed_overlay_layer(
+            "surface map geometry ready",
+            allow_lift=True,
+        )
 
+    def _sync_fixed_overlay_layer(self, reason: str, *, allow_lift: bool) -> None:
+        """Refresh the viewport-fixed overlay and optionally restore its stack order.
+
+        Policy: this is the only workspace-level place that should call the
+        fixed-overlay geometry/stacking API directly. Ordinary workspace
+        interactions should pass ``allow_lift=True`` so the overlay remains
+        above desk panels. Reveal and player-window flows must pass
+        ``allow_lift=False`` so geometry can be refreshed without stealing
+        focus or raising the GM overlay above player-facing windows.
+        """
         fixed_overlay = getattr(self, "fixed_overlay", None)
-        if fixed_overlay is not None:
-            try:
-                fixed_overlay.refresh_geometry()
+        if fixed_overlay is None:
+            return
+
+        try:
+            if allow_lift:
                 fixed_overlay.lift()
-            except Exception:
-                pass
+                return
+
+            refresh_without_lift = getattr(
+                fixed_overlay,
+                "refresh_geometry_without_lift",
+                None,
+            )
+            if callable(refresh_without_lift):
+                refresh_without_lift()
+            else:
+                fixed_overlay.refresh_geometry()
+        except Exception as exc:
+            log_warning(
+                "Fixed overlay layer sync failed "
+                f"({reason}, allow_lift={allow_lift}): {exc}"
+            )
 
     def _surface_is_ready_for_fixed_overlay(self) -> bool:
         """Return whether the surface is mapped with usable dimensions."""
@@ -2450,12 +2480,7 @@ class GMTableWorkspace(ctk.CTkFrame):
                 widget.lift()
             except Exception:
                 continue
-        fixed_overlay = getattr(self, "fixed_overlay", None)
-        if fixed_overlay is not None:
-            try:
-                fixed_overlay.lift()
-            except Exception:
-                pass
+        self._sync_fixed_overlay_layer("workspace overlays raised", allow_lift=True)
 
     def _visible_panel_ids(self) -> list[str]:
         """Return visible panels in z-order."""
@@ -2870,13 +2895,13 @@ class GMTableWorkspace(ctk.CTkFrame):
     def toggle_fixed_overlay(self) -> None:
         """Open or collapse the viewport-fixed table overlay."""
         self.fixed_overlay.toggle()
-        self._raise_workspace_overlays()
+        self._sync_fixed_overlay_layer("fixed overlay toggled", allow_lift=True)
         self._schedule_layout_changed()
 
     def add_to_fixed_overlay(self, kind: str, title: str, state: dict | None = None) -> str:
         """Pin a JSON-safe panel item into the fixed table overlay."""
         item_id = self.fixed_overlay.add_panel_item(kind, title, state or {})
-        self._raise_workspace_overlays()
+        self._sync_fixed_overlay_layer("item added to fixed overlay", allow_lift=True)
         self._schedule_layout_changed()
         return item_id
 

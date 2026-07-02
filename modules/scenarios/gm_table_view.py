@@ -2150,19 +2150,15 @@ class GMTableView(ctk.CTkFrame):
     def _restore_fixed_overlay_after_reveal(self) -> None:
         """Refresh fixed-overlay geometry after handout reveals create player windows."""
         workspace = getattr(self, "workspace", None)
-        fixed_overlay = getattr(workspace, "fixed_overlay", None)
-        if fixed_overlay is None:
+        sync_fixed_overlay_layer = getattr(workspace, "_sync_fixed_overlay_layer", None)
+        if not callable(sync_fixed_overlay_layer):
             return
 
         def _refresh_overlay_geometry() -> None:
-            try:
-                refresh_without_lift = getattr(
-                    fixed_overlay, "refresh_geometry_without_lift", None
-                )
-                if callable(refresh_without_lift):
-                    refresh_without_lift()
-            except Exception:
-                pass
+            sync_fixed_overlay_layer(
+                "restore fixed overlay after reveal",
+                allow_lift=False,
+            )
 
         _refresh_overlay_geometry()
         for delay_ms in (50, 200, 500):
