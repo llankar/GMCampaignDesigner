@@ -2,7 +2,34 @@
 
 from __future__ import annotations
 
-OVERLAY_OPACITY = 0.80
+# Requested visual behavior: visible fixed overlay at 85% opacity, i.e. 15%
+# transparency.
+OVERLAY_OPACITY = 0.85
+OVERLAY_TRANSPARENCY = round(1.0 - OVERLAY_OPACITY, 2)
+OVERLAY_OPACITY_OPTIONS = (1.0, 0.9, 0.85, 0.75, 0.6, 0.4, 0.25)
+
+
+def normalize_overlay_opacity(value: object) -> float:
+    """Return the nearest supported visible opacity, defaulting to 85%."""
+    try:
+        opacity = float(value)
+    except (TypeError, ValueError):
+        return OVERLAY_OPACITY
+    return min(OVERLAY_OPACITY_OPTIONS, key=lambda option: abs(option - opacity))
+
+
+def opacity_to_label(opacity: float) -> str:
+    """Return the UI label for a visible opacity value."""
+    return f"{round(normalize_overlay_opacity(opacity) * 100):d}%"
+
+
+def label_to_opacity(label: str) -> float:
+    """Parse an opacity label such as ``85%`` into a supported opacity value."""
+    cleaned = str(label or "").strip().rstrip("%")
+    try:
+        return normalize_overlay_opacity(float(cleaned) / 100.0)
+    except (TypeError, ValueError):
+        return OVERLAY_OPACITY
 
 
 def blend_hex_color(

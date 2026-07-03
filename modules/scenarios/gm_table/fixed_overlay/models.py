@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-MIN_OVERLAY_WIDTH = 180
+from .style import OVERLAY_OPACITY, normalize_overlay_opacity
+
+MIN_OVERLAY_WIDTH = 300
 MAX_OVERLAY_WIDTH = 1100
 DEFAULT_OVERLAY_WIDTH = 360
 
@@ -40,6 +42,7 @@ class FixedOverlayState:
     collapsed: bool = False
     width: int = 360
     anchor: str = "left"
+    opacity: float = OVERLAY_OPACITY
     selected_item_ids: list[str] = field(default_factory=list)
     items: list[FixedOverlayItem] = field(default_factory=list)
 
@@ -49,6 +52,7 @@ class FixedOverlayState:
             "collapsed": bool(self.collapsed),
             "width": max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, int(self.width or DEFAULT_OVERLAY_WIDTH))),
             "anchor": self.anchor if self.anchor in {"left"} else "left",
+            "opacity": normalize_overlay_opacity(self.opacity),
             "selected_item_ids": [str(value) for value in self.selected_item_ids],
             "items": [item.to_dict() for item in self.items],
         }
@@ -62,6 +66,7 @@ class FixedOverlayState:
             collapsed=bool(source.get("collapsed", False)),
             width=max(MIN_OVERLAY_WIDTH, min(MAX_OVERLAY_WIDTH, int(source.get("width") or DEFAULT_OVERLAY_WIDTH))),
             anchor="left",
+            opacity=normalize_overlay_opacity(source.get("opacity", OVERLAY_OPACITY)),
             selected_item_ids=[str(value) for value in list(source.get("selected_item_ids") or [])],
             items=[item for item in items if item.item_id],
         )

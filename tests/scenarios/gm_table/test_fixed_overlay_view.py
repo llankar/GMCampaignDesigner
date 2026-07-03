@@ -9,7 +9,10 @@ from modules.scenarios.gm_table.fixed_overlay.models import (
 from modules.scenarios.gm_table.fixed_overlay import view as fixed_overlay_view
 from modules.scenarios.gm_table.fixed_overlay.style import (
     OVERLAY_OPACITY,
+    OVERLAY_OPACITY_OPTIONS,
+    OVERLAY_TRANSPARENCY,
     blend_hex_color,
+    opacity_to_label,
 )
 from modules.scenarios.gm_table.fixed_overlay.view import (
     COLLAPSED_TAB_TEXT,
@@ -244,6 +247,15 @@ class _FakeCtkButton(_FakeCtkWidget):
     pass
 
 
+class _FakeCtkOptionMenu(_FakeCtkWidget):
+    def __init__(self, master=None, **kwargs: object) -> None:
+        super().__init__(master, **kwargs)
+        self.set_calls: list[str] = []
+
+    def set(self, value: str) -> None:
+        self.set_calls.append(value)
+
+
 class _FakeShell:
     def __init__(self) -> None:
         self._palette = {
@@ -257,6 +269,7 @@ class _FakeShell:
             "text": "#F4F7FB",
             "muted": "#9EABC2",
         }
+        self._state = FixedOverlayState()
         self.column_weights: dict[int, int] = {}
         self.row_weights: dict[int, int] = {}
 
@@ -278,6 +291,12 @@ class _FakeShell:
     def _overlay_surface_color(self) -> str:
         return fixed_overlay_view.FixedOverlayView._overlay_surface_color(self)
 
+    def _current_opacity(self) -> float:
+        return fixed_overlay_view.FixedOverlayView._current_opacity(self)
+
+    def _handle_opacity_selected(self, _label: str) -> None:
+        pass
+
     def _start_resize(self, _event: object) -> str:
         return "break"
 
@@ -288,9 +307,10 @@ class _FakeShell:
         return "break"
 
 
-def test_fixed_overlay_style_blends_at_eighty_percent_opacity() -> None:
-    assert OVERLAY_OPACITY == 0.80
-    assert blend_hex_color("#000000", "#FFFFFF", OVERLAY_OPACITY) == "#333333"
+def test_fixed_overlay_style_blends_at_eighty_five_percent_opacity() -> None:
+    assert OVERLAY_OPACITY == 0.85
+    assert OVERLAY_TRANSPARENCY == 0.15
+    assert blend_hex_color("#000000", "#FFFFFF", OVERLAY_OPACITY) == "#262626"
 
 
 def test_fixed_overlay_default_state_starts_expanded() -> None:
@@ -298,18 +318,30 @@ def test_fixed_overlay_default_state_starts_expanded() -> None:
 
     assert state.visible is True
     assert state.collapsed is False
+    assert state.opacity == OVERLAY_OPACITY
+
+
+def test_fixed_overlay_state_restores_supported_opacity() -> None:
+    state = FixedOverlayState.from_dict({"opacity": 0.6})
+
+    assert state.opacity == 0.6
+    assert state.to_dict()["opacity"] == 0.6
 
 
 def test_fixed_overlay_init_shows_default_visible_overlay(monkeypatch) -> None:
     layers: list[object] = []
 
     class _FakeTransparentOverlayWindow:
-        def __init__(self, _master: object, *, background: str) -> None:
+        def __init__(
+            self, _master: object, *, background: str, opacity: float = OVERLAY_OPACITY
+        ) -> None:
             self.background = background
+            self.opacity = opacity
             self.shell = _FakeCtkWidget()
             self.support = SimpleNamespace(mode="fake")
             self.configure_calls: list[dict[str, object]] = []
             self.place_calls: list[dict[str, object]] = []
+            self.opacity_calls: list[float] = []
             self.sync_calls = 0
             self.show_calls = 0
             self.lift_calls = 0
@@ -320,6 +352,9 @@ def test_fixed_overlay_init_shows_default_visible_overlay(monkeypatch) -> None:
 
         def place_configure(self, **kwargs: object) -> None:
             self.place_calls.append(kwargs)
+
+        def set_opacity(self, opacity: float) -> None:
+            self.opacity_calls.append(opacity)
 
         def sync_to_anchor(self) -> bool:
             self.sync_calls += 1
@@ -338,6 +373,7 @@ def test_fixed_overlay_init_shows_default_visible_overlay(monkeypatch) -> None:
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkScrollableFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkButton", _FakeCtkButton)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkOptionMenu", _FakeCtkOptionMenu)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkLabel", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFont", lambda **kwargs: kwargs)
     monkeypatch.setattr(
@@ -354,7 +390,9 @@ def test_fixed_overlay_init_shows_default_visible_overlay(monkeypatch) -> None:
     overlay = FixedOverlayView(object(), panel_builder=lambda *_args: None)
 
     layer = layers[0]
-    assert layer.place_calls == [_expected_place_options(180)]
+    assert layer.opacity == OVERLAY_OPACITY
+    assert layer.opacity_calls == [OVERLAY_OPACITY]
+    assert layer.place_calls == [_expected_place_options(300)]
     assert layer.show_calls == 1
     assert layer.lift_calls == 1
 
@@ -365,6 +403,7 @@ def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkScrollableFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkButton", _FakeCtkButton)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkOptionMenu", _FakeCtkOptionMenu)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkLabel", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFont", lambda **kwargs: kwargs)
     overlay = _FakeShell()
@@ -376,7 +415,12 @@ def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:
     assert overlay.resize_handle.grid_info()["column"] == 1
     assert overlay.tab_button.grid_info()["column"] == 2
     assert overlay.tab_button.kwargs["text"] == EXPANDED_TAB_TEXT
-    assert overlay.add_button.grid_info()["column"] == 1
+    assert overlay.opacity_menu.grid_info()["column"] == 1
+    assert overlay.opacity_menu.kwargs["values"] == [
+        opacity_to_label(value) for value in OVERLAY_OPACITY_OPTIONS
+    ]
+    assert overlay.opacity_menu.kwargs["command"] == overlay._handle_opacity_selected
+    assert overlay.add_button.grid_info()["column"] == 2
     assert overlay.add_button.kwargs["text"] == "+ Add"
     assert overlay.add_button.kwargs["command"] == overlay._request_add
 
@@ -456,6 +500,7 @@ def test_fixed_overlay_state_serializes_geometry_and_items() -> None:
 
     assert payload["collapsed"] is False
     assert payload["width"] == 1100
+    assert payload["opacity"] == OVERLAY_OPACITY
     assert payload["items"] == [
         {
             "item_id": "item-a",
@@ -505,17 +550,70 @@ def test_transparent_overlay_window_reports_graceful_fallback() -> None:
     assert support.mode == "fallback"
     assert support.true_transparency is False
     assert fake.window.calls == [
+        ("-alpha", OVERLAY_OPACITY),
         ("-transparentcolor", "#010203"),
-        ("-alpha", 0.80),
     ]
 
 
-def test_transparent_overlay_window_shell_uses_transparent_color(monkeypatch) -> None:
+def test_fixed_overlay_state_clamps_width_to_header_controls_minimum() -> None:
+    state = FixedOverlayState(width=1)
+
+    assert state.to_dict()["width"] == 300
+
+
+def test_transparent_overlay_window_prefers_window_alpha_for_opacity() -> None:
+    from modules.scenarios.gm_table.fixed_overlay.overlay_window import (
+        TransparentOverlayWindow,
+    )
+
+    class _AttributesWindow:
+        def __init__(self) -> None:
+            self.calls: list[tuple[object, ...]] = []
+
+        def attributes(self, *args: object) -> None:
+            self.calls.append(args)
+
+    fake = SimpleNamespace(window=_AttributesWindow())
+
+    support = TransparentOverlayWindow._configure_transparency(fake)  # type: ignore[arg-type]
+
+    assert support.mode == "alpha"
+    assert support.true_transparency is True
+    assert fake.window.calls == [("-alpha", OVERLAY_OPACITY)]
+
+
+def test_transparent_overlay_window_set_opacity_updates_window_alpha() -> None:
+    from modules.scenarios.gm_table.fixed_overlay.overlay_window import (
+        TransparentOverlayWindow,
+        TransparencySupport,
+    )
+
+    class _AttributesWindow:
+        def __init__(self) -> None:
+            self.calls: list[tuple[object, ...]] = []
+
+        def attributes(self, *args: object) -> None:
+            self.calls.append(args)
+
+    fake = SimpleNamespace(
+        window=_AttributesWindow(), support=TransparencySupport("alpha", True)
+    )
+
+    TransparentOverlayWindow.set_opacity(fake, 0.4)  # type: ignore[arg-type]
+
+    assert fake._opacity == 0.4
+    assert fake.window.calls == [("-alpha", 0.4)]
+
+
+def test_transparent_overlay_window_shell_uses_visible_background(monkeypatch) -> None:
     from modules.scenarios.gm_table.fixed_overlay import overlay_window
 
     created_frames: list[object] = []
 
     class FakeToplevel:
+        def __init__(self) -> None:
+            self.configure_calls: list[dict[str, object]] = []
+
         def withdraw(self) -> None:
             pass
 
@@ -523,7 +621,7 @@ def test_transparent_overlay_window_shell_uses_transparent_color(monkeypatch) ->
             pass
 
         def configure(self, **kwargs: object) -> None:
-            self.configured = kwargs
+            self.configure_calls.append(kwargs)
 
         def transient(self, _master: object) -> None:
             pass
@@ -555,29 +653,113 @@ def test_transparent_overlay_window_shell_uses_transparent_color(monkeypatch) ->
     monkeypatch.setattr(overlay_window.ctk, "CTkFrame", FakeFrame)
 
     window = overlay_window.TransparentOverlayWindow(FakeMaster(), background="#ABCDEF")
-    window.configure(fg_color="#ABCDEF", border_color="#123456")
+    window.configure(fg_color="#FEDCBA", border_color="#123456")
 
-    assert created_frames[0].kwargs["fg_color"] == overlay_window.TRANSPARENT_COLOR
+    assert window.window.configure_calls[0]["background"] == "#ABCDEF"
+    assert window.window.configure_calls[-1]["background"] == "#FEDCBA"
+    assert created_frames[0].kwargs["fg_color"] == "#ABCDEF"
     assert created_frames[0].kwargs["border_width"] == 0
-    assert created_frames[0].configure_calls[-1]["fg_color"] == overlay_window.TRANSPARENT_COLOR
+    assert created_frames[0].configure_calls[-1]["fg_color"] == "#FEDCBA"
     assert created_frames[0].configure_calls[-1]["border_color"] == "#123456"
 
 
-def test_build_shell_keeps_full_area_hosts_transparent(monkeypatch) -> None:
+def test_build_shell_paints_visible_full_area_hosts(monkeypatch) -> None:
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkScrollableFrame", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkButton", _FakeCtkButton)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkOptionMenu", _FakeCtkOptionMenu)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkLabel", _FakeCtkWidget)
     monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFont", lambda **kwargs: kwargs)
     overlay = _FakeShell()
 
     FixedOverlayView._build_shell(overlay)  # type: ignore[arg-type]
 
-    assert overlay.content.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
-    assert overlay.header.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
-    assert overlay.items_host.kwargs["fg_color"] == fixed_overlay_view.TRANSPARENT_COLOR
+    expected_surface = overlay._overlay_surface_color()
+    assert overlay.content.kwargs["fg_color"] == expected_surface
+    assert overlay.header.kwargs["fg_color"] == expected_surface
+    assert overlay.items_host.kwargs["fg_color"] == expected_surface
     assert overlay.resize_handle.kwargs["fg_color"] == overlay._palette["panel_focus"]
     assert overlay.tab_button.kwargs["fg_color"] == overlay._palette["accent"]
+
+
+def test_fixed_overlay_item_color_uses_eighty_five_percent_opacity() -> None:
+    overlay = _FakeShell()
+
+    item_color = FixedOverlayView._overlay_item_color(overlay)  # type: ignore[arg-type]
+
+    assert item_color == blend_hex_color("#171F30", "#11141E", OVERLAY_OPACITY)
+    assert item_color != overlay._palette["table_bg"]
+
+
+class _OpacityLayer:
+    def __init__(self) -> None:
+        self.configure_calls: list[dict[str, object]] = []
+        self.opacity_calls: list[float] = []
+
+    def configure(self, **kwargs: object) -> None:
+        self.configure_calls.append(kwargs)
+
+    def set_opacity(self, opacity: float) -> None:
+        self.opacity_calls.append(opacity)
+
+
+def test_handle_opacity_selected_updates_alpha_colors_and_state() -> None:
+    changed_calls: list[str] = []
+    overlay = FixedOverlayView.__new__(FixedOverlayView)
+    overlay._palette = {
+        "panel_bg": "#0F1523",
+        "panel_alt": "#171F30",
+        "table_bg": "#11141E",
+        "panel_focus": "#7DD3FC",
+    }
+    overlay._state = FixedOverlayState(opacity=OVERLAY_OPACITY)
+    overlay._overlay_layer = _OpacityLayer()
+    overlay.opacity_menu = _FakeCtkOptionMenu()
+    overlay.content = _FakeCtkWidget()
+    overlay.header = _FakeCtkWidget()
+    overlay.items_host = _FakeCtkWidget()
+    overlay._item_frames = {"item": _FakeCtkWidget()}
+    overlay._on_changed = lambda: changed_calls.append("changed")
+
+    FixedOverlayView._handle_opacity_selected(overlay, "60%")
+
+    expected_surface = blend_hex_color("#0F1523", "#11141E", 0.6)
+    expected_item = blend_hex_color("#171F30", "#11141E", 0.6)
+    assert overlay._state.opacity == 0.6
+    assert overlay._overlay_layer.opacity_calls == [0.6]
+    assert overlay._overlay_layer.configure_calls[-1]["fg_color"] == expected_surface
+    assert overlay.content.configure_calls[-1]["fg_color"] == expected_surface
+    assert overlay.header.configure_calls[-1]["fg_color"] == expected_surface
+    assert overlay.items_host.configure_calls[-1]["fg_color"] == expected_surface
+    assert overlay._item_frames["item"].configure_calls[-1]["fg_color"] == expected_item
+    assert overlay.opacity_menu.set_calls == ["60%"]
+    assert changed_calls == ["changed"]
+
+
+def test_apply_state_restores_opacity_to_control_alpha_and_colors() -> None:
+    overlay = FixedOverlayView.__new__(FixedOverlayView)
+    overlay._palette = {
+        "panel_bg": "#0F1523",
+        "panel_alt": "#171F30",
+        "table_bg": "#11141E",
+        "panel_focus": "#7DD3FC",
+    }
+    overlay._overlay_layer = _OpacityLayer()
+    overlay.opacity_menu = _FakeCtkOptionMenu()
+    overlay.content = _FakeCtkWidget()
+    overlay.header = _FakeCtkWidget()
+    overlay.items_host = _FakeCtkWidget()
+    overlay._item_frames = {"item": _FakeCtkWidget()}
+    overlay._refresh_items = lambda: None
+    overlay._refresh_geometry = lambda: None
+
+    FixedOverlayView.apply_state(overlay, FixedOverlayState(opacity=0.4))
+
+    expected_surface = blend_hex_color("#0F1523", "#11141E", 0.4)
+    assert overlay._state.opacity == 0.4
+    assert overlay.opacity_menu.set_calls == ["40%"]
+    assert overlay._overlay_layer.opacity_calls == [0.4]
+    assert overlay._overlay_layer.configure_calls[-1]["fg_color"] == expected_surface
 
 
 class _GeometryMaster:

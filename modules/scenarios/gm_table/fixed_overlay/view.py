@@ -8,16 +8,23 @@ import customtkinter as ctk
 from modules.helpers import theme_manager
 
 from .models import FixedOverlayItem, FixedOverlayState
-from .style import OVERLAY_OPACITY, blend_hex_color
+from .style import (
+    OVERLAY_OPACITY,
+    OVERLAY_OPACITY_OPTIONS,
+    blend_hex_color,
+    label_to_opacity,
+    normalize_overlay_opacity,
+    opacity_to_label,
+)
 from .theme import get_fixed_overlay_palette
-from .overlay_window import TRANSPARENT_COLOR, TransparentOverlayWindow
+from .overlay_window import TransparentOverlayWindow
 
 TAB_WIDTH = 28
 COLLAPSED_TAB_TEXT = "›"
 EXPANDED_TAB_TEXT = "‹"
-MIN_OVERLAY_WIDTH = 180
+MIN_OVERLAY_WIDTH = 300
 MAX_OVERLAY_WIDTH = 1100
-EMPTY_OVERLAY_WIDTH = 180
+EMPTY_OVERLAY_WIDTH = 300
 DEFAULT_ITEM_WIDTH = 340
 DEFAULT_ITEM_HEIGHT = 260
 MIN_ITEM_WIDTH = 240
@@ -32,15 +39,17 @@ class FixedOverlayView:
         self, master, *, panel_builder, on_changed=None, on_add_requested=None
     ):
         self._palette = get_fixed_overlay_palette()
+        self._state = FixedOverlayState()
         self._overlay_layer = TransparentOverlayWindow(
-            master, background=self._overlay_surface_color()
+            master,
+            background=self._overlay_surface_color(),
+            opacity=self._state.opacity,
         )
         self._shell = self._overlay_layer.shell
         self._shell.configure(border_color=self._palette["panel_focus"])
         self._panel_builder = panel_builder
         self._on_changed = on_changed
         self._on_add_requested = on_add_requested
-        self._state = FixedOverlayState()
         self._payloads: dict[str, object] = {}
         self._item_frames: dict[str, tk.Widget] = {}
         self._item_bodies: dict[str, tk.Widget] = {}
@@ -54,16 +63,23 @@ class FixedOverlayView:
         self.apply_state(self._state)
 
     def _overlay_surface_color(self) -> str:
-        """Return the fixed overlay surface color blended at 80% opacity."""
+        """Return the fixed overlay surface color at the selected opacity."""
         return blend_hex_color(
-            self._palette["panel_bg"], self._palette["table_bg"], OVERLAY_OPACITY
+            self._palette["panel_bg"],
+            self._palette["table_bg"],
+            self._current_opacity(),
         )
 
     def _overlay_item_color(self) -> str:
-        """Return fixed item chrome blended at 80% opacity."""
+        """Return fixed item chrome at the selected opacity."""
         return blend_hex_color(
-            self._palette["panel_alt"], self._palette["table_bg"], OVERLAY_OPACITY
+            self._palette["panel_alt"],
+            self._palette["table_bg"],
+            self._current_opacity(),
         )
+
+    def _current_opacity(self) -> float:
+        return normalize_overlay_opacity(getattr(self._state, "opacity", OVERLAY_OPACITY))
 
     def _build_shell(self) -> None:
         host = getattr(self, "_shell", self)
@@ -72,7 +88,7 @@ class FixedOverlayView:
         host.grid_columnconfigure(2, weight=0)
         host.grid_rowconfigure(0, weight=1)
         self.content = ctk.CTkFrame(
-            host, fg_color=TRANSPARENT_COLOR, corner_radius=0
+            host, fg_color=self._overlay_surface_color(), corner_radius=0
         )
         self.content.grid(row=0, column=0, sticky="nsew")
         self.resize_handle = ctk.CTkFrame(
@@ -99,7 +115,7 @@ class FixedOverlayView:
         self.content.grid_rowconfigure(1, weight=1)
         self.content.grid_columnconfigure(0, weight=1)
         self.header = ctk.CTkFrame(
-            self.content, fg_color=TRANSPARENT_COLOR, corner_radius=0
+            self.content, fg_color=self._overlay_surface_color(), corner_radius=0
         )
         header = self.header
         header.grid(row=0, column=0, sticky="ew")
@@ -110,15 +126,22 @@ class FixedOverlayView:
             text_color=self._palette["text"],
             font=ctk.CTkFont(size=13, weight="bold"),
         ).grid(row=0, column=0, sticky="w", padx=10, pady=8)
+        self.opacity_menu = ctk.CTkOptionMenu(
+            header,
+            values=[opacity_to_label(value) for value in OVERLAY_OPACITY_OPTIONS],
+            width=82,
+            command=self._handle_opacity_selected,
+        )
+        self.opacity_menu.grid(row=0, column=1, padx=(0, 6), pady=6)
         self.add_button = ctk.CTkButton(
             header, text="+ Add", width=68, command=self._request_add
         )
-        self.add_button.grid(row=0, column=1, padx=(0, 6), pady=6)
+        self.add_button.grid(row=0, column=2, padx=(0, 6), pady=6)
         ctk.CTkButton(header, text="‹", width=32, command=self.collapse).grid(
-            row=0, column=2, padx=(0, 8), pady=6
+            row=0, column=3, padx=(0, 8), pady=6
         )
         self.items_host = ctk.CTkScrollableFrame(
-            self.content, fg_color=TRANSPARENT_COLOR
+            self.content, fg_color=self._overlay_surface_color()
         )
         self.items_host.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
         self.empty_label = ctk.CTkLabel(
@@ -132,13 +155,7 @@ class FixedOverlayView:
     def _on_theme_changed(self, theme: str) -> None:
         """Refresh fixed-overlay chrome colors after the global theme changes."""
         self._palette = get_fixed_overlay_palette(theme)
-        self.configure(
-            fg_color=TRANSPARENT_COLOR,
-            border_color=self._palette["panel_focus"],
-        )
-        self.content.configure(fg_color=TRANSPARENT_COLOR)
-        self.header.configure(fg_color=TRANSPARENT_COLOR)
-        self.items_host.configure(fg_color=TRANSPARENT_COLOR)
+        self._refresh_overlay_colors()
         self.resize_handle.configure(fg_color=self._palette["panel_focus"])
         self.tab_button.configure(
             fg_color=self._palette["accent"],
@@ -193,8 +210,49 @@ class FixedOverlayView:
 
     def apply_state(self, state: FixedOverlayState) -> None:
         self._state = state
+        self._state.opacity = self._current_opacity()
+        self._sync_opacity_control()
+        self._set_overlay_layer_opacity(self._state.opacity)
+        self._refresh_overlay_colors()
         self._refresh_items()
         self._refresh_geometry()
+
+    def _sync_opacity_control(self) -> None:
+        opacity_menu = getattr(self, "opacity_menu", None)
+        if hasattr(opacity_menu, "set"):
+            opacity_menu.set(opacity_to_label(self._current_opacity()))
+
+    def _refresh_overlay_colors(self) -> None:
+        surface_color = self._overlay_surface_color()
+        item_color = self._overlay_item_color()
+        self.configure(
+            fg_color=surface_color,
+            border_color=self._palette["panel_focus"],
+        )
+        self.content.configure(fg_color=surface_color)
+        self.header.configure(fg_color=surface_color)
+        self.items_host.configure(fg_color=surface_color)
+        for frame in self._item_frames.values():
+            try:
+                frame.configure(fg_color=item_color)
+            except Exception:
+                pass
+
+    def _handle_opacity_selected(self, label: str) -> None:
+        opacity = label_to_opacity(label)
+        if opacity == self._current_opacity():
+            self._sync_opacity_control()
+            return
+        self._state.opacity = opacity
+        self._sync_opacity_control()
+        self._set_overlay_layer_opacity(opacity)
+        self._refresh_overlay_colors()
+        self._changed()
+
+    def _set_overlay_layer_opacity(self, opacity: float) -> None:
+        set_opacity = getattr(self._overlay_layer, "set_opacity", None)
+        if callable(set_opacity):
+            set_opacity(opacity)
 
     def refresh_geometry_without_lift(self) -> None:
         """Refresh placement without changing global window stacking order."""

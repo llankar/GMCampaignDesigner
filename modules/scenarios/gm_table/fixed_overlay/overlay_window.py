@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import customtkinter as ctk
 
+from .style import OVERLAY_OPACITY
 
 TRANSPARENT_COLOR = "#010203"
 
@@ -25,13 +26,15 @@ class TransparentOverlayWindow:
 
     Tk's regular child widgets cannot be truly translucent on every platform. This
     host keeps the fixed-overlay controls in a dedicated borderless ``Toplevel``
-    positioned over the GM table, then uses the best transparency option Tk offers
-    on the current windowing system. If true transparent colors are unavailable,
-    it gracefully falls back to an opaque toplevel whose child widgets still use
-    the pre-blended overlay colors from ``style.py``.
+    positioned over the GM table, then uses the best opacity option Tk offers
+    on the current windowing system. If whole-window alpha is unavailable, it
+    keeps painting visible pre-blended widget colors instead of removing the
+    overlay background with a transparent-color fill.
     """
 
-    def __init__(self, master: tk.Widget, *, background: str) -> None:
+    def __init__(
+        self, master: tk.Widget, *, background: str, opacity: float = OVERLAY_OPACITY
+    ) -> None:
         self.master = master
         self._width = 1
         self._visible = False
@@ -40,19 +43,17 @@ class TransparentOverlayWindow:
         self._place_options: dict[str, object] = {}
         self._last_geometry_failure_reason = ""
         self._destroyed = False
+        self._background = background
+        self._opacity = opacity
         self.window = tk.Toplevel(master.winfo_toplevel())
         self.window.withdraw()
         self.window.overrideredirect(True)
-        self.window.configure(background=TRANSPARENT_COLOR)
+        self.window.configure(background=self._background)
         self.window.transient(master.winfo_toplevel())
         self.support = self._configure_transparency()
-        # Keep the full-window host painted with Tk's transparent color.
-        # Opaque overlay chrome belongs on the controls/cards themselves; if the
-        # root shell uses the blended panel background it covers the entire
-        # Toplevel and defeats the transparent-color window configuration.
         self.shell = ctk.CTkFrame(
             self.window,
-            fg_color=TRANSPARENT_COLOR,
+            fg_color=self._background,
             corner_radius=0,
             border_width=0,
         )
@@ -61,14 +62,14 @@ class TransparentOverlayWindow:
 
     def _configure_transparency(self) -> TransparencySupport:
         try:
-            self.window.attributes("-transparentcolor", TRANSPARENT_COLOR)
-            return TransparencySupport("transparentcolor", True)
+            self.window.attributes("-alpha", getattr(self, "_opacity", OVERLAY_OPACITY))
+            return TransparencySupport("alpha", True)
         except tk.TclError as exc:
             try:
-                self.window.attributes("-alpha", 0.80)
-                return TransparencySupport("alpha", True, str(exc))
-            except tk.TclError as alpha_exc:
-                return TransparencySupport("fallback", False, str(alpha_exc))
+                self.window.attributes("-transparentcolor", TRANSPARENT_COLOR)
+                return TransparencySupport("transparentcolor", False, str(exc))
+            except tk.TclError as transparent_exc:
+                return TransparencySupport("fallback", False, str(transparent_exc))
 
     def _bind_anchor_events(self) -> None:
         anchor_widgets = (self.master, self.master.winfo_toplevel())
@@ -114,8 +115,22 @@ class TransparentOverlayWindow:
             self._width = max(1, int(kwargs["width"] or 1))
         shell_kwargs = {k: v for k, v in kwargs.items() if k != "width"}
         if "fg_color" in shell_kwargs:
-            shell_kwargs["fg_color"] = TRANSPARENT_COLOR
+            self._background = str(shell_kwargs["fg_color"])
+            try:
+                self.window.configure(background=self._background)
+            except tk.TclError:
+                pass
         self.shell.configure(**shell_kwargs)
+
+    def set_opacity(self, opacity: float) -> None:
+        """Update whole-window visible opacity when the platform supports it."""
+        self._opacity = opacity
+        if self.support.mode != "alpha":
+            return
+        try:
+            self.window.attributes("-alpha", self._opacity)
+        except tk.TclError:
+            pass
 
     @property
     def last_geometry_failure_reason(self) -> str:
