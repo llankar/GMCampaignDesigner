@@ -235,9 +235,14 @@ class FixedOverlayView:
         if not self._state.collapsed:
             self._state.width = width
         FixedOverlayView._place_with_width(self, width)
-        ensure_visible = getattr(self, "ensure_visible", None)
-        if callable(ensure_visible) and not ensure_visible():
-            return
+        show = getattr(self, "show", None)
+        if callable(show):
+            if not show():
+                return
+        else:
+            ensure_visible = getattr(self, "ensure_visible", None)
+            if callable(ensure_visible) and not ensure_visible():
+                return
         if lift_overlay:
             self.lift()
 

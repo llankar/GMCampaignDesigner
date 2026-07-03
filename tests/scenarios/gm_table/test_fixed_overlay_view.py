@@ -92,6 +92,7 @@ class _FakeFixedOverlay:
         self.place_calls: list[dict[str, object]] = []
         self.hidden = False
         self.lifted = False
+        self.show_calls = 0
 
     def configure(self, **kwargs: object) -> None:
         self.call_order.append(f"configure:{kwargs.get('width')}")
@@ -104,7 +105,13 @@ class _FakeFixedOverlay:
     def place_forget(self) -> None:
         self.hidden = True
 
+    def show(self) -> bool:
+        self.call_order.append("show")
+        self.show_calls += 1
+        return True
+
     def lift(self) -> None:
+        self.call_order.append("lift")
         self.lifted = True
 
 
@@ -120,7 +127,16 @@ def test_refresh_geometry_places_expanded_width() -> None:
     assert overlay.tab_button.options["text"] == EXPANDED_TAB_TEXT
     assert overlay.tab_button.grid_info()["column"] == 2
     assert overlay.tab_button.removed is False
+    assert overlay.show_calls == 1
     assert overlay.lifted is True
+
+
+def test_refresh_geometry_shows_overlay_host_before_lifting() -> None:
+    overlay = _FakeFixedOverlay()
+
+    FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
+
+    assert overlay.call_order[-2:] == ["show", "lift"]
 
 
 def test_refresh_geometry_uses_tab_width_when_collapsed() -> None:
@@ -161,13 +177,15 @@ def test_refresh_geometry_preserves_placed_width_across_toggles() -> None:
     FixedOverlayView._refresh_geometry(overlay)  # type: ignore[arg-type]
     assert overlay.configured_width == 420
     assert overlay.place_calls[-1] == _expected_place_options(420)
-    assert overlay.call_order[-6:] == [
+    assert overlay.call_order[-8:] == [
         "content.grid",
         "resize_handle.grid",
         "tab_button.grid",
         f"tab_button.configure:{EXPANDED_TAB_TEXT}",
         "configure:420",
         "place:420",
+        "show",
+        "lift",
     ]
     assert overlay.content.grid_info() == {"row": 0, "column": 0, "sticky": "nsew"}
     assert overlay.resize_handle.grid_info() == {"row": 0, "column": 1, "sticky": "ns"}
@@ -192,6 +210,7 @@ class _FakeCtkWidget(_FakeGridWidget):
         super().__init__()
         self.master = master
         self.kwargs = kwargs
+        self.configure_calls: list[dict[str, object]] = []
         self.column_weights: dict[int, int] = {}
         self.row_weights: dict[int, int] = {}
         self.bindings: list[tuple[object, object, object]] = []
@@ -206,9 +225,19 @@ class _FakeCtkWidget(_FakeGridWidget):
     def bind(self, sequence: object, callback: object, add: object = None) -> None:
         self.bindings.append((sequence, callback, add))
 
+    def configure(self, **kwargs: object) -> None:
+        self.configure_calls.append(kwargs)
+        self.kwargs.update(kwargs)
+
     def pack(self, **kwargs: object) -> None:
         self.packed = True
         self.pack_options = kwargs
+
+    def winfo_children(self) -> list[object]:
+        return []
+
+    def destroy(self) -> None:
+        self.destroyed = True
 
 
 class _FakeCtkButton(_FakeCtkWidget):
@@ -269,6 +298,67 @@ def test_fixed_overlay_default_state_starts_expanded() -> None:
 
     assert state.visible is True
     assert state.collapsed is False
+
+
+def test_fixed_overlay_init_shows_default_visible_overlay(monkeypatch) -> None:
+    layers: list[object] = []
+
+    class _FakeTransparentOverlayWindow:
+        def __init__(self, _master: object, *, background: str) -> None:
+            self.background = background
+            self.shell = _FakeCtkWidget()
+            self.support = SimpleNamespace(mode="fake")
+            self.configure_calls: list[dict[str, object]] = []
+            self.place_calls: list[dict[str, object]] = []
+            self.sync_calls = 0
+            self.show_calls = 0
+            self.lift_calls = 0
+            layers.append(self)
+
+        def configure(self, **kwargs: object) -> None:
+            self.configure_calls.append(kwargs)
+
+        def place_configure(self, **kwargs: object) -> None:
+            self.place_calls.append(kwargs)
+
+        def sync_to_anchor(self) -> bool:
+            self.sync_calls += 1
+            return True
+
+        def show(self) -> bool:
+            self.show_calls += 1
+            return True
+
+        def lift(self) -> None:
+            self.lift_calls += 1
+
+        def destroy(self) -> None:
+            pass
+
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFrame", _FakeCtkWidget)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkScrollableFrame", _FakeCtkWidget)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkButton", _FakeCtkButton)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkLabel", _FakeCtkWidget)
+    monkeypatch.setattr(fixed_overlay_view.ctk, "CTkFont", lambda **kwargs: kwargs)
+    monkeypatch.setattr(
+        fixed_overlay_view,
+        "TransparentOverlayWindow",
+        _FakeTransparentOverlayWindow,
+    )
+    monkeypatch.setattr(
+        fixed_overlay_view.theme_manager,
+        "register_theme_change_listener",
+        lambda _callback: lambda: None,
+    )
+
+    overlay = FixedOverlayView(object(), panel_builder=lambda *_args: None)
+
+    layer = layers[0]
+    assert layer.place_calls == [_expected_place_options(180)]
+    assert layer.show_calls == 1
+    assert layer.lift_calls == 1
+
+    overlay.destroy()
 
 
 def test_build_shell_places_tab_in_rightmost_column(monkeypatch) -> None:

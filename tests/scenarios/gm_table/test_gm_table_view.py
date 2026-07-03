@@ -1407,23 +1407,17 @@ def test_restore_fixed_overlay_after_reveal_refreshes_without_lifting() -> None:
     """Handout reveal completion should not lift fixed overlay over the handout."""
     calls = []
 
-    class _FixedOverlay:
-        def refresh_geometry_without_lift(self) -> None:
-            calls.append("refresh_without_lift")
-
-        def refresh_geometry(self) -> None:
-            calls.append("refresh")
-
-        def lift(self) -> None:
-            calls.append("lift")
+    class _Workspace:
+        def _sync_fixed_overlay_layer(self, reason: str, *, allow_lift: bool) -> None:
+            calls.append((reason, allow_lift))
 
     view = GMTableView.__new__(GMTableView)
-    view.workspace = SimpleNamespace(fixed_overlay=_FixedOverlay())
+    view.workspace = _Workspace()
     view.after = lambda _delay, callback: callback()
 
     GMTableView._restore_fixed_overlay_after_reveal(view)
 
-    assert calls == ["refresh_without_lift"] * 4
+    assert calls == [("restore fixed overlay after reveal", False)] * 4
 
 
 def test_restore_fixed_overlay_after_reveal_does_not_fallback_to_lifting_refresh() -> None:
