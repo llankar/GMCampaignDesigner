@@ -25,6 +25,8 @@ class PDFViewerFrame(ctk.CTkFrame):
         self.current_page = int(state.get("current_page") or 1)
         self.zoom = float(state.get("zoom") or 1.25)
         self.search_query = str(state.get("search_query") or "")
+        self._search_matches: list[int] = []
+        self._search_match_index = -1
         self._on_state_changed = on_state_changed
         self._render_token = 0
         self._page_image = None
@@ -46,6 +48,14 @@ class PDFViewerFrame(ctk.CTkFrame):
         ctk.CTkButton(controls, text="+", width=36, command=lambda: self.adjust_zoom(0.25)).pack(side="left", padx=(4,0))
         ctk.CTkButton(controls, text="Reset Zoom", width=96, command=self.reset_zoom).pack(side="left", padx=8)
         self.zoom_label = ctk.CTkLabel(controls, text="Zoom: 125%"); self.zoom_label.pack(side="left")
+        ctk.CTkLabel(controls, text="Find:").pack(side="left", padx=(12, 4))
+        self.search_var = tk.StringVar(value=self.search_query)
+        search_entry = ctk.CTkEntry(controls, width=180, textvariable=self.search_var)
+        search_entry.pack(side="left")
+        search_entry.bind("<Return>", lambda _e: self.find_next())
+        ctk.CTkButton(controls, text="Next", width=58, command=self.find_next).pack(side="left", padx=(4, 0))
+        self.search_status_label = ctk.CTkLabel(controls, text="")
+        self.search_status_label.pack(side="left", padx=(6, 0))
         body = ctk.CTkFrame(self); body.grid(row=1, column=0, sticky="nsew", padx=6, pady=(0,6)); body.grid_rowconfigure(0, weight=1); body.grid_columnconfigure(0, weight=1)
         self.canvas = tk.Canvas(body, bg="#0B1020", highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew")
@@ -61,6 +71,7 @@ class PDFViewerFrame(ctk.CTkFrame):
 
     def open_pdf(self, pdf_path: str, *, initial_page: int = 1, zoom: float | None = None) -> None:
         self.pdf_path = str(pdf_path or ""); self.attachment_path = self.pdf_path
+        self._reset_search_results()
         if zoom is not None: self.zoom = self._clamp_zoom(zoom)
         try:
             self._document = open_document(self.pdf_path, campaign_dir=self.campaign_dir) if self.pdf_path else None
@@ -69,6 +80,63 @@ class PDFViewerFrame(ctk.CTkFrame):
             log_warning(f"Unable to open PDF '{self.pdf_path}': {exc}", func_name="PDFViewerFrame.open_pdf")
             self._document = None; self.page_count = 0
         self.go_to_page(initial_page, render=True)
+
+
+    def _reset_search_results(self) -> None:
+        self._search_matches = []
+        self._search_match_index = -1
+
+    def _normalize_search_query(self, query: str) -> str:
+        return str(query or "").strip()
+
+    def _page_contains_query(self, page_index: int, query: str) -> bool:
+        if not self._document or not query:
+            return False
+        try:
+            page = self._document.load_page(page_index)
+            text = page.get_text("text") if hasattr(page, "get_text") else page.get_text()
+        except Exception:
+            return False
+        return query.casefold() in str(text or "").casefold()
+
+    def _build_search_matches(self, query: str) -> list[int]:
+        if not query or not self._document or not self.page_count:
+            return []
+        return [
+            page_number
+            for page_number in range(1, self.page_count + 1)
+            if self._page_contains_query(page_number - 1, query)
+        ]
+
+    def _update_search_status(self, text: str) -> None:
+        label = getattr(self, "search_status_label", None)
+        if label is not None:
+            label.configure(text=text)
+
+    def find_next(self) -> None:
+        query_var = getattr(self, "search_var", None)
+        query = self._normalize_search_query(query_var.get() if query_var is not None else self.search_query)
+        if not query:
+            self.search_query = ""
+            self._reset_search_results()
+            self._update_search_status("")
+            self._changed()
+            return
+
+        if query != self.search_query or not self._search_matches:
+            self.search_query = query
+            self._search_matches = self._build_search_matches(query)
+            self._search_match_index = -1
+
+        if not self._search_matches:
+            self._update_search_status("No matches")
+            self._changed()
+            return
+
+        self._search_match_index = (self._search_match_index + 1) % len(self._search_matches)
+        target_page = self._search_matches[self._search_match_index]
+        self._update_search_status(f"Match {self._search_match_index + 1}/{len(self._search_matches)}")
+        self.go_to_page(target_page)
 
     def _clamp_page(self, page: int) -> int:
         page = max(1, int(page or 1))
