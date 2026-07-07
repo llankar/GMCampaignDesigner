@@ -745,6 +745,7 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
 
     def _build_arc_generation_foundation(self) -> dict:
         """Build arc generation foundation."""
+        db_path = getattr(self.scenario_wrapper, "_db_path", None)
         return {
             "name": self.form_vars["name"].get().strip(),
             "genre": self.form_vars["genre"].get().strip(),
@@ -757,7 +758,8 @@ class CampaignBuilderWizard(ctk.CTkToplevel):
             "themes": [line.strip() for line in self.themes_box.get("1.0", "end").splitlines() if line.strip()],
             "notes": self.notes_box.get("1.0", "end").strip(),
             "existing_entities": load_existing_entity_catalog(
-                ("villains", "factions", "places", "npcs", "creatures")
+                ("villains", "factions", "places", "npcs", "creatures"),
+                db_path=db_path,
             ),
             "generation_defaults": dict(getattr(self, "generation_defaults", {})),
         }

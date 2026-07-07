@@ -16,7 +16,11 @@ ENTITY_WRAPPER_SPECS: dict[str, dict[str, str]] = {
 }
 
 
-def load_existing_entity_catalog(entity_types: list[str] | tuple[str, ...] | None = None) -> dict[str, list[str]]:
+def load_existing_entity_catalog(
+    entity_types: list[str] | tuple[str, ...] | None = None,
+    *,
+    db_path: str | None = None,
+) -> dict[str, list[str]]:
     """Load existing linkable entity names for scenario-expansion prompts."""
 
     catalog: dict[str, list[str]] = {}
@@ -27,7 +31,7 @@ def load_existing_entity_catalog(entity_types: list[str] | tuple[str, ...] | Non
             continue
 
         try:
-            wrapper = GenericModelWrapper(spec["wrapper"])
+            wrapper = GenericModelWrapper(spec["wrapper"], db_path=db_path)
             items = wrapper.load_items()
         except Exception:
             catalog[entity_type] = []
