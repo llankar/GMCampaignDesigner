@@ -157,3 +157,50 @@ Locations:
     assert parsed["Secrets"] == "The priest is the bell."
     assert parsed["NPCs"] == ["Mara, ash-smudged smith"]
     assert parsed["Places"] == ["The cracked belfry"]
+
+
+def test_ollama_provider_reports_unreachable_provider(monkeypatch):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    provider = generator.OllamaScenarioProvider(
+        generator.AIProviderConfig(base_url="http://127.0.0.1:11434", model="gpt-oss:20b")
+    )
+
+    def raise_url_error(*_args, **_kwargs):
+        raise generator.urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", raise_url_error)
+
+    with pytest.raises(generator.AIGenerationError) as excinfo:
+        provider.generate("hello")
+
+    assert "Cannot reach AI provider" in str(excinfo.value)
+    assert "model" not in str(excinfo.value).lower()
+
+
+def test_ollama_provider_reports_model_http_error(monkeypatch):
+    from io import BytesIO
+    from modules.scenarios import ai_scenario_generator as generator
+
+    provider = generator.OllamaScenarioProvider(
+        generator.AIProviderConfig(base_url="http://127.0.0.1:11434", model="gpt-oss:20b")
+    )
+
+    def raise_http_error(*_args, **_kwargs):
+        raise generator.urllib.error.HTTPError(
+            "http://127.0.0.1:11434/api/chat",
+            404,
+            "Not Found",
+            hdrs=None,
+            fp=BytesIO(b'{"error":"model \\"gpt-oss:20b\\" not found"}'),
+        )
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", raise_http_error)
+
+    with pytest.raises(generator.AIGenerationError) as excinfo:
+        provider.generate("hello")
+
+    message = str(excinfo.value)
+    assert "Ollama is reachable" in message
+    assert "ollama pull gpt-oss:20b" in message
+    assert "model" in message
