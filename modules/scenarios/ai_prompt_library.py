@@ -144,6 +144,11 @@ LEGACY_DEFAULT_OPTIONAL_QUESTION_KEYS = {
 }
 
 
+def _normalized_question_keys(questions: list[PromptQuestion]) -> set[str]:
+    """Return normalized question keys for identity and migration checks."""
+    return {question.key.strip().casefold() for question in questions}
+
+
 def default_prompt_questions() -> list[PromptQuestion]:
     """Return the current question flow for the built-in default prompt."""
     return [
@@ -267,7 +272,7 @@ class PromptLibrary:
         for prompt in prompts:
             if not _is_builtin_default_prompt(prompt):
                 continue
-            question_keys = {question.key.strip() for question in prompt.questions}
+            question_keys = _normalized_question_keys(prompt.questions)
             if not question_keys.intersection(LEGACY_DEFAULT_OPTIONAL_QUESTION_KEYS):
                 continue
             prompt.questions = default_prompt_questions()
