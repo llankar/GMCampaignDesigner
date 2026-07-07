@@ -133,6 +133,30 @@ def validate_prompt(prompt: ScenarioPrompt, existing: list[ScenarioPrompt] | Non
     return errors
 
 
+DEFAULT_PROMPT_NAME = "Professional RPG Scenario"
+DEFAULT_PROMPT_DESCRIPTION = "Industry-style prompt for a complete, playable RPG scenario."
+DEFAULT_PROMPT_CATEGORY = "Generic RPG"
+LEGACY_DEFAULT_OPTIONAL_QUESTION_KEYS = {
+    "tone",
+    "party_level",
+    "system",
+    "additional_constraints",
+}
+
+
+def default_prompt_questions() -> list[PromptQuestion]:
+    """Return the current question flow for the built-in default prompt."""
+    return [
+        PromptQuestion(
+            "scenario_type",
+            "Type or background (medfan, sci-fi, modern, Star Wars, Dresden Files, Dragonlance...)",
+            True,
+        ),
+        PromptQuestion("theme", "Theme of the scenario", True),
+        PromptQuestion("location", "Location of the scenario", True),
+    ]
+
+
 DEFAULT_PROMPT_TEXT = """# Role
 You are a professional RPG scenario writer working in the RPG industry. Your style is original, witty, sensory, mysterious, and immediately usable at the table. Use strong hooks, meaningful NPC motives, scene escalation, player agency, secrets, revelations, and playable conflicts.
 
@@ -191,17 +215,23 @@ def default_prompts() -> list[ScenarioPrompt]:
     """Return built-in prompts used to seed or restore the library."""
     return [
         ScenarioPrompt.new(
-            name="Professional RPG Scenario",
-            description="Industry-style prompt for a complete, playable RPG scenario.",
-            category="Generic RPG",
+            name=DEFAULT_PROMPT_NAME,
+            description=DEFAULT_PROMPT_DESCRIPTION,
+            category=DEFAULT_PROMPT_CATEGORY,
             prompt_text=DEFAULT_PROMPT_TEXT,
-            questions=[
-                PromptQuestion("scenario_type", "Type or background (medfan, sci-fi, modern, Star Wars, Dresden Files, Dragonlance...)", True),
-                PromptQuestion("theme", "Theme of the scenario", True),
-                PromptQuestion("location", "Location of the scenario", True),
-            ],
+            questions=default_prompt_questions(),
         )
     ]
+
+
+def _is_builtin_default_prompt(prompt: ScenarioPrompt) -> bool:
+    """Return whether a prompt clearly identifies the built-in default prompt."""
+    name_matches = prompt.name.strip().casefold() == DEFAULT_PROMPT_NAME.casefold()
+    metadata_matches = (
+        prompt.category.strip().casefold() == DEFAULT_PROMPT_CATEGORY.casefold()
+        and prompt.description.strip().casefold() == DEFAULT_PROMPT_DESCRIPTION.casefold()
+    )
+    return name_matches or metadata_matches
 
 
 class PromptLibrary:
@@ -227,7 +257,23 @@ class PromptLibrary:
         if not prompts:
             prompts = default_prompts()
             self.save(prompts)
+        elif self._migrate_builtin_default_questions(prompts):
+            self.save(prompts)
         return prompts
+
+    def _migrate_builtin_default_questions(self, prompts: list[ScenarioPrompt]) -> bool:
+        """Normalize legacy built-in default prompts to the current three-question flow."""
+        migrated = False
+        for prompt in prompts:
+            if not _is_builtin_default_prompt(prompt):
+                continue
+            question_keys = {question.key.strip() for question in prompt.questions}
+            if not question_keys.intersection(LEGACY_DEFAULT_OPTIONAL_QUESTION_KEYS):
+                continue
+            prompt.questions = default_prompt_questions()
+            prompt.updated_at = _utc_now()
+            migrated = True
+        return migrated
 
     def save(self, prompts: list[ScenarioPrompt]) -> None:
         """Persist prompts to JSON."""
