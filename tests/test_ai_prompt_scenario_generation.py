@@ -52,7 +52,7 @@ def test_prompt_library_migrates_legacy_builtin_default_questions(tmp_path):
             PromptQuestion("scenario_type", "Type"),
             PromptQuestion("theme", "Theme"),
             PromptQuestion("location", "Location"),
-            PromptQuestion("tone", "Tone", False),
+            PromptQuestion("Tone", "Tone", False),
             PromptQuestion("party_level", "Party level", False),
             PromptQuestion("system", "System", False),
             PromptQuestion("additional_constraints", "Additional constraints", False),
