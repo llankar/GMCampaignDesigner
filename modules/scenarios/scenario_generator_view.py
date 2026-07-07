@@ -430,7 +430,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             try:
                 result = AIScenarioGenerator().generate(prompt, answers)
             except Exception as exc:
-                self.after(0, lambda: self._on_ai_error(exc))
+                self.after(0, lambda exc=exc: self._on_ai_error(exc))
                 return
             self.after(0, lambda: self._on_ai_success(result))
 
