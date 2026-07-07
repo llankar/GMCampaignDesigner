@@ -273,9 +273,12 @@ class PromptLibrary:
             if not _is_builtin_default_prompt(prompt):
                 continue
             question_keys = _normalized_question_keys(prompt.questions)
-            if not question_keys.intersection(LEGACY_DEFAULT_OPTIONAL_QUESTION_KEYS):
+            prompt_placeholders = {name.casefold() for name in extract_placeholders(prompt.prompt_text)}
+            legacy_keys = question_keys.union(prompt_placeholders)
+            if not legacy_keys.intersection(LEGACY_DEFAULT_OPTIONAL_QUESTION_KEYS):
                 continue
             prompt.questions = default_prompt_questions()
+            prompt.prompt_text = DEFAULT_PROMPT_TEXT
             prompt.updated_at = _utc_now()
             migrated = True
         return migrated
