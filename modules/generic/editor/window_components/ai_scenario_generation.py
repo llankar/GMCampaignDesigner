@@ -3,6 +3,7 @@
 from modules.generic.editor.window_context import *
 from modules.campaigns.services.ai.generation_policy import build_hard_constraints_block
 from modules.campaigns.services.generation_defaults_service import CampaignGenerationDefaultsService
+from modules.scenarios.generated_scenario_parser import normalize_generated_scenario_payload
 
 
 class GenericEditorWindowAIScenarioGeneration:
@@ -348,12 +349,54 @@ class GenericEditorWindowAIScenarioGeneration:
                 phase="scenario_generation",
                 phase_message="Generating scenario content",
             )
-            data = None
             try:
-                data = LocalAIClient._parse_json_safe(content)
+                data = normalize_generated_scenario_payload(LocalAIClient._parse_json_safe(content))
             except Exception:
-                # If not JSON, fallback: put entire text into Summary
-                data = {"Title": "Generated Scenario", "Summary": content, "Secrets": "", "Scenes": []}
+                # If not JSON, parse the markdown/plain text instead of losing
+                # scenes and entity references into Summary.
+                data = normalize_generated_scenario_payload(content)
+
+            def _apply_linked_list(field_name, values):
+                if not isinstance(values, (list, tuple, set)):
+                    return
+                cleaned = []
+                for value in values:
+                    text = str(value).strip()
+                    if text and text not in cleaned:
+                        cleaned.append(text)
+                if not cleaned:
+                    return
+                widgets = self.field_widgets.get(field_name, [])
+                vars_list = self.field_widgets.get(f"{field_name}_vars", [])
+                add_combobox = self.field_widgets.get(f"{field_name}_add_combobox")
+                while len(widgets) < len(cleaned) and callable(add_combobox):
+                    add_combobox()
+                    widgets = self.field_widgets.get(field_name, [])
+                    vars_list = self.field_widgets.get(f"{field_name}_vars", [])
+                if len(widgets) > len(cleaned):
+                    for widget in widgets[len(cleaned):]:
+                        try:
+                            widget.master.destroy()
+                        except Exception:
+                            pass
+                    del widgets[len(cleaned):]
+                    if len(vars_list) > len(cleaned):
+                        del vars_list[len(cleaned):]
+                for index, name in enumerate(cleaned):
+                    if index < len(vars_list):
+                        vars_list[index].set(name)
+                    elif index < len(widgets):
+                        try:
+                            widgets[index].configure(state="normal")
+                            widgets[index].delete(0, "end")
+                            widgets[index].insert(0, name)
+                            widgets[index].configure(state="readonly")
+                        except Exception:
+                            pass
+                self.item[field_name] = cleaned
+
+            for linked_field in ("NPCs", "Places", "Creatures", "Factions", "Objects", "Maps", "Bases", "Villains"):
+                _apply_linked_list(linked_field, data.get(linked_field))
 
             # Apply fields
             title = data.get("Title") or self.item.get("Title")
@@ -416,6 +459,28 @@ class GenericEditorWindowAIScenarioGeneration:
                     if isinstance(sc, dict):
                         title_value = sc.get("Title") or sc.get("Scene")
                         raw_text = sc.get("Text") or sc.get("text") or sc.get("Summary") or sc
+                        for label, names in (sc.items()):
+                            if label not in state.get("entities", {}):
+                                continue
+                            state["entities"][label] = []
+                            for name in names if isinstance(names, (list, tuple, set)) else [names]:
+                                cleaned = str(name).strip()
+                                if cleaned and cleaned not in state["entities"][label]:
+                                    state["entities"][label].append(cleaned)
+                            frame = (state.get("entity_chip_frames") or {}).get(label)
+                            if frame is not None:
+                                for widget in list(frame.winfo_children()):
+                                    try:
+                                        widget.destroy()
+                                    except Exception:
+                                        pass
+                                if state["entities"].get(label):
+                                    if not frame.winfo_manager():
+                                        frame.pack(fill="x", padx=20, pady=(1, 0))
+                                    for entity_name in state["entities"][label]:
+                                        chip = ctk.CTkFrame(frame, fg_color="#3A3A3A")
+                                        chip.pack(side="left", padx=4, pady=2)
+                                        ctk.CTkLabel(chip, text=entity_name).pack(side="left", padx=(6, 6))
                     if title_entry is not None:
                         try:
                             # Keep AI generate full scenario resilient if this step fails.
@@ -483,8 +548,15 @@ def _build_one_click_scenario_user_prompt(
         "  \"Title\": string,\n"
         "  \"Summary\": string (1-3 short paragraphs, Markdown allowed),\n"
         "  \"Secrets\": string (a single compact secret),\n"
-        "  \"Scenes\": [string, ...] (3-5 concise scene beats; reference the selected entities by NAME)\n"
+        "  \"NPCs\": [string, ...],\n"
+        "  \"Places\": [string, ...],\n"
+        "  \"Creatures\": [string, ...],\n"
+        "  \"Factions\": [string, ...],\n"
+        "  \"Objects\": [string, ...],\n"
+        "  \"Scenes\": [\n"
+        "    {\"Title\": string, \"Text\": string, \"NPCs\": [string], \"Places\": [string], \"Creatures\": [string], \"Factions\": [string], \"Objects\": [string]}\n"
+        "  ]\n"
         "}\n"
-        "Constraints: Integrate the selected entities coherently. No extra keys. No code blocks. Keep within ~600 words.\n"
+        "Constraints: Integrate and link the selected entities coherently. Entity arrays must contain exact selected names only. No extra keys. No code blocks. Keep within ~600 words.\n"
         f"{_format_editor_prompt_block(hard_constraints_block)}"
     )

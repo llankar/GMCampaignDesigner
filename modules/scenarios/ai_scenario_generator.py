@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 import socket
 import urllib.error
 import urllib.request
@@ -12,6 +11,7 @@ from typing import Mapping
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception
 from modules.scenarios.ai_prompt_library import ScenarioPrompt, extract_placeholders
+from modules.scenarios.generated_scenario_parser import normalize_generated_scenario_payload
 
 
 class AIGenerationError(RuntimeError):
@@ -103,33 +103,7 @@ def validate_required_answers(prompt: ScenarioPrompt, answers: Mapping[str, str]
 
 def parse_generated_scenario(text: str) -> dict[str, str | list[str]]:
     """Best-effort parser that extracts common scenario sections without crashing."""
-    result: dict[str, str | list[str]] = {
-        "Title": "",
-        "Summary": text.strip(),
-        "Secrets": "",
-        "Places": [],
-        "NPCs": [],
-        "Objects": [],
-    }
-    title_match = re.search(r"^\s*Title\s*:\s*(.+)$", text, flags=re.IGNORECASE | re.MULTILINE)
-    if title_match:
-        result["Title"] = title_match.group(1).strip()
-    sections: dict[str, str] = {}
-    matches = list(re.finditer(r"^\s*([A-Za-z][A-Za-z0-9 ,/&-]+)\s*:\s*$", text, flags=re.MULTILINE))
-    for index, match in enumerate(matches):
-        key = match.group(1).strip().lower()
-        start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        sections[key] = text[start:end].strip()
-    if sections.get("scenario summary, maximum 8 short lines"):
-        result["Summary"] = sections["scenario summary, maximum 8 short lines"]
-    if sections.get("secrets and twists"):
-        result["Secrets"] = sections["secrets and twists"]
-    for section_name, target in (("locations", "Places"), ("npcs", "NPCs")):
-        raw = sections.get(section_name, "")
-        if raw:
-            result[target] = [line.strip(" -*") for line in raw.splitlines() if line.strip()][:20]
-    return result
+    return normalize_generated_scenario_payload(text)
 
 
 class AIScenarioGenerator:
