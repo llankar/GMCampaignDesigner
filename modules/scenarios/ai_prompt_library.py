@@ -140,10 +140,10 @@ You are a professional RPG scenario writer working in the RPG industry. Your sty
 - Type or background: {scenario_type}
 - Theme: {theme}
 - Location: {location}
-- Tone: {tone}
-- Party level: {party_level}
-- System: {system}
-- Additional constraints: {additional_constraints}
+- Tone: cinematic, mysterious, and playable
+- Power scale: appropriate for the campaign
+- System: system-neutral unless implied by the background
+- Constraints: none unless implied by the user answers
 
 # Rules
 1. Reread, criticize, and improve your own scenario before giving the final answer.
@@ -196,13 +196,9 @@ def default_prompts() -> list[ScenarioPrompt]:
             category="Generic RPG",
             prompt_text=DEFAULT_PROMPT_TEXT,
             questions=[
-                PromptQuestion("scenario_type", "Type or background (medfan, sci-fi, Star Wars, Dresden Files...)", True),
+                PromptQuestion("scenario_type", "Type or background (medfan, sci-fi, modern, Star Wars, Dresden Files, Dragonlance...)", True),
                 PromptQuestion("theme", "Theme of the scenario", True),
                 PromptQuestion("location", "Location of the scenario", True),
-                PromptQuestion("tone", "Tone", False, "mysterious and cinematic"),
-                PromptQuestion("party_level", "Party level / power scale", False, "appropriate for the current campaign"),
-                PromptQuestion("system", "Game system", False, "system-neutral"),
-                PromptQuestion("additional_constraints", "Additional constraints", False, "none"),
             ],
         )
     ]
