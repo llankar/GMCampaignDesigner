@@ -95,6 +95,30 @@ def test_prompt_library_migrates_builtin_default_by_known_metadata(tmp_path):
     assert [question.key for question in loaded[0].questions] == ["scenario_type", "theme", "location"]
 
 
+def test_prompt_library_migrates_builtin_default_prompt_text_placeholders(tmp_path):
+    library = PromptLibrary(tmp_path / "prompts.json")
+    legacy_prompt = ScenarioPrompt.new(
+        "Professional RPG Scenario",
+        "Industry-style prompt for a complete, playable RPG scenario.",
+        "Generic RPG",
+        "Write {scenario_type} {tone} {party_level} {system} {additional_constraints}",
+        [
+            PromptQuestion("scenario_type", "Type"),
+            PromptQuestion("theme", "Theme"),
+            PromptQuestion("location", "Location"),
+        ],
+    )
+    library.save([legacy_prompt])
+
+    loaded = library.load()
+    _final, unresolved = build_final_prompt(
+        loaded[0],
+        {"scenario_type": "medfan", "theme": "betrayal", "location": "old abbey"},
+    )
+
+    assert unresolved == []
+    assert [question.key for question in loaded[0].questions] == ["scenario_type", "theme", "location"]
+
 def test_prompt_library_rejects_invalid_json_import(tmp_path):
     library = PromptLibrary(tmp_path / "prompts.json")
     bad = tmp_path / "bad.json"
