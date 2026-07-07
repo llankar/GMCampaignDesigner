@@ -141,7 +141,12 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
         self.results_frame = ctk.CTkScrollableFrame(self, fg_color="#2c3e50")
         self.results_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        self.ai_result_text = ctk.CTkTextbox(self.results_frame, wrap="word")
+        self.results_frame.bind("<Configure>", self._resize_ai_result_textbox)
+        self.ai_result_text = ctk.CTkTextbox(
+            self.results_frame,
+            wrap="word",
+            height=self._result_textbox_height(),
+        )
 
         bottom = ctk.CTkFrame(self)
         bottom.pack(fill="x", padx=10, pady=(0, 10))
@@ -161,6 +166,20 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     def _prompt_names(self) -> list[str]:
         return [prompt.name for prompt in self.prompts] or [""]
+
+    def _result_textbox_height(self) -> int:
+        """Return a large result textbox height that follows the available panel."""
+        fallback_height = 520
+        available_height = self.results_frame.winfo_height()
+        if available_height <= 1:
+            return fallback_height
+        return max(fallback_height, available_height - 16)
+
+    def _resize_ai_result_textbox(self, _event: tk.Event | None = None) -> None:
+        """Keep generated AI text readable instead of capped at the widget default."""
+        if not self.current_ai_text or not self.ai_result_text.winfo_exists():
+            return
+        self.ai_result_text.configure(height=self._result_textbox_height())
 
     def _current_prompt(self) -> ScenarioPrompt | None:
         return next(
@@ -430,7 +449,11 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         if parsed.get("Title") and not self.title_var.get().strip():
             self.title_var.set(str(parsed["Title"]))
         self._clear_results()
-        self.ai_result_text = ctk.CTkTextbox(self.results_frame, wrap="word")
+        self.ai_result_text = ctk.CTkTextbox(
+            self.results_frame,
+            wrap="word",
+            height=self._result_textbox_height(),
+        )
         self.ai_result_text.insert("1.0", self.current_ai_text)
         self.ai_result_text.pack(fill="both", expand=True, padx=5, pady=5)
         self.export_btn.configure(state="normal")
