@@ -25,6 +25,9 @@ from modules.scenarios.ai_scenario_generator import (
     validate_required_answers,
 )
 from modules.scenarios.prompt_library_dialog import PromptLibraryDialog
+from modules.scenarios.services.generated_entity_persistence import (
+    GeneratedScenarioEntityPersistence,
+)
 
 log_module_import(__name__)
 
@@ -563,8 +566,24 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                 return
             existing.append(scenario_entity)
             wrapper.save_items(existing)
+            entity_result = GeneratedScenarioEntityPersistence().save_missing_entities(
+                scenario_entity
+            )
         except Exception as exc:
             log_exception("Scenario database save failed")
             messagebox.showerror("Save Error", str(exc))
             return
-        messagebox.showinfo("Saved", f"Scenario '{title}' added to database.")
+        created_bits = []
+        if entity_result.npcs_created:
+            created_bits.append(f"{len(entity_result.npcs_created)} NPC(s)")
+        if entity_result.places_created:
+            created_bits.append(f"{len(entity_result.places_created)} place(s)")
+        entity_summary = (
+            "\nCreated missing entities: " + ", ".join(created_bits)
+            if created_bits
+            else ""
+        )
+        messagebox.showinfo(
+            "Saved",
+            f"Scenario '{title}' added to database.{entity_summary}",
+        )
