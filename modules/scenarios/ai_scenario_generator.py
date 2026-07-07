@@ -62,9 +62,11 @@ class OllamaScenarioProvider:
         try:
             with urllib.request.urlopen(request, timeout=self.config.timeout) as response:
                 data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raise AIGenerationError(self._format_http_error(exc)) from exc
         except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
             raise AIGenerationError(
-                f"AI provider unavailable at {self.config.base_url}. Make sure Ollama is running and the model '{self.config.model}' is installed."
+                f"Cannot reach AI provider at {self.config.base_url}. Make sure Ollama is running and reachable from this application."
             ) from exc
         except json.JSONDecodeError as exc:
             raise AIGenerationError("AI provider returned invalid JSON.") from exc
@@ -73,6 +75,33 @@ class OllamaScenarioProvider:
         if not content:
             raise AIGenerationError("AI provider returned an empty scenario.")
         return content
+
+
+    def _format_http_error(self, exc: urllib.error.HTTPError) -> str:
+        """Return an actionable message for Ollama HTTP errors."""
+        detail = exc.reason or ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace").strip()
+        except Exception:
+            body = ""
+        if body:
+            try:
+                payload = json.loads(body)
+            except json.JSONDecodeError:
+                detail = body
+            else:
+                if isinstance(payload, dict):
+                    detail = str(payload.get("error") or payload.get("message") or detail)
+                else:
+                    detail = str(payload)
+        if exc.code == 404:
+            suffix = f" Ollama said: {detail}" if detail else ""
+            return (
+                f"Ollama is reachable at {self.config.base_url}, but model '{self.config.model}' was not accepted."
+                f" Verify the model name in AI settings or install it with: ollama pull {self.config.model}.{suffix}"
+            )
+        suffix = f" Response: {detail}" if detail else ""
+        return f"AI provider at {self.config.base_url} returned HTTP {exc.code}.{suffix}"
 
 
 class SafeFormatDict(dict):
