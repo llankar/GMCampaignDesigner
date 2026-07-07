@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import sqlite3
+
 from modules.campaigns.services.campaign_forge_persistence import (
     CampaignForgePersistence,
     SAVE_MODE_MERGE_KEEP_EXISTING,
@@ -87,3 +89,68 @@ def test_merge_vs_replace_behavior_for_arc_link_updates():
 
     assert merge_after == ["Legacy Lead", "Rainmarket Ultimatum", "Ash Dock Reckoning"]
     assert replace_after == ["Rainmarket Ultimatum", "Ash Dock Reckoning"]
+
+
+def _create_campaign_forge_tables(db_path):
+    """Create the minimal tables needed by campaign forge persistence tests."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE scenarios (Title TEXT PRIMARY KEY, Summary TEXT)")
+        cursor.execute("CREATE TABLE npcs (Name TEXT PRIMARY KEY, Role TEXT)")
+        cursor.execute("CREATE TABLE places (Name TEXT PRIMARY KEY, Description TEXT)")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _load_names(db_path, table):
+    """Load entity names from a table in deterministic order."""
+    conn = sqlite3.connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT Name FROM {table} ORDER BY Name")
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+def test_save_from_dry_run_persists_fallback_entities_to_scenario_db(tmp_path):
+    """Verify fallback entity wrappers use the scenario wrapper database path."""
+    from modules.generic.generic_model_wrapper import GenericModelWrapper
+
+    db_path = tmp_path / "campaign.sqlite"
+    _create_campaign_forge_tables(db_path)
+    scenario_wrapper = GenericModelWrapper("scenarios", db_path=str(db_path))
+    persistence = CampaignForgePersistence(scenario_wrapper=scenario_wrapper)
+
+    payload = {
+        "arcs": [
+            {
+                "arc_name": "Arc Alpha",
+                "scenarios": [
+                    {
+                        "Title": "Market Shadows",
+                        "Summary": "New contacts and locations emerge.",
+                        "EntityCreations": {
+                            "npcs": [{"Name": "Rika Vale", "Role": "Informant"}],
+                            "places": [{"Name": "Rainmarket", "Description": "A neon bazaar."}],
+                        },
+                    }
+                ],
+            }
+        ]
+    }
+    arcs = [{"name": "Arc Alpha", "scenarios": []}]
+    dry_run = persistence.build_dry_run_report(
+        payload,
+        arcs,
+        save_mode=SAVE_MODE_REPLACE_GENERATED_ONLY,
+    )
+
+    persistence.save_from_dry_run(payload, arcs, dry_run)
+
+    assert _load_names(db_path, "npcs") == ["Rika Vale"]
+    assert _load_names(db_path, "places") == ["Rainmarket"]
+    assert persistence.entity_wrappers["npcs"]._db_path == str(db_path)
+    assert persistence.entity_wrappers["places"]._db_path == str(db_path)

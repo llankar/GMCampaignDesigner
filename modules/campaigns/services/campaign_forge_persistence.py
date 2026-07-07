@@ -377,7 +377,8 @@ class CampaignForgePersistence:
         if not spec:
             return None
 
-        wrapper = GenericModelWrapper(spec["wrapper"])
+        db_path = getattr(self.scenario_wrapper, "_db_path", None)
+        wrapper = GenericModelWrapper(spec["wrapper"], db_path=db_path)
         self.entity_wrappers[entity_type] = wrapper
         return wrapper
 
