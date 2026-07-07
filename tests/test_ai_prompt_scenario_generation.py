@@ -41,6 +41,60 @@ def test_prompt_library_load_save_import_export_roundtrip(tmp_path):
     assert imported[0].questions[0].key == "theme"
 
 
+def test_prompt_library_migrates_legacy_builtin_default_questions(tmp_path):
+    library = PromptLibrary(tmp_path / "prompts.json")
+    legacy_prompt = ScenarioPrompt.new(
+        "Professional RPG Scenario",
+        "Industry-style prompt for a complete, playable RPG scenario.",
+        "Generic RPG",
+        "Write {scenario_type} {theme} {location}",
+        [
+            PromptQuestion("scenario_type", "Type"),
+            PromptQuestion("theme", "Theme"),
+            PromptQuestion("location", "Location"),
+            PromptQuestion("tone", "Tone", False),
+            PromptQuestion("party_level", "Party level", False),
+            PromptQuestion("system", "System", False),
+            PromptQuestion("additional_constraints", "Additional constraints", False),
+        ],
+    )
+    custom_prompt = ScenarioPrompt.new(
+        "Custom Scenario",
+        "Custom prompt that happens to use legacy-style optional questions.",
+        "Generic RPG",
+        "Write {scenario_type} {tone}",
+        [PromptQuestion("scenario_type", "Type"), PromptQuestion("tone", "Tone", False)],
+    )
+    library.save([legacy_prompt, custom_prompt])
+
+    loaded = library.load()
+
+    assert [question.key for question in loaded[0].questions] == ["scenario_type", "theme", "location"]
+    assert [question.key for question in loaded[1].questions] == ["scenario_type", "tone"]
+
+    reloaded = PromptLibrary(tmp_path / "prompts.json").load()
+    assert [question.key for question in reloaded[0].questions] == ["scenario_type", "theme", "location"]
+
+
+def test_prompt_library_migrates_builtin_default_by_known_metadata(tmp_path):
+    library = PromptLibrary(tmp_path / "prompts.json")
+    legacy_prompt = ScenarioPrompt.new(
+        "Renamed Default",
+        "Industry-style prompt for a complete, playable RPG scenario.",
+        "Generic RPG",
+        "Write {scenario_type} {theme} {location}",
+        [
+            PromptQuestion("scenario_type", "Type"),
+            PromptQuestion("additional_constraints", "Additional constraints", False),
+        ],
+    )
+    library.save([legacy_prompt])
+
+    loaded = library.load()
+
+    assert [question.key for question in loaded[0].questions] == ["scenario_type", "theme", "location"]
+
+
 def test_prompt_library_rejects_invalid_json_import(tmp_path):
     library = PromptLibrary(tmp_path / "prompts.json")
     bad = tmp_path / "bad.json"
