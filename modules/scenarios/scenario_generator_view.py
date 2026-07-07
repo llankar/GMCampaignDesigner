@@ -12,7 +12,11 @@ from campaign_generator import GENERATOR_FUNCTIONS, export_to_docx
 from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.helpers.logging_helper import log_exception, log_module_import
-from modules.scenarios.ai_prompt_library import PromptLibrary, ScenarioPrompt
+from modules.scenarios.ai_prompt_library import (
+    PromptLibrary,
+    PromptQuestion,
+    ScenarioPrompt,
+)
 from modules.scenarios.ai_scenario_generator import (
     AIGenerationError,
     AIScenarioGenerator,
@@ -63,27 +67,61 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         top = ctk.CTkFrame(self)
         top.pack(fill="x", padx=10, pady=10)
         ctk.CTkLabel(top, text="Mode:").pack(side="left")
-        ctk.CTkOptionMenu(top, values=["Random generator", "AI prompt generator"], variable=self.mode_var, command=self._on_mode_changed).pack(side="left", padx=5)
+        ctk.CTkOptionMenu(
+            top,
+            values=["Random generator", "AI prompt generator"],
+            variable=self.mode_var,
+            command=self._on_mode_changed,
+        ).pack(side="left", padx=5)
 
         self.random_frame = ctk.CTkFrame(self)
         ctk.CTkLabel(self.random_frame, text="Setting:").pack(side="left")
-        ctk.CTkOptionMenu(self.random_frame, values=list(GENERATOR_FUNCTIONS.keys()), variable=self.setting_var).pack(side="left", padx=5)
-        ctk.CTkButton(self.random_frame, text="Generate", command=self.generate_campaign).pack(side="left", padx=5)
+        ctk.CTkOptionMenu(
+            self.random_frame,
+            values=list(GENERATOR_FUNCTIONS.keys()),
+            variable=self.setting_var,
+        ).pack(side="left", padx=5)
+        ctk.CTkButton(
+            self.random_frame, text="Generate", command=self.generate_campaign
+        ).pack(side="left", padx=5)
 
         self.ai_frame = ctk.CTkFrame(self)
-        ctk.CTkLabel(self.ai_frame, text="Prompt:").grid(row=0, column=0, sticky="w", padx=6, pady=4)
-        self.prompt_menu = ctk.CTkOptionMenu(self.ai_frame, values=self._prompt_names(), variable=self.prompt_var, command=lambda _v: self._render_questions())
-        self.prompt_menu.grid(row=0, column=1, sticky="ew", padx=6, pady=4)
-        ctk.CTkButton(self.ai_frame, text="Manage Prompts", command=self._open_prompt_manager).grid(row=0, column=2, padx=6, pady=4)
-        ctk.CTkLabel(self.ai_frame, text="Question mode:").grid(row=0, column=3, sticky="w", padx=6, pady=4)
-        ctk.CTkOptionMenu(self.ai_frame, values=["Guided", "Advanced/manual"], variable=self.question_mode_var, command=lambda _v: self._render_questions()).grid(row=0, column=4, padx=6, pady=4)
+        ctk.CTkLabel(self.ai_frame, text="Prompt:").grid(
+            row=0, column=0, sticky="w", padx=8, pady=(8, 4)
+        )
+        self.prompt_menu = ctk.CTkOptionMenu(
+            self.ai_frame,
+            values=self._prompt_names(),
+            variable=self.prompt_var,
+            command=lambda _v: self._render_questions(),
+        )
+        self.prompt_menu.grid(row=0, column=1, sticky="ew", padx=8, pady=(8, 4))
+        ctk.CTkButton(
+            self.ai_frame, text="Manage Prompts", command=self._open_prompt_manager
+        ).grid(row=0, column=2, padx=8, pady=(8, 4))
+        ctk.CTkLabel(self.ai_frame, text="Question mode:").grid(
+            row=0, column=3, sticky="w", padx=8, pady=(8, 4)
+        )
+        ctk.CTkOptionMenu(
+            self.ai_frame,
+            values=["Guided", "Advanced/manual"],
+            variable=self.question_mode_var,
+            command=lambda _v: self._render_questions(),
+        ).grid(row=0, column=4, padx=8, pady=(8, 4))
         self.ai_frame.grid_columnconfigure(1, weight=1)
-        self.questions_frame = ctk.CTkFrame(self.ai_frame)
-        self.questions_frame.grid(row=1, column=0, columnspan=5, sticky="ew", padx=6, pady=6)
+        self.questions_frame = ctk.CTkFrame(
+            self.ai_frame, fg_color="#243447", corner_radius=12
+        )
+        self.questions_frame.grid(
+            row=1, column=0, columnspan=5, sticky="ew", padx=8, pady=(8, 10)
+        )
+        self.questions_frame.grid_columnconfigure(0, weight=1)
         self.questions_frame.grid_columnconfigure(1, weight=1)
         actions = ctk.CTkFrame(self.ai_frame)
-        actions.grid(row=2, column=0, columnspan=5, sticky="ew", padx=6, pady=6)
-        self.guided_back_btn = ctk.CTkButton(actions, text="Back", width=72, command=self._guided_back)
+        actions.grid(row=2, column=0, columnspan=5, sticky="ew", padx=8, pady=(0, 8))
+        self.guided_back_btn = ctk.CTkButton(
+            actions, text="Back", width=72, command=self._guided_back
+        )
         self.guided_back_btn.pack(side="left", padx=4)
         self.guided_primary_btn = ctk.CTkButton(
             actions,
@@ -94,7 +132,9 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             command=self._guided_primary_action,
         )
         self.guided_primary_btn.pack(side="left", padx=4)
-        self.generate_ai_btn = ctk.CTkButton(actions, text="Generate with AI", command=self.generate_with_ai)
+        self.generate_ai_btn = ctk.CTkButton(
+            actions, text="Generate with AI", command=self.generate_with_ai
+        )
         self.generate_ai_btn.pack(side="left", padx=4)
         self.progress_label = ctk.CTkLabel(actions, text="")
         self.progress_label.pack(side="left", padx=10)
@@ -106,10 +146,16 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         bottom = ctk.CTkFrame(self)
         bottom.pack(fill="x", padx=10, pady=(0, 10))
         ctk.CTkLabel(bottom, text="Title:").pack(side="left")
-        ctk.CTkEntry(bottom, textvariable=self.title_var).pack(side="left", padx=5, fill="x", expand=True)
-        self.export_btn = ctk.CTkButton(bottom, text="Export to DOCX", command=self.export_docx, state="disabled")
+        ctk.CTkEntry(bottom, textvariable=self.title_var).pack(
+            side="left", padx=5, fill="x", expand=True
+        )
+        self.export_btn = ctk.CTkButton(
+            bottom, text="Export to DOCX", command=self.export_docx, state="disabled"
+        )
         self.export_btn.pack(side="left", padx=5)
-        self.add_btn = ctk.CTkButton(bottom, text="Save to DB", command=self.add_to_db, state="disabled")
+        self.add_btn = ctk.CTkButton(
+            bottom, text="Save to DB", command=self.add_to_db, state="disabled"
+        )
         self.add_btn.pack(side="left", padx=5)
         self._render_questions()
 
@@ -117,7 +163,10 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         return [prompt.name for prompt in self.prompts] or [""]
 
     def _current_prompt(self) -> ScenarioPrompt | None:
-        return next((prompt for prompt in self.prompts if prompt.name == self.prompt_var.get()), None)
+        return next(
+            (prompt for prompt in self.prompts if prompt.name == self.prompt_var.get()),
+            None,
+        )
 
     def _on_mode_changed(self, _value: str) -> None:
         self.random_frame.pack_forget()
@@ -128,7 +177,9 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             self.random_frame.pack(fill="x", padx=10, pady=(0, 10))
 
     def _open_prompt_manager(self) -> None:
-        PromptLibraryDialog(self, self.prompt_library, on_change=self._reload_prompts_from_dialog)
+        PromptLibraryDialog(
+            self, self.prompt_library, on_change=self._reload_prompts_from_dialog
+        )
 
     def _reload_prompts_from_dialog(self) -> None:
         self._load_prompts()
@@ -143,31 +194,107 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         prompt = self._current_prompt()
         self.answer_vars = {}
         if not prompt:
-            ctk.CTkLabel(self.questions_frame, text="No prompt available. Use Manage Prompts to create one.").grid(row=0, column=0, sticky="w")
+            ctk.CTkLabel(
+                self.questions_frame,
+                text="No prompt available. Use Manage Prompts to create one.",
+                font=("Helvetica", 14, "bold"),
+            ).grid(row=0, column=0, sticky="w", padx=16, pady=16)
             self._show_manual_actions()
             return
         questions = prompt.questions
         if self.question_mode_var.get() == "Guided":
             self.guided_index = min(self.guided_index, max(len(questions) - 1, 0))
             if not questions:
-                ctk.CTkLabel(self.questions_frame, text="This prompt has no questions.").grid(row=0, column=0, sticky="w")
+                ctk.CTkLabel(
+                    self.questions_frame,
+                    text="This prompt has no questions.",
+                    font=("Helvetica", 14, "bold"),
+                ).grid(row=0, column=0, sticky="w", padx=16, pady=16)
                 self._show_manual_actions()
                 return
             question = questions[self.guided_index]
-            ctk.CTkLabel(self.questions_frame, text=f"Question {self.guided_index + 1}/{len(questions)}: {question.label}").grid(row=0, column=0, sticky="w", padx=6, pady=4)
-            var = tk.StringVar(value=self.guided_answers.get(question.key, question.default))
-            self.answer_vars[question.key] = var
-            entry = ctk.CTkEntry(self.questions_frame, textvariable=var)
-            entry.grid(row=1, column=0, sticky="ew", padx=6, pady=4)
-            entry.bind("<Return>", lambda _event: self._guided_primary_action())
+            self._render_guided_question_card(question, len(questions))
             self._update_guided_actions(prompt)
         else:
-            for row, question in enumerate(questions):
-                ctk.CTkLabel(self.questions_frame, text=question.label).grid(row=row, column=0, sticky="w", padx=6, pady=3)
-                var = tk.StringVar(value=self.guided_answers.get(question.key, question.default))
+            ctk.CTkLabel(
+                self.questions_frame,
+                text="Advanced answers",
+                font=("Helvetica", 16, "bold"),
+                anchor="w",
+            ).grid(row=0, column=0, columnspan=2, sticky="ew", padx=16, pady=(14, 8))
+            for row, question in enumerate(questions, start=1):
+                ctk.CTkLabel(self.questions_frame, text=question.label).grid(
+                    row=row, column=0, sticky="w", padx=16, pady=4
+                )
+                var = tk.StringVar(
+                    value=self.guided_answers.get(question.key, question.default)
+                )
                 self.answer_vars[question.key] = var
-                ctk.CTkEntry(self.questions_frame, textvariable=var).grid(row=row, column=1, sticky="ew", padx=6, pady=3)
+                ctk.CTkEntry(
+                    self.questions_frame,
+                    textvariable=var,
+                    placeholder_text=self._entry_placeholder(question),
+                ).grid(row=row, column=1, sticky="ew", padx=(8, 16), pady=4)
             self._show_manual_actions()
+
+    def _render_guided_question_card(
+        self, question: PromptQuestion, question_count: int
+    ) -> None:
+        """Render the active guided prompt question as a prominent card."""
+        ctk.CTkLabel(
+            self.questions_frame,
+            text=f"Step {self.guided_index + 1} of {question_count}",
+            text_color="#9fb3c8",
+            font=("Helvetica", 13, "bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="ew", padx=18, pady=(16, 4))
+        ctk.CTkLabel(
+            self.questions_frame,
+            text=question.label,
+            font=("Helvetica", 20, "bold"),
+            anchor="w",
+            justify="left",
+            wraplength=1100,
+        ).grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 8))
+        helper_text = self._question_helper_text()
+        if helper_text:
+            ctk.CTkLabel(
+                self.questions_frame,
+                text=helper_text,
+                text_color="#b8c7d9",
+                font=("Helvetica", 13),
+                anchor="w",
+                justify="left",
+                wraplength=1100,
+            ).grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 12))
+        var = tk.StringVar(
+            value=self.guided_answers.get(question.key, question.default)
+        )
+        self.answer_vars[question.key] = var
+        entry = ctk.CTkEntry(
+            self.questions_frame,
+            textvariable=var,
+            height=42,
+            font=("Helvetica", 15),
+            placeholder_text=self._entry_placeholder(question),
+        )
+        entry.grid(row=3, column=0, sticky="ew", padx=18, pady=(0, 18))
+        entry.bind("<Return>", lambda _event: self._guided_primary_action())
+        entry.focus_set()
+
+    def _question_helper_text(self) -> str:
+        """Return contextual helper text for the active guided question."""
+        if self.guided_index == 0:
+            return "Examples: medfan, sci-fi, modern, Star Wars, Dresden Files, Dragonlance"
+        return ""
+
+    def _entry_placeholder(self, question: PromptQuestion) -> str:
+        """Build a concise placeholder for scenario prompt answers."""
+        if question.default:
+            return question.default
+        if self.guided_index == 0 or question.key == "scenario_type":
+            return "e.g. medfan, sci-fi, modern, Star Wars..."
+        return "Type your answer here..."
 
     def _show_manual_actions(self) -> None:
         """Display the standalone AI generation action outside guided mode."""
@@ -178,14 +305,22 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     def _update_guided_actions(self, prompt: ScenarioPrompt) -> None:
         """Refresh guided navigation buttons for the active prompt/question."""
-        primary_text = "Write the scenario" if self.guided_index == len(prompt.questions) - 1 else "Continue"
+        primary_text = (
+            "Write the scenario"
+            if self.guided_index == len(prompt.questions) - 1
+            else "Continue"
+        )
         self.guided_primary_btn.configure(text=primary_text, state="normal")
         self.generate_ai_btn.pack_forget()
         if not self.guided_back_btn.winfo_ismapped():
             self.guided_back_btn.pack(side="left", padx=4, before=self.progress_label)
         if not self.guided_primary_btn.winfo_ismapped():
-            self.guided_primary_btn.pack(side="left", padx=4, before=self.progress_label)
-        self.guided_back_btn.configure(state="normal" if self.guided_index > 0 else "disabled")
+            self.guided_primary_btn.pack(
+                side="left", padx=4, before=self.progress_label
+            )
+        self.guided_back_btn.configure(
+            state="normal" if self.guided_index > 0 else "disabled"
+        )
 
     def _collect_answers(self) -> dict[str, str]:
         answers = dict(self.guided_answers)
@@ -228,8 +363,21 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         self._clear_results()
         for key, value in campaign.items():
             card = ctk.CTkFrame(self.results_frame, fg_color="#34495e", corner_radius=4)
-            title_lbl = ctk.CTkLabel(card, text=key, text_color="#ecf0f1", font=("Helvetica", 16, "bold"), anchor="w")
-            desc_lbl = ctk.CTkLabel(card, text=value, text_color="#bdc3c7", justify="left", wraplength=1580, font=("Helvetica", 14))
+            title_lbl = ctk.CTkLabel(
+                card,
+                text=key,
+                text_color="#ecf0f1",
+                font=("Helvetica", 16, "bold"),
+                anchor="w",
+            )
+            desc_lbl = ctk.CTkLabel(
+                card,
+                text=value,
+                text_color="#bdc3c7",
+                justify="left",
+                wraplength=1580,
+                font=("Helvetica", 14),
+            )
             title_lbl.pack(anchor="w", padx=8, pady=(4, 0))
             desc_lbl.pack(anchor="w", fill="x", padx=8, pady=(0, 6))
             card.pack(fill="x", expand=True, padx=5, pady=5)
@@ -245,11 +393,16 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         answers = self._collect_answers()
         missing = validate_required_answers(prompt, answers)
         if missing:
-            messagebox.showwarning("Missing Answers", "Please answer: " + ", ".join(missing))
+            messagebox.showwarning(
+                "Missing Answers", "Please answer: " + ", ".join(missing)
+            )
             return
         _final, unresolved = build_final_prompt(prompt, answers)
         if unresolved:
-            messagebox.showwarning("Placeholder Warning", "Unanswered placeholders: " + ", ".join(unresolved))
+            messagebox.showwarning(
+                "Placeholder Warning",
+                "Unanswered placeholders: " + ", ".join(unresolved),
+            )
         self.generate_ai_btn.configure(state="disabled")
         self.guided_primary_btn.configure(state="disabled")
         self.progress_label.configure(text="Generating with AI...")
@@ -309,11 +462,19 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         if not self.current_campaign and not self.current_ai_text:
             messagebox.showwarning("No Scenario", "Generate a scenario first.")
             return
-        filename = filedialog.asksaveasfilename(defaultextension=".docx", filetypes=[("Word Document", "*.docx")], title="Save Scenario")
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".docx",
+            filetypes=[("Word Document", "*.docx")],
+            title="Save Scenario",
+        )
         if not filename:
             return
         try:
-            payload = self._ai_export_payload(self._current_result_text()) if self.current_ai_text else self.current_campaign
+            payload = (
+                self._ai_export_payload(self._current_result_text())
+                if self.current_ai_text
+                else self.current_campaign
+            )
             export_to_docx(payload, filename)
         except Exception as exc:
             log_exception("Scenario DOCX export failed")
@@ -328,7 +489,9 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             return
         title = self.title_var.get().strip()
         if not title:
-            messagebox.showwarning("Missing Title", "Please provide a title for the scenario.")
+            messagebox.showwarning(
+                "Missing Title", "Please provide a title for the scenario."
+            )
             return
         if self.current_ai_text:
             text = self._current_result_text()
@@ -338,18 +501,42 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                 "Status": DEFAULT_SCENARIO_STATUS,
                 "Summary": str(parsed.get("Summary") or text),
                 "Secrets": str(parsed.get("Secrets") or ""),
-                "Places": parsed.get("Places") if isinstance(parsed.get("Places"), list) else [],
-                "NPCs": parsed.get("NPCs") if isinstance(parsed.get("NPCs"), list) else [],
-                "Objects": parsed.get("Objects") if isinstance(parsed.get("Objects"), list) else [],
+                "Places": (
+                    parsed.get("Places")
+                    if isinstance(parsed.get("Places"), list)
+                    else []
+                ),
+                "NPCs": (
+                    parsed.get("NPCs") if isinstance(parsed.get("NPCs"), list) else []
+                ),
+                "Objects": (
+                    parsed.get("Objects")
+                    if isinstance(parsed.get("Objects"), list)
+                    else []
+                ),
             }
         else:
             summary = "\n".join(f"{k}: {v}" for k, v in self.current_campaign.items())
-            scenario_entity = {"Title": title, "Status": DEFAULT_SCENARIO_STATUS, "Summary": summary, "Secrets": "", "Places": [], "NPCs": [], "Objects": []}
+            scenario_entity = {
+                "Title": title,
+                "Status": DEFAULT_SCENARIO_STATUS,
+                "Summary": summary,
+                "Secrets": "",
+                "Places": [],
+                "NPCs": [],
+                "Objects": [],
+            }
         try:
             wrapper = GenericModelWrapper("scenarios")
             existing = wrapper.load_items()
-            if any(str(s.get("Title", "")).strip().lower() == title.lower() for s in existing):
-                messagebox.showwarning("Duplicate Title", f"A scenario titled '{title}' already exists. Please rename it before saving.")
+            if any(
+                str(s.get("Title", "")).strip().lower() == title.lower()
+                for s in existing
+            ):
+                messagebox.showwarning(
+                    "Duplicate Title",
+                    f"A scenario titled '{title}' already exists. Please rename it before saving.",
+                )
                 return
             existing.append(scenario_entity)
             wrapper.save_items(existing)
