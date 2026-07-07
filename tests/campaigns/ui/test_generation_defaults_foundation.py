@@ -66,7 +66,13 @@ class _FakeTextBox:
 
 def test_build_arc_generation_foundation_includes_generation_defaults(monkeypatch):
     """Verify that build arc generation foundation includes generation defaults."""
-    monkeypatch.setattr(campaign_builder_wizard, "load_existing_entity_catalog", lambda _types: {"factions": ["Dawn Guard"]})
+    captured_catalog_args = {}
+
+    def _fake_load_existing_entity_catalog(_types, *, db_path=None):
+        captured_catalog_args["db_path"] = db_path
+        return {"factions": ["Dawn Guard"]}
+
+    monkeypatch.setattr(campaign_builder_wizard, "load_existing_entity_catalog", _fake_load_existing_entity_catalog)
 
     wizard = campaign_builder_wizard.CampaignBuilderWizard.__new__(campaign_builder_wizard.CampaignBuilderWizard)
     wizard.form_vars = {
@@ -81,6 +87,7 @@ def test_build_arc_generation_foundation_includes_generation_defaults(monkeypatc
     wizard.stakes_box = _FakeTextBox("Civil war")
     wizard.themes_box = _FakeTextBox("Trust\nLoyalty")
     wizard.notes_box = _FakeTextBox("Notes")
+    wizard.scenario_wrapper = SimpleNamespace(_db_path="/tmp/current-campaign.sqlite")
     wizard.generation_defaults = {
         "main_pc_factions": ["Dawn Guard"],
         "protected_factions": ["Cobalt Circle"],
@@ -92,3 +99,5 @@ def test_build_arc_generation_foundation_includes_generation_defaults(monkeypatc
 
     assert foundation["generation_defaults"]["main_pc_factions"] == ["Dawn Guard"]
     assert foundation["generation_defaults"]["allow_optional_conflicts"] is False
+    assert foundation["existing_entities"] == {"factions": ["Dawn Guard"]}
+    assert captured_catalog_args["db_path"] == "/tmp/current-campaign.sqlite"
