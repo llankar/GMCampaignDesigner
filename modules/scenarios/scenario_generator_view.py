@@ -83,10 +83,17 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         self.questions_frame.grid_columnconfigure(1, weight=1)
         actions = ctk.CTkFrame(self.ai_frame)
         actions.grid(row=2, column=0, columnspan=5, sticky="ew", padx=6, pady=6)
-        self.guided_back_btn = ctk.CTkButton(actions, text="Back", command=self._guided_back)
+        self.guided_back_btn = ctk.CTkButton(actions, text="Back", width=72, command=self._guided_back)
         self.guided_back_btn.pack(side="left", padx=4)
-        self.guided_next_btn = ctk.CTkButton(actions, text="Next", command=self._guided_next)
-        self.guided_next_btn.pack(side="left", padx=4)
+        self.guided_primary_btn = ctk.CTkButton(
+            actions,
+            text="Continue",
+            width=180,
+            height=36,
+            font=("Helvetica", 14, "bold"),
+            command=self._guided_primary_action,
+        )
+        self.guided_primary_btn.pack(side="left", padx=4)
         self.generate_ai_btn = ctk.CTkButton(actions, text="Generate with AI", command=self.generate_with_ai)
         self.generate_ai_btn.pack(side="left", padx=4)
         self.progress_label = ctk.CTkLabel(actions, text="")
@@ -137,24 +144,48 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         self.answer_vars = {}
         if not prompt:
             ctk.CTkLabel(self.questions_frame, text="No prompt available. Use Manage Prompts to create one.").grid(row=0, column=0, sticky="w")
+            self._show_manual_actions()
             return
         questions = prompt.questions
         if self.question_mode_var.get() == "Guided":
             self.guided_index = min(self.guided_index, max(len(questions) - 1, 0))
             if not questions:
                 ctk.CTkLabel(self.questions_frame, text="This prompt has no questions.").grid(row=0, column=0, sticky="w")
+                self._show_manual_actions()
                 return
             question = questions[self.guided_index]
             ctk.CTkLabel(self.questions_frame, text=f"Question {self.guided_index + 1}/{len(questions)}: {question.label}").grid(row=0, column=0, sticky="w", padx=6, pady=4)
             var = tk.StringVar(value=self.guided_answers.get(question.key, question.default))
             self.answer_vars[question.key] = var
-            ctk.CTkEntry(self.questions_frame, textvariable=var).grid(row=1, column=0, sticky="ew", padx=6, pady=4)
+            entry = ctk.CTkEntry(self.questions_frame, textvariable=var)
+            entry.grid(row=1, column=0, sticky="ew", padx=6, pady=4)
+            entry.bind("<Return>", lambda _event: self._guided_primary_action())
+            self._update_guided_actions(prompt)
         else:
             for row, question in enumerate(questions):
                 ctk.CTkLabel(self.questions_frame, text=question.label).grid(row=row, column=0, sticky="w", padx=6, pady=3)
                 var = tk.StringVar(value=self.guided_answers.get(question.key, question.default))
                 self.answer_vars[question.key] = var
                 ctk.CTkEntry(self.questions_frame, textvariable=var).grid(row=row, column=1, sticky="ew", padx=6, pady=3)
+            self._show_manual_actions()
+
+    def _show_manual_actions(self) -> None:
+        """Display the standalone AI generation action outside guided mode."""
+        self.guided_back_btn.pack_forget()
+        self.guided_primary_btn.pack_forget()
+        if not self.generate_ai_btn.winfo_ismapped():
+            self.generate_ai_btn.pack(side="left", padx=4, before=self.progress_label)
+
+    def _update_guided_actions(self, prompt: ScenarioPrompt) -> None:
+        """Refresh guided navigation buttons for the active prompt/question."""
+        primary_text = "Write the scenario" if self.guided_index == len(prompt.questions) - 1 else "Continue"
+        self.guided_primary_btn.configure(text=primary_text, state="normal")
+        self.generate_ai_btn.pack_forget()
+        if not self.guided_back_btn.winfo_ismapped():
+            self.guided_back_btn.pack(side="left", padx=4, before=self.progress_label)
+        if not self.guided_primary_btn.winfo_ismapped():
+            self.guided_primary_btn.pack(side="left", padx=4, before=self.progress_label)
+        self.guided_back_btn.configure(state="normal" if self.guided_index > 0 else "disabled")
 
     def _collect_answers(self) -> dict[str, str]:
         answers = dict(self.guided_answers)
@@ -162,7 +193,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             answers[key] = var.get().strip()
         return answers
 
-    def _guided_next(self) -> None:
+    def _guided_primary_action(self) -> None:
         prompt = self._current_prompt()
         if not prompt:
             return
@@ -170,6 +201,8 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         if self.guided_index < len(prompt.questions) - 1:
             self.guided_index += 1
             self._render_questions()
+            return
+        self.generate_with_ai()
 
     def _guided_back(self) -> None:
         self.guided_answers.update(self._collect_answers())
@@ -218,6 +251,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         if unresolved:
             messagebox.showwarning("Placeholder Warning", "Unanswered placeholders: " + ", ".join(unresolved))
         self.generate_ai_btn.configure(state="disabled")
+        self.guided_primary_btn.configure(state="disabled")
         self.progress_label.configure(text="Generating with AI...")
 
         def worker() -> None:
@@ -232,6 +266,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     def _on_ai_success(self, text: str) -> None:
         self.generate_ai_btn.configure(state="normal")
+        self.guided_primary_btn.configure(state="normal")
         self.progress_label.configure(text="")
         if not text.strip():
             messagebox.showerror("AI Error", "AI provider returned an empty scenario.")
@@ -250,6 +285,7 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     def _on_ai_error(self, exc: Exception) -> None:
         self.generate_ai_btn.configure(state="normal")
+        self.guided_primary_btn.configure(state="normal")
         self.progress_label.configure(text="")
         log_exception("AI scenario generation failed")
         if isinstance(exc, AIGenerationError):
