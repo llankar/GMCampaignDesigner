@@ -117,7 +117,16 @@ def build_final_prompt(prompt: ScenarioPrompt, answers: Mapping[str, str]) -> tu
     missing = [name for name in placeholders if not str(answers.get(name, "")).strip()]
     formatted = prompt.prompt_text.format_map(SafeFormatDict({k: str(v) for k, v in answers.items()}))
     answer_lines = [f"- {question.label} ({question.key}): {answers.get(question.key, question.default)}" for question in prompt.questions]
-    final = f"{formatted}\n\n# Collected answers\n" + "\n".join(answer_lines)
+    entity_schema_hint = (
+        "\n\n# Entity output requirements\n"
+        "When the scenario includes NPCs or Places, return them as structured JSON objects, "
+        "not just prose fragments. NPC objects should include Name, Role, Description, "
+        "Secret, Quote, RoleplayingCues, Personality, Motivation, Background, Traits, "
+        "Factions, Objects, Portrait when known. Place objects should include Name, "
+        "Description, NPCs, PlayerDisplay, Secrets, Portrait when known. The scenario's "
+        "NPCs and Places may still be concise, but descriptions must contain usable GM content.\n"
+    )
+    final = f"{formatted}\n\n# Collected answers\n" + "\n".join(answer_lines) + entity_schema_hint
     return final, missing
 
 
