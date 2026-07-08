@@ -27,6 +27,7 @@ from modules.scenarios.ai_scenario_generator import (
 from modules.scenarios.prompt_library_dialog import PromptLibraryDialog
 from modules.scenarios.services.generated_entity_persistence import (
     GeneratedScenarioEntityPersistence,
+    scenario_entity_names,
 )
 
 log_module_import(__name__)
@@ -527,14 +528,8 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                 "Status": DEFAULT_SCENARIO_STATUS,
                 "Summary": str(parsed.get("Summary") or text),
                 "Secrets": str(parsed.get("Secrets") or ""),
-                "Places": (
-                    parsed.get("Places")
-                    if isinstance(parsed.get("Places"), list)
-                    else []
-                ),
-                "NPCs": (
-                    parsed.get("NPCs") if isinstance(parsed.get("NPCs"), list) else []
-                ),
+                "Places": scenario_entity_names(parsed.get("Places")),
+                "NPCs": scenario_entity_names(parsed.get("NPCs")),
                 "Objects": (
                     parsed.get("Objects")
                     if isinstance(parsed.get("Objects"), list)
@@ -567,7 +562,8 @@ class ScenarioGeneratorView(ctk.CTkFrame):
             existing.append(scenario_entity)
             wrapper.save_items(existing)
             entity_result = GeneratedScenarioEntityPersistence().save_missing_entities(
-                scenario_entity
+                scenario_entity,
+                parsed if self.current_ai_text else None,
             )
         except Exception as exc:
             log_exception("Scenario database save failed")

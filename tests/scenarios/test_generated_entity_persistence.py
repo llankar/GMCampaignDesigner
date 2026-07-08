@@ -4,6 +4,7 @@ import sqlite3
 
 from modules.scenarios.services.generated_entity_persistence import (
     GeneratedScenarioEntityPersistence,
+    scenario_entity_names,
 )
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 
@@ -76,3 +77,56 @@ def test_save_missing_entities_keeps_existing_records(tmp_path):
     saved_mira = npc_wrapper.load_item_by_key("Captain Mira", key_field="Name")
     assert saved_mira["Description"] == "Existing details"
 
+
+def test_save_missing_entities_uses_structured_ai_payload(tmp_path):
+    """Verify generated entities reuse PDF-import-style rich records when available."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+    place_wrapper = GenericModelWrapper("places", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=place_wrapper,
+    )
+    parsed_payload = {
+        "Title": "Juliet's Fall",
+        "NPCs": [
+            {
+                "Name": "Juliet Vale",
+                "Role": "Fallen heir",
+                "Description": "A poised aristocrat hiding panic behind perfect etiquette.",
+                "Motivation": "Recover the ledger before her enemies do.",
+            }
+        ],
+        "Places": [
+            {
+                "Name": "Grand Ballroom",
+                "Description": "A rain-streaked event hall with cracked marble and champagne towers.",
+                "Secrets": "The balcony is rigged to collapse.",
+                "NPCs": ["Juliet Vale"],
+            }
+        ],
+    }
+
+    result = persistence.save_missing_entities(
+        {
+            "Title": "Juliet's Fall",
+            "NPCs": scenario_entity_names(parsed_payload["NPCs"]),
+            "Places": scenario_entity_names(parsed_payload["Places"]),
+        },
+        parsed_payload,
+    )
+
+    assert result.npcs_created == ["Juliet Vale"]
+    assert result.places_created == ["Grand Ballroom"]
+
+    saved_npc = npc_wrapper.load_item_by_key("Juliet Vale", key_field="Name")
+    saved_place = place_wrapper.load_item_by_key("Grand Ballroom", key_field="Name")
+
+    assert saved_npc["Role"] == "Fallen heir"
+    assert "poised aristocrat" in saved_npc["Description"]["text"]
+    assert "Recover the ledger" in saved_npc["Motivation"]["text"]
+    assert "rain-streaked event hall" in saved_place["Description"]["text"]
+    assert saved_place["NPCs"] == ["Juliet Vale"]
+    assert "balcony is rigged" in saved_place["Secrets"]["text"]
