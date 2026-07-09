@@ -9,8 +9,10 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from campaign_generator import GENERATOR_FUNCTIONS, export_to_docx
+from modules.ai.ollama_model_service import OllamaModelService
 from modules.campaigns.shared.arc_status import DEFAULT_SCENARIO_STATUS
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_module_import
 from modules.scenarios.ai_prompt_library import (
     PromptLibrary,
@@ -19,7 +21,9 @@ from modules.scenarios.ai_prompt_library import (
 )
 from modules.scenarios.ai_scenario_generator import (
     AIGenerationError,
+    AIProviderConfig,
     AIScenarioGenerator,
+    OllamaScenarioProvider,
     build_final_prompt,
     parse_generated_scenario,
     validate_required_answers,
@@ -45,6 +49,10 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         self.prompt_library = PromptLibrary()
         self.prompts: list[ScenarioPrompt] = []
         self.prompt_var = ctk.StringVar(value="")
+        self.ai_models = self._load_ai_models()
+        self.ai_model_var = ctk.StringVar(
+            value=self.ai_models[0] if self.ai_models else ""
+        )
         self.question_mode_var = ctk.StringVar(value="Guided")
         self.answer_vars: dict[str, tk.StringVar] = {}
         self.guided_index = 0
@@ -54,6 +62,22 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         self._load_prompts()
         self._build_widgets()
         self._on_mode_changed(self.mode_var.get())
+
+    def _load_ai_models(self) -> list[str]:
+        """Load available Ollama model names for the AI toolbar selector."""
+        config = AIProviderConfig.from_config()
+        fallback_model = (
+            ConfigHelper.get("LastUsed", "scenario_ai_model", fallback=config.model)
+            or config.model
+        ).strip()
+        try:
+            models = OllamaModelService(config.base_url).list_models()
+        except Exception:
+            log_exception("Failed to load Ollama model list")
+            models = []
+        if fallback_model and fallback_model not in models:
+            models.insert(0, fallback_model)
+        return models or [config.model]
 
     def _load_prompts(self) -> None:
         """Load prompt names for the selector."""
@@ -103,26 +127,35 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         ctk.CTkButton(
             self.ai_frame, text="Manage Prompts", command=self._open_prompt_manager
         ).grid(row=0, column=2, padx=8, pady=(8, 4))
-        ctk.CTkLabel(self.ai_frame, text="Question mode:").grid(
+        ctk.CTkLabel(self.ai_frame, text="Model:").grid(
             row=0, column=3, sticky="w", padx=8, pady=(8, 4)
+        )
+        ctk.CTkOptionMenu(
+            self.ai_frame,
+            values=self.ai_models,
+            variable=self.ai_model_var,
+        ).grid(row=0, column=4, sticky="ew", padx=8, pady=(8, 4))
+        ctk.CTkLabel(self.ai_frame, text="Question mode:").grid(
+            row=0, column=5, sticky="w", padx=8, pady=(8, 4)
         )
         ctk.CTkOptionMenu(
             self.ai_frame,
             values=["Guided", "Advanced/manual"],
             variable=self.question_mode_var,
             command=lambda _v: self._render_questions(),
-        ).grid(row=0, column=4, padx=8, pady=(8, 4))
+        ).grid(row=0, column=6, padx=8, pady=(8, 4))
         self.ai_frame.grid_columnconfigure(1, weight=1)
+        self.ai_frame.grid_columnconfigure(4, weight=0)
         self.questions_frame = ctk.CTkFrame(
             self.ai_frame, fg_color="#243447", corner_radius=12
         )
         self.questions_frame.grid(
-            row=1, column=0, columnspan=5, sticky="ew", padx=8, pady=(8, 10)
+            row=1, column=0, columnspan=7, sticky="ew", padx=8, pady=(8, 10)
         )
         self.questions_frame.grid_columnconfigure(0, weight=1)
         self.questions_frame.grid_columnconfigure(1, weight=1)
         actions = ctk.CTkFrame(self.ai_frame)
-        actions.grid(row=2, column=0, columnspan=5, sticky="ew", padx=8, pady=(0, 8))
+        actions.grid(row=2, column=0, columnspan=7, sticky="ew", padx=8, pady=(0, 8))
         self.guided_back_btn = ctk.CTkButton(
             actions, text="Back", width=72, command=self._guided_back
         )
@@ -426,13 +459,21 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                 "Placeholder Warning",
                 "Unanswered placeholders: " + ", ".join(unresolved),
             )
+        selected_model = self.ai_model_var.get().strip()
+        if not selected_model:
+            messagebox.showwarning("No AI Model", "Select an AI model first.")
+            return
+        provider_config = AIProviderConfig.from_config()
+        provider_config.model = selected_model
+        provider = OllamaScenarioProvider(provider_config)
+        ConfigHelper.set("LastUsed", "scenario_ai_model", selected_model)
         self.generate_ai_btn.configure(state="disabled")
         self.guided_primary_btn.configure(state="disabled")
         self.progress_label.configure(text="Generating with AI...")
 
         def worker() -> None:
             try:
-                result = AIScenarioGenerator().generate(prompt, answers)
+                result = AIScenarioGenerator(provider).generate(prompt, answers)
             except Exception as exc:
                 self.after(0, lambda exc=exc: self._on_ai_error(exc))
                 return
