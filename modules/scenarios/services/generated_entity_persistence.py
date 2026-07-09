@@ -8,6 +8,7 @@ from typing import Any, Iterable
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.importers.pdf_entity_importer import format_longtext_value, to_longtext
+from modules.pcs.character_creation.constants import SKILLS as SAVAGE_FATE_SKILLS
 from modules.scenarios.services.generated_entity_descriptions import (
     build_entity_description,
     build_npc_role,
@@ -260,21 +261,34 @@ def _split_atouts_section(text: str) -> tuple[str, str]:
 
 
 def _normalize_npc_traits(traits: Any) -> Any:
-    """Normalize AI-shaped NPC traits before rich-text formatting."""
+    """Normalize AI-shaped NPC traits before rich-text formatting.
+
+    Scenario AI sometimes uses the NPC ``Traits`` field for raw skills.  Savage
+    Fate NPC traits should instead be Atouts/advantages, so skill-only lists are
+    discarded rather than persisted as misleading bullets.
+    """
     if not isinstance(traits, list) or not traits:
         return traits
-    if not all(isinstance(item, dict) for item in traits):
-        return traits
 
-    atouts = _trait_dict_values(traits)
-    if not atouts:
-        return traits
-    return "Atouts:\n" + "\n".join(f"- {atout}" for atout in atouts)
+    if all(isinstance(item, dict) for item in traits):
+        atouts = _trait_dict_values(traits)
+        if not atouts:
+            return ""
+        return _format_atouts_block(atouts)
+
+    readable_traits = [
+        str(item).strip()
+        for item in traits
+        if item is not None and str(item).strip() and not _is_savage_fate_skill(item)
+    ]
+    if not readable_traits:
+        return ""
+    return readable_traits
 
 
 def _trait_dict_values(items: list[dict[str, Any]]) -> list[str]:
-    """Extract readable trait/advantage values from object-array AI output."""
-    supported_keys = ("atout", "asset", "advantage", "trait")
+    """Extract readable atout/advantage values from object-array AI output."""
+    supported_keys = ("atout", "asset", "advantage")
     values: list[str] = []
     for item in items:
         normalized_keys = {str(key).strip().casefold(): key for key in item}
@@ -289,13 +303,58 @@ def _trait_dict_values(items: list[dict[str, Any]]) -> list[str]:
             values.extend(
                 str(value).strip()
                 for value in source_value
-                if value is not None and str(value).strip()
+                if value is not None
+                and str(value).strip()
+                and not _is_savage_fate_skill(value)
             )
             continue
         text = str(source_value or "").strip()
-        if text:
+        if text and not _is_savage_fate_skill(text):
             values.append(text)
     return values
+
+
+_ENGLISH_SKILL_ALIASES = {
+    "academics",
+    "athletics",
+    "combat",
+    "command",
+    "craft",
+    "cunning",
+    "deceive",
+    "deception",
+    "diplomacy",
+    "drive",
+    "empathy",
+    "fight",
+    "investigation",
+    "lore",
+    "medicine",
+    "negotiation",
+    "notice",
+    "perception",
+    "persuasion",
+    "pilot",
+    "rapport",
+    "resources",
+    "shoot",
+    "stealth",
+    "survival",
+    "technology",
+    "will",
+}
+_SAVAGE_FATE_SKILL_NAMES = {skill.casefold() for skill in SAVAGE_FATE_SKILLS} | _ENGLISH_SKILL_ALIASES
+
+
+def _is_savage_fate_skill(value: Any) -> bool:
+    """Return whether a generated trait is actually a Savage Fate skill name."""
+    text = str(value or "").strip().casefold()
+    return text in _SAVAGE_FATE_SKILL_NAMES
+
+
+def _format_atouts_block(atouts: list[str]) -> str:
+    """Format extracted atouts as a dedicated Traits block."""
+    return "Atouts:\n" + "\n".join(f"- {atout}" for atout in atouts)
 
 
 def _merge_traits_with_atouts(traits: Any, atouts: str) -> str:

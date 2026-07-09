@@ -302,6 +302,7 @@ def test_save_missing_entities_normalizes_object_array_traits_as_atouts(tmp_path
                     {"Asset": "NanoChip"},
                     {"Advantage": "CombatTraining"},
                     {"Trait": "CoolUnderFire"},
+                    {"Advantage": "Diplomacy"},
                 ],
             }
         ],
@@ -317,5 +318,38 @@ def test_save_missing_entities_normalizes_object_array_traits_as_atouts(tmp_path
     assert "• RedHoloSight" in saved_npc["Traits"]["text"]
     assert "• NanoChip" in saved_npc["Traits"]["text"]
     assert "• CombatTraining" in saved_npc["Traits"]["text"]
-    assert "• CoolUnderFire" in saved_npc["Traits"]["text"]
+    assert "CoolUnderFire" not in saved_npc["Traits"]["text"]
+    assert "Diplomacy" not in saved_npc["Traits"]["text"]
     assert "Atout:" not in saved_npc["Traits"]["text"]
+
+
+def test_save_missing_entities_discards_skill_only_traits(tmp_path):
+    """Verify AI skill lists do not masquerade as Savage Fate Atouts."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=GenericModelWrapper("places", db_path=str(db_path)),
+    )
+    parsed_payload = {
+        "Title": "Court of Glass",
+        "NPCs": [
+            {
+                "Name": "Silas Wren",
+                "Traits": ["Cunning", "Negotiation", "Diplomacy"],
+            }
+        ],
+    }
+
+    persistence.save_missing_entities(
+        {"Title": "Court of Glass", "NPCs": ["Silas Wren"], "Places": []},
+        parsed_payload,
+    )
+
+    saved_npc = npc_wrapper.load_item_by_key("Silas Wren", key_field="Name")
+    assert saved_npc["Traits"]["text"] == ""
+    assert "Cunning" not in saved_npc["Traits"]["text"]
+    assert "Negotiation" not in saved_npc["Traits"]["text"]
+    assert "Diplomacy" not in saved_npc["Traits"]["text"]
