@@ -203,7 +203,9 @@ def _build_npc_record(
 ) -> dict[str, Any]:
     description = build_entity_description(data, scenario_source, "npc")
     description, description_atouts = _split_atouts_section(description)
-    traits = _merge_traits_with_atouts(data.get("Traits", ""), description_atouts)
+    traits = _merge_traits_with_atouts(
+        _normalize_npc_traits(data.get("Traits", "")), description_atouts
+    )
     return {
         "Name": str(data.get("Name") or data.get("Title") or "Unnamed").strip(),
         "Role": build_npc_role(data, description),
@@ -255,6 +257,45 @@ def _split_atouts_section(text: str) -> tuple[str, str]:
     description = source[: match.start()].rstrip()
     atouts = source[match.start() :].strip()
     return description, atouts
+
+
+def _normalize_npc_traits(traits: Any) -> Any:
+    """Normalize AI-shaped NPC traits before rich-text formatting."""
+    if not isinstance(traits, list) or not traits:
+        return traits
+    if not all(isinstance(item, dict) for item in traits):
+        return traits
+
+    atouts = _trait_dict_values(traits)
+    if not atouts:
+        return traits
+    return "Atouts:\n" + "\n".join(f"- {atout}" for atout in atouts)
+
+
+def _trait_dict_values(items: list[dict[str, Any]]) -> list[str]:
+    """Extract readable trait/advantage values from object-array AI output."""
+    supported_keys = ("atout", "asset", "advantage", "trait")
+    values: list[str] = []
+    for item in items:
+        normalized_keys = {str(key).strip().casefold(): key for key in item}
+        source_key = next(
+            (normalized_keys[key] for key in supported_keys if key in normalized_keys),
+            None,
+        )
+        if source_key is None:
+            continue
+        source_value = item.get(source_key)
+        if isinstance(source_value, list):
+            values.extend(
+                str(value).strip()
+                for value in source_value
+                if value is not None and str(value).strip()
+            )
+            continue
+        text = str(source_value or "").strip()
+        if text:
+            values.append(text)
+    return values
 
 
 def _merge_traits_with_atouts(traits: Any, atouts: str) -> str:
