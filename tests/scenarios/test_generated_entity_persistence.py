@@ -353,3 +353,70 @@ def test_save_missing_entities_discards_skill_only_traits(tmp_path):
     assert "Cunning" not in saved_npc["Traits"]["text"]
     assert "Negotiation" not in saved_npc["Traits"]["text"]
     assert "Diplomacy" not in saved_npc["Traits"]["text"]
+
+
+def test_scenario_entity_names_filters_malformed_tokens_and_normalizes_quotes():
+    """Verify persistence-side normalization prevents bogus entity records."""
+    assert scenario_entity_names(
+        [
+            "",
+            "```json",
+            "{",
+            "}",
+            "[",
+            "]",
+            "#",
+            '"""',
+            '"',
+            '"Name": "Lysa Vale",',
+            "NPCs:",
+            "Locations:",
+            "Secrets:",
+            "Lysa Vale",
+            "Agent Kira",
+            '"The Beast"',
+            "Lower East Side Warehouse District",
+        ]
+    ) == [
+        "Lysa Vale",
+        "Agent Kira",
+        "The Beast",
+        "Lower East Side Warehouse District",
+    ]
+
+
+def test_save_missing_entities_ignores_malformed_entity_names(tmp_path):
+    """Verify malformed parser output cannot create bogus NPC or place records."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+    place_wrapper = GenericModelWrapper("places", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=place_wrapper,
+    )
+
+    result = persistence.save_missing_entities(
+        {
+            "Title": "Bad Tokens",
+            "NPCs": [
+                "```json",
+                "{",
+                '"Name": "Lysa Vale",',
+                "Lysa Vale",
+                '"The Beast"',
+            ],
+            "Places": ["Locations:", "#", "Lower East Side Warehouse District"],
+        }
+    )
+
+    assert result.npcs_created == ["Lysa Vale", "The Beast"]
+    assert result.places_created == ["Lower East Side Warehouse District"]
+    assert {npc["Name"] for npc in npc_wrapper.load_items()} == {
+        "Lysa Vale",
+        "The Beast",
+    }
+    assert {place["Name"] for place in place_wrapper.load_items()} == {
+        "Lower East Side Warehouse District"
+    }
