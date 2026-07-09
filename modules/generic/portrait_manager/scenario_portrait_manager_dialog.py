@@ -7,6 +7,7 @@ from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageGrab
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import parse_portrait_value, primary_portrait, resolve_portrait_path
+from modules.helpers.template_loader import load_template
 from modules.ui.image_browser_dialog import ImageBrowserDialog
 from modules.ui.webview.pywebview_client import PyWebviewClient
 from modules.generic.portrait_manager.entity_portrait_actions import ScenarioPortraitEntity, campaign_relative_path, copy_portrait_to_campaign, missing_portrait_indices, portrait_status, set_entity_portraits
@@ -222,8 +223,21 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         if not entity:
             return
         from modules.generic.generic_editor_window import GenericEditorWindow
-        editor = GenericEditorWindow(self, entity.record, entity.wrapper, callback=lambda *_args: self._refresh_current())
+
+        try:
+            template = load_template(entity.entity_type)
+        except Exception as exc:
+            messagebox.showerror(
+                "Create Portrait",
+                f"Unable to load editor template for '{entity.entity_type}': {exc}",
+            )
+            return
+
+        editor = GenericEditorWindow(self, entity.record, template, entity.wrapper)
         editor.create_portrait_with_swarmui()
+        self.wait_window(editor)
+        if getattr(editor, "saved", False):
+            entity.wrapper.save_item(entity.record)
         self._refresh_current()
 
     def make_primary(self):
