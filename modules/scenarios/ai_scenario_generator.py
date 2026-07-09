@@ -26,6 +26,15 @@ class AIProviderConfig:
     model: str = "llama3.1"
     temperature: float = 0.7
     timeout: int = 120
+    max_tokens: int = 0
+
+    @staticmethod
+    def _parse_max_tokens(value: object) -> int:
+        """Safely parse the optional maximum token count."""
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            return 0
 
     @classmethod
     def from_config(cls) -> "AIProviderConfig":
@@ -35,6 +44,7 @@ class AIProviderConfig:
             model=ConfigHelper.get("AI", "model", fallback="llama3.1") or "llama3.1",
             temperature=float(ConfigHelper.get("AI", "temperature", fallback="0.7") or 0.7),
             timeout=int(float(ConfigHelper.get("AI", "timeout", fallback="120") or 120)),
+            max_tokens=cls._parse_max_tokens(ConfigHelper.get("AI", "max_tokens", fallback="0")),
         )
 
 
@@ -47,11 +57,15 @@ class OllamaScenarioProvider:
     def generate(self, prompt: str) -> str:
         """Send prompt to Ollama and return generated text."""
         url = f"{self.config.base_url}/api/chat"
+        options = {"temperature": self.config.temperature}
+        if self.config.max_tokens > 0:
+            options["num_predict"] = self.config.max_tokens
+
         payload = {
             "model": self.config.model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
-            "options": {"temperature": self.config.temperature},
+            "options": options,
         }
         request = urllib.request.Request(
             url,

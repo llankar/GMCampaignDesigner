@@ -11,7 +11,13 @@ from modules.scenarios.ai_prompt_library import (
     extract_placeholders,
     validate_prompt,
 )
-from modules.scenarios.ai_scenario_generator import build_final_prompt, parse_generated_scenario, validate_required_answers
+from modules.scenarios.ai_scenario_generator import (
+    AIProviderConfig,
+    OllamaScenarioProvider,
+    build_final_prompt,
+    parse_generated_scenario,
+    validate_required_answers,
+)
 
 
 def test_extract_placeholders_ignores_duplicates_and_invalid_format_parts():
@@ -226,3 +232,96 @@ def test_ollama_provider_reports_model_http_error(monkeypatch):
     assert "Ollama is reachable" in message
     assert "ollama pull gpt-oss:20b" in message
     assert "model" in message
+
+
+class _FakeOllamaResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def read(self):
+        return b'{"message": {"content": "Generated scenario"}}'
+
+
+def test_ollama_provider_sends_positive_max_tokens_as_num_predict(monkeypatch):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    captured_payloads = []
+    provider = OllamaScenarioProvider(AIProviderConfig(max_tokens=512))
+
+    def fake_urlopen(request, **_kwargs):
+        captured_payloads.append(generator.json.loads(request.data.decode("utf-8")))
+        return _FakeOllamaResponse()
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", fake_urlopen)
+
+    assert provider.generate("hello") == "Generated scenario"
+    assert captured_payloads[0]["options"]["num_predict"] == 512
+
+
+@pytest.mark.parametrize("max_tokens", [0, -25])
+def test_ollama_provider_omits_non_positive_max_tokens(monkeypatch, max_tokens):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    captured_payloads = []
+    provider = OllamaScenarioProvider(AIProviderConfig(max_tokens=max_tokens))
+
+    def fake_urlopen(request, **_kwargs):
+        captured_payloads.append(generator.json.loads(request.data.decode("utf-8")))
+        return _FakeOllamaResponse()
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", fake_urlopen)
+
+    assert provider.generate("hello") == "Generated scenario"
+    assert "num_predict" not in captured_payloads[0]["options"]
+
+
+def test_ai_provider_config_defaults_invalid_max_tokens_to_zero(monkeypatch):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    def fake_get(_section, key, fallback=None):
+        values = {
+            "base_url": "http://example.test/",
+            "model": "test-model",
+            "temperature": "0.3",
+            "timeout": "10",
+            "max_tokens": "not-an-int",
+        }
+        return values.get(key, fallback)
+
+    monkeypatch.setattr(generator.ConfigHelper, "get", fake_get)
+
+    config = AIProviderConfig.from_config()
+
+    assert config.max_tokens == 0
+
+
+def test_ollama_provider_generates_with_invalid_configured_max_tokens(monkeypatch):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    captured_payloads = []
+
+    def fake_get(_section, key, fallback=None):
+        values = {
+            "base_url": "http://example.test/",
+            "model": "test-model",
+            "temperature": "0.3",
+            "timeout": "10",
+            "max_tokens": "invalid",
+        }
+        return values.get(key, fallback)
+
+    def fake_urlopen(request, **_kwargs):
+        captured_payloads.append(generator.json.loads(request.data.decode("utf-8")))
+        return _FakeOllamaResponse()
+
+    monkeypatch.setattr(generator.ConfigHelper, "get", fake_get)
+    monkeypatch.setattr(generator.urllib.request, "urlopen", fake_urlopen)
+
+    provider = OllamaScenarioProvider()
+
+    assert provider.generate("hello") == "Generated scenario"
+    assert provider.config.max_tokens == 0
+    assert "num_predict" not in captured_payloads[0]["options"]
