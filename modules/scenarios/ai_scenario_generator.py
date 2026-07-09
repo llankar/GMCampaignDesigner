@@ -27,6 +27,7 @@ class AIProviderConfig:
     temperature: float = 0.7
     timeout: int = 120
     max_tokens: int = 0
+    stream: bool = True
 
     @staticmethod
     def _parse_max_tokens(value: object) -> int:
@@ -45,6 +46,7 @@ class AIProviderConfig:
             temperature=float(ConfigHelper.get("AI", "temperature", fallback="0.7") or 0.7),
             timeout=int(float(ConfigHelper.get("AI", "timeout", fallback="120") or 120)),
             max_tokens=cls._parse_max_tokens(ConfigHelper.get("AI", "max_tokens", fallback="0")),
+            stream=ConfigHelper.getboolean("AI", "stream", fallback=True),
         )
 
 
@@ -64,7 +66,7 @@ class OllamaScenarioProvider:
         payload = {
             "model": self.config.model,
             "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
+            "stream": self.config.stream,
             "options": options,
         }
         request = urllib.request.Request(
@@ -75,7 +77,7 @@ class OllamaScenarioProvider:
         )
         try:
             with urllib.request.urlopen(request, timeout=self.config.timeout) as response:
-                data = json.loads(response.read().decode("utf-8"))
+                content = self._read_streaming_response(response) if self.config.stream else self._read_response(response)
         except urllib.error.HTTPError as exc:
             raise AIGenerationError(self._format_http_error(exc)) from exc
         except (TimeoutError, socket.timeout) as exc:
@@ -90,12 +92,32 @@ class OllamaScenarioProvider:
             ) from exc
         except json.JSONDecodeError as exc:
             raise AIGenerationError("AI provider returned invalid JSON.") from exc
-        message = data.get("message", {}) if isinstance(data, dict) else {}
-        content = str(message.get("content") or data.get("response") or "").strip()
         if not content:
             raise AIGenerationError("AI provider returned an empty scenario.")
         return content
 
+    @staticmethod
+    def _read_response(response) -> str:
+        """Read one non-streaming Ollama JSON response."""
+        data = json.loads(response.read().decode("utf-8"))
+        message = data.get("message", {}) if isinstance(data, dict) else {}
+        return str(message.get("content") or data.get("response") or "").strip()
+
+    @staticmethod
+    def _read_streaming_response(response) -> str:
+        """Read newline-delimited Ollama JSON chunks and stitch content fragments."""
+        fragments: list[str] = []
+        for raw_line in response:
+            line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else str(raw_line)
+            line = line.strip()
+            if not line:
+                continue
+            data = json.loads(line)
+            message = data.get("message", {}) if isinstance(data, dict) else {}
+            fragment = message.get("content")
+            if fragment:
+                fragments.append(str(fragment))
+        return "".join(fragments).strip()
 
     def _format_http_error(self, exc: urllib.error.HTTPError) -> str:
         """Return an actionable message for Ollama HTTP errors."""
