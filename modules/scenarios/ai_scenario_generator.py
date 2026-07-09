@@ -64,7 +64,13 @@ class OllamaScenarioProvider:
                 data = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             raise AIGenerationError(self._format_http_error(exc)) from exc
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+        except (TimeoutError, socket.timeout) as exc:
+            raise AIGenerationError(
+                f"AI provider at {self.config.base_url} did not answer within {self.config.timeout} seconds. "
+                "Ollama may still be running, but the response is too long or the model is too slow. "
+                "Increase [AI] timeout or reduce the requested output."
+            ) from exc
+        except urllib.error.URLError as exc:
             raise AIGenerationError(
                 f"Cannot reach AI provider at {self.config.base_url}. Make sure Ollama is running and reachable from this application."
             ) from exc

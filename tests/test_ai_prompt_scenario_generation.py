@@ -178,6 +178,28 @@ def test_ollama_provider_reports_unreachable_provider(monkeypatch):
     assert "model" not in str(excinfo.value).lower()
 
 
+def test_ollama_provider_reports_socket_timeout_as_timeout(monkeypatch):
+    import socket
+
+    from modules.scenarios import ai_scenario_generator as generator
+
+    provider = generator.OllamaScenarioProvider(
+        generator.AIProviderConfig(base_url="http://127.0.0.1:11434", model="gpt-oss:20b", timeout=5)
+    )
+
+    def raise_socket_timeout(*_args, **_kwargs):
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", raise_socket_timeout)
+
+    with pytest.raises(generator.AIGenerationError) as excinfo:
+        provider.generate("hello")
+
+    message = str(excinfo.value)
+    assert "did not answer within 5 seconds" in message
+    assert "timeout" in message
+    assert "Cannot reach AI provider" not in message
+
 def test_ollama_provider_reports_model_http_error(monkeypatch):
     from io import BytesIO
     from modules.scenarios import ai_scenario_generator as generator
