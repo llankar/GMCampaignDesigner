@@ -249,3 +249,73 @@ def test_save_missing_entities_formats_npc_longtext_lists(tmp_path):
     assert "• Former courier" in saved_npc["Background"]["text"]
     assert "• Quick thinker" in saved_npc["Traits"]["text"]
     assert '"Goal"' not in saved_npc["Motivation"]["text"]
+
+
+def test_save_missing_entities_keeps_string_list_traits_readable(tmp_path):
+    """Verify string-list Traits remain readable after NPC persistence."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=GenericModelWrapper("places", db_path=str(db_path)),
+    )
+    parsed_payload = {
+        "Title": "Chrome Ghosts",
+        "NPCs": [
+            {
+                "Name": "Vera Coil",
+                "Traits": ["RedHoloSight", "NanoChip", "CombatTraining"],
+            }
+        ],
+    }
+
+    persistence.save_missing_entities(
+        {"Title": "Chrome Ghosts", "NPCs": ["Vera Coil"], "Places": []},
+        parsed_payload,
+    )
+
+    saved_npc = npc_wrapper.load_item_by_key("Vera Coil", key_field="Name")
+    assert "• RedHoloSight" in saved_npc["Traits"]["text"]
+    assert "• NanoChip" in saved_npc["Traits"]["text"]
+    assert "• CombatTraining" in saved_npc["Traits"]["text"]
+
+
+def test_save_missing_entities_normalizes_object_array_traits_as_atouts(tmp_path):
+    """Verify object-array AI advantages are normalized into an Atouts block."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=GenericModelWrapper("places", db_path=str(db_path)),
+    )
+    parsed_payload = {
+        "Title": "Chrome Ghosts",
+        "NPCs": [
+            {
+                "Name": "Sable Nyx",
+                "Traits": [
+                    {"Atout": "RedHoloSight"},
+                    {"Asset": "NanoChip"},
+                    {"Advantage": "CombatTraining"},
+                    {"Trait": "CoolUnderFire"},
+                ],
+            }
+        ],
+    }
+
+    persistence.save_missing_entities(
+        {"Title": "Chrome Ghosts", "NPCs": ["Sable Nyx"], "Places": []},
+        parsed_payload,
+    )
+
+    saved_npc = npc_wrapper.load_item_by_key("Sable Nyx", key_field="Name")
+    assert "Atouts:" in saved_npc["Traits"]["text"]
+    assert "• RedHoloSight" in saved_npc["Traits"]["text"]
+    assert "• NanoChip" in saved_npc["Traits"]["text"]
+    assert "• CombatTraining" in saved_npc["Traits"]["text"]
+    assert "• CoolUnderFire" in saved_npc["Traits"]["text"]
+    assert "Atout:" not in saved_npc["Traits"]["text"]
