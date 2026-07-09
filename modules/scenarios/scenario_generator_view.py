@@ -61,23 +61,44 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         self.current_ai_text = ""
         self._load_prompts()
         self._build_widgets()
+        self._start_ai_model_discovery()
         self._on_mode_changed(self.mode_var.get())
 
     def _load_ai_models(self) -> list[str]:
-        """Load available Ollama model names for the AI toolbar selector."""
+        """Return the configured AI model without blocking on Ollama discovery."""
         config = AIProviderConfig.from_config()
         fallback_model = (
             ConfigHelper.get("LastUsed", "scenario_ai_model", fallback=config.model)
             or config.model
         ).strip()
-        try:
-            models = OllamaModelService(config.base_url).list_models()
-        except Exception:
-            log_exception("Failed to load Ollama model list")
-            models = []
-        if fallback_model and fallback_model not in models:
-            models.insert(0, fallback_model)
-        return models or [config.model]
+        return [fallback_model or config.model]
+
+    def _start_ai_model_discovery(self) -> None:
+        """Discover Ollama models in the background and refresh the selector."""
+        config = AIProviderConfig.from_config()
+
+        def worker() -> None:
+            try:
+                models = OllamaModelService(config.base_url).list_models()
+            except Exception:
+                log_exception("Failed to load Ollama model list")
+                return
+            self.after(0, lambda: self._update_ai_model_options(models))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _update_ai_model_options(self, models: list[str]) -> None:
+        """Apply discovered model names to the AI selector on the Tk thread."""
+        discovered_models = [model for model in models if model]
+        if not discovered_models:
+            return
+        current_model = self.ai_model_var.get().strip()
+        selected_model = (
+            current_model if current_model in discovered_models else discovered_models[0]
+        )
+        self.ai_models = discovered_models
+        self.ai_model_menu.configure(values=self.ai_models)
+        self.ai_model_var.set(selected_model)
 
     def _load_prompts(self) -> None:
         """Load prompt names for the selector."""
@@ -130,11 +151,12 @@ class ScenarioGeneratorView(ctk.CTkFrame):
         ctk.CTkLabel(self.ai_frame, text="Model:").grid(
             row=0, column=3, sticky="w", padx=8, pady=(8, 4)
         )
-        ctk.CTkOptionMenu(
+        self.ai_model_menu = ctk.CTkOptionMenu(
             self.ai_frame,
             values=self.ai_models,
             variable=self.ai_model_var,
-        ).grid(row=0, column=4, sticky="ew", padx=8, pady=(8, 4))
+        )
+        self.ai_model_menu.grid(row=0, column=4, sticky="ew", padx=8, pady=(8, 4))
         ctk.CTkLabel(self.ai_frame, text="Question mode:").grid(
             row=0, column=5, sticky="w", padx=8, pady=(8, 4)
         )
