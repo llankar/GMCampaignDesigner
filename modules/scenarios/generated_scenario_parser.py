@@ -6,6 +6,10 @@ import json
 import re
 from typing import Any
 
+from modules.scenarios.services.generated_entity_name_validation import (
+    normalize_generated_entity_name,
+)
+
 _ENTITY_FIELDS = (
     "NPCs",
     "Places",
@@ -198,12 +202,13 @@ def _parse_entity_json_records(raw_json: str) -> list[dict[str, Any]]:
     for item in parsed:
         if not isinstance(item, dict):
             continue
-        name = item.get("Name") or item.get("Title") or item.get("name") or item.get("title")
-        if not str(name or "").strip():
+        name = normalize_generated_entity_name(
+            item.get("Name") or item.get("Title") or item.get("name") or item.get("title")
+        )
+        if not name:
             continue
         record = {str(key): value for key, value in item.items()}
-        if not record.get("Name"):
-            record["Name"] = str(name).strip()
+        record["Name"] = name
         records.append(record)
     return records
 
@@ -326,7 +331,7 @@ def _entity_records_from_value(value: Any) -> list[dict[str, Any]]:
         if isinstance(item, dict):
             records.extend(_parse_entity_json_records(json.dumps(item)))
         else:
-            name = str(item or "").strip()
+            name = normalize_generated_entity_name(item)
             if name:
                 records.append({"Name": name})
     return _dedupe_entity_records(records)
@@ -363,7 +368,7 @@ def _coerce_names(value: Any) -> list[str]:
 def _dedupe(values) -> list[str]:
     result: list[str] = []
     for value in values:
-        text = str(value).strip()
+        text = normalize_generated_entity_name(value)
         if text and text not in result:
             result.append(text)
     return result

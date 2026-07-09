@@ -14,6 +14,9 @@ from modules.scenarios.services.generated_entity_descriptions import (
     build_npc_role,
     linked_npcs_for_place,
 )
+from modules.scenarios.services.generated_entity_name_validation import (
+    normalize_generated_entity_name,
+)
 
 
 @dataclass(frozen=True)
@@ -155,9 +158,11 @@ def _entity_records(value: Any) -> list[dict[str, Any]]:
             or value.get("title")
         )
         record = {str(k): v for k, v in value.items()}
-        if name and not record.get("Name"):
-            record["Name"] = name
-        return [record] if record.get("Name") else []
+        normalized_name = normalize_generated_entity_name(name)
+        if not normalized_name:
+            return []
+        record["Name"] = normalized_name
+        return [record]
     if isinstance(value, str):
         values: Iterable[Any] = value.split(",")
     elif isinstance(value, (list, tuple, set)):
@@ -170,7 +175,7 @@ def _entity_records(value: Any) -> list[dict[str, Any]]:
         if isinstance(item, dict):
             records.extend(_entity_records(item))
             continue
-        name = str(item or "").strip()
+        name = normalize_generated_entity_name(item)
         if name:
             records.append({"Name": name})
     return _dedupe_records(records)
@@ -178,9 +183,9 @@ def _entity_records(value: Any) -> list[dict[str, Any]]:
 
 def _entity_names(records: list[dict[str, Any]]) -> list[str]:
     return [
-        str(record.get("Name") or "").strip()
+        name
         for record in records
-        if str(record.get("Name") or "").strip()
+        if (name := normalize_generated_entity_name(record.get("Name")))
     ]
 
 
@@ -188,12 +193,14 @@ def _dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     seen: set[str] = set()
     for record in records:
-        name = str(record.get("Name") or "").strip()
+        name = normalize_generated_entity_name(record.get("Name"))
         key = name.casefold()
         if not name or key in seen:
             continue
         seen.add(key)
-        result.append(record)
+        normalized_record = dict(record)
+        normalized_record["Name"] = name
+        result.append(normalized_record)
     return result
 
 

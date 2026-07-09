@@ -110,3 +110,31 @@ The crystal comet falls tonight.
     ]
     assert parsed["NPCs"] == ["Mira Dawn", "Old Fen", "Captain Rusk", "Sable Choir"]
     assert parsed["Places"] == ["Starfall Meadow", "Watchtower Ruins", "Moonstone Vault"]
+
+
+def test_entity_name_normalization_filters_malformed_tokens_and_keeps_valid_names():
+    """Malformed generated entity tokens should not leak into scenario links."""
+    parsed = parse_markdown_scenario(
+        '''
+NPCs:
+- ```json
+- {
+- "Name": "Lysa Vale",
+- NPCs:
+- Lysa Vale
+- Agent Kira
+- "The Beast"
+
+Locations:
+- }
+- [
+- Locations:
+- Lower East Side Warehouse District
+- #
+- "
+- """
+'''
+    )
+
+    assert parsed["NPCs"] == ["Lysa Vale", "Agent Kira", "The Beast"]
+    assert parsed["Places"] == ["Lower East Side Warehouse District"]
