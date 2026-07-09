@@ -130,3 +130,49 @@ def test_save_missing_entities_uses_structured_ai_payload(tmp_path):
     assert "rain-streaked event hall" in saved_place["Description"]["text"]
     assert saved_place["NPCs"] == ["Juliet Vale"]
     assert "balcony is rigged" in saved_place["Secrets"]["text"]
+
+
+def test_save_missing_entities_uses_scene_text_instead_of_generic_fallback(tmp_path):
+    """Verify bare generated entities are enriched from generated scene text."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+    place_wrapper = GenericModelWrapper("places", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=place_wrapper,
+    )
+    parsed_payload = {
+        "Title": "Death in Love",
+        "Summary": "A doomed wedding hides a murder pact.",
+        "NPCs": ["Juliet Vale"],
+        "Places": ["Grand Ballroom"],
+        "Scenes": [
+            {
+                "Title": "The Poisoned Toast",
+                "Text": "Juliet Vale trembles while accusing the masked violinist. The Grand Ballroom erupts as guests notice the poisoned glass.",
+                "NPCs": ["Juliet Vale"],
+                "Places": ["Grand Ballroom"],
+            }
+        ],
+    }
+
+    persistence.save_missing_entities(
+        {
+            "Title": "Death in Love",
+            "NPCs": scenario_entity_names(parsed_payload["NPCs"]),
+            "Places": scenario_entity_names(parsed_payload["Places"]),
+            "Scenes": parsed_payload["Scenes"],
+        },
+        parsed_payload,
+    )
+
+    saved_npc = npc_wrapper.load_item_by_key("Juliet Vale", key_field="Name")
+    saved_place = place_wrapper.load_item_by_key("Grand Ballroom", key_field="Name")
+
+    assert "Generated from AI scenario" not in saved_npc["Description"]["text"]
+    assert "Generated from AI scenario" not in saved_place["Description"]["text"]
+    assert saved_npc["Role"] != "Scenario NPC"
+    assert "Poisoned Toast" in saved_npc["Description"]["text"]
+    assert "poisoned glass" in saved_place["Description"]["text"]
