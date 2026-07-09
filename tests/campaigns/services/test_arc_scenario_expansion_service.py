@@ -795,3 +795,72 @@ def test_arc_scenario_expansion_accepts_json_string_created_records():
             "Description": "A labyrinth of humming servers.",
         }
     ]
+
+
+def test_arc_scenario_expansion_replaces_scene_notes_in_created_entity_descriptions():
+    """Verify created entity descriptions are image-ready, not scene bookkeeping."""
+    ai_client = _FakeAIClient(
+        """
+        {
+          "arcs": [
+            {
+              "arc_name": "Love and Cure",
+              "scenarios": [
+                {
+                  "Title": "Core of the Starvers",
+                  "Summary": "The heroes cross a starving biotech city to rescue two lovers and decide whether the AI cure should survive.",
+                  "Secrets": "The cure is also a bio-weapon.",
+                  "Scenes": [
+                    {"Title": "Ambush Rescue", "Objective": "Rescue the lovers", "Setup": "Starvers attack a broken tram station", "Challenge": "Fight through panic", "Stakes": "The cure sample is lost", "Twists": "The attackers are infected", "GMNotes": "Keep motion frantic", "Outcome": "The lovers reveal the AI core location", "Entities": {"Places": ["Broken Tram Station"], "NPCs": ["Elian Voss"], "Villains": ["AI Core"], "Factions": ["Starvers"]}},
+                    {"Title": "Hidden Cure", "Objective": "Reach the lab", "Setup": "A glass clinic glows under emergency lights", "Challenge": "Bypass quarantines", "Stakes": "The bio-weapon spreads", "Twists": "The cure needs a host", "GMNotes": "Make choices costly", "Outcome": "The core opens", "Entities": {"Places": ["Broken Tram Station"], "NPCs": ["Elian Voss"], "Villains": ["AI Core"], "Factions": ["Starvers"]}},
+                    {"Title": "AI Heart", "Objective": "Decide fate of love and cure", "Setup": "The AI core hangs in a cathedral of cables", "Challenge": "Negotiate with the machine", "Stakes": "Love or the cure may die", "Twists": "The lovers can merge with it", "GMNotes": "Offer three endings", "Outcome": "The city changes forever", "Entities": {"Places": ["Broken Tram Station"], "NPCs": ["Elian Voss"], "Villains": ["AI Core"], "Factions": ["Starvers"]}}
+                  ],
+                  "Places": ["Broken Tram Station"],
+                  "NPCs": ["Elian Voss"],
+                  "Villains": ["AI Core"],
+                  "Creatures": [],
+                  "Factions": ["Starvers"],
+                  "Objects": [],
+                  "EntityCreations": {
+                    "villains": [{"Name": "AI Core", "Description": "Scene 3: Purpose: Confront the AI core; decide fate of love and cure."}],
+                    "factions": [{"Name": "Starvers", "Description": "A desperate infected mob with ritual scars, torn respirators, and hungry luminous eyes."}],
+                    "places": [{"Name": "Broken Tram Station", "Description": "Scene 2: Purpose: Intervene in a Starver ambush; rescue the lovers.\\nAtouts: Chaos, Survival Instinct, Hidden Cure, Bio-weapon, AI Control."}],
+                    "npcs": [{"Name": "Elian Voss", "Description": "Scene 3: Purpose: Confront the AI core; decide fate of love and cure."}],
+                    "creatures": []
+                  }
+                },
+                {
+                  "Title": "Cure Aftermath",
+                  "Summary": "The survivors defend the new cure from raiders.",
+                  "Secrets": "A faction wants to corrupt it.",
+                  "Scenes": ["Guard the clinic", "Expose the saboteur", "Choose who receives the first dose"],
+                  "Places": ["Broken Tram Station"],
+                  "NPCs": ["Elian Voss"],
+                  "Villains": ["AI Core"],
+                  "Creatures": [],
+                  "Factions": ["Starvers"],
+                  "Objects": []
+                }
+              ]
+            }
+          ]
+        }
+        """
+    )
+    service = ArcScenarioExpansionService(ai_client)
+
+    result = service.generate_scenarios(
+        {
+            "name": "Biotech Hearts",
+            "existing_entities": {"villains": [], "factions": [], "places": [], "npcs": [], "creatures": []},
+        },
+        [{"name": "Love and Cure", "scenarios": ["The First Hunger"]}],
+    )
+
+    creations = result["arcs"][0]["scenarios"][0]["EntityCreations"]
+    for entity_type in ("villains", "places", "npcs"):
+        description = creations[entity_type][0]["Description"]
+        assert "Image-ready description" in description
+        assert "Purpose:" not in description
+        assert "Atouts:" not in description
+        assert len(description) > 250
