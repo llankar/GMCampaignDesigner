@@ -307,6 +307,13 @@ class ArcScenarioExpansionService:
             raise ArcScenarioExpansionValidationError(
                 f"Generated scenario '{title}' for arc '{parent_arc_name}' must include at least 3 scenes"
             )
+        ArcScenarioExpansionService._ensure_entity_creation_visual_descriptions(
+            entity_creations=entity_creations,
+            scenario_title=title,
+            scenario_summary=summary,
+            parent_arc_name=parent_arc_name,
+            scenes=scenes,
+        )
 
         places = ArcScenarioExpansionService._normalize_string_list(payload.get("Places"))
         npcs = ArcScenarioExpansionService._normalize_string_list(payload.get("NPCs"))
@@ -413,6 +420,96 @@ class ArcScenarioExpansionService:
             "Objects": objects,
             "EntityCreations": entity_creations,
         }
+
+
+    @staticmethod
+    def _ensure_entity_creation_visual_descriptions(
+        *,
+        entity_creations: dict[str, list[dict[str, Any]]],
+        scenario_title: str,
+        scenario_summary: str,
+        parent_arc_name: str,
+        scenes: list[str],
+    ) -> None:
+        """Ensure generated entity descriptions are visual enough for image prompts.
+
+        Some local models put scene bookkeeping text in created entity Description
+        fields (for example "Scene 3: Purpose: ..." or an Atouts list).  Those
+        snippets are useful for traceability, but they are poor entity records
+        and cannot drive portrait or place image generation.  Keep the record
+        saveable by replacing weak descriptions with a concrete visual prompt
+        assembled from the scenario context and the scenes where the entity
+        appears.
+        """
+
+        for entity_type, records in entity_creations.items():
+            for record in records or []:
+                if not isinstance(record, dict):
+                    continue
+                name = str(record.get("Name") or "").strip()
+                if not name:
+                    continue
+                description = str(record.get("Description") or "").strip()
+                if ArcScenarioExpansionService._is_weak_entity_description(description):
+                    record["Description"] = ArcScenarioExpansionService._build_visual_entity_description(
+                        entity_type=entity_type,
+                        name=name,
+                        scenario_title=scenario_title,
+                        scenario_summary=scenario_summary,
+                        parent_arc_name=parent_arc_name,
+                        scenes=scenes,
+                    )
+
+    @staticmethod
+    def _is_weak_entity_description(description: str) -> bool:
+        """Return True when a created entity description is not image-ready."""
+        text = str(description or "").strip()
+        if len(text) < 140:
+            return True
+        lowered = text.casefold()
+        weak_markers = ("scene ", "purpose:", "atouts:", "objective:", "stakes:")
+        return any(marker in lowered for marker in weak_markers) and len(text) < 260
+
+    @staticmethod
+    def _build_visual_entity_description(
+        *,
+        entity_type: str,
+        name: str,
+        scenario_title: str,
+        scenario_summary: str,
+        parent_arc_name: str,
+        scenes: list[str],
+    ) -> str:
+        """Build a concrete visual description suitable for AI art generation."""
+        entity_label = {
+            "places": "location",
+            "npcs": "NPC portrait subject",
+            "villains": "villain portrait subject",
+            "factions": "faction visual identity",
+            "creatures": "creature design",
+        }.get(entity_type, "entity")
+        scene_context = ArcScenarioExpansionService._scene_context_for_entity(name, scenes)
+        arc_text = f" in the '{parent_arc_name}' arc" if parent_arc_name else ""
+        summary_text = scenario_summary.strip() or "a tense tabletop RPG scenario"
+        return (
+            f"Image-ready description for {name}, a {entity_label}{arc_text} from scenario "
+            f"'{scenario_title}'. Use a cinematic tabletop RPG illustration style. "
+            f"Depict the details implied by the scenario premise: {summary_text}. "
+            f"Visual focus: distinctive silhouette, clear mood, readable materials, lighting, "
+            f"environmental clues, and dramatic composition that can be used directly as an AI art prompt. "
+            f"Scene context: {scene_context}"
+        )
+
+    @staticmethod
+    def _scene_context_for_entity(name: str, scenes: list[str]) -> str:
+        """Return compact scene text mentioning the entity, or broad scenario scene context."""
+        key = name.casefold()
+        matches = [scene.replace("\n", "; ") for scene in scenes if key in scene.casefold()]
+        selected = matches[:2] or [scene.replace("\n", "; ") for scene in scenes[:2]]
+        context = " | ".join(part.strip() for part in selected if part.strip())
+        if not context:
+            return "Keep the design specific, atmospheric, and immediately drawable."
+        return context[:700]
 
     @staticmethod
     def _normalize_string_list(value: Any) -> list[str]:

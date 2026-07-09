@@ -393,6 +393,7 @@ def build_arc_scenario_expansion_prompt(
         "- Places, NPCs, Villains, Creatures, Factions, and Objects must always be JSON arrays, even when empty.\n"
         "- Reuse names from campaign foundation.existing_entities whenever they fit.\n"
         "- If you use any villain, faction, place, NPC, or creature name that is not in campaign foundation.existing_entities, include it in EntityCreations with a matching Name.\n"
+        "- EntityCreations Description fields must be full image-ready visual descriptions (appearance, mood, materials, lighting, environment, and composition), never scene labels, Purpose summaries, Atouts lists, or other bookkeeping text.\n"
         "- Keep each scenario self-contained enough to save directly as a scenario record.\n"
         f"{_format_prompt_block(hard_constraints_block)}"
     )
