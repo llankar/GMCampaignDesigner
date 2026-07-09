@@ -131,7 +131,11 @@ def _normalize_scene(scene: Any, index: int) -> dict[str, Any]:
 
 
 _JSON_ENTITY_HEADING_RE = re.compile(
-    r"^\s{0,3}#{1,6}\s+(NPCs?|Locations?|Places?)\s*(?:\([^)]*json[^)]*\))?\s*$",
+    r"^\s{0,3}(?:"
+    r"#{1,6}\s+(?P<markdown>NPCs?|Locations?|Places?)\s*(?:\([^)]*json[^)]*\))?"
+    r"|\*\*(?P<bold_colon>NPCs?|Locations?|Places?)\s*:\*\*"
+    r"|\*\*(?P<bold>NPCs?|Locations?|Places?)\*\*\s*:"
+    r")\s*$",
     re.IGNORECASE,
 )
 _JSON_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*$", re.IGNORECASE)
@@ -149,7 +153,8 @@ def _extract_json_entity_sections(text: str) -> tuple[dict[str, list[dict[str, A
         if not heading:
             index += 1
             continue
-        canonical = "NPCs" if heading.group(1).lower().startswith("npc") else "Places"
+        entity_label = next(group for group in heading.groups() if group)
+        canonical = "NPCs" if entity_label.lower().startswith("npc") else "Places"
         cursor = index + 1
         while cursor < len(lines) and not lines[cursor].strip():
             cursor += 1
