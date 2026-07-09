@@ -43,6 +43,7 @@ from modules.objects.object_constants import OBJECT_CATEGORY_ALLOWED
 from modules.ai.pipeline import execute_ai_chat
 from modules.generic.entities.linking import entity_label_map, resolve_entity_slug
 from modules.generic.entities.merge import EntityMergeError, merge_selected_entities
+from modules.generic.portrait_manager import ScenarioPortraitManagerDialog, resolve_scenario_linked_entities
 
 log_module_import(__name__)
 
@@ -3107,6 +3108,10 @@ class GenericListView(ctk.CTkFrame):
                 label="Generate Newsletter...",
                 command=lambda: self.open_newsletter_preview(iid),
             )
+            menu.add_command(
+                label="Generate Portraits...",
+                command=lambda: self.open_scenario_portrait_manager(iid),
+            )
         if item:
             menu.add_command(
                 label="Display on Second Screen",
@@ -4556,6 +4561,36 @@ class GenericListView(ctk.CTkFrame):
                 self.after(0, lambda: self._set_ai_categorize_running(False))
 
         threading.Thread(target=run, daemon=True).start()
+
+
+    def open_scenario_portrait_manager(self, iid):
+        """Open a portrait-management dialog for entities linked to a scenario."""
+        scenario, _base_id = self._find_item_by_iid(iid)
+        if not scenario:
+            messagebox.showerror("Generate Portraits", "Unable to resolve the selected scenario.")
+            return
+        entities = resolve_scenario_linked_entities(scenario)
+        if not entities:
+            messagebox.showinfo(
+                "Generate Portraits",
+                "No linked entities could be resolved for this scenario.",
+            )
+            return
+
+        def _on_portrait_change(_entity):
+            try:
+                self.reload_from_db()
+            except Exception:
+                pass
+
+        dialog = ScenarioPortraitManagerDialog(
+            self,
+            scenario=scenario,
+            entities=entities,
+            on_change=_on_portrait_change,
+        )
+        dialog.lift()
+        dialog.focus_force()
 
     def _find_item_by_iid(self, iid):
         """Find item by iid."""
