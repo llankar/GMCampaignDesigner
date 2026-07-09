@@ -70,6 +70,13 @@ def build_existing_entity_lookup(foundation: dict[str, Any]) -> dict[str, set[st
             lookup[entity_type] = set()
             continue
 
-        lookup[entity_type] = {str(value).strip().casefold() for value in raw_values if str(value).strip()}
+        names: set[str] = set()
+        for value in raw_values:
+            name = str(value).strip()
+            if not name:
+                continue
+            names.add(name)
+            names.add(name.casefold())
+        lookup[entity_type] = names
 
     return lookup

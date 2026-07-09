@@ -762,3 +762,36 @@ def test_arc_scenario_expansion_auto_fixes_scene_entity_typos_from_db_catalog():
     first = result["arcs"][0]["scenarios"][0]
     assert first["Places"] == ["Rainmarket"]
     assert first["NPCs"] == ["Rika Vale"]
+
+
+def test_arc_scenario_expansion_extracts_entity_names_from_object_links():
+    """Verify entity link normalizing extracts names instead of stringifying JSON objects."""
+    payload = [
+        {"Name": "Ghost Subway – Platform 12", "Description": "A cracked platform."},
+        {"name": "Sky Gardens of the Megatower", "NPCs": ["Liora"]},
+        "Liora",
+        {"Title": "Fallback Title"},
+        {"Description": "No usable name"},
+    ]
+
+    assert ArcScenarioExpansionService._normalize_string_list(payload) == [
+        "Ghost Subway – Platform 12",
+        "Sky Gardens of the Megatower",
+        "Liora",
+        "Fallback Title",
+    ]
+
+
+def test_arc_scenario_expansion_accepts_json_string_created_records():
+    """Verify wrapped JSON object records are parsed before EntityCreations persistence."""
+    records = ArcScenarioExpansionService._normalize_created_records(
+        '{"Name":"Silicon Vault – Novatek Data Hub","Description":"A labyrinth of humming servers."}',
+        "places",
+    )
+
+    assert records == [
+        {
+            "Name": "Silicon Vault – Novatek Data Hub",
+            "Description": "A labyrinth of humming servers.",
+        }
+    ]
