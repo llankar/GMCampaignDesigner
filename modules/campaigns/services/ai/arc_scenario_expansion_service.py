@@ -315,19 +315,6 @@ class ArcScenarioExpansionService:
         factions = ArcScenarioExpansionService._normalize_string_list(payload.get("Factions"))
         objects = ArcScenarioExpansionService._normalize_string_list(payload.get("Objects"))
 
-        ArcScenarioExpansionService._backfill_missing_entity_creations(
-            title=title,
-            summary=summary,
-            parent_arc_name=parent_arc_name,
-            places=places,
-            npcs=npcs,
-            villains=villains,
-            creatures=creatures,
-            factions=factions,
-            entity_creations=entity_creations,
-            existing_entities=existing_entities,
-        )
-
         links, scene_entities, entity_creations = validate_and_fix_scene_entity_links(
             title=title,
             ai_client=self.ai_client,
@@ -429,12 +416,49 @@ class ArcScenarioExpansionService:
 
     @staticmethod
     def _normalize_string_list(value: Any) -> list[str]:
-        """Normalize string list."""
-        if value in (None, ""):
+        """Normalize an AI list field into clean entity names.
+
+        Newer local models sometimes return a list of entity objects in link
+        fields (for example ``Places: [{"Name": ...}]``) or wrap that list as
+        a JSON string.  Persisting ``str(dict)`` creates garbage rows whose names
+        are JSON fragments, so accept those shapes but always extract the Name.
+        """
+        parsed = deserialize_possible_json(value)
+        if parsed in (None, ""):
             return []
-        if not isinstance(value, list):
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+        if isinstance(parsed, str):
             raise ArcScenarioExpansionValidationError("Scenario link fields must be JSON arrays")
-        return [str(item).strip() for item in value if str(item).strip()]
+        if not isinstance(parsed, list):
+            raise ArcScenarioExpansionValidationError("Scenario link fields must be JSON arrays")
+
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for item in parsed:
+            name = ArcScenarioExpansionService._extract_entity_name(item)
+            if not name:
+                continue
+            key = name.casefold()
+            if key in seen:
+                continue
+            normalized.append(name)
+            seen.add(key)
+        return normalized
+
+    @staticmethod
+    def _extract_entity_name(value: Any) -> str:
+        """Return a display-safe entity name from a scalar or object."""
+        parsed = deserialize_possible_json(value)
+        if isinstance(parsed, dict):
+            for key in ("Name", "name", "Title", "title"):
+                name = str(parsed.get(key) or "").strip()
+                if name:
+                    return name
+            return ""
+        if isinstance(parsed, (list, tuple, set)):
+            return ""
+        return str(parsed or "").strip()
 
     @staticmethod
     def _normalize_entity_creations(value: Any) -> dict[str, list[dict[str, Any]]]:
@@ -712,17 +736,20 @@ class ArcScenarioExpansionService:
     @staticmethod
     def _normalize_created_records(value: Any, entity_type: str) -> list[dict[str, Any]]:
         """Normalize created records."""
-        if value in (None, ""):
+        parsed = deserialize_possible_json(value)
+        if parsed in (None, ""):
             return []
-        if not isinstance(value, list):
+        if isinstance(parsed, dict):
+            parsed = [parsed]
+        if not isinstance(parsed, list):
             raise ArcScenarioExpansionValidationError(
                 f"EntityCreations.{entity_type} must be a JSON array"
             )
 
         normalized: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for record in value:
-            # Process each record from value.
+        for record in parsed:
+            # Process each record from parsed.
             if not isinstance(record, dict):
                 raise ArcScenarioExpansionValidationError(
                     f"EntityCreations.{entity_type} entries must be JSON objects"
