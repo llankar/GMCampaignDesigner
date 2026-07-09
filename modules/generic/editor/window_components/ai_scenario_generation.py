@@ -4,6 +4,8 @@ from modules.generic.editor.window_context import *
 from modules.campaigns.services.ai.generation_policy import build_hard_constraints_block
 from modules.campaigns.services.generation_defaults_service import CampaignGenerationDefaultsService
 from modules.scenarios.generated_scenario_parser import normalize_generated_scenario_payload
+from modules.ai.model_selection_dialog import AIModelSelectionDialog
+from modules.ai.ollama_model_service import OllamaModelService
 
 
 class GenericEditorWindowAIScenarioGeneration:
@@ -335,6 +337,10 @@ class GenericEditorWindowAIScenarioGeneration:
                 examples_text=examples_text,
                 hard_constraints_block=hard_constraints_block,
             )
+            selected_ai_model = self._choose_scenario_generation_model()
+            if not selected_ai_model:
+                return
+
             # Build prompt and call AI
             content = run_ai_editor_chat(
                 self._get_ai(),
@@ -347,7 +353,8 @@ class GenericEditorWindowAIScenarioGeneration:
                 entity_type="scenarios",
                 action_label="Generate Scenario",
                 phase="scenario_generation",
-                phase_message="Generating scenario content",
+                phase_message=f"Generating scenario content with {selected_ai_model}",
+                model=selected_ai_model,
             )
             try:
                 data = normalize_generated_scenario_payload(LocalAIClient._parse_json_safe(content))
@@ -503,6 +510,21 @@ class GenericEditorWindowAIScenarioGeneration:
 
         except Exception as e:
             messagebox.showerror("AI Error", f"Failed to generate scenario: {e}")
+
+    def _choose_scenario_generation_model(self) -> str | None:
+        """Prompt the user to choose an Ollama model for scenario generation."""
+        ai_client = self._get_ai()
+        service = OllamaModelService(getattr(ai_client, "base_url", "http://127.0.0.1:11434"))
+        models = service.list_models()
+        if not models:
+            messagebox.showerror(
+                "No Ollama models found",
+                "No local Ollama models were found. Install a model with `ollama pull <model>` and try again.",
+            )
+            return None
+
+        dialog = AIModelSelectionDialog(self, models, title="Scenario AI Model")
+        return dialog.selected_model
 
 
 def _load_editor_hard_constraints_block(
