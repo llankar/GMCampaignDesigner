@@ -25,26 +25,35 @@ class OllamaModelService:
     @staticmethod
     def _list_models_from_cli() -> list[str]:
         """Return model names from the ``ollama list`` command."""
-        try:
-            completed = subprocess.run(
-                ["ollama", "list"],
-                capture_output=True,
-                check=True,
-                text=True,
-                timeout=10,
-            )
-        except Exception:
-            return []
+        commands = (
+            ["pwsh", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "ollama list"],
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", "ollama list"],
+            ["ollama", "list"],
+        )
 
-        names: list[str] = []
-        for line in (completed.stdout or "").splitlines():
-            line = line.strip()
-            if not line or line.lower().startswith("name"):
+        for command in commands:
+            try:
+                completed = subprocess.run(
+                    command,
+                    capture_output=True,
+                    check=True,
+                    text=True,
+                    timeout=10,
+                )
+            except Exception:
                 continue
-            name = line.split()[0].strip()
-            if name and name not in names:
-                names.append(name)
-        return names
+
+            names: list[str] = []
+            for line in (completed.stdout or "").splitlines():
+                line = line.strip()
+                if not line or line.lower().startswith("name"):
+                    continue
+                name = line.split()[0].strip()
+                if name and name not in names:
+                    names.append(name)
+            return names
+
+        return []
 
     def _list_models_from_api(self) -> list[str]:
         """Return model names from Ollama's HTTP tags endpoint."""
