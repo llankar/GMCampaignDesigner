@@ -378,3 +378,80 @@ def test_ollama_provider_generates_with_invalid_configured_max_tokens(monkeypatc
     assert provider.generate("hello") == "Generated scenario"
     assert provider.config.max_tokens == 0
     assert "num_predict" not in captured_payloads[0]["options"]
+
+
+def test_parse_generated_scenario_extracts_fenced_entity_json_after_scenes():
+    text = '''Title: Neon Feud
+Summary: Corporate lovers race the city.
+
+## Scene 1: Rooftop
+Purpose: Establish danger.
+  - Jax Shade (Elysium hacker) – determined.
+
+## Scene 2: Subway
+Purpose: Flight through the city.
+
+## Scene 3: Holo-Bridge
+Purpose: Final showdown.
+Atouts: Bridge Collapse, Laser Traps.
+
+---
+
+## NPCs (JSON)
+
+```json
+[
+  {
+    "Name": "Jax \\\"Shade\\\" Kade",
+    "Role": "Elysium Syndicate hacker",
+    "Description": "Mid-30s, trench coat, cybernetic eye.",
+    "Secret": "He engineered the Core hack.",
+    "Quote": "In a city of neon, love is still code.",
+    "RoleplayingCues": ["checks wrist implant constantly"],
+    "Personality": "Skeptical, witty",
+    "Motivation": "Escape corporate shackles",
+    "Background": "Former Elysium tech.",
+    "Traits": ["Tech Savvy"],
+    "Factions": ["Elysium Syndicate (Former)"],
+    "Objects": ["Neural chip"],
+    "Portrait": null
+  },
+  {
+    "Name": "Liora Voss",
+    "Role": "Nebula Consortium heir",
+    "Description": "Early 20s, silver hair.",
+    "Secret": "She sabotaged the Core.",
+    "Portrait": null
+  }
+]
+```
+
+---
+
+## Locations (JSON)
+
+```json
+[
+  {
+    "Name": "Central Holo-Bridge",
+    "Description": "Suspended over traffic and laser grids.",
+    "NPCs": ["Jax \\\"Shade\\\" Kade", "Liora Voss"],
+    "PlayerDisplay": "The air crackles with static.",
+    "Secrets": ["A hidden control room lies beneath the bridge."],
+    "Portrait": null
+  }
+]
+```
+'''
+
+    parsed = parse_generated_scenario(text)
+
+    assert [npc["Name"] for npc in parsed["NPCs"]] == [
+        'Jax "Shade" Kade',
+        "Liora Voss",
+    ]
+    assert parsed["NPCs"][0]["Role"] == "Elysium Syndicate hacker"
+    assert [place["Name"] for place in parsed["Places"]] == ["Central Holo-Bridge"]
+    assert len(parsed["Scenes"]) == 3
+    assert "NPCs (JSON)" not in parsed["Scenes"][-1]["Text"]
+    assert "Locations (JSON)" not in parsed["Scenes"][-1]["Text"]

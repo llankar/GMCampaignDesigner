@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -60,7 +61,8 @@ def parse_markdown_scenario(text: str) -> dict[str, Any]:
     if not text:
         return result
 
-    before_scenes, scene_blocks = _split_scene_blocks(text)
+    json_entities, scenario_text = _extract_json_entity_sections(text)
+    before_scenes, scene_blocks = _split_scene_blocks(scenario_text)
     sections = _extract_sections(before_scenes)
 
     title = sections.get("Title") or _extract_inline_field(before_scenes, "title")
@@ -81,6 +83,10 @@ def parse_markdown_scenario(text: str) -> dict[str, Any]:
         values = _coerce_names(sections.get(key))
         if values:
             result[key] = values
+
+    for key, records in json_entities.items():
+        if records:
+            result[key] = records
 
     scenes = [_parse_scene_block(title_part, body) for title_part, body in scene_blocks]
     scenes = [scene for scene in scenes if scene.get("Title") or _scene_text(scene)]
@@ -122,6 +128,87 @@ def _normalize_scene(scene: Any, index: int) -> dict[str, Any]:
         return normalized
     parsed = _parse_scene_block(f"Scene {index}", str(scene or ""))
     return parsed
+
+
+_JSON_ENTITY_HEADING_RE = re.compile(
+    r"^\s{0,3}#{1,6}\s+(NPCs?|Locations?|Places?)\s*(?:\([^)]*json[^)]*\))?\s*$",
+    re.IGNORECASE,
+)
+_JSON_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*$", re.IGNORECASE)
+_FENCE_END_RE = re.compile(r"^\s*```\s*$")
+
+
+def _extract_json_entity_sections(text: str) -> tuple[dict[str, list[dict[str, Any]]], str]:
+    """Extract fenced NPC/place JSON blocks and remove them from scene prose."""
+    entities: dict[str, list[dict[str, Any]]] = {"NPCs": [], "Places": []}
+    lines = text.splitlines()
+    keep = [True] * len(lines)
+    index = 0
+    while index < len(lines):
+        heading = _JSON_ENTITY_HEADING_RE.match(lines[index])
+        if not heading:
+            index += 1
+            continue
+        canonical = "NPCs" if heading.group(1).lower().startswith("npc") else "Places"
+        cursor = index + 1
+        while cursor < len(lines) and not lines[cursor].strip():
+            cursor += 1
+        if cursor >= len(lines) or not _JSON_FENCE_RE.match(lines[cursor]):
+            index += 1
+            continue
+        end = cursor + 1
+        while end < len(lines) and not _FENCE_END_RE.match(lines[end]):
+            end += 1
+        if end >= len(lines):
+            index += 1
+            continue
+        raw_json = "\n".join(lines[cursor + 1 : end]).strip()
+        records = _parse_entity_json_records(raw_json)
+        if records:
+            entities[canonical].extend(records)
+            for remove_index in range(index, end + 1):
+                keep[remove_index] = False
+            index = end + 1
+            continue
+        index += 1
+    cleaned_text = "\n".join(line for line, should_keep in zip(lines, keep) if should_keep).strip()
+    return {key: _dedupe_entity_records(value) for key, value in entities.items()}, cleaned_text
+
+
+def _parse_entity_json_records(raw_json: str) -> list[dict[str, Any]]:
+    try:
+        parsed = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(parsed, dict):
+        parsed = [parsed]
+    if not isinstance(parsed, list):
+        return []
+    records: list[dict[str, Any]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("Name") or item.get("Title") or item.get("name") or item.get("title")
+        if not str(name or "").strip():
+            continue
+        record = {str(key): value for key, value in item.items()}
+        if not record.get("Name"):
+            record["Name"] = str(name).strip()
+        records.append(record)
+    return records
+
+
+def _dedupe_entity_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for record in records:
+        name = str(record.get("Name") or record.get("Title") or "").strip()
+        key = name.casefold()
+        if not name or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(record)
+    return deduped
 
 
 def _split_scene_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
@@ -204,13 +291,35 @@ def _promote_scene_entities(
     result: dict[str, Any], scenes: list[dict[str, Any]]
 ) -> None:
     for key in _ENTITY_FIELDS:
-        combined = _coerce_names(result.get(key))
+        existing_value = result.get(key)
+        combined_records = _entity_records_from_value(existing_value)
+        combined_names = _coerce_names(existing_value)
         for scene in scenes:
             for name in _coerce_names(scene.get(key)):
-                if name not in combined:
-                    combined.append(name)
-        if combined:
-            result[key] = combined
+                if name not in combined_names:
+                    combined_names.append(name)
+                    if combined_records:
+                        combined_records.append({"Name": name})
+        if combined_records:
+            result[key] = _dedupe_entity_records(combined_records)
+        elif combined_names:
+            result[key] = combined_names
+
+
+def _entity_records_from_value(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        return _parse_entity_json_records(json.dumps(value))
+    if not isinstance(value, list) or not any(isinstance(item, dict) for item in value):
+        return []
+    records: list[dict[str, Any]] = []
+    for item in value:
+        if isinstance(item, dict):
+            records.extend(_parse_entity_json_records(json.dumps(item)))
+        else:
+            name = str(item or "").strip()
+            if name:
+                records.append({"Name": name})
+    return _dedupe_entity_records(records)
 
 
 def _canonical_key(label: str) -> str | None:
