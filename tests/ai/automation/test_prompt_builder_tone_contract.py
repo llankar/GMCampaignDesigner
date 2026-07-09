@@ -39,3 +39,30 @@ def test_build_entity_prompt_includes_tone_contract(monkeypatch):
     assert "Genre: Cyberpunk" in prompt
     assert "Tone: Paranoid and gritty" in prompt
     assert "Setting: A sprawling arcology" in prompt
+
+
+def test_build_entity_prompt_guides_npc_description_and_atouts(monkeypatch):
+    """Verify NPC prompt keeps Atouts out of Description."""
+    module = _load_prompt_builder_module()
+    monkeypatch.setattr(module, "load_campaign_tone_contract", lambda db_path=None: None)
+
+    prompt = module.build_entity_prompt("npcs", 1, "Create an ally")
+
+    assert "Description must be a physical, visual description" in prompt
+    assert "Put any 'Atouts:' section in Traits instead" in prompt
+
+
+def test_build_linked_entities_prompt_guides_place_description(monkeypatch):
+    """Verify linked place prompt asks for image-ready physical descriptions."""
+    module = _load_prompt_builder_module()
+    monkeypatch.setattr(module, "load_campaign_tone_contract", lambda db_path=None: None)
+
+    prompt = module.build_linked_entities_prompt(
+        "places",
+        ["Iron Chapel"],
+        "Create places",
+        "Parent scenario",
+    )
+
+    assert "Description must be a physical, visual description" in prompt
+    assert "architecture/layout, materials, colors, lighting" in prompt

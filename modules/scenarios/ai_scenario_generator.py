@@ -166,7 +166,8 @@ def build_final_prompt(prompt: ScenarioPrompt, answers: Mapping[str, str]) -> tu
         "Secret, Quote, RoleplayingCues, Personality, Motivation, Background, Traits, "
         "Factions, Objects, Portrait when known. Place objects should include Name, "
         "Description, NPCs, PlayerDisplay, Secrets, Portrait when known. The scenario's "
-        "NPCs and Places may still be concise, but descriptions must contain usable GM content.\n"
+        "NPCs and Places may still be concise, but Description fields must be physical, visual descriptions "
+        "suitable for AI image generation. Put any Atouts section for NPCs in Traits, not Description.\n"
     )
     final = f"{formatted}\n\n# Collected answers\n" + "\n".join(answer_lines) + entity_schema_hint
     return final, missing

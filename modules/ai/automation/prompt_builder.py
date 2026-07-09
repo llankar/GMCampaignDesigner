@@ -34,6 +34,26 @@ def _build_tone_contract_section(*, db_path: str | None = None) -> str:
     return f"\n{format_tone_contract_guidance(contract)}\n"
 
 
+def _entity_content_guidance(entity_slug: str) -> str:
+    """Return extra field guidance for entity types with image-facing descriptions."""
+    normalized = (entity_slug or "").strip().lower()
+    if normalized == "npcs":
+        return (
+            "NPC field guidance:\n"
+            "- Description must be a physical, visual description suitable for AI image generation: "
+            "apparent age, body type, face, hair, clothing, colors, posture, props, and overall visual mood.\n"
+            "- Do not put 'Atouts:' or advantages/assets in Description. Put any 'Atouts:' section in Traits instead.\n"
+        )
+    if normalized == "places":
+        return (
+            "Place field guidance:\n"
+            "- Description must be a physical, visual description suitable for AI image generation: "
+            "architecture/layout, materials, colors, lighting, atmosphere, scale, landmarks, foreground/background details, and visual mood.\n"
+            "- Keep non-visual lore, hooks, and secrets out of Description when another field is available.\n"
+        )
+    return ""
+
+
 def build_entity_prompt(entity_slug: str, count: int, user_prompt: str, *, db_path: str | None = None) -> str:
     """Build entity prompt."""
     template = load_template(entity_slug)
@@ -55,6 +75,7 @@ def build_entity_prompt(entity_slug: str, count: int, user_prompt: str, *, db_pa
         f"{tone_contract}"
         "Use the following fields exactly as keys (keep casing):\n"
         f"{field_list}\n\n"
+        f"{_entity_content_guidance(entity_slug)}"
         "Rules:\n"
         "- Output must be a JSON array of objects.\n"
         "- Use lists for fields typed as list.\n"
@@ -90,6 +111,7 @@ def build_linked_entities_prompt(
         f"{tone_contract}"
         "Use the following fields exactly as keys (keep casing):\n"
         f"{field_list}\n\n"
+        f"{_entity_content_guidance(entity_slug)}"
         "Rules:\n"
         "- Output must be a JSON array of objects.\n"
         "- Each object must include the exact Name/Title from the required list.\n"

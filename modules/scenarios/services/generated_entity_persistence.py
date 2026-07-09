@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Iterable
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
@@ -201,6 +202,8 @@ def _build_npc_record(
     scenario_source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     description = build_entity_description(data, scenario_source, "npc")
+    description, description_atouts = _split_atouts_section(description)
+    traits = _merge_traits_with_atouts(data.get("Traits", ""), description_atouts)
     return {
         "Name": str(data.get("Name") or data.get("Title") or "Unnamed").strip(),
         "Role": build_npc_role(data, description),
@@ -211,7 +214,7 @@ def _build_npc_record(
         "Personality": to_longtext(data.get("Personality", "")),
         "Motivation": to_longtext(data.get("Motivation", "")),
         "Background": to_longtext(data.get("Background", "")),
-        "Traits": to_longtext(data.get("Traits", "")),
+        "Traits": to_longtext(traits),
         "Genre": data.get("Genre", ""),
         "Factions": data.get("Factions", []),
         "Objects": data.get("Objects", []),
@@ -237,6 +240,32 @@ def _build_place_record(
         "Portrait": data.get("Portrait", ""),
         "Notes": _generated_notes(scenario_title),
     }
+
+
+def _split_atouts_section(text: str) -> tuple[str, str]:
+    """Move a trailing Atouts section out of NPC descriptions and into traits."""
+    source = str(text or "").strip()
+    if not source:
+        return "", ""
+    match = re.search(r"(?im)^\s*(?:[*#-]\s*)?Atouts\s*:\s*", source)
+    if not match:
+        return source, ""
+    description = source[: match.start()].rstrip()
+    atouts = source[match.start() :].strip()
+    return description, atouts
+
+
+def _merge_traits_with_atouts(traits: Any, atouts: str) -> str:
+    """Append extracted Atouts to the Traits field without losing existing traits."""
+    base = str(traits or "").strip()
+    extra = str(atouts or "").strip()
+    if not extra:
+        return base
+    if not base:
+        return extra
+    if extra.casefold() in base.casefold():
+        return base
+    return f"{base}\n\n{extra}"
 
 
 def _generated_notes(scenario_title: str) -> str:

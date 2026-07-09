@@ -176,3 +176,37 @@ def test_save_missing_entities_uses_scene_text_instead_of_generic_fallback(tmp_p
     assert saved_npc["Role"] != "Scenario NPC"
     assert "Poisoned Toast" in saved_npc["Description"]["text"]
     assert "poisoned glass" in saved_place["Description"]["text"]
+
+
+def test_save_missing_entities_moves_npc_atouts_from_description_to_traits(tmp_path):
+    """Verify generated NPC Atouts are saved in Traits, not Description."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=GenericModelWrapper("places", db_path=str(db_path)),
+    )
+    parsed_payload = {
+        "Title": "Glass Wolves",
+        "NPCs": [
+            {
+                "Name": "Mara Voss",
+                "Description": "Tall smuggler in a red synth-leather coat with silver eyes.\nAtouts:\n- Quick draw\n- Knows every dock camera",
+                "Traits": "Restless and charming",
+            }
+        ],
+    }
+
+    persistence.save_missing_entities(
+        {"Title": "Glass Wolves", "NPCs": ["Mara Voss"], "Places": []},
+        parsed_payload,
+    )
+
+    saved_npc = npc_wrapper.load_item_by_key("Mara Voss", key_field="Name")
+    assert "Atouts" not in saved_npc["Description"]["text"]
+    assert "Tall smuggler" in saved_npc["Description"]["text"]
+    assert "Restless and charming" in saved_npc["Traits"]["text"]
+    assert "Atouts" in saved_npc["Traits"]["text"]
+    assert "Quick draw" in saved_npc["Traits"]["text"]
