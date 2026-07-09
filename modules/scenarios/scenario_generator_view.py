@@ -29,6 +29,7 @@ from modules.scenarios.ai_scenario_generator import (
     validate_required_answers,
 )
 from modules.scenarios.prompt_library_dialog import PromptLibraryDialog
+from modules.scenarios.services.ai_model_options import build_ai_model_options
 from modules.scenarios.services.generated_entity_persistence import (
     GeneratedScenarioEntityPersistence,
     scenario_entity_names,
@@ -67,11 +68,15 @@ class ScenarioGeneratorView(ctk.CTkFrame):
     def _load_ai_models(self) -> list[str]:
         """Return the configured AI model without blocking on Ollama discovery."""
         config = AIProviderConfig.from_config()
-        fallback_model = (
-            ConfigHelper.get("LastUsed", "scenario_ai_model", fallback=config.model)
-            or config.model
-        ).strip()
-        return [fallback_model or config.model]
+        last_used_model = ConfigHelper.get(
+            "LastUsed", "scenario_ai_model", fallback=config.model
+        )
+        models, _selected_model = build_ai_model_options(
+            configured_model=config.model,
+            last_used_model=last_used_model,
+            discovered_models=[],
+        )
+        return models
 
     def _start_ai_model_discovery(self) -> None:
         """Discover Ollama models in the background and refresh the selector."""
@@ -89,14 +94,22 @@ class ScenarioGeneratorView(ctk.CTkFrame):
 
     def _update_ai_model_options(self, models: list[str]) -> None:
         """Apply discovered model names to the AI selector on the Tk thread."""
-        discovered_models = [model for model in models if model]
-        if not discovered_models:
-            return
-        current_model = self.ai_model_var.get().strip()
-        selected_model = (
-            current_model if current_model in discovered_models else discovered_models[0]
+        config = AIProviderConfig.from_config()
+        last_used_model = ConfigHelper.get(
+            "LastUsed", "scenario_ai_model", fallback=config.model
         )
-        self.ai_models = discovered_models
+        current_model = self.ai_model_var.get().strip()
+        model_options, selected_model = build_ai_model_options(
+            configured_model=config.model,
+            last_used_model=last_used_model,
+            discovered_models=models,
+            current_model=current_model,
+        )
+        if not model_options:
+            return
+        if model_options == self.ai_models and selected_model == current_model:
+            return
+        self.ai_models = model_options
         self.ai_model_menu.configure(values=self.ai_models)
         self.ai_model_var.set(selected_model)
 
