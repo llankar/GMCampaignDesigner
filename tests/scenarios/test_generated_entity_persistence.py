@@ -210,3 +210,42 @@ def test_save_missing_entities_moves_npc_atouts_from_description_to_traits(tmp_p
     assert "Restless and charming" in saved_npc["Traits"]["text"]
     assert "Atouts" in saved_npc["Traits"]["text"]
     assert "Quick draw" in saved_npc["Traits"]["text"]
+
+
+def test_save_missing_entities_formats_npc_longtext_lists(tmp_path):
+    """Verify list-shaped NPC longtext fields save as readable bullets."""
+    db_path = tmp_path / "campaign.db"
+    _create_campaign_db(db_path)
+    npc_wrapper = GenericModelWrapper("npcs", db_path=str(db_path))
+
+    persistence = GeneratedScenarioEntityPersistence(
+        npc_wrapper=npc_wrapper,
+        place_wrapper=GenericModelWrapper("places", db_path=str(db_path)),
+    )
+    parsed_payload = {
+        "Title": "Neon Masks",
+        "NPCs": [
+            {
+                "Name": "Iris Null",
+                "RoleplayingCues": ["Avoids eye contact", "Taps coded rhythms"],
+                "Personality": ["Dry wit", "Careful listener"],
+                "Motivation": [{"Goal": "Steal the key", "Fear": "Being identified"}],
+                "Background": ["Former courier", "Knows the old tunnels"],
+                "Traits": ["Quick thinker", "Network of informants"],
+            }
+        ],
+    }
+
+    persistence.save_missing_entities(
+        {"Title": "Neon Masks", "NPCs": ["Iris Null"], "Places": []},
+        parsed_payload,
+    )
+
+    saved_npc = npc_wrapper.load_item_by_key("Iris Null", key_field="Name")
+    assert "• Avoids eye contact" in saved_npc["RoleplayingCues"]["text"]
+    assert "• Dry wit" in saved_npc["Personality"]["text"]
+    assert "Goal: Steal the key" in saved_npc["Motivation"]["text"]
+    assert "Fear: Being identified" in saved_npc["Motivation"]["text"]
+    assert "• Former courier" in saved_npc["Background"]["text"]
+    assert "• Quick thinker" in saved_npc["Traits"]["text"]
+    assert '"Goal"' not in saved_npc["Motivation"]["text"]

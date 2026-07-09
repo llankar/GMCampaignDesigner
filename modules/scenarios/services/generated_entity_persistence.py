@@ -7,7 +7,7 @@ import re
 from typing import Any, Iterable
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
-from modules.importers.pdf_entity_importer import to_longtext
+from modules.importers.pdf_entity_importer import format_longtext_value, to_longtext
 from modules.scenarios.services.generated_entity_descriptions import (
     build_entity_description,
     build_npc_role,
@@ -210,11 +210,13 @@ def _build_npc_record(
         "Description": to_longtext(description),
         "Secret": to_longtext(data.get("Secret") or data.get("Secrets") or ""),
         "Quote": data.get("Quote", ""),
-        "RoleplayingCues": to_longtext(data.get("RoleplayingCues", "")),
-        "Personality": to_longtext(data.get("Personality", "")),
-        "Motivation": to_longtext(data.get("Motivation", "")),
-        "Background": to_longtext(data.get("Background", "")),
-        "Traits": to_longtext(traits),
+        "RoleplayingCues": to_longtext(
+            format_longtext_value(data.get("RoleplayingCues", ""))
+        ),
+        "Personality": to_longtext(format_longtext_value(data.get("Personality", ""))),
+        "Motivation": to_longtext(format_longtext_value(data.get("Motivation", ""))),
+        "Background": to_longtext(format_longtext_value(data.get("Background", ""))),
+        "Traits": to_longtext(format_longtext_value(traits)),
         "Genre": data.get("Genre", ""),
         "Factions": data.get("Factions", []),
         "Objects": data.get("Objects", []),
@@ -257,7 +259,7 @@ def _split_atouts_section(text: str) -> tuple[str, str]:
 
 def _merge_traits_with_atouts(traits: Any, atouts: str) -> str:
     """Append extracted Atouts to the Traits field without losing existing traits."""
-    base = str(traits or "").strip()
+    base = str(format_longtext_value(traits) or "").strip()
     extra = str(atouts or "").strip()
     if not extra:
         return base
