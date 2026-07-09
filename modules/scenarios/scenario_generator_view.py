@@ -535,6 +535,11 @@ class ScenarioGeneratorView(ctk.CTkFrame):
                     if isinstance(parsed.get("Objects"), list)
                     else []
                 ),
+                "Scenes": (
+                    parsed.get("Scenes")
+                    if isinstance(parsed.get("Scenes"), list)
+                    else []
+                ),
             }
         else:
             summary = "\n".join(f"{k}: {v}" for k, v in self.current_campaign.items())

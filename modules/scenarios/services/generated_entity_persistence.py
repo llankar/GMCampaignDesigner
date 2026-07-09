@@ -1,4 +1,5 @@
 """Persist entities referenced by generated scenarios."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +7,11 @@ from typing import Any, Iterable
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.importers.pdf_entity_importer import to_longtext
+from modules.scenarios.services.generated_entity_descriptions import (
+    build_entity_description,
+    build_npc_role,
+    linked_npcs_for_place,
+)
 
 
 @dataclass(frozen=True)
@@ -49,22 +55,33 @@ class GeneratedScenarioEntityPersistence:
         npc_records = _entity_records(source.get("NPCs") or scenario.get("NPCs"))
         place_records = _entity_records(source.get("Places") or scenario.get("Places"))
         npc_names = _entity_names(npc_records)
-        created_npcs = self._save_missing_npcs(npc_records, title)
-        created_places = self._save_missing_places(place_records, npc_names, title)
+        created_npcs = self._save_missing_npcs(npc_records, title, source)
+        created_places = self._save_missing_places(
+            place_records, npc_names, title, source
+        )
 
         # If only scene-level entities were present, keep the old name-based
         # behavior as a final fallback.
         if not npc_records:
-            created_npcs = self._save_missing_npcs(_entity_records(scenario.get("NPCs")), title)
+            created_npcs = self._save_missing_npcs(
+                _entity_records(scenario.get("NPCs")), title, source
+            )
         if not place_records:
-            created_places = self._save_missing_places(_entity_records(scenario.get("Places")), npc_names, title)
+            created_places = self._save_missing_places(
+                _entity_records(scenario.get("Places")), npc_names, title, source
+            )
 
         return GeneratedEntitySaveResult(
             npcs_created=created_npcs,
             places_created=created_places,
         )
 
-    def _save_missing_npcs(self, records: list[dict[str, Any]], scenario_title: str) -> list[str]:
+    def _save_missing_npcs(
+        self,
+        records: list[dict[str, Any]],
+        scenario_title: str,
+        scenario_source: dict[str, Any] | None = None,
+    ) -> list[str]:
         existing = self._load_index(self.npc_wrapper)
         created: list[str] = []
         for data in records:
@@ -74,7 +91,7 @@ class GeneratedScenarioEntityPersistence:
             key = name.casefold()
             if key in existing:
                 continue
-            record = _build_npc_record(data, scenario_title)
+            record = _build_npc_record(data, scenario_title, scenario_source)
             self.npc_wrapper.save_item(record, key_field="Name")
             existing[key] = record
             created.append(name)
@@ -85,6 +102,7 @@ class GeneratedScenarioEntityPersistence:
         records: list[dict[str, Any]],
         npc_names: list[str],
         scenario_title: str,
+        scenario_source: dict[str, Any] | None = None,
     ) -> list[str]:
         existing = self._load_index(self.place_wrapper)
         created: list[str] = []
@@ -95,7 +113,9 @@ class GeneratedScenarioEntityPersistence:
             key = name.casefold()
             if key in existing:
                 continue
-            record = _build_place_record(data, npc_names, scenario_title)
+            record = _build_place_record(
+                data, npc_names, scenario_title, scenario_source
+            )
             self.place_wrapper.save_item(record, key_field="Name")
             existing[key] = record
             created.append(name)
@@ -126,7 +146,12 @@ def _entity_records(value: Any) -> list[dict[str, Any]]:
     if value is None:
         return []
     if isinstance(value, dict):
-        name = value.get("Name") or value.get("Title") or value.get("name") or value.get("title")
+        name = (
+            value.get("Name")
+            or value.get("Title")
+            or value.get("name")
+            or value.get("title")
+        )
         record = {str(k): v for k, v in value.items()}
         if name and not record.get("Name"):
             record["Name"] = name
@@ -150,7 +175,11 @@ def _entity_records(value: Any) -> list[dict[str, Any]]:
 
 
 def _entity_names(records: list[dict[str, Any]]) -> list[str]:
-    return [str(record.get("Name") or "").strip() for record in records if str(record.get("Name") or "").strip()]
+    return [
+        str(record.get("Name") or "").strip()
+        for record in records
+        if str(record.get("Name") or "").strip()
+    ]
 
 
 def _dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -166,11 +195,15 @@ def _dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return result
 
 
-def _build_npc_record(data: dict[str, Any], scenario_title: str) -> dict[str, Any]:
-    description = data.get("Description") or data.get("Summary") or _generated_description("NPC", scenario_title)
+def _build_npc_record(
+    data: dict[str, Any],
+    scenario_title: str,
+    scenario_source: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    description = build_entity_description(data, scenario_source, "npc")
     return {
         "Name": str(data.get("Name") or data.get("Title") or "Unnamed").strip(),
-        "Role": data.get("Role", "Scenario NPC"),
+        "Role": build_npc_role(data, description),
         "Description": to_longtext(description),
         "Secret": to_longtext(data.get("Secret") or data.get("Secrets") or ""),
         "Quote": data.get("Quote", ""),
@@ -187,9 +220,14 @@ def _build_npc_record(data: dict[str, Any], scenario_title: str) -> dict[str, An
     }
 
 
-def _build_place_record(data: dict[str, Any], npc_names: list[str], scenario_title: str) -> dict[str, Any]:
-    description = data.get("Description") or data.get("Summary") or _generated_description("place", scenario_title)
-    npcs = scenario_entity_names(data.get("NPCs")) or npc_names
+def _build_place_record(
+    data: dict[str, Any],
+    npc_names: list[str],
+    scenario_title: str,
+    scenario_source: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    description = build_entity_description(data, scenario_source, "place")
+    npcs = linked_npcs_for_place(data, npc_names, scenario_source)
     return {
         "Name": str(data.get("Name") or data.get("Title") or "Unnamed").strip(),
         "Description": to_longtext(description),
@@ -199,12 +237,6 @@ def _build_place_record(data: dict[str, Any], npc_names: list[str], scenario_tit
         "Portrait": data.get("Portrait", ""),
         "Notes": _generated_notes(scenario_title),
     }
-
-
-def _generated_description(entity_label: str, scenario_title: str) -> str:
-    if scenario_title:
-        return f"Generated from AI scenario '{scenario_title}'. Add details during prep."
-    return f"Generated from an AI scenario. Add {entity_label} details during prep."
 
 
 def _generated_notes(scenario_title: str) -> str:

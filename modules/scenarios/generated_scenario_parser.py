@@ -1,10 +1,20 @@
 """Normalize AI-generated scenario payloads into editable scenario fields."""
+
 from __future__ import annotations
 
 import re
 from typing import Any
 
-_ENTITY_FIELDS = ("NPCs", "Places", "Creatures", "Factions", "Objects", "Maps", "Bases", "Villains")
+_ENTITY_FIELDS = (
+    "NPCs",
+    "Places",
+    "Creatures",
+    "Factions",
+    "Objects",
+    "Maps",
+    "Bases",
+    "Villains",
+)
 _SECTION_ALIASES = {
     "title": "Title",
     "scenario title": "Title",
@@ -27,8 +37,12 @@ _SECTION_ALIASES = {
     "bases": "Bases",
     "villains": "Villains",
 }
-_SCENE_HEADING_RE = re.compile(r"^\s{0,3}#{2,6}\s*(?:scene\s*)?(\d+)?\s*[:.)-]?\s*(.*)$", re.IGNORECASE)
-_FIELD_RE = re.compile(r"^\s*(?:[-*]\s*)?(?:\*\*)?([A-Za-z][A-Za-z0-9 ()/&-]{1,45})(?:\*\*)?\s*:\s*(.*)$")
+_SCENE_HEADING_RE = re.compile(
+    r"^\s{0,3}#{2,6}\s*(?:scene\s*)?(\d+)?\s*[:.)-]?\s*(.*)$", re.IGNORECASE
+)
+_FIELD_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?([A-Za-z][A-Za-z0-9 (),/&-]{1,60})(?:\*\*)?\s*:\s*(.*)$"
+)
 _MARKDOWN_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*$")
 
 
@@ -86,7 +100,9 @@ def _normalize_mapping(data: dict[str, Any]) -> dict[str, Any]:
         scenes = parsed.get("Scenes") or [{"Text": str(scenes)}]
     if not isinstance(scenes, list):
         scenes = [scenes]
-    normalized_scenes = [_normalize_scene(scene, idx) for idx, scene in enumerate(scenes, start=1)]
+    normalized_scenes = [
+        _normalize_scene(scene, idx) for idx, scene in enumerate(scenes, start=1)
+    ]
     result["Scenes"] = normalized_scenes
     _promote_scene_entities(result, normalized_scenes)
     return result
@@ -115,7 +131,10 @@ def _split_scene_blocks(text: str) -> tuple[str, list[tuple[str, str]]]:
         match = _SCENE_HEADING_RE.match(line)
         line_label = line.lower().lstrip("# ").strip()
         if match and (match.group(1) or line_label.startswith("scene ")):
-            title = match.group(2).strip() or f"Scene {match.group(1) or len(scene_indices)+1}"
+            title = (
+                match.group(2).strip()
+                or f"Scene {match.group(1) or len(scene_indices)+1}"
+            )
             scene_indices.append((i, title))
     if not scene_indices:
         return text, []
@@ -168,7 +187,11 @@ def _parse_scene_block(title: str, body: str) -> dict[str, Any]:
             if key == "Places":
                 scene["Places"] = _coerce_names(value)
                 continue
-            if key in {"Summary", "Secrets"} or field.group(1).strip().lower() in {"purpose", "atouts", "stakes"}:
+            if key in {"Summary", "Secrets"} or field.group(1).strip().lower() in {
+                "purpose",
+                "atouts",
+                "stakes",
+            }:
                 if value:
                     text_lines.append(f"{field.group(1).strip()}: {value}")
                 continue
@@ -177,7 +200,9 @@ def _parse_scene_block(title: str, body: str) -> dict[str, Any]:
     return scene
 
 
-def _promote_scene_entities(result: dict[str, Any], scenes: list[dict[str, Any]]) -> None:
+def _promote_scene_entities(
+    result: dict[str, Any], scenes: list[dict[str, Any]]
+) -> None:
     for key in _ENTITY_FIELDS:
         combined = _coerce_names(result.get(key))
         for scene in scenes:
@@ -202,9 +227,17 @@ def _coerce_names(value: Any) -> list[str]:
             values.extend(_coerce_names(item))
         return _dedupe(values)
     if isinstance(value, dict):
-        return _coerce_names(value.get("Name") or value.get("Title") or value.get("name") or value.get("title"))
+        return _coerce_names(
+            value.get("Name")
+            or value.get("Title")
+            or value.get("name")
+            or value.get("title")
+        )
     text = _clean_value(str(value))
-    parts = re.split(r",|;|\band\b|&", text)
+    lines = [line.strip(" -*•") for line in text.splitlines() if line.strip(" -*•")]
+    if len(lines) > 1:
+        return _dedupe(lines)
+    parts = re.split(r";|\band\b|&", text)
     return _dedupe(part.strip(" -*•") for part in parts if part.strip(" -*•"))
 
 
@@ -222,12 +255,21 @@ def _clean_value(value: Any) -> str:
 
 
 def _extract_inline_field(text: str, field_name: str) -> str:
-    match = re.search(rf"^\s*(?:\*\*)?{re.escape(field_name)}(?:\*\*)?\s*:\s*(.+)$", text, re.IGNORECASE | re.MULTILINE)
+    match = re.search(
+        rf"^\s*(?:\*\*)?{re.escape(field_name)}(?:\*\*)?\s*:\s*(.+)$",
+        text,
+        re.IGNORECASE | re.MULTILINE,
+    )
     return match.group(1).strip() if match else ""
 
 
 def _strip_known_inline_fields(text: str) -> str:
-    return re.sub(r"^\s*(?:\*\*)?(?:Title|Scenario Title)(?:\*\*)?\s*:.+$", "", text, flags=re.IGNORECASE | re.MULTILINE)
+    return re.sub(
+        r"^\s*(?:\*\*)?(?:Title|Scenario Title)(?:\*\*)?\s*:.+$",
+        "",
+        text,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
 
 
 def _scene_text(scene: dict[str, Any]) -> str:
