@@ -39,10 +39,15 @@ _SECTION_ALIASES = {
     "villains": "Villains",
 }
 _SCENE_HEADING_RE = re.compile(
-    r"^\s{0,3}#{2,6}\s*(?:scene\s*)?(\d+)?\s*[:.)-]?\s*(.*)$", re.IGNORECASE
+    r"^\s{0,3}(?:#{2,6}\s*)?(?:\*{1,2})?"
+    r"(?:scene\s*)?(\d+)?\s*[:.)-]?\s*(.*?)"
+    r"(?:\*{1,2})?\s*$",
+    re.IGNORECASE,
 )
 _FIELD_RE = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:\*\*)?([A-Za-z][A-Za-z0-9 (),/&-]{1,60})(?:\*\*)?\s*:\s*(.*)$"
+    r"^\s*(?:[-*]\s*)?(?:\*{1,2})?"
+    r"([A-Za-z][A-Za-z0-9 (),/&-]{1,60})"
+    r"(?:\*{1,2})?\s*:\s*(.*)$"
 )
 _MARKDOWN_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*$")
 
