@@ -244,6 +244,57 @@ class _FakeOllamaResponse:
     def read(self):
         return b'{"message": {"content": "Generated scenario"}}'
 
+    def __iter__(self):
+        return iter([b'{"message": {"content": "Generated scenario"}}\n'])
+
+
+class _FakeStreamingOllamaResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def __iter__(self):
+        return iter([
+            b'{"message": {"content": "The Ash "}}\n',
+            b'\n',
+            b'{"message": {"content": "Bell"}}\n',
+            b'{"done": true}\n',
+        ])
+
+
+def test_ollama_provider_stitches_newline_delimited_streaming_chunks(monkeypatch):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    captured_payloads = []
+    provider = OllamaScenarioProvider(AIProviderConfig(stream=True))
+
+    def fake_urlopen(request, **_kwargs):
+        captured_payloads.append(generator.json.loads(request.data.decode("utf-8")))
+        return _FakeStreamingOllamaResponse()
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", fake_urlopen)
+
+    assert provider.generate("hello") == "The Ash Bell"
+    assert captured_payloads[0]["stream"] is True
+
+
+def test_ollama_provider_keeps_non_streaming_mode_when_disabled(monkeypatch):
+    from modules.scenarios import ai_scenario_generator as generator
+
+    captured_payloads = []
+    provider = OllamaScenarioProvider(AIProviderConfig(stream=False))
+
+    def fake_urlopen(request, **_kwargs):
+        captured_payloads.append(generator.json.loads(request.data.decode("utf-8")))
+        return _FakeOllamaResponse()
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", fake_urlopen)
+
+    assert provider.generate("hello") == "Generated scenario"
+    assert captured_payloads[0]["stream"] is False
+
 
 def test_ollama_provider_sends_positive_max_tokens_as_num_predict(monkeypatch):
     from modules.scenarios import ai_scenario_generator as generator
@@ -288,6 +339,7 @@ def test_ai_provider_config_defaults_invalid_max_tokens_to_zero(monkeypatch):
             "temperature": "0.3",
             "timeout": "10",
             "max_tokens": "not-an-int",
+            "stream": "false",
         }
         return values.get(key, fallback)
 
@@ -310,6 +362,7 @@ def test_ollama_provider_generates_with_invalid_configured_max_tokens(monkeypatc
             "temperature": "0.3",
             "timeout": "10",
             "max_tokens": "invalid",
+            "stream": "false",
         }
         return values.get(key, fallback)
 
