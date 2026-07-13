@@ -15,14 +15,14 @@ class ConfigHelper:
     _config_path: Path = Path("config/config.ini")
 
     @classmethod
-    def load_config(cls, file_path: Union[str, os.PathLike] = "config/config.ini"):
+    def load_config(cls, file_path: Union[str, os.PathLike, None] = None):
         """Load the configuration from ``file_path``.
 
         The file is read only when it's not cached or when the file has
         changed on disk since the last load. This allows updating the
         configuration without restarting the application.
         """
-        path = Path(file_path)
+        path = cls.get_config_path() if file_path is None else Path(file_path)
         cls._config_path = path
         mtime = os.path.getmtime(path) if path.exists() else None
 
@@ -103,7 +103,7 @@ class ConfigHelper:
     def get_config_path(cls) -> Path:
         """Return config path."""
         if not isinstance(cls._config_path, Path):
-            cls._config_path = Path("config/config.ini")
+            cls._config_path = Path(cls._config_path)
         return cls._config_path
 
     @classmethod
