@@ -1,7 +1,8 @@
-﻿"""Utilities for window components portrait and image workflows."""
+"""Utilities for window components portrait and image workflows."""
 
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, tk_listbox_theme
+from modules.generic.editor.window_components.portrait_generation_dialog import PortraitGenerationDialog, clamp_portrait_image_count
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
@@ -452,30 +453,21 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             messagebox.showerror("Error", "No models available in SwarmUI models folder.")
             return
 
-        # Pop-up to select model
-        top = ctk.CTkToplevel(self)
-        top.title("Select AI Model")
-        top.geometry("400x200")
-        top.transient(self)
-        top.grab_set()
-
-        model_var = ctk.StringVar(value=model_options[0])
         last_model = ConfigHelper.get("LastUsed", "model", fallback=None)
-        
-        if last_model in model_options:
-            selected_model = ctk.StringVar(value=last_model)
-        else:
-            selected_model = ctk.StringVar(value=model_options[0])
-        ctk.CTkLabel(top, text="Select AI Model for this NPC:").pack(pady=20)
-        ctk.CTkOptionMenu(top, values=model_options, variable=selected_model).pack(pady=10)
-
-        def on_confirm():
-            """Handle confirm."""
-            top.destroy()
-            ConfigHelper.set("LastUsed", "model", selected_model.get())
-            self.generate_portrait(selected_model.get())
-        ctk.CTkButton(top, text="Generate", command=on_confirm).pack(pady=10)
-    def generate_portrait(self, selected_model):
+        selected_model = last_model if last_model in model_options else model_options[0]
+        dialog = PortraitGenerationDialog(
+            self,
+            model_options=model_options,
+            selected_model=selected_model,
+        )
+        self.wait_window(dialog)
+        if not dialog.result:
+            return
+        self.generate_portrait(
+            dialog.result["model"],
+            image_count=dialog.result["image_count"],
+        )
+    def generate_portrait(self, selected_model, image_count=None):
         """
         Generates a portrait image using the SwarmUI API and associates the resulting
         image with the current NPC by updating its 'Portrait' field.
@@ -504,7 +496,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             # Step 2: Define image generation parameters
             prompt_data = {
                 "session_id": session_id,
-                "images": 6,  # Generate multiple candidates
+                "images": clamp_portrait_image_count(image_count),  # Generate selected candidates
                 "prompt": prompt,
                 "negativeprompt": "blurry, low quality, comics style, mangastyle, paint style, watermark, ugly, monstrous, too many fingers, too many legs, too many arms, bad hands, unrealistic weapons, bad grip on equipment, nude",
                 "model": selected_model,
@@ -544,7 +536,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 messagebox.showerror("Error", "Failed to download generated images.")
                 return
 
-            # Step 4: Let user choose one of the 6 images
+            # Step 4: Let user choose one of the generated images
             chosen_index = self._show_image_selection_window(thumbs)
             if chosen_index is None or chosen_index < 0 or chosen_index >= len(images_bytes):
                 return  # User cancelled
@@ -594,15 +586,13 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             selected["idx"] = i
             top.destroy()
 
-        # Layout: 3 columns x 2 rows (up to 6 images)
-        cols = 6 if len(pil_images) <= 6 else 6
-        # Place horizontally side by side if <= 6
-        for i, img in enumerate(pil_images[:6]):
-            cimg = ctk.CTkImage(light_image=img, size=(256, 256))
+        cols = min(5, max(1, len(pil_images)))
+        for i, img in enumerate(pil_images):
+            cimg = ctk.CTkImage(light_image=img, size=(180, 180))
             ctk_images.append(cimg)
-            btn = ctk.CTkButton(container, image=cimg, text="", width=260, height=260,
+            btn = ctk.CTkButton(container, image=cimg, text=f"#{i + 1}", compound="top", width=188, height=214,
                                 command=lambda idx=i: on_choose(idx))
-            btn.grid(row=0, column=i, padx=5, pady=5)
+            btn.grid(row=i // cols, column=i % cols, padx=6, pady=6, sticky="nsew")
 
         # Cancel button
         cancel_btn = ctk.CTkButton(top, text="Cancel", command=lambda: (setattr(selected, "idx", None), top.destroy()))
@@ -616,8 +606,9 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         # Size window to fit thumbnails in a row
         top.update_idletasks()
-        total_w = min(6, len(pil_images)) * (260 + 10) + 20
-        total_h = 320
+        rows = (len(pil_images) + cols - 1) // cols
+        total_w = cols * (188 + 14) + 40
+        total_h = rows * (214 + 14) + 90
         try:
             top.geometry(f"{total_w}x{total_h}")
         except Exception:
