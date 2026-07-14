@@ -14,6 +14,7 @@ from PIL import ImageGrab
 from tkinter import filedialog,  messagebox
 from modules.helpers.swarmui_helper import get_available_models
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.filename_helper import safe_filename_component
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.helpers.template_loader import load_template

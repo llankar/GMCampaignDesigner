@@ -212,7 +212,7 @@ class GenericEditorWindowAssetPathAndPreview:
 
         image_folder.mkdir(parents=True, exist_ok=True)
 
-        image_name = self.item.get('Name', 'Unnamed').replace(' ', '_')
+        image_name = safe_filename_component(self.item.get('Name', 'Unnamed'), fallback='Unnamed')
         ext = os.path.splitext(src_path)[-1].lower()
         dest_filename = f"{image_name}_{id(self)}{ext}"
         dest_path = image_folder / dest_filename
@@ -231,7 +231,7 @@ class GenericEditorWindowAssetPathAndPreview:
 
         portrait_folder.mkdir(parents=True, exist_ok=True)
 
-        npc_name = self.item.get('Name', 'Unnamed').replace(' ', '_')
+        npc_name = safe_filename_component(self.item.get('Name', 'Unnamed'), fallback='Unnamed')
         source_stem = os.path.splitext(os.path.basename(src_path))[0]
         sanitized_stem = ''.join(
             char if char.isalnum() or char in {'_', '-'} else '_'

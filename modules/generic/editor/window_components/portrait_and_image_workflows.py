@@ -230,7 +230,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 portrait_folder = campaign_dir / 'assets' / 'portraits'
                 portrait_folder.mkdir(parents=True, exist_ok=True)
 
-                base_name = (self.item.get('Name') or 'Unnamed').replace(' ', '_')
+                base_name = safe_filename_component(self.item.get('Name'), fallback='Unnamed')
                 dest_filename = f"{base_name}_{id(self)}.png"
                 dest_path = portrait_folder / dest_filename
 
@@ -380,7 +380,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 image_folder = campaign_dir / 'assets' / 'images' / 'map_images'
                 image_folder.mkdir(parents=True, exist_ok=True)
 
-                base_name = (self.item.get('Name') or 'Unnamed').replace(' ', '_')
+                base_name = safe_filename_component(self.item.get('Name'), fallback='Unnamed')
                 dest_filename = f"{base_name}_{id(self)}.png"
                 dest_path = image_folder / dest_filename
 
@@ -549,7 +549,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             chosen_bytes = images_bytes[chosen_index]
 
             # Step 5: Save the chosen image locally and update the NPC's Portrait field
-            output_filename = f"{npc_name.replace(' ', '_')}_portrait.png"
+            output_filename = f"{safe_filename_component(npc_name, fallback='Unknown')}_portrait.png"
             with open(output_filename, "wb") as f:
                 f.write(chosen_bytes)
 
