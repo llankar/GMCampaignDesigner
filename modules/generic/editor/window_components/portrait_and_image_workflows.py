@@ -2,7 +2,11 @@
 
 from modules.generic.editor.window_context import *
 from modules.generic.editor.styles import EDITOR_PALETTE, primary_button_style, tk_listbox_theme
-from modules.generic.editor.window_components.portrait_generation_dialog import PortraitGenerationDialog, clamp_portrait_image_count
+from modules.generic.editor.window_components.portrait_generation_dialog import (
+    PortraitGenerationDialog,
+    clamp_portrait_cfg_scale,
+    clamp_portrait_image_count,
+)
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
@@ -466,8 +470,9 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         self.generate_portrait(
             dialog.result["model"],
             image_count=dialog.result["image_count"],
+            cfgscale=dialog.result["cfgscale"],
         )
-    def generate_portrait(self, selected_model, image_count=None):
+    def generate_portrait(self, selected_model, image_count=None, cfgscale=None):
         """
         Generates a portrait image using the SwarmUI API and associates the resulting
         image with the current NPC by updating its 'Portrait' field.
@@ -502,7 +507,7 @@ class GenericEditorWindowPortraitAndImageWorkflows:
                 "model": selected_model,
                 "width": 1024,
                 "height": 1024,
-                "cfgscale": 9,
+                "cfgscale": clamp_portrait_cfg_scale(cfgscale),
                 "steps": 20,
                 "seed": -1
             }
