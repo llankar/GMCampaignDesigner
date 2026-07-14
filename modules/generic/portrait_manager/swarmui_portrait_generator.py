@@ -44,6 +44,14 @@ class SwarmUIPortraitSettings:
 
 
 @dataclass(frozen=True)
+class GeneratedPortraitCandidate:
+    """A downloaded SwarmUI portrait candidate before user selection."""
+
+    image_bytes: bytes
+    thumbnail: Image.Image
+
+
+@dataclass(frozen=True)
 class GeneratedPortraitResult:
     """Paths produced by a successful portrait generation."""
 
@@ -92,6 +100,38 @@ def build_portrait_prompt(
     return " ".join(parts) or entity.name or "fantasy portrait"
 
 
+def generate_scenario_portrait_candidates(
+    entity: ScenarioPortraitEntity,
+    settings: SwarmUIPortraitSettings,
+    *,
+    template: dict[str, Any] | None = None,
+    prompt_fields: list[str] | None = None,
+) -> list[GeneratedPortraitCandidate]:
+    """Generate and download SwarmUI portrait candidates without selecting or saving them."""
+    session_id = _get_swarm_session_id()
+    prompt = build_portrait_prompt(entity, template, prompt_fields=prompt_fields)
+    image_paths = _request_swarm_images(session_id, prompt, settings)
+    image_bytes = _download_generated_images(image_paths)
+    if not image_bytes:
+        raise RuntimeError("Failed to download generated images.")
+    return [
+        GeneratedPortraitCandidate(image_bytes=content, thumbnail=_make_thumbnail(content))
+        for content in image_bytes
+    ]
+
+
+def save_generated_portrait_candidate(
+    entity: ScenarioPortraitEntity,
+    candidate: GeneratedPortraitCandidate,
+) -> GeneratedPortraitResult:
+    """Persist a selected generated candidate and return campaign-relative portrait paths."""
+    portrait_path, generated_path = _store_selected_portrait(entity, candidate.image_bytes)
+    return GeneratedPortraitResult(
+        portrait_paths=[portrait_path],
+        generated_asset_paths=[generated_path] if generated_path else [],
+    )
+
+
 def generate_scenario_portrait(
     parent,
     entity: ScenarioPortraitEntity,
@@ -105,25 +145,17 @@ def generate_scenario_portrait(
 
     Returns campaign-relative portrait paths suitable for ``set_entity_portraits``.
     """
-    session_id = _get_swarm_session_id()
-    prompt = build_portrait_prompt(entity, template, prompt_fields=prompt_fields)
-    image_paths = _request_swarm_images(session_id, prompt, settings)
-    image_bytes = _download_generated_images(image_paths)
-    if not image_bytes:
-        raise RuntimeError("Failed to download generated images.")
-
-    thumbs = [_make_thumbnail(content) for content in image_bytes]
-    chosen_index = show_image_selection_window(parent, thumbs)
-    if chosen_index is None:
-        return None
-    if chosen_index < 0 or chosen_index >= len(image_bytes):
-        return None
-
-    portrait_path, generated_path = _store_selected_portrait(entity, image_bytes[chosen_index])
-    result = GeneratedPortraitResult(
-        portrait_paths=[portrait_path],
-        generated_asset_paths=[generated_path] if generated_path else [],
+    candidates = generate_scenario_portrait_candidates(
+        entity,
+        settings,
+        template=template,
+        prompt_fields=prompt_fields,
     )
+    chosen_index = show_image_selection_window(parent, [candidate.thumbnail for candidate in candidates])
+    if chosen_index is None or chosen_index < 0 or chosen_index >= len(candidates):
+        return None
+
+    result = save_generated_portrait_candidate(entity, candidates[chosen_index])
     if callable(on_generated):
         on_generated(result)
     return result
