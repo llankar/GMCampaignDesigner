@@ -39,6 +39,7 @@ from modules.helpers.template_loader import (
     list_manageable_entities,
 )
 from modules.helpers.config_helper import ConfigHelper
+from modules.helpers.filename_helper import safe_filename_component
 from modules.helpers.backup_helper import (
     BackupError,
     ManifestError,
@@ -4272,7 +4273,7 @@ class MainWindow(ctk.CTk):
             if downloaded_image.status_code != 200:
                 print(f"Failed to download generated image for NPC '{npc_name}'")
                 return
-            output_filename = f"{npc_name.replace(' ', '_')}_portrait.png"
+            output_filename = f"{safe_filename_component(npc_name, fallback='Unknown')}_portrait.png"
             with open(output_filename, "wb") as f:
                 f.write(downloaded_image.content)
             GENERATED_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "generated")
@@ -4330,7 +4331,7 @@ class MainWindow(ctk.CTk):
             if downloaded_image.status_code != 200:
                 print(f"Failed to download generated image for Creature '{creature_name}'")
                 return
-            output_filename = f"{creature_name.replace(' ', '_')}_portrait.png"
+            output_filename = f"{safe_filename_component(creature_name, fallback='Unknown')}_portrait.png"
             with open(output_filename, "wb") as f:
                 f.write(downloaded_image.content)
             GENERATED_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "generated")
