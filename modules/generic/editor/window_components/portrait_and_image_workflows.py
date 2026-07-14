@@ -7,6 +7,14 @@ from modules.generic.editor.window_components.portrait_generation_dialog import 
     clamp_portrait_cfg_scale,
     clamp_portrait_image_count,
 )
+from modules.helpers.swarmui_portrait_service import (
+    PortraitGenerationSource,
+    SwarmUIPortraitSettings,
+    cleanup_swarmui,
+    generate_portrait_candidates,
+    launch_swarmui,
+    save_generated_portrait_candidate,
+)
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
@@ -419,39 +427,19 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
         messagebox.showinfo("Paste Image", "Clipboard content is not an image.")
     def launch_swarmui(self):
-        """Launch swarmui."""
-        global SWARMUI_PROCESS
-        # Retrieve the SwarmUI path from config.ini
-        swarmui_path = ConfigHelper.get("Paths", "swarmui_path", fallback=r"E:\SwarmUI\SwarmUI")
-        # Build the command by joining the path with the batch file name
-        SWARMUI_CMD = os.path.join(swarmui_path, "launch-windows.bat")
-        env = os.environ.copy()
-        env.pop('VIRTUAL_ENV', None)
-        if SWARMUI_PROCESS is None or SWARMUI_PROCESS.poll() is not None:
-            try:
-                # Keep swarmui resilient if this step fails.
-                SWARMUI_PROCESS = subprocess.Popen(
-                    SWARMUI_CMD,
-                    shell=True,
-                    cwd=swarmui_path,
-                    env=env
-                )
-                # Wait a little for the process to initialize.
-                time.sleep(120.0)
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to launch SwarmUI: {e}")
+        """Launch SwarmUI through the shared portrait service."""
+        try:
+            launch_swarmui()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to launch SwarmUI: {e}")
+
     def cleanup_swarmui(self):
-        """
-        Terminate the SwarmUI process if it is running.
-        """
-        global SWARMUI_PROCESS
-        if SWARMUI_PROCESS is not None and SWARMUI_PROCESS.poll() is None:
-            SWARMUI_PROCESS.terminate()
+        """Terminate the SwarmUI process if it is running."""
+        cleanup_swarmui()
+
     def create_portrait_with_swarmui(self):
         """Create a portrait by delegating image generation to SwarmUI."""
-
         self.launch_swarmui()
-        # Ask for model
         model_options = get_available_models()
         if not model_options:
             messagebox.showerror("Error", "No models available in SwarmUI models folder.")
@@ -472,99 +460,46 @@ class GenericEditorWindowPortraitAndImageWorkflows:
             image_count=dialog.result["image_count"],
             cfgscale=dialog.result["cfgscale"],
         )
+
     def generate_portrait(self, selected_model, image_count=None, cfgscale=None):
-        """
-        Generates a portrait image using the SwarmUI API and associates the resulting
-        image with the current NPC by updating its 'Portrait' field.
-        """
-        SWARM_API_URL = "http://127.0.0.1:7801"  # Change if needed
+        """Generate and attach a portrait using the shared SwarmUI service."""
+        key_field = self.model_wrapper._infer_key_field() if self.model_wrapper else "Name"
+        entity_name = str(
+            self.item.get(key_field)
+            or self.item.get("Name")
+            or self.item.get("Title")
+            or "Unknown"
+        )
+        source = PortraitGenerationSource(name=entity_name, record=self.item, key_field=key_field)
+        settings = SwarmUIPortraitSettings(
+            model=str(selected_model),
+            image_count=clamp_portrait_image_count(image_count),
+            cfgscale=clamp_portrait_cfg_scale(cfgscale),
+        )
+
         try:
-            # Step 1: Obtain a new session from SwarmUI
-            session_url = f"{SWARM_API_URL}/API/GetNewSession"
-            session_response = requests.post(session_url, json={}, headers={"Content-Type": "application/json"})
-            session_data = session_response.json()
-            session_id = session_data.get("session_id")
-            if not session_id:
-                messagebox.showerror("Error", "Failed to obtain session ID from Swarm API.")
-                return
-
-            # Build a prompt based on the current NPC's data (you can enhance this as needed)
-            npc_name = self.item.get("Name", "Unknown")
-            npc_role = self.item.get("Role", "Unknown")
-            npc_faction = self.item.get("Factions", "Unknown")
-            npc_object = self.item.get("Objects", "Unknown")
-            npc_desc = self.item.get("Description", "Unknown") 
-            npc_desc =  text_helpers.format_longtext(npc_desc)
-            npc_desc = f"{npc_desc} {npc_role} {npc_faction} {npc_object}"
-            prompt = f"{npc_desc}"
-
-            # Step 2: Define image generation parameters
-            prompt_data = {
-                "session_id": session_id,
-                "images": clamp_portrait_image_count(image_count),  # Generate selected candidates
-                "prompt": prompt,
-                "negativeprompt": "blurry, low quality, comics style, mangastyle, paint style, watermark, ugly, monstrous, too many fingers, too many legs, too many arms, bad hands, unrealistic weapons, bad grip on equipment, nude",
-                "model": selected_model,
-                "width": 1024,
-                "height": 1024,
-                "cfgscale": clamp_portrait_cfg_scale(cfgscale),
-                "steps": 20,
-                "seed": -1
-            }
-            generate_url = f"{SWARM_API_URL}/API/GenerateText2Image"
-            image_response = requests.post(generate_url, json=prompt_data, headers={"Content-Type": "application/json"})
-            image_data = image_response.json()
-
-            images = image_data.get("images")
-            if not images or len(images) == 0:
-                messagebox.showerror("Error", "Image generation failed. Check API response.")
-                return
-
-            # Step 3: Download all generated images into memory
-            thumbs = []
-            images_bytes = []
-            for rel_path in images:
-                try:
-                    # Keep generate portrait resilient if this step fails.
-                    url = f"{SWARM_API_URL}/{rel_path}"
-                    resp = requests.get(url)
-                    if resp.status_code == 200:
-                        images_bytes.append(resp.content)
-                        img = Image.open(BytesIO(resp.content)).convert("RGB")
-                        thumb = img.copy()
-                        thumb.thumbnail((256, 256))
-                        thumbs.append(thumb)
-                except Exception:
-                    continue
-
-            if not thumbs:
-                messagebox.showerror("Error", "Failed to download generated images.")
-                return
-
-            # Step 4: Let user choose one of the generated images
-            chosen_index = self._show_image_selection_window(thumbs)
-            if chosen_index is None or chosen_index < 0 or chosen_index >= len(images_bytes):
-                return  # User cancelled
-
-            chosen_bytes = images_bytes[chosen_index]
-
-            # Step 5: Save the chosen image locally and update the NPC's Portrait field
-            output_filename = f"{safe_filename_component(npc_name, fallback='Unknown')}_portrait.png"
-            with open(output_filename, "wb") as f:
-                f.write(chosen_bytes)
-
-            # Associate the selected portrait with the NPC data.
-            generated_path = self.copy_and_resize_portrait(output_filename)
-            self._add_portrait_path(generated_path, make_primary=not self.portrait_paths)
-
-            # Copy the original generated file to assets/generated and delete local temp
-            GENERATED_FOLDER = os.path.join(ConfigHelper.get_campaign_dir(), "assets", "generated")
-            os.makedirs(GENERATED_FOLDER, exist_ok=True)
-            shutil.copy(output_filename, os.path.join(GENERATED_FOLDER, output_filename))
-            os.remove(output_filename)
-
+            template = load_template(self.model_wrapper.entity_type) if self.model_wrapper else None
+            candidates = generate_portrait_candidates(source, settings, template=template)
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred: {e}")
+            return
+
+        chosen_index = self._show_image_selection_window([candidate.thumbnail for candidate in candidates])
+        if chosen_index is None or chosen_index < 0 or chosen_index >= len(candidates):
+            return
+
+        try:
+            result = save_generated_portrait_candidate(
+                source,
+                candidates[chosen_index],
+                copy_portrait=lambda src_path, _name: self.copy_and_resize_portrait(src_path),
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Unable to save selected portrait: {e}")
+            return
+
+        for portrait_path in result.portrait_paths:
+            self._add_portrait_path(portrait_path, make_primary=not self.portrait_paths)
     def _show_image_selection_window(self, pil_images):
         """
         Display a modal window with thumbnails side by side for the user to choose.
