@@ -67,6 +67,10 @@ from modules.helpers.portrait_helper import parse_portrait_value, serialize_port
 from modules.ui.system_selector_dialog import CampaignSystemSelectorDialog
 from modules.ui.database_manager_dialog import DatabaseManagerDialog
 from modules.ui.system_manager_dialog import SystemManagerDialog
+from modules.generic.editor.window_components.portrait_generation_dialog import (
+    PortraitGenerationDialog,
+    clamp_portrait_cfg_scale,
+)
 from modules.ui.menu_bar import AppMenuBar
 from modules.ui.ambiance import SecondScreenAmbiancePlayer
 from modules.ui.ambiance.control_window import AmbianceControlWindow
@@ -4140,26 +4144,13 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(top, text="Continue", command=on_confirm).pack(pady=10)
 
     def generate_missing_npc_portraits(self):
-        """Handle generate missing NPC portraits."""
-        def confirm_model_and_continue():
-            """Handle confirm model and continue."""
-            ConfigHelper.set("LastUsed", "model", self.selected_model.get())
-            top.destroy()
-            self.generate_portraits_continue_npcs()
-        top = ctk.CTkToplevel(self)
-        top.title("Select AI Model for NPCs")
-        top.geometry("400x200")
-        top.transient(self)
-        top.grab_set()
-        ctk.CTkLabel(top, text="Select AI Model to use for NPC portrait generation:").pack(pady=20)
-        last_model = ConfigHelper.get("LastUsed", "model", fallback=None)
-        # Use ctk.StringVar
-        if last_model in self.model_options:
-            self.selected_model = ctk.StringVar(value=last_model)
-        else:
-            self.selected_model = ctk.StringVar(value=self.model_options[0])
-        ctk.CTkOptionMenu(top, values=self.model_options, variable=self.selected_model).pack(pady=10)
-        ctk.CTkButton(top, text="Continue", command=confirm_model_and_continue).pack(pady=10)
+        """Ask for NPC portrait generation settings before generating."""
+        settings = self._ask_portrait_generation_settings()
+        if not settings:
+            return
+        self.selected_model = ctk.StringVar(value=settings["model"])
+        self.selected_cfgscale = clamp_portrait_cfg_scale(settings["cfgscale"])
+        self.generate_portraits_continue_npcs()
 
     def generate_portraits_continue_npcs(self):
         """Handle generate portraits continue NPCs."""
@@ -4188,25 +4179,25 @@ class MainWindow(ctk.CTk):
         conn.close()
 
     def generate_missing_creature_portraits(self):
-        """Handle generate missing creature portraits."""
-        def confirm_model_and_continue():
-            """Handle confirm model and continue."""
-            ConfigHelper.set("LastUsed", "model", self.selected_model.get())
-            top.destroy()
-            self.generate_portraits_continue_creatures()
-        top = ctk.CTkToplevel(self)
-        top.title("Select AI Model for Creatures")
-        top.geometry("400x200")
-        top.transient(self)
-        top.grab_set()
-        ctk.CTkLabel(top, text="Select AI Model to use for creature portrait generation:").pack(pady=20)
+        """Ask for creature portrait generation settings before generating."""
+        settings = self._ask_portrait_generation_settings()
+        if not settings:
+            return
+        self.selected_model = ctk.StringVar(value=settings["model"])
+        self.selected_cfgscale = clamp_portrait_cfg_scale(settings["cfgscale"])
+        self.generate_portraits_continue_creatures()
+
+    def _ask_portrait_generation_settings(self):
+        """Collect shared SwarmUI portrait generation settings."""
         last_model = ConfigHelper.get("LastUsed", "model", fallback=None)
-        if last_model in self.model_options:
-            self.selected_model = ctk.StringVar(value=last_model)
-        else:
-            self.selected_model = ctk.StringVar(value=self.model_options[0])
-        ctk.CTkOptionMenu(top, values=self.model_options, variable=self.selected_model).pack(pady=10)
-        ctk.CTkButton(top, text="Continue", command=confirm_model_and_continue).pack(pady=10)
+        selected_model = last_model if last_model in self.model_options else self.model_options[0]
+        dialog = PortraitGenerationDialog(
+            self,
+            model_options=self.model_options,
+            selected_model=selected_model,
+        )
+        self.wait_window(dialog)
+        return dialog.result
 
     def generate_portraits_continue_creatures(self):
         """Handle generate portraits continue creatures."""
@@ -4265,7 +4256,7 @@ class MainWindow(ctk.CTk):
                 "model": self.selected_model.get(),
                 "width": 1024,
                 "height": 1024,
-                "cfgscale": 9,
+                "cfgscale": clamp_portrait_cfg_scale(getattr(self, "selected_cfgscale", None)),
                 "steps": 20,
                 "seed": -1
             }
@@ -4323,7 +4314,7 @@ class MainWindow(ctk.CTk):
                 "model": self.selected_model.get(),
                 "width": 1024,
                 "height": 1024,
-                "cfgscale": 9,
+                "cfgscale": clamp_portrait_cfg_scale(getattr(self, "selected_cfgscale", None)),
                 "steps": 20,
                 "seed": -1
             }
