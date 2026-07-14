@@ -16,11 +16,13 @@ from modules.generic.editor.window_components.portrait_generation_dialog import 
     clamp_portrait_cfg_scale,
     clamp_portrait_image_count,
 )
+from modules.generic.portrait_manager.components.generated_portrait_selection_dialog import GeneratedPortraitSelectionDialog
 from modules.generic.portrait_manager.entity_portrait_actions import ScenarioPortraitEntity, campaign_relative_path, copy_portrait_to_campaign, missing_portrait_indices, portrait_status, set_entity_portraits
 from modules.generic.portrait_manager.swarmui_portrait_generator import (
     SwarmUIPortraitSettings,
-    generate_scenario_portrait,
+    generate_scenario_portrait_candidates,
     launch_swarmui,
+    save_generated_portrait_candidate,
 )
 
 class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
@@ -282,8 +284,7 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
             cfgscale=clamp_portrait_cfg_scale(dialog.result["cfgscale"]),
         )
         try:
-            result = generate_scenario_portrait(
-                self,
+            candidates = generate_scenario_portrait_candidates(
                 entity,
                 settings,
                 template=template,
@@ -291,8 +292,25 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         except Exception as exc:
             messagebox.showerror("Create Portrait", f"An error occurred: {exc}")
             return
-        if not result:
+        if not candidates:
+            messagebox.showinfo("Create Portrait", "No portrait candidates were generated.")
             return
+
+        selection_dialog = GeneratedPortraitSelectionDialog(
+            self,
+            entity_name=entity.name,
+            candidates=candidates,
+        )
+        self.wait_window(selection_dialog)
+        if not selection_dialog.result:
+            return
+
+        try:
+            result = save_generated_portrait_candidate(entity, selection_dialog.result)
+        except Exception as exc:
+            messagebox.showerror("Create Portrait", f"Unable to save selected portrait: {exc}")
+            return
+
         self._save_paths(self._paths() + result.portrait_paths)
 
     def make_primary(self):
