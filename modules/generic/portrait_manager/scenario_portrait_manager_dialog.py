@@ -10,7 +10,18 @@ from modules.helpers.portrait_helper import parse_portrait_value, primary_portra
 from modules.helpers.template_loader import load_template
 from modules.ui.image_browser_dialog import ImageBrowserDialog
 from modules.ui.webview.pywebview_client import PyWebviewClient
+from modules.helpers.swarmui_helper import get_available_models
+from modules.generic.editor.window_components.portrait_generation_dialog import (
+    PortraitGenerationDialog,
+    clamp_portrait_cfg_scale,
+    clamp_portrait_image_count,
+)
 from modules.generic.portrait_manager.entity_portrait_actions import ScenarioPortraitEntity, campaign_relative_path, copy_portrait_to_campaign, missing_portrait_indices, portrait_status, set_entity_portraits
+from modules.generic.portrait_manager.swarmui_portrait_generator import (
+    SwarmUIPortraitSettings,
+    generate_scenario_portrait,
+    launch_swarmui,
+)
 
 class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
     """Manage portraits for all entities referenced by one scenario."""
@@ -233,7 +244,6 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         entity = self._entity()
         if not entity:
             return
-        from modules.generic.generic_editor_window import GenericEditorWindow
 
         try:
             template = load_template(entity.entity_type)
@@ -244,12 +254,46 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
             )
             return
 
-        editor = GenericEditorWindow(self, entity.record, template, entity.wrapper)
-        editor.create_portrait_with_swarmui()
-        self.wait_window(editor)
-        if getattr(editor, "saved", False):
-            entity.wrapper.save_item(entity.record)
-        self._refresh_current()
+        try:
+            launch_swarmui()
+        except Exception as exc:
+            messagebox.showerror("Create Portrait", f"Failed to launch SwarmUI: {exc}")
+            return
+
+        model_options = get_available_models()
+        if not model_options:
+            messagebox.showerror("Create Portrait", "No models available in SwarmUI models folder.")
+            return
+
+        last_model = ConfigHelper.get("LastUsed", "model", fallback=None)
+        selected_model = last_model if last_model in model_options else model_options[0]
+        dialog = PortraitGenerationDialog(
+            self,
+            model_options=model_options,
+            selected_model=selected_model,
+        )
+        self.wait_window(dialog)
+        if not dialog.result:
+            return
+
+        settings = SwarmUIPortraitSettings(
+            model=str(dialog.result["model"]),
+            image_count=clamp_portrait_image_count(dialog.result["image_count"]),
+            cfgscale=clamp_portrait_cfg_scale(dialog.result["cfgscale"]),
+        )
+        try:
+            result = generate_scenario_portrait(
+                self,
+                entity,
+                settings,
+                template=template,
+            )
+        except Exception as exc:
+            messagebox.showerror("Create Portrait", f"An error occurred: {exc}")
+            return
+        if not result:
+            return
+        self._save_paths(self._paths() + result.portrait_paths)
 
     def make_primary(self):
         paths = self._paths()
