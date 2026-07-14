@@ -35,6 +35,9 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         self.current_index = 0 if entities else -1
         self._preview_image = None
         self._row_ids: dict[int, str] = {}
+        self._auto_generate_active: bool = False
+        self._auto_generate_indices: list[int] = []
+        self._auto_generate_position: int = 0
         self.title(f"Scenario Portraits - {scenario.get('Title', 'Scenario')}")
         self.geometry("980x640")
         self.transient(master)
@@ -51,7 +54,8 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         nav.pack(fill="x", padx=12, pady=6)
         ctk.CTkButton(nav, text="Previous missing", command=self.previous_missing).pack(side="left", padx=4)
         ctk.CTkButton(nav, text="Next missing", command=self.next_missing).pack(side="left", padx=4)
-        ctk.CTkButton(nav, text="Skip", command=self.next_missing).pack(side="left", padx=4)
+        ctk.CTkButton(nav, text="Generate All Missing", command=self.generate_all_missing).pack(side="left", padx=4)
+        ctk.CTkButton(nav, text="Skip", command=self.skip_missing).pack(side="left", padx=4)
         self.missing_label = ctk.CTkLabel(nav, text="")
         self.missing_label.pack(side="left", padx=12)
         body = ctk.CTkFrame(self)
@@ -173,6 +177,58 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
     def next_missing(self):
         self._move_missing(1)
 
+    def skip_missing(self):
+        if self._auto_generate_active:
+            self._advance_auto_generate_queue()
+            return
+        self.next_missing()
+
+    def generate_all_missing(self):
+        self._auto_generate_indices = missing_portrait_indices(self.entities)
+        self._auto_generate_position = 0
+        if not self._auto_generate_indices:
+            messagebox.showinfo(
+                "Generate All Missing",
+                "All missing scenario portraits have been processed.",
+            )
+            return
+        self._auto_generate_active = True
+        self._process_next_auto_generate()
+
+    def _advance_auto_generate_queue(self):
+        if not self._auto_generate_active:
+            return
+        self._auto_generate_position += 1
+        self._process_next_auto_generate()
+
+    def _process_next_auto_generate(self):
+        if not self._auto_generate_active:
+            return
+        missing = missing_portrait_indices(self.entities)
+        remaining = [
+            index
+            for index in self._auto_generate_indices[self._auto_generate_position:]
+            if index in missing
+        ]
+        if not remaining:
+            self._finish_auto_generate_queue()
+            return
+        target = remaining[0]
+        self._auto_generate_indices = remaining
+        self._auto_generate_position = 0
+        self._select_index(target)
+        self._generate_portrait_for_current(auto_continue=True)
+
+    def _finish_auto_generate_queue(self):
+        self._auto_generate_active = False
+        self._auto_generate_indices = []
+        self._auto_generate_position = 0
+        self._refresh_current()
+        messagebox.showinfo(
+            "Generate All Missing",
+            "All missing scenario portraits have been processed.",
+        )
+
     def _move_missing(self, direction: int):
         missing = missing_portrait_indices(self.entities)
         if not missing:
@@ -243,9 +299,12 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         messagebox.showinfo("Paste Portrait", "No image found in clipboard.")
 
     def create_portrait(self):
+        self._generate_portrait_for_current(auto_continue=False)
+
+    def _generate_portrait_for_current(self, *, auto_continue: bool = False):
         entity = self._entity()
         if not entity:
-            return
+            return False
 
         try:
             template = load_template(entity.entity_type)
@@ -254,18 +313,18 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
                 "Create Portrait",
                 f"Unable to load editor template for '{entity.entity_type}': {exc}",
             )
-            return
+            return False
 
         try:
             launch_swarmui()
         except Exception as exc:
             messagebox.showerror("Create Portrait", f"Failed to launch SwarmUI: {exc}")
-            return
+            return False
 
         model_options = get_available_models()
         if not model_options:
             messagebox.showerror("Create Portrait", "No models available in SwarmUI models folder.")
-            return
+            return False
 
         last_model = ConfigHelper.get("LastUsed", "model", fallback=None)
         selected_model = last_model if last_model in model_options else model_options[0]
@@ -276,7 +335,7 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         )
         self.wait_window(dialog)
         if not dialog.result:
-            return
+            return False
 
         settings = SwarmUIPortraitSettings(
             model=str(dialog.result["model"]),
@@ -291,10 +350,10 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
             )
         except Exception as exc:
             messagebox.showerror("Create Portrait", f"An error occurred: {exc}")
-            return
+            return False
         if not candidates:
             messagebox.showinfo("Create Portrait", "No portrait candidates were generated.")
-            return
+            return False
 
         selection_dialog = GeneratedPortraitSelectionDialog(
             self,
@@ -303,15 +362,18 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         )
         self.wait_window(selection_dialog)
         if not selection_dialog.result:
-            return
+            return False
 
         try:
             result = save_generated_portrait_candidate(entity, selection_dialog.result)
         except Exception as exc:
             messagebox.showerror("Create Portrait", f"Unable to save selected portrait: {exc}")
-            return
+            return False
 
         self._save_paths(self._paths() + result.portrait_paths)
+        if auto_continue and self._auto_generate_active:
+            self.after(100, self._process_next_auto_generate)
+        return True
 
     def make_primary(self):
         paths = self._paths()
