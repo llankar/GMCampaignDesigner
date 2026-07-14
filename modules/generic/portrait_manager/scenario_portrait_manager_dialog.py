@@ -113,24 +113,35 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
                 break
         self._refresh_preview()
 
+    def _clear_preview_image(self, text: str = "[No Portrait]"):
+        try:
+            self.preview_label.configure(image="", text=text)
+        except tk.TclError:
+            try:
+                if self.preview_label.winfo_exists():
+                    self.preview_label.configure(text=text)
+            except tk.TclError:
+                pass
+        self._preview_image = None
+
     def _refresh_preview(self):
         entity = self._entity()
         if not entity:
-            self.preview_label.configure(image=None, text="[No Portrait]")
+            self._clear_preview_image()
             return
         self.detail_label.configure(text=f"{entity.entity_type}: {entity.name}\nSource: {entity.source_field}")
         primary = primary_portrait(parse_portrait_value(entity.record.get("Portrait", "")))
         resolved = resolve_portrait_path(primary, ConfigHelper.get_campaign_dir()) if primary else None
         try:
             if resolved and Path(resolved).exists():
-                image = Image.open(resolved).resize((256, 256))
+                with Image.open(resolved) as source:
+                    image = source.resize((256, 256)).copy()
                 self._preview_image = ctk.CTkImage(light_image=image, size=(256, 256))
                 self.preview_label.configure(image=self._preview_image, text="")
                 return
         except Exception:
             pass
-        self._preview_image = None
-        self.preview_label.configure(image=None, text="[No Portrait]")
+        self._clear_preview_image()
 
     def _paths(self) -> list[str]:
         entity = self._entity()
