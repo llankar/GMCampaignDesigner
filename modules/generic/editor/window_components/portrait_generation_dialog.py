@@ -96,8 +96,8 @@ class PortraitGenerationDialog(ctk.CTkToplevel):
         self._cfg_label_var = ctk.StringVar()
 
         self.title("Portrait Generation")
-        self.geometry("520x590")
-        self.minsize(500, 560)
+        self.geometry("520x680")
+        self.minsize(500, 650)
         self.transient(master)
         self.grab_set()
         self._build_ui()
