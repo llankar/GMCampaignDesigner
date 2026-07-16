@@ -26,6 +26,14 @@ From the repository root:
 python scripts/generate_docs.py
 ```
 
+For prose-only user-manual changes, reuse the committed screenshots without opening the application UI:
+
+```powershell
+python scripts/generate_docs.py --manual-only
+```
+
+The manual-only command refreshes `docs/user-manual.html`; it does not update `docs/index.html` or capture screenshots.
+
 ## Requirements
 
 - Use the same Python environment that can already launch `main_window.py`.

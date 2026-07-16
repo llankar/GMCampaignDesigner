@@ -89,6 +89,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                         _command("Customize Fields", app.open_custom_fields_editor, icon_key="customize_fields"),
                         _command("New Entity Type", app.open_new_entity_type_dialog, icon_key="new_entity_type"),
                         _command("Manage Systems", app.open_system_manager_dialog, icon_key="system_manager"),
+                        _command("AI Settings", _optional_command(app, "open_ai_settings"), icon_key="system_manager"),
                         _command("Cross-campaign Asset Library", app.open_cross_campaign_asset_library, icon_key="asset_library"),
                     ],
                 ),
