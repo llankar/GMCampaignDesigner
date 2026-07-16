@@ -1102,6 +1102,7 @@ class MainWindow(ctk.CTk):
             SidebarItemSpec("swarm_path", "Set SwarmUI Path", self.select_swarmui_path),
             SidebarItemSpec("customize_fields", "Customize Fields", self.open_custom_fields_editor),
             SidebarItemSpec("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
+            SidebarItemSpec("system_manager", "AI Settings", self.open_ai_settings),
             SidebarItemSpec("auto_improve", "Auto-improvement (Codex CLI)", self.open_auto_improve_panel),
             SidebarItemSpec("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
             SidebarItemSpec("db_export", "Create Campaign Backup", self.prompt_campaign_backup),

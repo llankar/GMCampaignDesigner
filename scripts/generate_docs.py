@@ -7,6 +7,8 @@ import re
 import time
 import copy
 import shutil
+from datetime import datetime
+from html import escape
 from pathlib import Path
 
 from PIL import ImageGrab
@@ -2233,6 +2235,11 @@ def main():
 
 def build_user_manual(shots, menu_data, py_files):
     """Build user manual."""
+    generated_on = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %z")
+    version_text = (ROOT / "version.txt").read_text(encoding="utf-8", errors="replace")
+    version_match = re.search(r"filevers=\((\d+),\s*(\d+),\s*(\d+),\s*(\d+)\)", version_text)
+    app_version = ".".join(version_match.groups()) if version_match else "unknown"
+
     def img(key, alt=None):
         """Handle img."""
         p = shots.get(key)
@@ -2247,7 +2254,8 @@ def build_user_manual(shots, menu_data, py_files):
 
     def section(title, body):
         """Handle section."""
-        return f"<section><h2 id='{title.lower().replace(' ', '-')}'>{title}</h2>{body}</section>"
+        slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+        return f"<section><h2 id='{slug}'>{escape(title)}</h2>{body}</section>"
 
     def collect_items(filter_fn):
         """Collect items."""
@@ -2287,6 +2295,8 @@ def build_user_manual(shots, menu_data, py_files):
                 '<b>Manage Campaign Systems</b>: Edit system dice defaults, supported faces, and analyzer config.',
                 '<b>Customize Fields</b>: Open the custom field editor (see Editor Tools).',
                 '<b>New Entity Type</b>: Add custom entities and templates.',
+                '<b>AI Settings</b>: Configure the AI endpoint, model, temperature, token limit, and optional API key.',
+                '<b>Auto-improvement (Codex CLI)</b>: Open the developer-oriented automated improvement panel. Review its command and dry-run settings before starting it.',
                 '<b>Create/Restore Campaign Backup</b>: Save or recover a full campaign archive.',
                 '<b>Cross-campaign Asset Library</b>: Export/import NPCs, Objects, and Maps with media bundles.',
                 '<b>Set SwarmUI Path</b>: Point the portrait generator at your SwarmUI installation.',
@@ -2299,7 +2309,7 @@ def build_user_manual(shots, menu_data, py_files):
             [
                 '<b>Manage Scenarios</b>: Maintain adventure outlines and summaries.',
                 '<b>Manage NPCs / PCs / Creatures</b>: Track cast members, their traits, and portraits.',
-                '<b>Manage Places, Factions, Objects, Informations, Clues, Books, Maps</b>: Open the corresponding list view.',
+                '<b>Manage Places, Factions, Objects, Information, Clues, Books, Maps</b>: Open the corresponding list view.',
             ],
             'accordion_campaign_workshop',
         ),
@@ -2307,7 +2317,9 @@ def build_user_manual(shots, menu_data, py_files):
             'Relations & Graphs',
             'Open visual editors to map relationships between entities.',
             [
-                '<b>NPC / PC / Faction / Scenario Graph Editor</b>: Launch the graph workspace focused on that entity type.',
+                '<b>Character / Villain / Faction / Scenario Graph Editor</b>: Launch the graph workspace focused on that entity type.',
+                '<b>Create Random Table</b>: Build reusable roll tables.',
+                '<b>Scene Flow Viewer</b> and <b>World Map</b>: Open visual campaign-planning surfaces.',
             ],
             'accordion_relations_graphs',
         ),
@@ -2315,32 +2327,133 @@ def build_user_manual(shots, menu_data, py_files):
             'Utilities',
             'Launch helper tools for session prep and presentation.',
             [
-                '<b>Campaign Builder</b>, <b>Generate Scenario</b>, <b>Scenario Builder Wizard</b>, and <b>AI Wizard</b>: Automate outline, arc planning, or content generation.',
+                '<b>Start Guided Tour</b>: Launch interactive onboarding.',
+                '<b>Campaign Builder</b>, <b>Generate Scenario</b>, and <b>Scenario Builder Wizard</b>: Automate outline, arc planning, or content generation.',
+                '<b>Advance Timeline</b>: Apply campaign-time progression and event processing.',
                 '<b>Import Scenario</b>, <b>Import NPCs/Creatures from PDF</b>, and <b>Import Equipment from PDF</b>: Convert external sources into campaign data.',
-                '<b>Campaign Overview</b>, <b>GM Table</b>, <b>GM Screen</b>, <b>Scene Flow Viewer</b>, <b>World Map</b>, <b>Map Tool</b>, and <b>Whiteboard</b>: Present and prep live session visuals.',
-                '<b>Portrait tools</b>: Generate portraits (SwarmUI), auto-associate NPC portraits, or import folders of art.',
-                '<b>Dice Bar</b> and <b>Open Dice Roller</b>: Quick always-on-top roller and full formula roller.',
-                '<b>Sound &amp; Music Manager</b> and <b>Audio Controls Bar</b>: Organize playlists and control playback.',
-                '<b>Export Scenarios</b> / <b>Export for Foundry</b>: Produce shareable outputs.',
+                '<b>GM Screen</b>, <b>Map Tool</b>, and <b>Whiteboard</b>: Present and prep live session visuals.',
+                '<b>Generate Portraits</b> and <b>Import Portraits from Folder</b>: Create or associate entity artwork.',
+                '<b>Sound &amp; Music Manager</b>, <b>Dice Roller</b>, <b>Session Timers</b>, and <b>Character Creation</b>: Run table utilities.',
+                '<b>Export Scenarios</b> and <b>Campaign Dossier</b>: Produce shareable outputs.',
             ],
             'accordion_utilities',
         ),
     ]
 
     parts = [
-        "<html><head><meta charset='utf-8'><title>GMCampaignDesigner User Manual</title>",
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='generator' content='scripts/generate_docs.py'><title>GMCampaignDesigner User Manual</title>",
         "<link rel='stylesheet' href='user-manual.css'></head><body>",
-        "<header><h1>GMCampaignDesigner User Manual</h1></header>",
-        "<nav><a href='#getting-started'>Getting Started</a><a href='#sidebar-accordion'>Sidebar Accordion</a><a href='#systems-&-data'>Systems &amp; Data</a><a href='#cross-campaign-asset-library'>Cross-Campaign Asset Library</a><a href='#entity-managers'>Entity Managers</a><a href='#detail-windows'>Detail Windows</a><a href='#editor-tools'>Editor Tools</a><a href='#random-tables'>Random Tables</a><a href='#graph-editors'>Graph Editors</a><a href='#campaign-builder'>Campaign Builder</a><a href='#campaign-overview'>Campaign Overview</a><a href='#gm-virtual-table'>GM Virtual Table</a><a href='#gm-screen'>GM Screen</a><a href='#scenario-tools'>Scenario Tools</a><a href='#scene-flow'>Scene Flow</a><a href='#map-tool'>Map Tool</a><a href='#whiteboard'>Whiteboard</a><a href='#world-map'>World Map</a><a href='#exports-&-handouts'>Exports &amp; Handouts</a><a href='#dice-roller'>Dice Roller</a><a href='#audio-&-music'>Audio &amp; Music</a><a href='#books'>Books</a><a href='#web-viewer'>Web Viewer</a><a href='#keyboard-shortcuts'>Keyboard Shortcuts</a><a href='#tips'>Tips</a></nav><div class='container'>"
+        f"<header><h1>GMCampaignDesigner User Manual</h1><p class='revision'>Application {app_version} &middot; Generated {generated_on}</p></header>",
+        "<nav aria-label='Manual chapters'><span class='nav-label'>Workflows:</span><a href='#install-and-create-your-first-campaign'>First Campaign</a><a href='#build-and-organize-a-campaign'>Build</a><a href='#turn-an-idea-into-a-playable-scenario'>Scenario</a><a href='#prepare-a-session-with-the-gm-screen-and-gm-table'>Session Prep</a><a href='#present-maps-handouts-and-ambiance'>Present</a><a href='#back-up-validate-and-repair-a-campaign'>Protect &amp; Repair</a><a href='#reference-appendix'>Reference</a></nav><main class='container'>"
     ]
 
-    parts.append(section('Getting Started',
+    parts.append(
+        "<section class='manual-intro' aria-labelledby='manual-introduction'><h2 id='manual-introduction'>How to use this manual</h2>"
+        "<p>Start with the six workflows below. Each one carries a real task from its starting point to a checkable result. "
+        "Use the reference appendix when you need the controls and options for one particular feature.</p>"
+        "<div class='warning'><b>Screenshot age:</b> Screenshots are generated examples and may lag behind the current interface. "
+        "When wording differs, follow the menu paths and button labels in the text.</div></section>"
+    )
+
+    parts.append(section('Install and Create Your First Campaign',
+        "<p><b>Outcome:</b> the application opens with a new campaign database, a selected game system, and an initial backup.</p>"
+        "<ol class='workflow'>"
+        "<li><b>Install or unpack the application.</b> For a packaged release, keep the complete application folder together and run <code>RPGCampaignManager.exe</code>. "
+        "From a source checkout, install Python 3.8 or newer, run <code>python -m pip install -r requirements.txt</code>, then run <code>python main_window.py</code> from the repository root.</li>"
+        "<li><b>Create the database.</b> Choose <b>File &rarr; Change Database</b> or press <b>F6</b>. Enter a new campaign name and click <b>Create</b>; select the new database and click <b>Use Selected</b>. "
+        "The campaign is stored under <code>Campaigns/&lt;campaign-name&gt;/</code> unless you browse to an external database.</li>"
+        "<li><b>Choose the rules system.</b> Use <b>Switch System</b> at the top of the sidebar. Confirm the system name and theme shown in the main window.</li>"
+        "<li><b>Add the first records.</b> Open <b>Campaign &rarr; PCs</b> and create at least one player character, then add a Place and an NPC from the corresponding managers. Save each editor before closing it.</li>"
+        "<li><b>Take a baseline backup.</b> Choose <b>File &rarr; Create Backup</b>, select a safe destination outside the active campaign folder, and keep the resulting archive.</li>"
+        "</ol>"
+        "<p class='checkpoint'><b>Checkpoint:</b> close and reopen the application, select the campaign if prompted, and confirm that the PC, Place, and NPC are still present.</p>"
+        + img('main_window', 'Main window overview')
+    ))
+
+    parts.append(section('Build and Organize a Campaign',
+        "<p><b>Outcome:</b> campaign arcs, scenarios, and reusable entities form a navigable structure.</p>"
+        "<ol class='workflow'>"
+        "<li><b>Sketch the campaign structure.</b> Open <b>GM Tools &rarr; Campaign Builder</b>. Define the campaign premise and create or edit arcs before generating detailed content.</li>"
+        "<li><b>Create the shared cast and locations.</b> Add recurring NPCs, factions, places, objects, clues, and maps from <b>Campaign</b>. Use stable, distinct names because scenario links resolve through these records.</li>"
+        "<li><b>Add scenarios to the right arc.</b> Create them manually from <b>Campaign &rarr; Scenarios</b>, use the Scenario Builder Wizard, or follow the AI workflow below. Review linked entities and the campaign/arc assignment before saving.</li>"
+        "<li><b>Visualize relationships.</b> Use a character, faction, or scenario graph for relationships; use Scene Flow for the order and branches between scenes; use World Map for geographic links.</li>"
+        "<li><b>Review the overview.</b> Open <b>Campaign &rarr; Campaign Overview</b>, select an arc and scenario, and correct missing or misplaced content before session prep.</li>"
+        "</ol>"
+        "<p class='checkpoint'><b>Checkpoint:</b> the Campaign Overview shows at least one arc containing a scenario with linked people and places.</p>"
+    ))
+
+    parts.append(section('Turn an Idea into a Playable Scenario',
+        "<p><b>Outcome:</b> a reviewed scenario contains a hook, scenes, stakes, and valid links to campaign entities.</p>"
+        "<ol class='workflow'>"
+        "<li><b>Choose an authoring path.</b> Use <b>GM Tools &rarr; Scenario Builder Wizard</b> for guided manual planning, <b>Generate Scenario</b> for random or AI-assisted drafting, or <b>Import Scenario</b> for existing material.</li>"
+        "<li><b>Define play-facing essentials.</b> Record the hook, objective, stakes, secrets, expected scenes, and likely outcomes. Link existing NPCs and Places instead of duplicating them.</li>"
+        "<li><b>Review generated or imported content.</b> Check names, scene headings, relationships, and any new records before saving. AI output is draft material, not verified campaign truth.</li>"
+        "<li><b>Arrange the scene flow.</b> Open Scene Flow, order the nodes, label alternate routes, and ensure the group can recover from a skipped scene or failed clue.</li>"
+        "<li><b>Verify references.</b> Run <b>Campaign &rarr; Verify Campaign</b> and resolve missing or ambiguous links before building the session workspace.</li>"
+        "</ol>"
+        "<p class='checkpoint'><b>Checkpoint:</b> open the scenario detail view and read it from hook to outcome without needing an unlinked or undefined record.</p>"
+    ))
+
+    parts.append(section('Prepare a Session with the GM Screen and GM Table',
+        "<p><b>Outcome:</b> the GM workspace contains the scenario, rules references, handouts, maps, notes, and utilities needed at the table.</p>"
+        "<ol class='workflow'>"
+        "<li><b>Choose the session scenario.</b> Open its detail view and check scenes, cast, locations, clues, and handouts one last time.</li>"
+        "<li><b>Build the GM Screen.</b> Open <b>Campaign &rarr; GM Screen</b>, add tabs for frequently referenced entities, random tables, scene flow, or other tools, and save the layout.</li>"
+        "<li><b>Arrange the GM Table.</b> Open <b>Campaign &rarr; GM Table</b>, select the scenario, and add panels for scenario detail, handouts, Map Tool, Image Library, notes, timers, or other session material.</li>"
+        "<li><b>Separate private and player material.</b> Keep secrets in clearly marked GM-only panels. Inspect every panel before using <b>Reveal</b> or placing it in a fixed overlay.</li>"
+        "<li><b>Save and rehearse.</b> Save the GM Table layout, test minimized-panel restore, open the important maps, and confirm audio and timer controls before players arrive.</li>"
+        "</ol>"
+        "<p class='checkpoint'><b>Checkpoint:</b> reopen both workspaces and confirm the layout returns without exposing GM-only notes on the player display.</p>"
+    ))
+
+    parts.append(section('Present Maps, Handouts and Ambiance',
+        "<p><b>Outcome:</b> players receive only the intended map state, image, handout, whiteboard, or ambiance.</p>"
+        "<ol class='workflow'>"
+        "<li><b>Choose the display route.</b> Use a second-monitor player view for local play or a web display for remote devices. Treat every player display as public to the table.</li>"
+        "<li><b>Prepare maps privately.</b> Load the background, add tokens and drawings, set facing and measurements, and paint fog of war before broadcasting. Test pan and zoom synchronization.</li>"
+        "<li><b>Reveal handouts deliberately.</b> Open the handout or Image Library panel, inspect it for hidden notes and filenames, then reveal only the selected content.</li>"
+        "<li><b>Set sound and visual ambiance.</b> Build Music, Ambience, and SFX playlists in <b>GM Tools &rarr; Sound &amp; Music</b>. Use Ambiance Control separately for player-facing wallpapers.</li>"
+        "<li><b>Secure remote access.</b> Use an access token and a trusted network. Do not expose the web server directly to the public internet; disable remote editing when players do not need it.</li>"
+        "</ol>"
+        "<p class='checkpoint'><b>Checkpoint:</b> view the player display from the players' position or device and verify that no GM notes, unrevealed map area, or private campaign media are visible.</p>"
+    ))
+
+    parts.append(section('Back Up, Validate and Repair a Campaign',
+        "<p><b>Outcome:</b> a restorable backup exists and campaign references pass validation after any repairs.</p>"
+        "<ol class='workflow'>"
+        "<li><b>Create a fresh backup.</b> Choose <b>File &rarr; Create Backup</b> before importing, generating content in bulk, changing schemas, or applying repairs. Store the archive outside the active campaign directory.</li>"
+        "<li><b>Run validation.</b> Choose <b>Campaign &rarr; Verify Campaign</b>. Work through missing references, ambiguous matches, and invalid campaign/arc/scenario relationships.</li>"
+        "<li><b>Apply the smallest repair.</b> Replace a broken reference with the intended record or remove it when it is genuinely obsolete. Review the summary before committing changes.</li>"
+        "<li><b>Re-run validation.</b> Confirm the repaired campaign is clean, then open affected scenarios and entity detail windows to spot-check the result.</li>"
+        "<li><b>Restore only when needed.</b> <b>File &rarr; Restore Backup</b> replaces active campaign data and assets with the selected archive. Back up the current state first, even when it is damaged, so the restore can be reversed.</li>"
+        "</ol>"
+        "<p class='checkpoint'><b>Checkpoint:</b> validation reports no unresolved problems and a copy of the tested backup is stored separately from the campaign.</p>"
+    ))
+
+    parts.append(section('Reference Appendix',
+        "<p>The remaining sections describe individual windows, controls, menus, integrations, and shortcuts. They are reference material rather than a required reading order.</p>"
+    ))
+
+    parts.append(section('Getting Started Reference',
         "<ul>"
         "<li>Launch the app: <code>python main_window.py</code>.</li>"
-        "<li>Open <b>Data & System &rarr; Change Data Storage</b> to launch the database manager and choose or create a campaign.</li>"
+        "<li>Open <b>File &rarr; Change Database</b> or press <b>F6</b> to choose or create a campaign database.</li>"
         "<li>Use <b>Switch System</b> (top of the sidebar) to choose the campaign rules system and a visual theme.</li>"
-        "<li>Populate PCs, NPCs, Creatures, Places, Objects, Informations, Clues, Maps, and Books.</li>"
+        "<li>Use <b>Help &rarr; Guided Tour</b> for interactive onboarding.</li>"
+        "<li>Populate PCs, NPCs, Creatures, Places, Objects, Information records, Clues, Maps, and Books from <b>Campaign</b> or the Campaign Workshop sidebar.</li>"
+        "<li>Create a backup from <b>File &rarr; Create Backup</b> before a large import, restore, AI generation, or validation repair.</li>"
         "</ul>" + img('main_window', 'Main window overview')
+    ))
+
+    parts.append(section('Navigation',
+        "<p>The top menu is the stable route used throughout this manual; the sidebar provides faster access to many of the same commands.</p>"
+        "<ul>"
+        "<li><b>File:</b> database selection, backups, systems, schemas, AI Settings, shared assets, and Auto Improve App.</li>"
+        "<li><b>Campaign:</b> entity managers, GM Table, GM Screen, Campaign Overview, World Map, graphs, scene flow, random tables, and Verify Campaign.</li>"
+        "<li><b>GM Tools:</b> scenario generation, imports, exports, portraits, image library, map, whiteboard, dice, audio, timers, ambiance, and character creation.</li>"
+        "<li><b>View:</b> compact Audio Bar and Dice Bar.</li>"
+        "<li><b>Help:</b> Guided Tour and the shortcut reference.</li>"
+        "</ul>"
     ))
 
     accordion_html = [
@@ -2363,6 +2476,8 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Campaign Backups:</b> Create a full archive of the database and assets, or restore from a backup file.</li>"
         "<li><b>Cross-campaign Asset Library:</b> Export/import NPCs, Objects, and Maps with media bundles; optional online gallery publishing.</li>"
         "<li><b>Set SwarmUI Path:</b> Point portrait generation to your SwarmUI install.</li>"
+        "<li><b>AI Settings:</b> Open from <b>File &rarr; AI Settings</b> or the Data &amp; System sidebar to configure the endpoint, default model, temperature, maximum token count, and optional API key.</li>"
+        "<li><b>Auto Improve App:</b> Open from <b>File &rarr; Auto Improve App</b>. This developer tool can invoke Codex CLI and optionally commit changes; verify its command, validation, dry-run, and auto-commit settings before use.</li>"
         "</ul>"
     ))
     parts.append(section('Cross-Campaign Asset Library',
@@ -2373,6 +2488,8 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Export bundles:</b> <b>Export Selected…</b> packages chosen records and their media into a portable zip bundle.</li>"
         "<li><b>Copy directly:</b> <b>Copy to Current Campaign</b> imports selected records straight into the active campaign and resolves duplicates interactively.</li>"
         "<li><b>Import bundles:</b> <b>Import Bundle…</b> restores a shared bundle; <b>Import Image Library…</b> limits the import to image-library assets.</li>"
+        "<li><b>Workspace extras:</b> Full campaign bundles can carry GM Table layouts and ambiance wallpapers in addition to entity records and media.</li>"
+        "<li><b>Duplicates:</b> Review merge prompts carefully. Make a backup first when importing into a populated campaign.</li>"
         "<li><b>Online gallery:</b> Publish bundles to GitHub, browse online releases, download shared bundles, or install a full campaign package. Publishing actions require a configured GitHub token.</li>"
         "</ul>"
         + (img('asset_library_overview', 'Cross-campaign Asset Library overview') if shots.get('asset_library_overview') else '')
@@ -2398,14 +2515,14 @@ def build_user_manual(shots, menu_data, py_files):
         "<ul>",
         "<li><b>Quick edit:</b> Double-click a row to launch the Generic Editor window. Use the toolbar buttons to add new entries.</li>",
         "<li><b>Right-click options:</b> Duplicate, delete, recolor rows, show portraits, export data, or send a card to the second screen." + ("<ul>" + ent_menu_html + "</ul>" if ent_menu_html else "") + "</li>",
-        "<li><b>Import/Export:</b> Use JSON import/export, the AI Wizard for assisted authoring, or Import Text (Web) for scenarios, creatures, and objects.</li>",
-        "<li><b>AI tools:</b> The AI Wizard can generate NPCs, scenarios, and beats with consistency checks; Objects also support AI Categorize for quick classification.</li>",
+        "<li><b>Import/Export:</b> Use JSON import/export, AI-assisted authoring, or Import Text (Web) for scenarios, creatures, and objects.</li>",
+        "<li><b>AI tools:</b> Entity-specific AI actions can generate NPCs, scenarios, and beats with consistency checks; Objects also support AI Categorize for quick classification.</li>",
         "<li><b>Bulk media:</b> Maps can import folders of images; Books can import PDFs or directories of PDFs.</li>",
         "<li><b>Second screen:</b> Display selected fields on a player-facing monitor from the context menu.</li>",
         "</ul>",
         "<p><b>Web text import:</b> Click <i>Import Text (Web)</i> to open the embedded browser, select text on a page, then click Import (or press <code>Ctrl+Shift+I</code>) to open the mapping dialog.</p>",
         clues_html,
-        ''.join(img(f"entity_{k}", f"{k.title()} manager") for k in [
+        ''.join(img(f"entity_{k}", "Information records manager" if k == "informations" else f"{k.title()} manager") for k in [
             'scenarios', 'pcs', 'npcs', 'creatures', 'factions', 'places', 'objects', 'informations', 'clues', 'maps', 'books'
         ])
     ]
@@ -2429,10 +2546,29 @@ def build_user_manual(shots, menu_data, py_files):
         "</ul>",
         "<p><b>Portrait workflow:</b> Add multiple portraits, set a primary portrait, search the web for images, paste from the clipboard, or generate art via SwarmUI (requires the SwarmUI path in Data &amp; System).</p>",
         img('scenario_editor', 'Generic Editor window'),
-        "<p>Use <b>Data & System &rarr; Customize Fields</b> to tailor the schema per entity. The editor below lets you add new fields, set types, and choose linked entities.</p>",
+        "<p>Use <b>File &rarr; Customize Fields</b> or <b>Data &amp; System &rarr; Customize Fields</b> in the sidebar to tailor the schema per entity. The editor below lets you add new fields, set types, and choose linked entities.</p>",
         img('custom_fields_editor', 'Custom Fields Editor')
     ])
     parts.append(section('Editor Tools', editor_body))
+
+    parts.append(section('Portrait Generation',
+        "<p>SwarmUI-backed portrait tools are available from entity editors, the GM Tools menu, and scenario context menus.</p>"
+        "<h3>Generate portraits for a scenario</h3>"
+        "<ol>"
+        "<li>Open <b>Campaign &rarr; Manage Scenarios</b>, right-click a scenario, and choose <b>Generate Portraits…</b>.</li>"
+        "<li>Select the linked NPCs, Places, Creatures, or other supported entities to process.</li>"
+        "<li>Choose the SwarmUI model, number of candidates, and CFG scale. More candidates take longer and use more generation resources.</li>"
+        "<li>Generate missing portraits individually or use <b>Generate All Missing</b>. When several candidates are returned, select the image to keep.</li>"
+        "<li>Confirm that the selected portrait appears on the entity before closing the manager.</li>"
+        "</ol>"
+        "<h3>Bulk and manual workflows</h3>"
+        "<ul>"
+        "<li><b>GM Tools &rarr; Generate Portraits:</b> generate missing NPC or Creature portraits in bulk.</li>"
+        "<li><b>GM Tools &rarr; Import Portraits from Folder:</b> match existing image files to portrait-capable records.</li>"
+        "<li><b>Entity editor:</b> add several portraits, set the primary image, paste from the clipboard, search the web, or generate a new image.</li>"
+        "</ul>"
+        "<div class='warning'><b>Before generation:</b> Set the SwarmUI installation with <b>File &rarr; Set SwarmUI Path</b>. Generated filenames are sanitized and selected images are copied into the active campaign.</div>"
+    ))
 
     parts.append(section('Random Tables',
         "<p>Create and roll random tables for inspiration or procedural prep. You can open the editor from <b>Relations &amp; Graphs &rarr; Create Random Table</b>, or add a Random Tables panel inside the GM Screen.</p>"
@@ -2449,7 +2585,7 @@ def build_user_manual(shots, menu_data, py_files):
         ge_link_html = "<li><b>Arrow Mode submenu:</b> " + ', '.join(arrow_items) + "</li>"
     ge_shape_html = ''.join(f"<li>{i}</li>" for i in shape_items_graph) if shape_items_graph else ''
     parts.append(section('Graph Editors',
-        "<p>Visual editors for Characters, Factions, and Scenarios let you map relationships and story beats.</p>"
+        "<p>Visual editors for Characters, Villains, Factions, and Scenarios let you map relationships and story beats. Open them from <b>Campaign &rarr; Story Structure</b> or the Relations &amp; Graphs sidebar.</p>"
         "<ul>"
         "<li><b>Add nodes:</b> Use the toolbar actions or double-click (where available) to create a node.</li>"
         "<li><b>Drag to arrange:</b> Left-click and drag nodes to reposition; mouse wheel zooms the canvas.</li>"
@@ -2491,12 +2627,15 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('GM Virtual Table',
         "<p>The GM Table is the freeform virtual tabletop-style workspace for arranging panels, maps, handouts, and utilities around a single scenario.</p>"
         "<ul>"
-        "<li><b>Open:</b> Utilities &rarr; <b>GM Table</b>, then choose a scenario. The default layout opens scenario details and handouts side by side.</li>"
-        "<li><b>Toolbar:</b> Use <b>Add Panel</b>, <b>Scene</b>, <b>Map Tool</b>, <b>Player View</b>, <b>Fog</b>, <b>Tile</b>, <b>Cascade</b>, <b>Restore All</b>, <b>Save</b>, and <b>Reset</b> to manage the workspace.</li>"
-        "<li><b>Panel types:</b> Add campaign dashboard, world map, map tool, scene flow, whiteboard, random tables, plot twists, image library, handouts, notes, graphs, or entity detail panels.</li>"
-        "<li><b>Scenario focus:</b> Layouts persist per scenario, so you can maintain different tabletops for different sessions.</li>"
-        "<li><b>Live play:</b> Use the table as the orchestration layer while dedicated tools such as Map Tool and Whiteboard keep their own specialist controls.</li>"
+        "<li><b>Open:</b> Choose <b>Campaign &rarr; GM Table</b>, then select a scenario. The default layout opens scenario details and handouts side by side.</li>"
+        "<li><b>Content:</b> Add Campaign Dashboard, World Map, Map Tool, Scenario Board, Scene Flow, Image Library, Handouts, Container Window, Loot Generator, Object Shelf, Whiteboard, Random Tables, Plot Twists, entity details, Puzzle Display, Note Tab, Sticky Note, and graph panels.</li>"
+        "<li><b>Organization:</b> Search, tile, cascade, align, distribute, resize, snap to grid, or spread panels. Sticky notes can be clustered by tag or colour; minimized panels remain available in the restore tray.</li>"
+        "<li><b>Annotations and attachments:</b> Draw desk annotations and attach campaign images or entity material to the workspace.</li>"
+        "<li><b>Player reveal:</b> Reveal a selected panel to the player display. Fixed overlays remain positioned above the player view until removed.</li>"
+        "<li><b>Appearance:</b> Panel skins and depth styles help visually group material.</li>"
+        "<li><b>Persistence:</b> Save the table layout after arranging panels. Layouts persist per scenario; named table layouts can be transferred in full campaign bundles.</li>"
         "</ul>"
+        "<div class='warning'><b>Player-facing safety:</b> Check a panel for GM-only notes and secrets before revealing it or placing it in a fixed overlay.</div>"
         + (img('gm_table_default', 'GM Table - default layout') if shots.get('gm_table_default') else '')
         + (img('gm_table_panels', 'GM Table - expanded panel layout') if shots.get('gm_table_panels') else '')
     ))
@@ -2518,12 +2657,44 @@ def build_user_manual(shots, menu_data, py_files):
         "<p>Scenario toolkit for rapid authoring:</p>"
         "<ul>"
         "<li><b>Scenario Builder Wizard:</b> Plan scenes step-by-step, link NPCs/Places/Maps, and preview a scene flow before saving.</li>"
-        "<li><b>Scenario Generator:</b> Configure prompts and let the AI draft outline sections you can review and tweak.</li>"
+        "<li><b>Scenario Generator:</b> Use either the random generator or AI prompt generator, select a saved prompt and AI model, answer guided questions, then review the streamed result before saving.</li>"
         "<li><b>Scenario Importer:</b> Map headings from external documents into template fields before saving.</li>"
         "<li><b>AI & web import:</b> Use AI helpers and the Web Text Import flow to turn online sources or external text into structured scenario content.</li>"
         "<li><b>PDF Importers:</b> Utilities include Creature and Equipment importers that extract entries from PDFs with a review step.</li>"
         "</ul>"
         + img('scenario_builder', 'Scenario Builder Wizard') + img('scenario_generator', 'Scenario Generator') + img('scenario_importer', 'Scenario Importer')
+    ))
+
+    parts.append(section('AI Scenario Generation',
+        "<ol>"
+        "<li>Configure the endpoint from <b>File &rarr; AI Settings</b>. For Ollama, ensure the service is running and at least one model is installed.</li>"
+        "<li>Open <b>GM Tools &rarr; Generate Scenario</b> and choose <b>AI prompt generator</b>.</li>"
+        "<li>Select a prompt and a discovered model. The last model is remembered. Use <b>Manage Prompts</b> to create, edit, duplicate, or remove reusable guided prompts.</li>"
+        "<li>Answer the prompt questions and start generation. Output streams into the result area while the request is running.</li>"
+        "<li>Review names, scene headings, linked entities, traits, and descriptions before saving.</li>"
+        "<li>When saved, structured output can create the scenario and missing linked entities such as NPCs and Places. Existing entity names are normalized to reduce broken links and duplicate records.</li>"
+        "</ol>"
+        "<div class='warning'><b>Review required:</b> AI output can be incomplete or incorrect. Back up the campaign before a large generation and inspect newly created entities afterward.</div>"
+    ))
+
+    parts.append(section('Campaign Validation',
+        "<p>Open <b>Campaign &rarr; Verify Campaign</b> to check campaign hierarchy and entity references.</p>"
+        "<ul>"
+        "<li>The validation wizard reports missing references, ambiguous matches, and invalid campaign/arc/scenario relationships.</li>"
+        "<li>For a missing reference, remove it or select a replacement target.</li>"
+        "<li>For an ambiguous reference, inspect the source field and choose the intended record.</li>"
+        "<li>Review the summary before applying fixes. Re-run verification afterward to confirm the campaign is clean.</li>"
+        "</ul>"
+        "<div class='warning'><b>Backup first:</b> Validation repairs modify campaign data and may update several references.</div>"
+    ))
+
+    parts.append(section('Campaign Time & Session Tools',
+        "<ul>"
+        "<li><b>Advance Timeline:</b> Open from the Utilities sidebar to move campaign time forward and process scheduled events.</li>"
+        "<li><b>Calendar:</b> Use the Calendar control in the main window to show or hide the campaign calendar dock; open the full calendar for event editing and navigation.</li>"
+        "<li><b>Session Timers:</b> Choose <b>GM Tools &rarr; Session Timers</b> or the main Timer control to run session countdowns and reminders.</li>"
+        "<li><b>Character Creation:</b> Choose <b>GM Tools &rarr; Character Creation</b> to build a PC using the active system's rules and progression options.</li>"
+        "</ul>"
     ))
 
     map_tok_html = ''.join(f"<li>{i}</li>" for i in map_token_items) if map_token_items else ''
@@ -2533,7 +2704,7 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('Scene Flow',
         "<p>Visualize your scenario as a flow of scenes and links. Drag nodes to rearrange, connect scenes with labeled links, and preview the structure before a session.</p>"
         "<ul>"
-        "<li><b>Open:</b> Utilities &rarr; Open Scene Flow Viewer (or add a tab inside the GM Screen).</li>"
+        "<li><b>Open:</b> <b>Campaign &rarr; Scene Flow Viewer</b>, the Relations &amp; Graphs sidebar, or a GM Screen/GM Table panel.</li>"
         "<li><b>Nodes & links:</b> Create, rename, colorize scenes; add directional links with labels.</li>"
         "<li><b>Layout:</b> Pan and zoom the canvas; arrange scenes for readability.</li>"
         "</ul>"
@@ -2550,12 +2721,14 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Fog of war:</b> Paint additive or subtractive fog with brush shortcuts (<code>[</code>/<code>]</code>) and reset the mask with a single click.</li>"
 
         "<li><b>Tokens & auras:</b> Add NPC, PC, or creature tokens, colour their borders, track HP overlays, and duplicate or delete entries through the context menu.</li>"
+        "<li><b>Token facing:</b> Rotate token facing where the selected token and view support it.</li>"
 
         "<li><b>Drawing tools:</b> Switch between Token, Rectangle, and Oval modes to sketch zones, spell areas, or light auras with filled/outline styles; add editable text labels and tweak drawing colours.</li>"
 
         "<li><b>Background rotation:</b> Rotate the map image from the toolbar; rotation is saved with the background for consistent sharing/exports.</li>"
 
         "<li><b>Broadcast & sync:</b> Mirror the current map to fullscreen or the web client; pan and zoom updates are pushed live.</li>"
+        "<li><b>Remote display:</b> Treat the web display as player-facing. Enable remote editing only on a trusted network and use the configured access token.</li>"
 
         "</ul>"
 
@@ -2591,9 +2764,11 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('World Map',
         "<p>The World Map window lets you navigate nested maps, place NPC/PC/Creature/Place tokens, and drill down to regional maps while reviewing a compact inspector for the selected entity.</p>"
         "<ul>"
-        "<li><b>Open:</b> Utilities &rarr; Open World Map (or from the GM Screen via <i>Add Panel &rarr; World Map</i>).</li>"
+        "<li><b>Open:</b> <b>Campaign &rarr; World Map</b>, the Relations &amp; Graphs sidebar, or a GM Screen/GM Table panel.</li>"
         "<li><b>Select map:</b> Load an existing entry or create a new one and assign a background image.</li>"
         "<li><b>Tokens:</b> Add NPCs, PCs, Creatures, Places, and Maps as pins. Selecting a Map token opens its child map.</li>"
+        "<li><b>Marker types:</b> Classify markers as location, quest, danger, treasure, or note. The selected type appears as a badge; use the type filter to reduce clutter.</li>"
+        "<li><b>Measurements:</b> Choose a distance template, grid-cell size, scale, and unit, then draw persistent measurements. Use <b>Clear Measurements</b> to remove them from the current map.</li>"
         "<li><b>Pan &amp; zoom:</b> Middle-drag to pan; mouse wheel to zoom. View state persists per map.</li>"
         "<li><b>Inspector:</b> Click a token to view summary, notes, and quick stats; switch tabs to review more context.</li>"
         "</ul>"
@@ -2614,7 +2789,7 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('Dice Roller',
         "<p>Use the full Dice Roller for formula-based rolls with polyhedral previews, or the compact Dice Bar for always-on-top quick rolls.</p>"
         "<ul>"
-        "<li><b>Open:</b> Utilities &rarr; Dice Bar and Utilities &rarr; Open Dice Roller.</li>"
+        "<li><b>Open:</b> <b>GM Tools &rarr; Dice</b> for the full roller, or <b>View &rarr; Show Dice Bar</b> for the compact bar.</li>"
         "<li><b>System presets:</b> Supported dice and default formulas adapt to the selected campaign system.</li>"
         "<li><b>Formula entry:</b> Build expressions (e.g., <code>2d20+5</code>), double-click presets to add dice, press Enter or click Roll.</li>"
         "<li><b>Exploding:</b> Toggle exploding dice to reroll max results.</li>"
@@ -2626,13 +2801,30 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('Audio & Music',
         "<p>Organize and play background music and sound effects, with persistent playlists per section.</p>"
         "<ul>"
-        "<li><b>Open:</b> Utilities &rarr; Sound &amp; Music Manager. Use tabs for Music, Ambience, and SFX.</li>"
+        "<li><b>Open:</b> <b>GM Tools &rarr; Sound &amp; Music</b>. Use tabs for Music, Ambience, and SFX.</li>"
         "<li><b>Library:</b> Create types, add files or entire folders, rescan, and remove tracks.</li>"
         "<li><b>Playback:</b> Play/Pause, Next/Prev, volume, and per-section loop. Last playlist and loop settings are restored.</li>"
         "<li><b>AI Sorting:</b> Optionally categorize folders with local AI (if configured).</li>"
-        "<li><b>Audio Controls Bar:</b> Utilities &rarr; Audio Controls Bar opens a compact always-on-top controller.</li>"
+        "<li><b>Audio Controls Bar:</b> <b>View &rarr; Show Audio Bar</b> opens a compact always-on-top controller.</li>"
         "</ul>"
         + img('sound_manager', 'Sound & Music Manager') + img('audio_bar', 'Audio Controls Bar')
+    ))
+
+    parts.append(section('Audio & Ambiance',
+        "<p>Audio playback and visual ambiance are separate player-presentation tools.</p>"
+        "<ul>"
+        "<li><b>Sound &amp; Music:</b> Organize Music, Ambience, and SFX libraries and control playback.</li>"
+        "<li><b>Ambiance Control:</b> Open from <b>GM Tools &rarr; Ambiance Control</b> to manage the player-facing ambiance display independently of GM workspaces.</li>"
+        "<li><b>Import Ambiance Wallpapers:</b> Import campaign wallpaper bundles from <b>GM Tools</b>. Wallpapers may also travel in full cross-campaign bundles.</li>"
+        "</ul>"
+    ))
+
+    parts.append(section('Image Library',
+        "<ul>"
+        "<li>Choose <b>GM Tools &rarr; Open Image Library</b> to browse campaign images and reusable assets.</li>"
+        "<li>Choose <b>GM Tools &rarr; Import Image Directories…</b> to add one or more folders. Review import options and duplicate handling before confirming.</li>"
+        "<li>Image Library assets can be used in GM Table panels and transferred through the Cross-campaign Asset Library.</li>"
+        "</ul>"
     ))
 
     parts.append(section('Books',
@@ -2654,6 +2846,26 @@ def build_user_manual(shots, menu_data, py_files):
         "<li><b>Clues board:</b> Drag clues, create links, and save positions.</li>"
         "<li><b>Media:</b> Portraits and uploaded assets are served from the active campaign.</li>"
         "</ul>"
+        "<div class='warning'><b>Network safety:</b> Do not expose the server directly to the public internet without authentication, access controls, and an appropriate reverse proxy. Player-facing services may expose campaign media.</div>"
+    ))
+
+    parts.append(section('Guided Tour',
+        "<p>Choose <b>Help &rarr; Guided Tour</b> or <b>Start Guided Tour</b> in the Utilities sidebar. The tour highlights stable interface targets and guides a new GM through initial campaign setup. You can close it and restart it later from Help.</p>"
+    ))
+
+    parts.append(section('Troubleshooting & Safety',
+        "<h3>AI or Ollama models do not appear</h3>"
+        "<p>Confirm Ollama is running, the configured base URL is reachable, and at least one model is installed. Reopen the generator to repeat background model discovery. Check the application logs if discovery still fails.</p>"
+        "<h3>SwarmUI portrait generation fails</h3>"
+        "<p>Re-select the SwarmUI directory from <b>File &rarr; Set SwarmUI Path</b>, verify SwarmUI starts independently, and try one entity before running bulk generation.</p>"
+        "<h3>Media is missing</h3>"
+        "<p>Keep campaign media inside the active campaign directory. If a campaign was moved manually, use the normal bundle/backup workflow or repair affected paths from the entity editor.</p>"
+        "<h3>Imports and duplicate records</h3>"
+        "<p>Back up first, review merge prompts, then run <b>Campaign &rarr; Verify Campaign</b> after the import.</p>"
+        "<h3>Backup and restore</h3>"
+        "<p>Create backups from <b>File &rarr; Create Backup</b>. Restoring replaces active campaign data and assets with the selected archive, so preserve the current campaign with a fresh backup first.</p>"
+        "<h3>Player-facing displays</h3>"
+        "<p>Review panels, maps, notes, portraits, and browser-accessible media before broadcasting. Use access tokens and trusted networks for web map and whiteboard services.</p>"
     ))
 
     parts.append(section('Keyboard Shortcuts',
@@ -2675,17 +2887,36 @@ def build_user_manual(shots, menu_data, py_files):
     parts.append(section('Tips',
         "<div class='tip'><b>Documentation refresh:</b> Run <code>python scripts/generate_docs.py</code> from the repository root after UI, menu, screenshot, or API changes. It refreshes <code>docs/index.html</code>, this manual, and <code>docs/images/</code>.</div>"
         "<div class='tip'><b>Exports:</b> Use <i>Export Scenarios</i>, <i>Campaign Dossier</i>, <i>Session Brief</i>, or <i>Export for Foundry</i> depending on the audience.</div>"
-        "<div class='tip'><b>Portrait workflow:</b> Generate or link portraits from the Utilities section; double-click a portrait in any list to pop it out.</div>"
+        "<div class='tip'><b>Portrait workflow:</b> Generate or link portraits from GM Tools, a scenario context menu, or an entity editor; double-click a portrait in a list to pop it out.</div>"
         "<div class='tip'><b>Cross-campaign reuse:</b> Use the Cross-campaign Asset Library to move NPCs, objects, and maps between campaigns with their media.</div>"
-        "<div class='tip'><b>AI settings:</b> Configure the local AI endpoint in <code>config/config.ini</code> under the <code>[AI]</code> section.</div>"
-        "<div class='tip'><b>Auto-improvement:</b> Configure the Codex CLI integration in <code>config/config.ini</code> under <code>[AutoImprove]</code> before using automated improvement workflows.</div>"
+        "<div class='tip'><b>AI settings:</b> Use <b>File &rarr; AI Settings</b> for the endpoint, model, temperature, token limit, and optional API key.</div>"
+        "<div class='tip'><b>Auto-improvement:</b> Open <b>File &rarr; Auto Improve App</b>. Prefer dry-run until its Codex CLI and validation commands have been verified.</div>"
         "<div class='tip'><b>Logging:</b> Enable logs in <code>config/config.ini</code> to troubleshoot AI imports and automated workflows.</div>"
     ))
 
-    parts.append("</div></body></html>")
-    return ''.join(parts)
+    parts.append("</main></body></html>")
+    return '\n'.join(parts) + '\n'
+
+
+def refresh_user_manual_from_existing_images():
+    """Regenerate manual prose without launching the screenshot capture UI."""
+    ensure_dirs()
+    files = discover_python_files()
+    menu_data = []
+    for path in files:
+        menu_data.extend(parse_context_menus(path))
+    for path in discover_html_files():
+        menu_data.extend(parse_html_context_menus(path))
+    shots = {path.stem: path for path in IMAGES_DIR.glob("*.png")}
+    manual = build_user_manual(shots, menu_data, files)
+    target = DOCS_DIR / "user-manual.html"
+    target.write_text(manual, encoding="utf-8")
+    print(f"User manual written from existing screenshots: {target}")
 
 
 
 if __name__ == "__main__":
-    main()
+    if "--manual-only" in sys.argv:
+        refresh_user_manual_from_existing_images()
+    else:
+        main()
