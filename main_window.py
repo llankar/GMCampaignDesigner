@@ -3774,10 +3774,9 @@ class MainWindow(ctk.CTk):
             )
             return
         publisher.select_campaign(matching_campaign)
-        # Defer until the publisher has rendered the selected campaign. Its
-        # existing full-campaign publication flow requests title, description,
-        # and a final explicit confirmation from the user.
-        publisher.after_idle(publisher.publish_selected_to_github)
+        # Full-campaign updates must use the optimistic revision publisher;
+        # the gallery action remains a merge-oriented manual asset feature.
+        publisher.after_idle(publisher.publish_campaign_update)
 
     def _save_remote_campaign_snapshot(self, root: Path, result) -> None:
         """Download/copy a remote revision without applying it to the campaign."""
