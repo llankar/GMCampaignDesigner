@@ -19,10 +19,12 @@ def _valid_sha256(value: str) -> str:
 
 
 def _validate_revision(revision: int, parent_revision: Optional[int]) -> None:
-    if isinstance(revision, bool) or revision < 1:
+    if isinstance(revision, bool) or not isinstance(revision, int) or revision < 1:
         raise ValueError("revision must be a positive integer")
     if parent_revision is not None and (
-        isinstance(parent_revision, bool) or not 0 <= parent_revision < revision
+        isinstance(parent_revision, bool)
+        or not isinstance(parent_revision, int)
+        or not 0 <= parent_revision < revision
     ):
         raise ValueError("parent_revision must precede revision")
 
@@ -53,8 +55,10 @@ class CampaignSyncMetadata:
     def from_dict(cls, value: Dict[str, Any]) -> "CampaignSyncMetadata":
         return cls(
             campaign_id=str(value["campaign_id"]),
-            revision=int(value["revision"]),
-            parent_revision=(int(value["parent_revision"]) if value.get("parent_revision") is not None else None),
+            # Revisions are protocol integers.  Do not silently turn names,
+            # numeric strings, floats, or booleans into valid revisions.
+            revision=value["revision"],
+            parent_revision=value.get("parent_revision"),
             snapshot_sha256=str(value.get("snapshot_sha256") or ""),
             published_at=str(value.get("published_at") or ""),
             publisher_installation_id=str(value.get("publisher_installation_id") or ""),
@@ -85,8 +89,8 @@ class RemoteCampaignRevision:
     def from_dict(cls, value: Dict[str, Any]) -> "RemoteCampaignRevision":
         return cls(
             campaign_id=str(value["campaign_id"]),
-            revision=int(value["revision"]),
-            parent_revision=(int(value["parent_revision"]) if value.get("parent_revision") is not None else None),
+            revision=value["revision"],
+            parent_revision=value.get("parent_revision"),
             snapshot_sha256=str(value.get("snapshot_sha256") or ""),
             snapshot_mode=str(value.get("snapshot_mode") or "full_campaign"),
             published_at=(str(value["published_at"]) if value.get("published_at") else None),
