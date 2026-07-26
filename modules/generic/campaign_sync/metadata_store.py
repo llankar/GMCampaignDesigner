@@ -72,3 +72,26 @@ class InstallationStateStore:
         state["installation_id"] = value
         self.write(state)
         return value
+
+    def campaign_state(self, installation_key: str) -> dict:
+        """Return state belonging only to one local campaign installation."""
+        state = self.read()
+        campaigns = state.get("campaign_sync")
+        if not isinstance(campaigns, dict):
+            return {}
+        value = campaigns.get(str(installation_key))
+        return dict(value) if isinstance(value, dict) else {}
+
+    def update_campaign_state(self, installation_key: str, **changes: object) -> dict:
+        """Atomically merge machine-local check state for one installation."""
+        state = self.read()
+        campaigns = state.setdefault("campaign_sync", {})
+        if not isinstance(campaigns, dict):
+            campaigns = {}
+            state["campaign_sync"] = campaigns
+        current = campaigns.get(str(installation_key))
+        current = dict(current) if isinstance(current, dict) else {}
+        current.update(changes)
+        campaigns[str(installation_key)] = current
+        self.write(state)
+        return current

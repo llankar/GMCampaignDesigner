@@ -11,6 +11,7 @@ import shutil
 import re
 import unicodedata
 import threading
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 import tkinter as tk
@@ -113,6 +114,18 @@ from modules.pcs.display_pcs import display_pcs_in_banner
 from modules.pcs.character_creation import CharacterCreationView
 from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.custom_fields_editor import CustomFieldsEditor
+from modules.generic.github_gallery_client import GithubGalleryClient
+from modules.generic.campaign_sync.settings import CampaignUpdatePreferences
+from modules.generic.campaign_sync.update_checker import (
+    CampaignUpdateChecker,
+    UpdateCheckSettings,
+    UpdateStatus,
+)
+from modules.generic.campaign_sync.update_ui import (
+    CampaignUpdatePrompt,
+    CampaignUpdateSettingsDialog,
+)
+from modules.generic.cross_campaign_asset_service import install_full_campaign_bundle
 from modules.generic.new_entity_type_dialog import NewEntityTypeDialog
 from modules.auto_improve.ui.auto_improve_panel import AutoImprovePanel
 from modules.campaigns.services import (
@@ -219,6 +232,9 @@ class MainWindow(ctk.CTk):
         self._database_manager_dialog = None
         self._campaign_builder_wizard = None
         self._update_thread = None
+        self._campaign_update_checker = CampaignUpdateChecker(GithubGalleryClient())
+        self._campaign_update_prompt = None
+        self._downloaded_campaign_updates = {}
         self.whiteboard_controller = None
         root = self.winfo_toplevel()
         root.bind_all("<Control-f>", self._on_ctrl_f)
@@ -239,6 +255,7 @@ class MainWindow(ctk.CTk):
         self.after(400, self.open_audio_bar)
         self.after(600, lambda: self._queue_update_check(force=True))
         self.after(800, self._auto_open_campaign_overview)
+        self.after(1000, self._queue_campaign_update_check)
 
     def _bind_global_shortcuts(self):
         """Bind global shortcuts."""
@@ -332,6 +349,10 @@ class MainWindow(ctk.CTk):
         ctk.CTkButton(btns, text="Save", command=save).pack(side="right", padx=6)
         ctk.CTkButton(btns, text="Defaults", command=reset_defaults).pack(side="right", padx=6)
         ctk.CTkButton(btns, text="Close", command=top.destroy).pack(side="right", padx=6)
+
+    def open_campaign_update_settings(self):
+        """Open installation-local automatic campaign update preferences."""
+        CampaignUpdateSettingsDialog(self)
 
     def register_tour_widget(self, screen: str, key: str, widget):
         """Register a guided-tour target widget by stable key."""
@@ -1103,6 +1124,7 @@ class MainWindow(ctk.CTk):
             SidebarItemSpec("customize_fields", "Customize Fields", self.open_custom_fields_editor),
             SidebarItemSpec("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
             SidebarItemSpec("system_manager", "AI Settings", self.open_ai_settings),
+            SidebarItemSpec("campaign_updates", "Campaign Update Settings", self.open_campaign_update_settings),
             SidebarItemSpec("auto_improve", "Auto-improvement (Codex CLI)", self.open_auto_improve_panel),
             SidebarItemSpec("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
             SidebarItemSpec("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
@@ -3543,7 +3565,7 @@ class MainWindow(ctk.CTk):
             detail_builder=detail_builder,
         )
 
-    def _run_progress_task(self, title, worker, success_message, detail_builder=None):
+    def _run_progress_task(self, title, worker, success_message, detail_builder=None, on_success=None):
         """Run progress task."""
         progress_win = ctk.CTkToplevel(self)
         progress_win.title(title)
@@ -3588,9 +3610,14 @@ class MainWindow(ctk.CTk):
             close_window()
             messagebox.showerror(title, detail)
 
-        def on_success(result):
+        success_callback = on_success
+
+        def handle_success(result):
             """Handle success."""
             close_window()
+            if success_callback:
+                success_callback(result)
+                return
             detail = detail_builder(result) if detail_builder else None
             message = success_message or "Operation completed."
             if detail:
@@ -3623,9 +3650,118 @@ class MainWindow(ctk.CTk):
                 self.after(0, lambda detail=detail: handle_error("Unexpected Error", detail))
                 return
 
-            self.after(0, lambda: on_success(result))
+            self.after(0, lambda: handle_success(result))
 
         threading.Thread(target=run_worker, daemon=True).start()
+
+    def _active_campaign_root(self) -> Path:
+        db_path = ConfigHelper.get("Database", "path", fallback="default_campaign.db")
+        return Path(str(db_path)).expanduser().resolve().parent
+
+    def _queue_campaign_update_check(self, *, force: bool = False) -> None:
+        """Check the currently selected campaign using the shared worker mechanism."""
+        preferences = CampaignUpdatePreferences.load()
+        root = self._active_campaign_root()
+        # A prompt belongs to the campaign that produced it.  In particular,
+        # do not leave campaign A's actions usable while campaign B is active.
+        existing = self._campaign_update_prompt
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.destroy()
+            except Exception:
+                pass
+            self._campaign_update_prompt = None
+        settings = UpdateCheckSettings(
+            enabled=preferences.automatic_checks,
+            offline=preferences.offline,
+            interval_seconds=preferences.frequency_hours * 3600,
+            force=force,
+        )
+
+        def worker(progress):
+            progress("Checking campaign revisions…", 0.15)
+            result = self._campaign_update_checker.check(root, settings)
+            progress("Campaign check complete.", 1.0)
+            return result
+
+        self._run_progress_task(
+            "Checking Campaign Updates", worker, None,
+            on_success=lambda result: self._handle_campaign_update_result(root, result, preferences),
+        )
+
+    def _handle_campaign_update_result(self, root, result, preferences) -> None:
+        # Results can arrive after another code path selected a new database.
+        # Never offer or download an update for a campaign that is no longer
+        # active.
+        if Path(root).resolve() != self._active_campaign_root():
+            return
+        if result.status is not UpdateStatus.UPDATE_AVAILABLE:
+            return
+        if preferences.automatic_download:
+            self._download_campaign_update(root, result, show_prompt=True)
+            return
+        self._show_campaign_update_prompt(root, result)
+
+    def _show_campaign_update_prompt(self, root: Path, result) -> None:
+        existing = self._campaign_update_prompt
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.destroy()
+            except Exception:
+                pass
+        prompt = CampaignUpdatePrompt(
+            self,
+            result,
+            on_update=lambda: self._confirm_campaign_update(root, result),
+            on_later=lambda: None,
+            on_ignore=lambda: self._campaign_update_checker.ignore_revision(
+                root, result.available_revision
+            ),
+        )
+        self._campaign_update_prompt = prompt
+
+    def _download_campaign_update(self, root: Path, result, *, show_prompt: bool) -> None:
+        temp_dir = Path(tempfile.mkdtemp(prefix="gmcd_campaign_update_"))
+        asset_name = Path(getattr(result.bundle, "asset_name", "campaign.zip") or "campaign.zip").name
+        archive = temp_dir / (asset_name if asset_name.lower().endswith(".zip") else f"{asset_name}.zip")
+
+        def worker(progress):
+            return self._campaign_update_checker.gallery_client.download_bundle(
+                result.bundle, archive, progress_callback=progress
+            )
+
+        def downloaded(path):
+            self._downloaded_campaign_updates[(str(root), result.available_revision)] = Path(path)
+            if show_prompt and Path(root).resolve() == self._active_campaign_root():
+                self._show_campaign_update_prompt(root, result)
+
+        self._run_progress_task("Downloading Campaign Update", worker, None, on_success=downloaded)
+
+    def _confirm_campaign_update(self, root: Path, result) -> None:
+        if not messagebox.askyesno(
+            "Apply Campaign Update",
+            f"Apply revision {result.available_revision} to '{result.campaign_name}' now?",
+            parent=self,
+        ):
+            return
+        archive = self._downloaded_campaign_updates.get((str(root), result.available_revision))
+        if archive is None or not archive.exists():
+            self._download_campaign_update(root, result, show_prompt=True)
+            # Download completion deliberately asks again before applying.
+            return
+
+        def worker(progress):
+            return install_full_campaign_bundle(archive, root, progress_callback=progress)
+
+        def applied(_campaign):
+            initialize_db()
+            self._reload_active_campaign_system()
+            self.refresh_entities()
+            messagebox.showinfo("Campaign Updated", f"Revision {result.available_revision} was applied.")
+
+        self._run_progress_task("Applying Campaign Update", worker, None, on_success=applied)
 
     def _format_backup_summary(self, manifest: dict | None, *, include_target: bool) -> str:
         """Format backup summary."""
@@ -4086,6 +4222,9 @@ class MainWindow(ctk.CTk):
                 self.db_tooltip.text = full_path
         except Exception:
             self.db_tooltip = None
+
+        # The configured path and campaign-bound UI are now both ready.
+        self.after_idle(lambda: self._queue_campaign_update_check(force=True))
 
     def select_swarmui_path(self):
         """Select swarmui path."""
