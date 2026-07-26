@@ -32,6 +32,7 @@ from modules.generic.cross_campaign_gm_tables import (
 )
 from modules.generic.generic_model_wrapper import GenericModelWrapper
 from modules.generic.campaign_sync.hashing import hash_campaign_snapshot
+from modules.generic.campaign_sync.change_detector import CampaignChangeDetector
 from modules.generic.campaign_sync.metadata_store import (
     CampaignSyncMetadataStore,
     InstallationStateStore,
@@ -905,6 +906,11 @@ def export_bundle(
         # failed export must not consume a revision number.
         if include_database:
             sync_store.write(sync_metadata)
+            CampaignChangeDetector().persist_baseline(
+                source_campaign.root,
+                sync_metadata.snapshot_sha256,
+                database_path=source_campaign.db_path,
+            )
 
         _call_progress(progress_callback, "Export completed", 1.0)
     finally:
@@ -1603,6 +1609,16 @@ def install_full_campaign_bundle(
             )
 
         install_wallpaper_bundle(temp_dir, target_root, manifest)
+
+        sync_value = manifest.get("sync")
+        if isinstance(sync_value, dict):
+            sync_metadata = CampaignSyncMetadata.from_dict(sync_value)
+            CampaignSyncMetadataStore(target_root).write(sync_metadata)
+            # Compute this installation's baseline from what was actually
+            # restored rather than trusting archive metadata alone.
+            CampaignChangeDetector().persist_baseline(
+                target_root, database_path=db_destination
+            )
 
         campaign_name = str(
             manifest.get("source_campaign", {}).get("name") or target_dir.name
