@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import shutil
 import sqlite3
 import tempfile
@@ -13,6 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Dict, Iterable, List, Optional, Tuple
+from uuid import uuid4
 
 from modules.audio.entity_audio import normalize_audio_reference
 from modules.generic.ambiance_wallpaper_bundle import (
@@ -31,6 +31,12 @@ from modules.generic.cross_campaign_gm_tables import (
     merge_gm_virtual_tables,
 )
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.generic.campaign_sync.hashing import hash_campaign_snapshot
+from modules.generic.campaign_sync.metadata_store import (
+    CampaignSyncMetadataStore,
+    InstallationStateStore,
+)
+from modules.generic.campaign_sync.models import CampaignSyncMetadata
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import (
     parse_portrait_value,
@@ -704,6 +710,7 @@ def export_bundle(
     include_systems: bool = True,
     include_random_tables: bool = False,
     gm_virtual_tables: Optional[List[dict]] = None,
+    change_summary: Optional[str] = None,
     progress_callback=None,
 ) -> dict:
     """Export bundle."""
@@ -735,6 +742,22 @@ def export_bundle(
         "assets": [],
         "bundle_mode": "full_campaign" if include_database else "asset_bundle",
     }
+    if include_database:
+        sync_store = CampaignSyncMetadataStore(source_campaign.root)
+        previous_sync = sync_store.read()
+        revision = (previous_sync.revision + 1) if previous_sync else 1
+        sync_metadata = CampaignSyncMetadata(
+            campaign_id=(previous_sync.campaign_id if previous_sync else str(uuid4())),
+            revision=revision,
+            parent_revision=(previous_sync.revision if previous_sync else None),
+            snapshot_sha256=hash_campaign_snapshot(source_campaign.root),
+            published_at=manifest["created_at"],
+            publisher_installation_id=InstallationStateStore().installation_id(),
+            bundle_version=BUNDLE_VERSION,
+            change_summary=change_summary,
+            snapshot_mode="full_campaign",
+        )
+        manifest["sync"] = sync_metadata.to_dict()
 
     assets_lookup: Dict[str, Path] = {}
 
@@ -854,8 +877,9 @@ def export_bundle(
                     "file_name": source_campaign.db_path.name,
                     "relative_path": f"database/{source_campaign.db_path.name}",
                     "size": int(stat.st_size),
-                    "modified_at": datetime.utcfromtimestamp(stat.st_mtime).isoformat()
-                    + "Z",
+                    "modified_at": datetime.fromtimestamp(
+                        stat.st_mtime, timezone.utc
+                    ).isoformat().replace("+00:00", "Z"),
                 }
             except Exception as exc:
                 log_exception(
@@ -876,6 +900,11 @@ def export_bundle(
                     continue
                 arcname = file_path.relative_to(temp_root).as_posix()
                 zf.write(file_path, arcname)
+
+        # Advance local state only after the complete snapshot was written.  A
+        # failed export must not consume a revision number.
+        if include_database:
+            sync_store.write(sync_metadata)
 
         _call_progress(progress_callback, "Export completed", 1.0)
     finally:
