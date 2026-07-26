@@ -121,6 +121,11 @@ from modules.generic.campaign_sync.update_checker import (
     UpdateCheckSettings,
     UpdateStatus,
 )
+from modules.generic.campaign_sync.change_detector import (
+    CampaignChangeDetector,
+    CampaignChangeState,
+    create_campaign_backup_archive,
+)
 from modules.generic.campaign_sync.update_ui import (
     CampaignUpdatePrompt,
     CampaignUpdateSettingsDialog,
@@ -3719,8 +3724,82 @@ class MainWindow(ctk.CTk):
             on_ignore=lambda: self._campaign_update_checker.ignore_revision(
                 root, result.available_revision
             ),
+            on_backup_replace=lambda: self._backup_then_replace_campaign(root, result),
+            on_publish_local=lambda: self._publish_local_campaign_revision(root, result),
+            on_save_remote=lambda: self._save_remote_campaign_snapshot(root, result),
         )
         self._campaign_update_prompt = prompt
+
+    def _backup_then_replace_campaign(self, root: Path, result) -> None:
+        """Create a durable local archive before entering the replace flow."""
+        backup_dir = Path.home() / ".gmcd" / "campaign_backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        archive = backup_dir / f"{root.name}_before_r{result.available_revision}_{timestamp}.zip"
+        try:
+            create_campaign_backup_archive(root, archive)
+        except Exception as exc:
+            messagebox.showerror("Backup Failed", f"The campaign was not replaced.\n\n{exc}", parent=self)
+            return
+        messagebox.showinfo("Local Backup Created", f"Backup saved to:\n{archive}", parent=self)
+        self._confirm_campaign_update(root, result, allow_non_clean=True)
+
+    def _publish_local_campaign_revision(self, root: Path, result) -> None:
+        """Route a safe local-publication choice to the existing publisher."""
+        if result.conflict:
+            messagebox.showwarning(
+                "Campaign Conflict",
+                "Local and remote changes derive from the same parent revision. "
+                "Publishing over the remote revision is disabled.",
+                parent=self,
+            )
+            return
+        self.open_cross_campaign_asset_library()
+        publisher = self._asset_library_window
+        if publisher is None:
+            return
+        matching_campaign = next(
+            (
+                campaign
+                for campaign in publisher.source_campaigns
+                if campaign.root.resolve() == root.resolve()
+            ),
+            None,
+        )
+        if matching_campaign is None:
+            messagebox.showerror(
+                "Publish Local Campaign",
+                "The active campaign could not be selected in the publisher.",
+                parent=self,
+            )
+            return
+        publisher.select_campaign(matching_campaign)
+        # Defer until the publisher has rendered the selected campaign. Its
+        # existing full-campaign publication flow requests title, description,
+        # and a final explicit confirmation from the user.
+        publisher.after_idle(publisher.publish_selected_to_github)
+
+    def _save_remote_campaign_snapshot(self, root: Path, result) -> None:
+        """Download/copy a remote revision without applying it to the campaign."""
+        destination = filedialog.asksaveasfilename(
+            title="Save Remote Campaign Snapshot",
+            initialfile=f"{root.name}_remote_r{result.available_revision}.zip",
+            defaultextension=".zip",
+            filetypes=[("Zip Archives", "*.zip")],
+        )
+        if not destination:
+            return
+        cached = self._downloaded_campaign_updates.get((str(root), result.available_revision))
+        if cached is not None and cached.exists():
+            shutil.copy2(cached, destination)
+            return
+
+        def worker(progress):
+            return self._campaign_update_checker.gallery_client.download_bundle(
+                result.bundle, Path(destination), progress_callback=progress
+            )
+
+        self._run_progress_task("Saving Remote Campaign Snapshot", worker, None)
 
     def _download_campaign_update(self, root: Path, result, *, show_prompt: bool) -> None:
         temp_dir = Path(tempfile.mkdtemp(prefix="gmcd_campaign_update_"))
@@ -3739,7 +3818,25 @@ class MainWindow(ctk.CTk):
 
         self._run_progress_task("Downloading Campaign Update", worker, None, on_success=downloaded)
 
-    def _confirm_campaign_update(self, root: Path, result) -> None:
+    def _confirm_campaign_update(
+        self, root: Path, result, *, allow_non_clean: bool = False
+    ) -> None:
+        # The campaign can change while a prompt is open or an archive is
+        # downloading.  Revalidate at the destructive boundary rather than
+        # relying on the earlier update-check result.
+        if not allow_non_clean:
+            local_changes = CampaignChangeDetector(
+                self._campaign_update_checker.installation_store
+            ).detect(root)
+            if local_changes.state is not CampaignChangeState.CLEAN:
+                messagebox.showwarning(
+                    "Campaign Changed",
+                    "The campaign is no longer known to match the installed revision. "
+                    "Use the backup-and-replace option or save the remote snapshot separately.",
+                    parent=self,
+                )
+                self._queue_campaign_update_check(force=True)
+                return
         if not messagebox.askyesno(
             "Apply Campaign Update",
             f"Apply revision {result.available_revision} to '{result.campaign_name}' now?",

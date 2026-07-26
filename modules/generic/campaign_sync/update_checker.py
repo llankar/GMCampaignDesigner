@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from .metadata_store import CampaignSyncMetadataStore, InstallationStateStore
+from .change_detector import CampaignChangeDetector, CampaignChangeState
 
 
 class UpdateStatus(str, Enum):
@@ -40,6 +41,8 @@ class CampaignUpdateResult:
     checked_remote: bool = False
     ignored: bool = False
     error: Optional[str] = None
+    local_change_state: CampaignChangeState = CampaignChangeState.UNKNOWN
+    conflict: bool = False
 
 
 class CampaignUpdateChecker:
@@ -131,6 +134,17 @@ class CampaignUpdateChecker:
         available = revision > metadata.revision
         ignored = available and ignored_revision == revision
         status = UpdateStatus.UPDATE_AVAILABLE if available and not ignored else UpdateStatus.UP_TO_DATE
+        local_changes = CampaignChangeDetector(self.installation_store).detect(root)
+        remote_parent = getattr(remote, "parent_revision", None)
+        if remote_parent is None:
+            remote_metadata = getattr(remote, "metadata", {})
+            sync_value = remote_metadata.get("sync", {}) if isinstance(remote_metadata, dict) else {}
+            remote_parent = sync_value.get("parent_revision") if isinstance(sync_value, dict) else None
+        conflict = (
+            available
+            and local_changes.state is CampaignChangeState.LOCALLY_MODIFIED
+            and remote_parent == metadata.revision
+        )
         summary = getattr(remote, "change_summary", None)
         if not summary:
             remote_metadata = getattr(remote, "metadata", {})
@@ -147,6 +161,8 @@ class CampaignUpdateChecker:
             bundle=remote,
             checked_remote=True,
             ignored=ignored,
+            local_change_state=local_changes.state,
+            conflict=conflict,
         )
 
     def ignore_revision(self, campaign_root: Path, revision: int) -> None:

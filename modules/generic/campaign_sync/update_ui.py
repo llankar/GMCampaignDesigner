@@ -4,22 +4,26 @@ from __future__ import annotations
 
 import tkinter as tk
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Optional
 
 import customtkinter as ctk
 
 from .settings import CampaignUpdatePreferences
 from .update_checker import CampaignUpdateResult
+from .change_detector import CampaignChangeState
 
 
 class CampaignUpdatePrompt(ctk.CTkToplevel):
     """Non-modal prompt: the rest of the application remains usable."""
 
     def __init__(self, master, result: CampaignUpdateResult, *, on_update: Callable[[], None],
-                 on_later: Callable[[], None], on_ignore: Callable[[], None]) -> None:
+                 on_later: Callable[[], None], on_ignore: Callable[[], None],
+                 on_backup_replace: Optional[Callable[[], None]] = None,
+                 on_publish_local: Optional[Callable[[], None]] = None,
+                 on_save_remote: Optional[Callable[[], None]] = None) -> None:
         super().__init__(master)
         self.title("Campaign update available")
-        self.geometry("560x390")
+        self.geometry("680x500")
         self.resizable(False, False)
         self.transient(master)
         self.protocol("WM_DELETE_WINDOW", self._later)
@@ -41,16 +45,44 @@ class CampaignUpdatePrompt(ctk.CTkToplevel):
             details.append(f"Publisher: {result.publisher}")
         if result.change_summary:
             details.extend(("", "Changes:", result.change_summary))
+        if result.conflict:
+            details.extend((
+                "", "Conflict: local and remote changes derive from the same parent revision.",
+                "Nothing will be merged or overwritten automatically.",
+            ))
+        elif result.local_change_state is CampaignChangeState.LOCALLY_MODIFIED:
+            details.extend(("", "Local content has changed since the installed revision."))
+        elif result.local_change_state is CampaignChangeState.UNKNOWN:
+            details.extend(("", "Local change state is unknown; a safe one-click replacement is disabled."))
         ctk.CTkLabel(self, text="\n".join(details), justify="left", anchor="nw",
                      wraplength=500).pack(fill="both", expand=True, padx=28, pady=12)
         buttons = ctk.CTkFrame(self, fg_color="transparent")
         buttons.pack(fill="x", padx=20, pady=(8, 20))
-        ctk.CTkButton(buttons, text="Update now", command=lambda: self._choose(on_update)).pack(side="left")
-        ctk.CTkButton(buttons, text="Later", command=self._later).pack(side="left", padx=10)
-        ctk.CTkButton(buttons, text="Ignore this revision", command=lambda: self._choose(on_ignore)).pack(side="right")
+        if result.local_change_state is CampaignChangeState.CLEAN:
+            ctk.CTkButton(buttons, text="Replace with update", command=lambda: self._choose(on_update)).pack(side="left")
+        else:
+            ctk.CTkButton(
+                buttons, text="Back up local and replace",
+                command=lambda: self._choose(on_backup_replace),
+                state="normal" if on_backup_replace else "disabled",
+            ).pack(side="left")
+            ctk.CTkButton(
+                buttons, text="Publish local as new revision",
+                command=lambda: self._choose(on_publish_local),
+                state="normal" if on_publish_local and not result.conflict else "disabled",
+            ).pack(side="left", padx=8)
+            ctk.CTkButton(
+                buttons, text="Save remote separately",
+                command=lambda: self._choose(on_save_remote),
+                state="normal" if on_save_remote else "disabled",
+            ).pack(side="left")
+        ctk.CTkButton(buttons, text="Cancel", command=self._later).pack(side="right", padx=8)
+        ctk.CTkButton(buttons, text="Ignore", command=lambda: self._choose(on_ignore)).pack(side="right")
         self.lift()
 
-    def _choose(self, callback: Callable[[], None]) -> None:
+    def _choose(self, callback: Optional[Callable[[], None]]) -> None:
+        if callback is None:
+            return
         self.destroy()
         callback()
 
