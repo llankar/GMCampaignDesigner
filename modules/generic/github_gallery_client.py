@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 from urllib.parse import quote
+from uuid import UUID
 
 import requests
 
+from modules.generic.campaign_sync.models import RemoteCampaignRevision
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_info, log_module_import, log_warning
 from modules.helpers.secret_helper import decrypt_secret
@@ -47,6 +49,11 @@ class GalleryBundleSummary:
     is_draft: bool
     asset_count: int
     asset_download_count: int
+    campaign_id: Optional[str] = None
+    revision: Optional[int] = None
+    parent_revision: Optional[int] = None
+    snapshot_sha256: str = ""
+    snapshot_mode: str = ""
 
     @property
     def display_title(self) -> str:
@@ -181,6 +188,19 @@ class GithubGalleryClient:
         )
         return results
 
+    def highest_revision(
+        self, campaign_id: str, *, include_drafts: bool = False
+    ) -> Optional[GalleryBundleSummary]:
+        """Return the highest valid synchronized revision for an exact UUID."""
+        normalized_campaign_id = str(UUID(str(campaign_id)))
+        candidates = [
+            bundle
+            for bundle in self.list_bundles(include_drafts=include_drafts)
+            if bundle.campaign_id == normalized_campaign_id
+            and bundle.revision is not None
+        ]
+        return max(candidates, key=lambda bundle: bundle.revision or 0, default=None)
+
     # ----------------------------------------------------------- Downloading
     def download_bundle(
         self,
@@ -244,8 +264,14 @@ class GithubGalleryClient:
             raise FileNotFoundError(archive_path)
         session = self._create_session(auth=True)
         metadata = self._metadata_from_manifest(manifest, title, description)
-        tag_slug = _slugify(title or archive_path.stem)
-        tag_name = f"bundle-{tag_slug}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+        remote_revision = self._remote_revision_from_metadata(metadata)
+        if remote_revision is not None:
+            tag_name = (
+                f"campaign-{remote_revision.campaign_id}-r{remote_revision.revision}"
+            )
+        else:
+            tag_slug = _slugify(title or archive_path.stem)
+            tag_name = f"bundle-{tag_slug}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
         payload = {
             "tag_name": tag_name,
             "name": title,
@@ -357,6 +383,11 @@ class GithubGalleryClient:
         entity_counts: Dict[str, int] = {}
         source_campaign = ""
         manifest_created_at = ""
+        campaign_id = None
+        revision = None
+        parent_revision = None
+        snapshot_sha256 = ""
+        snapshot_mode = ""
         if isinstance(metadata, dict):
             # Handle the branch where isinstance(metadata, dict).
             description = str(metadata.get("description") or "")
@@ -373,6 +404,13 @@ class GithubGalleryClient:
             elif isinstance(source_data, str):
                 source_campaign = source_data
             manifest_created_at = str(metadata.get("created_at") or "")
+            remote_revision = self._remote_revision_from_metadata(metadata)
+            if remote_revision is not None:
+                campaign_id = remote_revision.campaign_id
+                revision = remote_revision.revision
+                parent_revision = remote_revision.parent_revision
+                snapshot_sha256 = remote_revision.snapshot_sha256
+                snapshot_mode = remote_revision.snapshot_mode
 
         summary = GalleryBundleSummary(
             release_id=int(release.get("id") or 0),
@@ -393,6 +431,11 @@ class GithubGalleryClient:
             is_draft=bool(release.get("draft")),
             asset_count=len(release.get("assets") or []),
             asset_download_count=int(asset.get("download_count") or 0),
+            campaign_id=campaign_id,
+            revision=revision,
+            parent_revision=parent_revision,
+            snapshot_sha256=snapshot_sha256,
+            snapshot_mode=snapshot_mode,
         )
         if not summary.download_url:
             raise RuntimeError("Bundle asset missing download URL")
@@ -474,7 +517,37 @@ class GithubGalleryClient:
                 "file_name": str(database_entry.get("file_name") or ""),
                 "size": int(database_entry.get("size") or 0),
             }
+        sync_entry = manifest.get("sync")
+        if isinstance(sync_entry, dict):
+            metadata["sync"] = {
+                key: sync_entry.get(key)
+                for key in (
+                    "campaign_id",
+                    "revision",
+                    "parent_revision",
+                    "snapshot_sha256",
+                    "published_at",
+                    "publisher_installation_id",
+                    "bundle_version",
+                    "change_summary",
+                    "snapshot_mode",
+                )
+                if sync_entry.get(key) is not None
+            }
         return metadata
+
+    @staticmethod
+    def _remote_revision_from_metadata(
+        metadata: Dict[str, object],
+    ) -> Optional[RemoteCampaignRevision]:
+        """Parse valid sync metadata; malformed data remains a manual bundle."""
+        sync = metadata.get("sync")
+        if not isinstance(sync, dict):
+            return None
+        try:
+            return RemoteCampaignRevision.from_dict(sync)
+        except (KeyError, TypeError, ValueError):
+            return None
 
 
 def _slugify(value: str) -> str:

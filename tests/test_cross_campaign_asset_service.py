@@ -109,6 +109,34 @@ def test_export_bundle_raises_when_database_missing(tmp_path):
     assert not destination.exists()
 
 
+def test_full_campaign_export_persists_sync_identity_and_advances_revision(
+    tmp_path, monkeypatch
+):
+    campaign_root = tmp_path / "campaign"
+    campaign_root.mkdir()
+    database = campaign_root / "campaign.db"
+    sqlite3.connect(database).close()
+    source = CampaignDatabase("Same display name", campaign_root, database)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+    first = export_bundle(
+        tmp_path / "first.zip", source, {}, include_database=True,
+        include_systems=False,
+    )
+    second = export_bundle(
+        tmp_path / "second.zip", source, {}, include_database=True,
+        include_systems=False,
+    )
+
+    assert first["sync"]["campaign_id"] == second["sync"]["campaign_id"]
+    assert first["sync"]["revision"] == 1
+    assert second["sync"]["revision"] == 2
+    assert second["sync"]["parent_revision"] == 1
+    stored = json.loads((campaign_root / ".gmcd" / "sync.json").read_text())
+    assert stored["campaign_id"] == first["sync"]["campaign_id"]
+    assert "Same display name" not in first["sync"].values()
+
+
 def test_collect_assets_includes_image_library_files(tmp_path):
     """Image library entries should include file references for bundle export."""
     campaign_root = tmp_path / "campaign"
