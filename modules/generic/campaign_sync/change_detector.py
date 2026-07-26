@@ -170,9 +170,17 @@ def _normalized_relative_path(value: str) -> str:
 
 
 def calculate_campaign_fingerprint(
-    campaign_root: Path, *, database_path: Optional[Path] = None
+    campaign_root: Path,
+    *,
+    database_path: Optional[Path] = None,
+    database_snapshot_path: Optional[Path] = None,
 ) -> str:
-    """Return the canonical SHA-256 of normalized paths and content hashes."""
+    """Return the canonical SHA-256 of normalized paths and content hashes.
+
+    ``database_snapshot_path`` lets a bundle producer hash the exact SQLite
+    backup that it will archive while retaining the live database's logical
+    relative path in the canonical digest.
+    """
     root = Path(campaign_root).expanduser().resolve()
     database = _database_path(root, database_path)
     try:
@@ -180,7 +188,14 @@ def calculate_campaign_fingerprint(
     except ValueError as exc:
         raise ValueError("campaign database must be inside the campaign root") from exc
 
-    entries = [(_normalized_relative_path(database_relative), sqlite_snapshot_sha256(database))]
+    if database_snapshot_path is None:
+        database_digest = sqlite_snapshot_sha256(database)
+    else:
+        snapshot = Path(database_snapshot_path).expanduser().resolve()
+        if not snapshot.is_file():
+            raise FileNotFoundError(snapshot)
+        database_digest = sha256_file(snapshot)
+    entries = [(_normalized_relative_path(database_relative), database_digest)]
     entries.extend(
         (_normalized_relative_path(relative), sha256_file(path))
         for relative, path in _content_files(root)

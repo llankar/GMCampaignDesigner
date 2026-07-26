@@ -34,6 +34,11 @@ from modules.generic.github_gallery_client import (
     GalleryBundleSummary,
     GithubGalleryClient,
 )
+from modules.generic.campaign_sync.metadata_store import CampaignSyncMetadataStore
+from modules.generic.campaign_sync.publisher import (
+    CampaignPublisher,
+    PublishOutcome,
+)
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.checkbox_dialog import CheckboxDialog
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
@@ -72,6 +77,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         }
 
         self.gallery_client = GithubGalleryClient()
+        self.campaign_publisher = CampaignPublisher(self.gallery_client)
         self._online_dialog: Optional["OnlineGalleryDialog"] = None
         self.active_campaign = get_active_campaign()
         self.source_campaigns: List[CampaignDatabase] = []
@@ -231,6 +237,23 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             command=self.configure_github_token,
         )
         self.github_token_btn.grid(row=0, column=8, padx=6, pady=6, sticky="ew")
+
+        sync_row = ctk.CTkFrame(self)
+        sync_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
+        for column_index in range(4):
+            sync_row.grid_columnconfigure(column_index, weight=1)
+        ctk.CTkButton(sync_row, text="Enable synchronization", command=self.enable_campaign_sync).grid(
+            row=0, column=0, padx=6, pady=6, sticky="ew"
+        )
+        ctk.CTkButton(sync_row, text="Publish campaign update", command=self.publish_campaign_update).grid(
+            row=0, column=1, padx=6, pady=6, sticky="ew"
+        )
+        ctk.CTkButton(sync_row, text="Check for updates", command=self.check_campaign_updates).grid(
+            row=0, column=2, padx=6, pady=6, sticky="ew"
+        )
+        ctk.CTkButton(sync_row, text="Unlink this local copy", command=self.unlink_campaign_sync).grid(
+            row=0, column=3, padx=6, pady=6, sticky="ew"
+        )
 
         self._update_publish_button_state()
 
@@ -593,22 +616,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
 
         selections = self._gather_selected_records()
-        publishing_full_campaign = False
         if not selections:
-            # Handle the branch where selections is unavailable.
-            if not messagebox.askyesno(
-                "Publish Entire Campaign",
-                "No assets are selected.\n\nDo you want to publish the entire campaign database, including all attachments?",
-            ):
-                return
-            selections = self._gather_all_records()
-            if not selections:
-                messagebox.showinfo(
-                    "Nothing to Publish",
-                    "The selected campaign does not contain any exportable assets.",
-                )
-                return
-            publishing_full_campaign = True
+            messagebox.showinfo(
+                "Select Manual Assets",
+                "This action publishes a manual asset-library bundle that can be merged. "
+                "Select assets, or use 'Publish campaign update' for a versioned complete snapshot.",
+            )
+            return
 
         default_title = self.selected_campaign.name or "Campaign Bundle"
         title = simpledialog.askstring(
@@ -636,28 +650,107 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         description = description.strip()
 
         include_random_tables = False
-        if not publishing_full_campaign:
-            random_tables_dialog = CheckboxDialog(
-                self,
-                title="Publish Options",
-                message="Do you want to include random tables files from this campaign?",
-                checkbox_label="Include random tables",
-                default=False,
-                confirm_label="Continue",
-                cancel_label="Cancel",
-            )
-            self.wait_window(random_tables_dialog)
-            if random_tables_dialog.result is None:
-                return
-            include_random_tables = bool(random_tables_dialog.result)
+        random_tables_dialog = CheckboxDialog(
+            self,
+            title="Publish Options",
+            message="Do you want to include random tables files from this campaign?",
+            checkbox_label="Include random tables",
+            default=False,
+            confirm_label="Continue",
+            cancel_label="Cancel",
+        )
+        self.wait_window(random_tables_dialog)
+        if random_tables_dialog.result is None:
+            return
+        include_random_tables = bool(random_tables_dialog.result)
 
         self._publish_bundle_to_github(
             selections=selections,
             title=title,
             description=description,
-            include_database=publishing_full_campaign,
+            include_database=False,
             include_random_tables=include_random_tables,
         )
+
+    def enable_campaign_sync(self):
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+        metadata = self.campaign_publisher.enable(
+            self.selected_campaign.root, database_path=self.selected_campaign.db_path
+        )
+        messagebox.showinfo(
+            "Synchronization Enabled",
+            f"Campaign ID: {metadata.campaign_id}\nInitial revision: {metadata.revision}",
+        )
+
+    def publish_campaign_update(self):
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+        if not self.gallery_client.can_publish:
+            messagebox.showerror("GitHub Token Required", "Configure a GitHub token before publishing.")
+            return
+        title = simpledialog.askstring(
+            "Campaign Update", "Release title:", initialvalue=self.selected_campaign.name, parent=self
+        )
+        if title is None:
+            return
+        summary = simpledialog.askstring("Change Summary", "What changed?", parent=self)
+        if summary is None:
+            return
+
+        campaign = self.selected_campaign
+
+        def worker(callback):
+            return self.campaign_publisher.publish(
+                campaign.root,
+                database_path=campaign.db_path,
+                title=title.strip() or campaign.name,
+                change_summary=summary.strip() or None,
+                progress_callback=callback,
+            )
+
+        def success(result):
+            if result.outcome is PublishOutcome.CONFLICTED:
+                messagebox.showwarning("Publication Conflict", result.conflict_message)
+            else:
+                messagebox.showinfo("Campaign Published", f"Revision {result.revision} was published.")
+            self._refresh_online_dialog()
+        self._run_progress_task(
+            "Publishing Campaign Update", worker, None, None, on_success=success
+        )
+
+    def check_campaign_updates(self):
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+        callback = getattr(self.master, "_queue_campaign_update_check", None)
+        if (
+            callable(callback)
+            and self.selected_campaign.root.resolve()
+            == self.active_campaign.root.resolve()
+        ):
+            callback(force=True)
+        else:
+            messagebox.showinfo(
+                "Check for Updates",
+                "Select this campaign as the active campaign to check it.",
+            )
+
+    def unlink_campaign_sync(self):
+        if not self.selected_campaign:
+            messagebox.showwarning("No Source", "Select a source campaign first.")
+            return
+        if not CampaignSyncMetadataStore(self.selected_campaign.root).read():
+            messagebox.showinfo("Not Linked", "This local campaign is not synchronized.")
+            return
+        if messagebox.askyesno(
+            "Unlink Local Copy",
+            "Stop update checks for this local copy? Remote releases are unchanged.",
+        ):
+            self.campaign_publisher.unlink(self.selected_campaign.root)
+            messagebox.showinfo("Campaign Unlinked", "This local copy is no longer synchronized.")
 
     def publish_image_library_to_github(self):
         """Publish image library records from the selected campaign to GitHub."""

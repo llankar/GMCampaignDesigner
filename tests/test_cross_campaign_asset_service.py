@@ -109,7 +109,7 @@ def test_export_bundle_raises_when_database_missing(tmp_path):
     assert not destination.exists()
 
 
-def test_full_campaign_export_persists_sync_identity_and_advances_revision(
+def test_manual_full_campaign_export_does_not_create_sync_identity(
     tmp_path, monkeypatch
 ):
     campaign_root = tmp_path / "campaign"
@@ -128,13 +128,9 @@ def test_full_campaign_export_persists_sync_identity_and_advances_revision(
         include_systems=False,
     )
 
-    assert first["sync"]["campaign_id"] == second["sync"]["campaign_id"]
-    assert first["sync"]["revision"] == 1
-    assert second["sync"]["revision"] == 2
-    assert second["sync"]["parent_revision"] == 1
-    stored = json.loads((campaign_root / ".gmcd" / "sync.json").read_text())
-    assert stored["campaign_id"] == first["sync"]["campaign_id"]
-    assert "Same display name" not in first["sync"].values()
+    assert first["bundle_mode"] == second["bundle_mode"] == "full_campaign"
+    assert "sync" not in first and "sync" not in second
+    assert not (campaign_root / ".gmcd" / "sync.json").exists()
 
 
 def test_collect_assets_includes_image_library_files(tmp_path):
