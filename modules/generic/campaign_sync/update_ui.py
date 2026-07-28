@@ -95,13 +95,16 @@ class CampaignUpdateSettingsDialog(ctk.CTkToplevel):
     def __init__(self, master) -> None:
         super().__init__(master)
         self.title("Campaign Update Settings")
-        self.geometry("520x330")
+        self.geometry("560x470")
         self.resizable(False, False)
         preferences = CampaignUpdatePreferences.load()
         self.checks = tk.BooleanVar(value=preferences.automatic_checks)
         self.download = tk.BooleanVar(value=preferences.automatic_download)
         self.offline = tk.BooleanVar(value=preferences.offline)
         self.frequency = tk.StringVar(value=str(preferences.frequency_hours))
+        self.auto_publish = tk.BooleanVar(value=preferences.automatic_publication)
+        self.publish_idle = tk.StringVar(value=str(preferences.publication_idle_seconds))
+        self.publish_maximum = tk.StringVar(value=str(preferences.publication_maximum_seconds))
         frame = ctk.CTkFrame(self)
         frame.pack(fill="both", expand=True, padx=20, pady=20)
         ctk.CTkCheckBox(frame, text="Automatically check linked campaigns", variable=self.checks).pack(anchor="w", pady=8)
@@ -111,6 +114,14 @@ class CampaignUpdateSettingsDialog(ctk.CTkToplevel):
         ctk.CTkEntry(row, textvariable=self.frequency, width=90).pack(side="left", padx=12)
         ctk.CTkCheckBox(frame, text="Download updates automatically (confirmation is still required to apply)",
                         variable=self.download).pack(anchor="w", pady=8)
+        ctk.CTkCheckBox(frame, text="Automatically publish saved campaign changes",
+                        variable=self.auto_publish).pack(anchor="w", pady=8)
+        publish_row = ctk.CTkFrame(frame, fg_color="transparent")
+        publish_row.pack(fill="x", pady=8)
+        ctk.CTkLabel(publish_row, text="Idle delay (seconds):").pack(side="left")
+        ctk.CTkEntry(publish_row, textvariable=self.publish_idle, width=75).pack(side="left", padx=8)
+        ctk.CTkLabel(publish_row, text="Maximum interval:").pack(side="left", padx=(12, 0))
+        ctk.CTkEntry(publish_row, textvariable=self.publish_maximum, width=75).pack(side="left", padx=8)
         ctk.CTkCheckBox(frame, text="Offline / disable network checks", variable=self.offline).pack(anchor="w", pady=8)
         self.error = ctk.CTkLabel(frame, text="", text_color="#ff7777")
         self.error.pack(anchor="w", pady=4)
@@ -121,10 +132,15 @@ class CampaignUpdateSettingsDialog(ctk.CTkToplevel):
     def _save(self) -> None:
         try:
             hours = int(self.frequency.get())
-            if hours < 1:
+            idle = int(self.publish_idle.get())
+            maximum = int(self.publish_maximum.get())
+            if hours < 1 or idle < 1 or maximum < idle:
                 raise ValueError
         except ValueError:
-            self.error.configure(text="Frequency must be a positive whole number.")
+            self.error.configure(text="Use positive whole numbers; maximum must be at least the idle delay.")
             return
-        CampaignUpdatePreferences(self.checks.get(), hours, self.download.get(), self.offline.get()).save()
+        CampaignUpdatePreferences(
+            self.checks.get(), hours, self.download.get(), self.offline.get(),
+            self.auto_publish.get(), idle, maximum,
+        ).save()
         self.destroy()
