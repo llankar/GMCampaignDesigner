@@ -29,6 +29,9 @@ from .change_detector import CampaignChangeDetector, calculate_campaign_fingerpr
 from .hashing import sha256_file
 from .metadata_store import CampaignSyncMetadataStore, InstallationStateStore
 from .models import CampaignSyncMetadata
+from .delta_applier import apply_delta, clone_campaign
+from .delta_builder import build_inventory
+from .delta_manifest import DeltaManifest, InventoryEntry
 
 ProgressCallback = Callable[[str, float], None]
 CancelCallback = Callable[[], bool]
@@ -165,6 +168,9 @@ def _preserve_local_settings(
         if not source.is_file():
             continue
         destination.parent.mkdir(parents=True, exist_ok=True)
+        # Delta staging may use hard links. Detach before filtering or copying
+        # so staging can never mutate the still-active campaign.
+        destination.unlink(missing_ok=True)
         if source.name.lower() == "settings.ini":
             parser = configparser.ConfigParser()
             parser.read(source, encoding="utf-8")
@@ -213,7 +219,7 @@ class CampaignUpdater:
         if current is None:
             raise CampaignUpdateError("Campaign is not linked for synchronization")
         expected_mode = str(getattr(release, "snapshot_mode", "") or "").lower()
-        if expected_mode and expected_mode != "full_campaign":
+        if expected_mode and expected_mode not in {"full_campaign", "campaign_delta"}:
             raise CampaignUpdateError(
                 "Asset-only bundles cannot be synchronized automatically"
             )
@@ -266,13 +272,16 @@ class CampaignUpdater:
                 raise CampaignUpdateError(
                     f"Unsupported bundle version: {manifest.get('version')}"
                 )
-            if manifest.get("bundle_mode") != "full_campaign" or not isinstance(
-                manifest.get("database"), dict
-            ):
+            bundle_mode = manifest.get("bundle_mode")
+            if bundle_mode not in {"full_campaign", "campaign_delta"} or not isinstance(manifest.get("database"), dict):
                 raise CampaignUpdateError(
                     "Asset-only bundles cannot be synchronized automatically"
                 )
             sync = CampaignSyncMetadata.from_dict(manifest.get("sync") or {})
+            if sync.snapshot_mode != bundle_mode:
+                raise CampaignUpdateError("Bundle mode does not match synchronization metadata")
+            if expected_mode and expected_mode != bundle_mode:
+                raise CampaignUpdateError("Selected release mode does not match the downloaded bundle")
             if sync.bundle_version != BUNDLE_VERSION:
                 raise CampaignUpdateError("Incompatible synchronized bundle version")
             release_campaign = str(
@@ -291,13 +300,28 @@ class CampaignUpdater:
                 raise CampaignUpdateError(
                     "Bundle revision does not match the selected release"
                 )
-            if (
-                sync.parent_revision != current.revision
-                or release_parent != current.revision
+            if bundle_mode == "campaign_delta" and (
+                sync.parent_revision != current.revision or release_parent != current.revision
             ):
                 raise CampaignUpdateError(
                     "Bundle parent revision does not match the installed revision"
                 )
+            delta = None
+            if bundle_mode == "campaign_delta":
+                try:
+                    delta = DeltaManifest.from_dict(manifest.get("delta") or {})
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise CampaignUpdateError(f"Invalid delta manifest: {exc}") from exc
+                baseline = self.installation_store.campaign_state(str(active)).get("baseline_fingerprint")
+                if (
+                    sync.base_revision != current.revision
+                    or delta.base_revision != current.revision
+                    or sync.base_content_fingerprint != baseline
+                    or delta.base_content_fingerprint != baseline
+                ):
+                    raise CampaignUpdateError(
+                        "Delta base revision or content fingerprint does not match the installed campaign"
+                    )
             _validate_declared_hashes(extracted, manifest)
             check_cancel()
             report("Creating safety backup…", 0.55)
@@ -310,9 +334,38 @@ class CampaignUpdater:
             check_cancel()
             if staging.exists() or rollback.exists():
                 raise CampaignUpdateError("Update staging location already exists")
-            target_db = _copy_payload(extracted, staging, manifest)
+            if delta is None:
+                target_db = _copy_payload(extracted, staging, manifest)
+            else:
+                clone_campaign(active, staging)
+                try:
+                    target_db = apply_delta(extracted, staging, delta, manifest["database"])
+                except ValueError as exc:
+                    raise CampaignUpdateError(str(exc)) from exc
             _validate_sqlite(target_db)
             _preserve_local_settings(active, staging, self.local_settings)
+            try:
+                inventory_data = (
+                    delta.inventory if delta is not None else
+                    tuple(InventoryEntry.from_dict(item) for item in manifest.get("content_inventory", ()))
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise CampaignUpdateError(f"Invalid content inventory: {exc}") from exc
+            if inventory_data:
+                actual_inventory = build_inventory(staging, target_db, database_snapshot_path=target_db)
+                if actual_inventory != inventory_data:
+                    raise CampaignUpdateError("Reconstructed campaign inventory does not match the publisher")
+            expected_content = str((manifest.get("sync") or {}).get("snapshot_sha256") or "")
+            staged_fingerprint = calculate_campaign_fingerprint(
+                staging, database_path=target_db, database_snapshot_path=target_db
+            )
+            # Legacy full bundles did not carry an inventory and used this
+            # field only for transport metadata. New versioned snapshots do,
+            # and can therefore enforce publisher/reconstruction identity.
+            if inventory_data and staged_fingerprint != expected_content:
+                raise CampaignUpdateError(
+                    "Reconstructed campaign fingerprint does not match the publisher"
+                )
             CampaignSyncMetadataStore(staging).write(sync)
             check_cancel()
             report("Preparing campaign replacement…", 0.9)
@@ -327,14 +380,13 @@ class CampaignUpdater:
                     raise
                 try:
                     self.reopen()
-                    baseline = calculate_campaign_fingerprint(
-                        active, database_path=active / target_db.name
-                    )
+                    baseline = staged_fingerprint
                     CampaignChangeDetector(self.installation_store).persist_baseline(
                         active, baseline, database_path=active / target_db.name
                     )
                     self.installation_store.update_campaign_state(
-                        str(active), installed_revision=sync.revision
+                        str(active), installed_revision=sync.revision,
+                        baseline_inventory=[entry.__dict__ for entry in inventory_data],
                     )
                 except Exception as exc:
                     failed = parent / f".{active.name}.failed-{stamp}"
@@ -374,6 +426,24 @@ class CampaignUpdater:
                 # No progress/cancellation callbacks are consulted after
                 # replacement_started becomes true: commit or rollback only.
                 _ = replacement_started
+
+    def install_chain(self, campaign_root: Path, releases: Iterable[object], **kwargs) -> list[CampaignUpdateReceipt]:
+        """Install a strictly ordered compatible chain, never skipping a delta base."""
+        ordered = sorted(releases, key=lambda item: getattr(item, "revision", 0))
+        receipts: list[CampaignUpdateReceipt] = []
+        for release in ordered:
+            current = CampaignSyncMetadataStore(campaign_root).read()
+            if current is None:
+                raise CampaignUpdateError("Campaign is not linked for synchronization")
+            revision = getattr(release, "revision", None)
+            if revision <= current.revision:
+                continue
+            mode = str(getattr(release, "snapshot_mode", "full_campaign"))
+            base = getattr(release, "base_revision", getattr(release, "parent_revision", None))
+            if mode == "campaign_delta" and base != current.revision:
+                raise CampaignUpdateError("Delta chain is incomplete or based on an unrelated revision")
+            receipts.append(self.install(campaign_root, release, **kwargs))
+        return receipts
 
 
 __all__ = [

@@ -10,6 +10,8 @@ import shutil
 import sqlite3
 import tempfile
 import time
+import json
+import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -27,6 +29,7 @@ from .change_detector import CampaignChangeDetector, calculate_campaign_fingerpr
 from .hashing import sha256_file
 from .metadata_store import CampaignSyncMetadataStore, InstallationStateStore
 from .models import CampaignSyncMetadata
+from .delta_builder import build_inventory, write_delta_bundle
 
 
 class CampaignPublishError(RuntimeError):
@@ -76,12 +79,14 @@ class CampaignPublisher:
         retry_attempts: int = 3,
         retry_delay: float = 0.05,
         sleeper: Callable[[float], None] = time.sleep,
+        checkpoint_interval: int = 10,
     ) -> None:
         self.gallery_client = gallery_client
         self.installation_store = installation_store or InstallationStateStore()
         self.retry_attempts = max(1, int(retry_attempts))
         self.retry_delay = max(0.0, float(retry_delay))
         self.sleeper = sleeper
+        self.checkpoint_interval = max(2, int(checkpoint_interval))
 
     def enable(self, campaign_root: Path, *, database_path: Optional[Path] = None) -> CampaignSyncMetadata:
         """Give a legacy campaign a durable UUID and initial revision.
@@ -105,6 +110,11 @@ class CampaignPublisher:
         CampaignChangeDetector(self.installation_store).persist_baseline(
             root, fingerprint, database_path=database_path
         )
+        if database_path:
+            inventory = build_inventory(root, Path(database_path))
+            self.installation_store.update_campaign_state(
+                str(root), baseline_inventory=[entry.__dict__ for entry in inventory]
+            )
         return metadata
 
     def unlink(self, campaign_root: Path) -> bool:
@@ -162,21 +172,42 @@ class CampaignPublisher:
                 database_snapshot_path=database_snapshot,
             )
             published_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            state = self.installation_store.campaign_state(str(root))
+            from .delta_manifest import InventoryEntry
+            try:
+                baseline_inventory = tuple(InventoryEntry.from_dict(x) for x in state.get("baseline_inventory", ()))
+            except (KeyError, TypeError, ValueError):
+                baseline_inventory = ()
+            current_inventory = build_inventory(root, database, database_snapshot_path=database_snapshot)
+            is_checkpoint = revision == 1 or revision % self.checkpoint_interval == 0 or not baseline_inventory
+            snapshot_mode = "full_campaign" if is_checkpoint else "campaign_delta"
+            base_fingerprint = state.get("baseline_fingerprint") if snapshot_mode == "campaign_delta" else None
             metadata = CampaignSyncMetadata(
                 campaign_id=local.campaign_id, revision=revision,
                 parent_revision=(remote_revision or None), snapshot_sha256=content_digest,
                 published_at=published_at,
                 publisher_installation_id=self.installation_store.installation_id(),
                 bundle_version=BUNDLE_VERSION, change_summary=change_summary,
-                snapshot_mode="full_campaign",
+                snapshot_mode=snapshot_mode,
+                base_revision=remote_revision if snapshot_mode == "campaign_delta" else None,
+                base_content_fingerprint=base_fingerprint,
             )
             archive = temp_dir / f"{root.name}-r{revision}.zip"
-            manifest = export_bundle(
-                archive, CampaignDatabase(root.name, root, database_snapshot), {},
-                include_database=True, include_systems=True,
-                sync_metadata=metadata, change_summary=change_summary,
-                progress_callback=progress_callback,
-            )
+            if snapshot_mode == "campaign_delta":
+                manifest = write_delta_bundle(
+                    archive, root, database_snapshot, database.relative_to(root).as_posix(),
+                    metadata.to_dict(), remote_revision, str(base_fingerprint),
+                    baseline_inventory, current_inventory,
+                )
+            else:
+                manifest = export_bundle(
+                    archive, CampaignDatabase(root.name, root, database_snapshot), {},
+                    include_database=True, include_systems=True,
+                    sync_metadata=metadata, change_summary=change_summary,
+                    progress_callback=progress_callback,
+                )
+                manifest["content_inventory"] = [entry.__dict__ for entry in current_inventory]
+                self._replace_archive_manifest(archive, manifest)
             # The updater authenticates the downloaded ZIP against release
             # metadata.  Keep the content digest embedded in the ZIP manifest,
             # then publish/store the digest of the completed immutable archive.
@@ -196,6 +227,8 @@ class CampaignPublisher:
                 bundle_version=metadata.bundle_version,
                 change_summary=metadata.change_summary,
                 snapshot_mode=metadata.snapshot_mode,
+                base_revision=metadata.base_revision,
+                base_content_fingerprint=metadata.base_content_fingerprint,
             )
 
             # GitHub has no compare-and-swap primitive, so make the second
@@ -229,6 +262,10 @@ class CampaignPublisher:
         CampaignChangeDetector(self.installation_store).persist_baseline(
             root, content_digest, database_path=database
         )
+        self.installation_store.update_campaign_state(
+            str(root), installed_revision=revision,
+            baseline_inventory=[entry.__dict__ for entry in current_inventory],
+        )
         return CampaignPublishResult(
             PublishOutcome.PUBLISHED, revision, local.campaign_id, digest, release
         )
@@ -244,6 +281,19 @@ class CampaignPublisher:
         finally:
             destination.close()
             source.close()
+
+    @staticmethod
+    def _replace_archive_manifest(archive: Path, manifest: dict) -> None:
+        """Rewrite the generated ZIP so inventory is part of the immutable revision."""
+        replacement = archive.with_suffix(".rewritten.zip")
+        with zipfile.ZipFile(archive, "r") as source, zipfile.ZipFile(
+            replacement, "w", compression=zipfile.ZIP_DEFLATED
+        ) as destination:
+            for info in source.infolist():
+                if info.filename != "manifest.json":
+                    destination.writestr(info, source.read(info.filename))
+            destination.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
+        replacement.replace(archive)
 
     def _matching_revisions(self, campaign_id: str, revision: int) -> list[object]:
         list_bundles = getattr(self.gallery_client, "list_bundles", None)
