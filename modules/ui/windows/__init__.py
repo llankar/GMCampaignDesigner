@@ -1,0 +1,2 @@
+"""Reusable window lifecycle helpers."""
+

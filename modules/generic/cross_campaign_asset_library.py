@@ -46,6 +46,7 @@ from modules.helpers.portrait_helper import primary_portrait
 from modules.helpers.secret_helper import decrypt_secret, encrypt_secret
 from modules.helpers.selection_dialog import SelectionDialog
 from modules.helpers.template_loader import load_entity_definitions, list_known_entities
+from modules.ui.windows.progress_dialog import ProgressDialogLifecycle
 
 
 class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
@@ -1523,6 +1524,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         bar = ctk.CTkProgressBar(progress_win, mode="determinate")
         bar.pack(fill="x", padx=20, pady=(0, 20))
         bar.set(0.0)
+        lifecycle = ProgressDialogLifecycle(self, progress_win)
 
         def update(message: str, fraction: float):
             """Update the operation."""
@@ -1535,40 +1537,31 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 except Exception:
                     bar.set(0.0)
 
-            self.after(0, apply)
-
-        def close():
-            """Close the operation."""
-            if progress_win.winfo_exists():
-                # Handle the branch where progress_win.winfo_exists().
-                try:
-                    progress_win.grab_release()
-                except Exception:
-                    pass
-                progress_win.destroy()
+            lifecycle.schedule_update(apply)
 
         def handle_success(result):
             """Handle handle success."""
-            close()
-            if on_success:
-                on_success(result)
-                return
-            if success_message:
-                detail = detail_builder(result) if detail_builder else None
-                message = (
-                    success_message if not detail else f"{success_message}\n\n{detail}"
-                )
-                messagebox.showinfo("Success", message)
+            def notify():
+                if on_success:
+                    on_success(result)
+                    return
+                if success_message:
+                    detail = detail_builder(result) if detail_builder else None
+                    message = (
+                        success_message if not detail else f"{success_message}\n\n{detail}"
+                    )
+                    messagebox.showinfo("Success", message)
+
+            lifecycle.close(notify)
 
         def handle_error(exc: Exception):
             """Handle handle error."""
-            close()
             details = str(exc).strip()
             if details:
                 message = f"{exc.__class__.__name__}: {details}"
             else:
                 message = repr(exc)
-            messagebox.showerror("Operation Failed", message)
+            lifecycle.close(lambda: messagebox.showerror("Operation Failed", message))
 
         def run():
             """Run the operation."""
