@@ -2,6 +2,7 @@
 
 import sqlite3
 import json
+import threading
 from db.db import get_connection, load_schema_from_json
 from modules.generic.json_value_deserializer import deserialize_possible_json
 from modules.helpers.logging_helper import log_module_import
@@ -9,6 +10,26 @@ from modules.helpers.logging_helper import log_module_import
 log_module_import(__name__)
 
 class GenericModelWrapper:
+    _save_listeners = set()
+    _save_listener_lock = threading.RLock()
+
+    @classmethod
+    def add_save_listener(cls, callback):
+        with cls._save_listener_lock:
+            cls._save_listeners.add(callback)
+
+    @classmethod
+    def remove_save_listener(cls, callback):
+        with cls._save_listener_lock:
+            cls._save_listeners.discard(callback)
+
+    def _notify_saved(self):
+        """Notify only after SQLite commit has completed successfully."""
+        with self._save_listener_lock:
+            listeners = tuple(self._save_listeners)
+        for callback in listeners:
+            callback(self._db_path)
+
     def __init__(self, entity_type, db_path=None):
         """Initialize the GenericModelWrapper instance."""
         self.entity_type = entity_type
@@ -169,6 +190,7 @@ class GenericModelWrapper:
                     cursor.execute(delete_sql)
 
             conn.commit()
+            self._notify_saved()
         finally:
             conn.close()
 
@@ -212,6 +234,7 @@ class GenericModelWrapper:
                 cursor.execute(update_sql, values + [original_key_value])
                 if cursor.rowcount:
                     conn.commit()
+                    self._notify_saved()
                     return
 
             placeholders = ", ".join("?" for _ in keys)
@@ -219,5 +242,6 @@ class GenericModelWrapper:
             sql = f"INSERT OR REPLACE INTO {self.table} ({cols}) VALUES ({placeholders})"
             cursor.execute(sql, values)
             conn.commit()
+            self._notify_saved()
         finally:
             conn.close()

@@ -692,16 +692,21 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         if not self.gallery_client.can_publish:
             messagebox.showerror("GitHub Token Required", "Configure a GitHub token before publishing.")
             return
-        title = simpledialog.askstring(
-            "Campaign Update", "Release title:", initialvalue=self.selected_campaign.name, parent=self
-        )
-        if title is None:
-            return
-        summary = simpledialog.askstring("Change Summary", "What changed?", parent=self)
-        if summary is None:
+        campaign = self.selected_campaign
+        metadata = self.campaign_publisher.enable(campaign.root, database_path=campaign.db_path)
+        coordinator = getattr(self.master, "_auto_publish_coordinator", None)
+        if coordinator is not None:
+            expected_parent = 0 if metadata.revision == 1 and not metadata.published_at else metadata.revision
+            coordinator.mark_dirty(
+                campaign_id=metadata.campaign_id, campaign_name=campaign.name,
+                campaign_root=campaign.root, database_path=campaign.db_path,
+                expected_parent_revision=expected_parent,
+            )
+            coordinator.publish_now(metadata.campaign_id)
             return
 
-        campaign = self.selected_campaign
+        title = f"{campaign.name} — Revision {metadata.revision + 1}"
+        summary = f"Saved campaign changes for {campaign.name}."
 
         def worker(callback):
             return self.campaign_publisher.publish(
@@ -719,7 +724,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 messagebox.showinfo("Campaign Published", f"Revision {result.revision} was published.")
             self._refresh_online_dialog()
         self._run_progress_task(
-            "Publishing Campaign Update", worker, None, None, on_success=success
+            "Publishing Campaign Update", worker, None, None, on_success=success, modal=False
         )
 
     def check_campaign_updates(self):
@@ -1506,7 +1511,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
     # ------------------------------------------------------- Busy handling
     def _run_progress_task(
-        self, title, worker, success_message, detail_builder, on_success=None
+        self, title, worker, success_message, detail_builder, on_success=None, modal=True
     ):
         """Run progress task."""
         progress_win = ctk.CTkToplevel(self)
@@ -1514,7 +1519,8 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         progress_win.geometry("420x160")
         progress_win.resizable(False, False)
         progress_win.transient(self)
-        progress_win.grab_set()
+        if modal:
+            progress_win.grab_set()
         progress_win.lift()
 
         label = ctk.CTkLabel(
@@ -1525,6 +1531,8 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         bar.pack(fill="x", padx=20, pady=(0, 20))
         bar.set(0.0)
         lifecycle = ProgressDialogLifecycle(self, progress_win)
+        if not modal:
+            progress_win.protocol("WM_DELETE_WINDOW", lifecycle.close)
 
         def update(message: str, fraction: float):
             """Update the operation."""

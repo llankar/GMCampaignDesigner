@@ -120,6 +120,13 @@ from modules.generic.generic_list_selection_view import GenericListSelectionView
 from modules.generic.custom_fields_editor import CustomFieldsEditor
 from modules.generic.github_gallery_client import GithubGalleryClient
 from modules.generic.campaign_sync.settings import CampaignUpdatePreferences
+from modules.generic.campaign_sync.metadata_store import CampaignSyncMetadataStore
+from modules.generic.campaign_sync.publisher import CampaignPublisher
+from modules.generic.campaign_sync.auto_publish import (
+    AutoPublishCoordinator, DurableOutbox, PublicationScheduler,
+    PublicationWorker, TkEventBridge,
+)
+import queue
 from modules.generic.campaign_sync.update_checker import (
     CampaignUpdateChecker,
     UpdateCheckSettings,
@@ -243,6 +250,25 @@ class MainWindow(ctk.CTk):
         self._campaign_builder_wizard = None
         self._update_thread = None
         self._campaign_update_checker = CampaignUpdateChecker(GithubGalleryClient())
+        sync_preferences = CampaignUpdatePreferences.load()
+        publish_events = queue.Queue()
+        publish_client = GithubGalleryClient()
+        self._auto_publish_coordinator = AutoPublishCoordinator(
+            DurableOutbox(Path.home() / ".gmcampaigndesigner" / "campaign-publish-outbox.json"),
+            PublicationWorker(lambda: CampaignPublisher(publish_client), publish_events),
+            scheduler=PublicationScheduler(
+                sync_preferences.publication_idle_seconds,
+                sync_preferences.publication_maximum_seconds,
+            ),
+            automatic=sync_preferences.automatic_publication,
+            offline=sync_preferences.offline,
+        )
+        self._auto_publish_bridge = TkEventBridge(
+            self, publish_events, self._on_auto_publish_event,
+            coordinator=self._auto_publish_coordinator,
+        )
+        GenericModelWrapper.add_save_listener(self._on_campaign_data_saved)
+        self._auto_publish_bridge.start()
         self._campaign_update_prompt = None
         self._downloaded_campaign_updates = {}
         self.whiteboard_controller = None
@@ -266,6 +292,40 @@ class MainWindow(ctk.CTk):
         self.after(600, lambda: self._queue_update_check(force=True))
         self.after(800, self._auto_open_campaign_overview)
         self.after(1000, self._queue_campaign_update_check)
+
+    def _on_campaign_data_saved(self, database_path=None) -> None:
+        """Mark linked campaign content dirty after its database commit succeeds."""
+        database = Path(database_path or ConfigHelper.get(
+            "Database", "path", fallback="default_campaign.db"
+        )).expanduser().resolve()
+        root = database.parent
+        metadata = CampaignSyncMetadataStore(root).read()
+        if metadata is None:
+            return
+        expected_parent = 0 if metadata.revision == 1 and not metadata.published_at else metadata.revision
+        self._auto_publish_coordinator.mark_dirty(
+            campaign_id=metadata.campaign_id, campaign_name=root.name,
+            campaign_root=root, database_path=database,
+            expected_parent_revision=expected_parent,
+        )
+
+    def _on_auto_publish_event(self, event) -> None:
+        """Main-thread hook for status surfaces; intentionally safe when none is open."""
+        window = getattr(self, "_asset_library_window", None)
+        callback = getattr(window, "handle_auto_publish_event", None)
+        if callable(callback):
+            callback(event)
+
+    def destroy(self):
+        """Persist unfinished publication work and stop polling before Tk teardown."""
+        bridge = getattr(self, "_auto_publish_bridge", None)
+        if bridge is not None:
+            bridge.stop()
+        coordinator = getattr(self, "_auto_publish_coordinator", None)
+        if coordinator is not None:
+            coordinator.shutdown(wait=False)
+        GenericModelWrapper.remove_save_listener(getattr(self, "_on_campaign_data_saved", None))
+        super().destroy()
 
     def _bind_global_shortcuts(self):
         """Bind global shortcuts."""
