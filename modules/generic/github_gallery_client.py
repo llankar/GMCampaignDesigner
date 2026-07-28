@@ -54,6 +54,9 @@ class GalleryBundleSummary:
     parent_revision: Optional[int] = None
     snapshot_sha256: str = ""
     snapshot_mode: str = ""
+    base_revision: Optional[int] = None
+    base_content_fingerprint: str = ""
+    transfer_size: Optional[int] = None
 
     @property
     def display_title(self) -> str:
@@ -388,6 +391,8 @@ class GithubGalleryClient:
         parent_revision = None
         snapshot_sha256 = ""
         snapshot_mode = ""
+        base_revision = None
+        base_content_fingerprint = ""
         if isinstance(metadata, dict):
             # Handle the branch where isinstance(metadata, dict).
             description = str(metadata.get("description") or "")
@@ -411,6 +416,8 @@ class GithubGalleryClient:
                 parent_revision = remote_revision.parent_revision
                 snapshot_sha256 = remote_revision.snapshot_sha256
                 snapshot_mode = remote_revision.snapshot_mode
+                base_revision = remote_revision.base_revision
+                base_content_fingerprint = remote_revision.base_content_fingerprint or ""
 
         summary = GalleryBundleSummary(
             release_id=int(release.get("id") or 0),
@@ -436,6 +443,9 @@ class GithubGalleryClient:
             parent_revision=parent_revision,
             snapshot_sha256=snapshot_sha256,
             snapshot_mode=snapshot_mode,
+            base_revision=base_revision,
+            base_content_fingerprint=base_content_fingerprint,
+            transfer_size=int((metadata.get("transfer_size") if isinstance(metadata, dict) else 0) or asset.get("size") or 0),
         )
         if not summary.download_url:
             raise RuntimeError("Bundle asset missing download URL")
@@ -531,6 +541,8 @@ class GithubGalleryClient:
                     "bundle_version",
                     "change_summary",
                     "snapshot_mode",
+                    "base_revision",
+                    "base_content_fingerprint",
                 )
                 if sync_entry.get(key) is not None
             }

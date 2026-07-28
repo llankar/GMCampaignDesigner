@@ -40,7 +40,12 @@ class CampaignUpdatePrompt(ctk.CTkToplevel):
             f"Installed revision: {result.installed_revision}",
             f"Available revision: {result.available_revision}",
             f"Published: {published}",
+            f"Snapshot: {'Full checkpoint' if result.snapshot_mode == 'full_campaign' else 'Incremental revision'}",
         ]
+        if result.transfer_size is not None:
+            details.append(f"Transfer size: {result.transfer_size / (1024 * 1024):.1f} MiB")
+        if result.required_base_revision is not None:
+            details.append(f"Required base revision: {result.required_base_revision}")
         if result.publisher:
             details.append(f"Publisher: {result.publisher}")
         if result.change_summary:

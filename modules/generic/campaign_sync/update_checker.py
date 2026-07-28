@@ -43,6 +43,9 @@ class CampaignUpdateResult:
     error: Optional[str] = None
     local_change_state: CampaignChangeState = CampaignChangeState.UNKNOWN
     conflict: bool = False
+    snapshot_mode: str = "full_campaign"
+    transfer_size: Optional[int] = None
+    required_base_revision: Optional[int] = None
 
 
 class CampaignUpdateChecker:
@@ -163,6 +166,9 @@ class CampaignUpdateChecker:
             ignored=ignored,
             local_change_state=local_changes.state,
             conflict=conflict,
+            snapshot_mode=str(getattr(remote, "snapshot_mode", "full_campaign")),
+            transfer_size=getattr(remote, "transfer_size", None),
+            required_base_revision=getattr(remote, "base_revision", None),
         )
 
     def ignore_revision(self, campaign_root: Path, revision: int) -> None:

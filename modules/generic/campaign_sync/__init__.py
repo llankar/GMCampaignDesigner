@@ -20,6 +20,7 @@ from .updater import (
     CampaignUpdateReceipt,
     CampaignUpdater,
 )
+from .delta_manifest import DeltaManifest, InventoryEntry
 
 __all__ = [
     "CampaignSyncMetadata",
@@ -37,4 +38,6 @@ __all__ = [
     "CampaignUpdateError",
     "CampaignUpdateReceipt",
     "CampaignUpdater",
+    "DeltaManifest",
+    "InventoryEntry",
 ]

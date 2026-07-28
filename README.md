@@ -136,3 +136,12 @@ Detailed logs can help troubleshoot AI imports and other automated workflows. To
 4. Save the file and restart GMCampaignDesigner.
 
 When logging is enabled, runtime messages are written to the configured log file (for example, `logs/gmcampaigndesigner.log`), which you can inspect to see the AI payloads processed during imports.
+# Campaign synchronization snapshots
+
+Synchronized revision 1 and every periodic checkpoint are **full checkpoints**.
+Revisions between checkpoints are **incremental revisions**: they transfer a
+complete consistent SQLite snapshot plus only new or changed campaign files and
+deletion tombstones. Each incremental revision declares its required base
+revision and base content fingerprint; clients must apply the complete ordered
+chain or start from a compatible full checkpoint. Update screens show both the
+transfer size and required base revision.
