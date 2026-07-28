@@ -61,3 +61,57 @@ def apply_ctk_button_after_cleanup_patch(ctk_module: Any) -> None:
     button_cls.destroy = _safe_destroy
     button_cls._gm_after_cleanup_patch = True
     log_debug("Applied CTkButton after-cleanup compatibility patch")
+
+
+def apply_ctk_toplevel_after_cleanup_patch(ctk_module: Any) -> None:
+    """Cancel pending ``CTkToplevel`` callbacks before destroying the window.
+
+    On Windows, CustomTkinter temporarily withdraws a toplevel while changing
+    its title-bar colour and schedules a callback that calls ``deiconify``.
+    Destroying the window before that callback runs leaves the callback queued,
+    causing a ``TclError: bad window path name``.  Track callbacks registered on
+    each toplevel and cancel the outstanding ones during teardown.
+    """
+
+    toplevel_cls = getattr(ctk_module, "CTkToplevel", None)
+    if toplevel_cls is None:
+        return
+    if getattr(toplevel_cls, "_gm_after_cleanup_patch", False):
+        return
+
+    original_after = toplevel_cls.after
+    original_after_cancel = toplevel_cls.after_cancel
+    original_destroy = toplevel_cls.destroy
+
+    def _tracked_after(self: Any, ms: int, callback: Any = None, *args: Any) -> Any:
+        callback_id = original_after(self, ms, callback, *args)
+        if callback is not None and callback_id:
+            tracked = getattr(self, "_gm_tracked_after_ids", None)
+            if tracked is None:
+                tracked = set()
+                setattr(self, "_gm_tracked_after_ids", tracked)
+            tracked.add(callback_id)
+        return callback_id
+
+    def _tracked_after_cancel(self: Any, callback_id: Any) -> None:
+        tracked = getattr(self, "_gm_tracked_after_ids", None)
+        if tracked is not None:
+            tracked.discard(callback_id)
+        original_after_cancel(self, callback_id)
+
+    def _safe_destroy(self: Any) -> Any:
+        tracked = tuple(getattr(self, "_gm_tracked_after_ids", ()))
+        for callback_id in tracked:
+            try:
+                original_after_cancel(self, callback_id)
+            except Exception:
+                pass
+        if hasattr(self, "_gm_tracked_after_ids"):
+            self._gm_tracked_after_ids.clear()
+        return original_destroy(self)
+
+    toplevel_cls.after = _tracked_after
+    toplevel_cls.after_cancel = _tracked_after_cancel
+    toplevel_cls.destroy = _safe_destroy
+    toplevel_cls._gm_after_cleanup_patch = True
+    log_debug("Applied CTkToplevel after-cleanup compatibility patch")

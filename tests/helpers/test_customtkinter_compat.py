@@ -1,4 +1,7 @@
-from modules.helpers.customtkinter_compat import apply_ctk_button_after_cleanup_patch
+from modules.helpers.customtkinter_compat import (
+    apply_ctk_button_after_cleanup_patch,
+    apply_ctk_toplevel_after_cleanup_patch,
+)
 
 
 class _FakeButton:
@@ -22,6 +25,14 @@ class _FakeButton:
 
 class _FakeCTK:
     CTkButton = _FakeButton
+
+
+class _FakeToplevel(_FakeButton):
+    pass
+
+
+class _FakeToplevelCTK:
+    CTkToplevel = _FakeToplevel
 
 
 def test_patch_cancels_pending_after_callbacks_on_destroy():
@@ -48,3 +59,27 @@ def test_patch_is_idempotent():
     button.after_cancel(callback_id)
 
     assert button.after_cancel_calls.count(callback_id) == 1
+
+
+def test_toplevel_patch_cancels_titlebar_callback_before_destroy():
+    apply_ctk_toplevel_after_cleanup_patch(_FakeToplevelCTK)
+
+    window = _FakeToplevelCTK.CTkToplevel()
+    callback_id = window.after(5, window.destroy)
+
+    result = window.destroy()
+
+    assert result == "destroyed"
+    assert window.destroy_calls == 1
+    assert callback_id in window.after_cancel_calls
+
+
+def test_toplevel_patch_is_idempotent():
+    apply_ctk_toplevel_after_cleanup_patch(_FakeToplevelCTK)
+    apply_ctk_toplevel_after_cleanup_patch(_FakeToplevelCTK)
+
+    window = _FakeToplevelCTK.CTkToplevel()
+    callback_id = window.after(5, lambda: None)
+    window.after_cancel(callback_id)
+
+    assert window.after_cancel_calls.count(callback_id) == 1
