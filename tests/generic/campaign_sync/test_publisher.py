@@ -7,7 +7,14 @@ import io
 
 import pytest
 
-from modules.generic.campaign_sync.metadata_store import InstallationStateStore
+from modules.generic.campaign_sync.change_detector import (
+    CampaignChangeDetector,
+    CampaignChangeState,
+)
+from modules.generic.campaign_sync.metadata_store import (
+    CampaignSyncMetadataStore,
+    InstallationStateStore,
+)
 from modules.generic.campaign_sync.hashing import sha256_file
 from modules.generic.campaign_sync.publisher import (
     CampaignPublisher,
@@ -57,6 +64,9 @@ def campaign(tmp_path):
     connection.execute("INSERT INTO notes VALUES ('one')")
     connection.commit()
     connection.close()
+    asset = root / "assets" / "image_library" / "scene.png"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"original image")
     return root, database
 
 
@@ -92,9 +102,36 @@ def test_release_digest_authenticates_archive_and_bundle_retains_uuid(campaign, 
     result = publisher.publish(root, database_path=database)
 
     assert result.snapshot_sha256 == result.release.archive_sha256
+    assert CampaignSyncMetadataStore(root).read().snapshot_sha256 == result.release.archive_sha256
     with zipfile.ZipFile(io.BytesIO(result.release.archive_bytes)) as archive:
         manifest = json.loads(archive.read("manifest.json"))
     assert manifest["sync"]["campaign_id"] == identity.campaign_id
+
+
+@pytest.mark.parametrize("changed_content", ["database", "asset"])
+def test_publication_baseline_tracks_campaign_content(campaign, tmp_path, changed_content):
+    root, database = campaign
+    gallery = MockGallery()
+    publisher = _publisher(tmp_path, gallery)
+    publisher.enable(root, database_path=database)
+
+    publisher.publish(root, database_path=database)
+
+    detector = CampaignChangeDetector(publisher.installation_store)
+    assert detector.detect(root, database_path=database).state is CampaignChangeState.CLEAN
+
+    if changed_content == "database":
+        connection = sqlite3.connect(database)
+        connection.execute("INSERT INTO notes VALUES ('locally changed')")
+        connection.commit()
+        connection.close()
+    else:
+        (root / "assets" / "image_library" / "scene.png").write_bytes(b"locally changed image")
+
+    assert (
+        detector.detect(root, database_path=database).state
+        is CampaignChangeState.LOCALLY_MODIFIED
+    )
 
 
 def test_stale_parent_is_rejected_before_release(campaign, tmp_path):
