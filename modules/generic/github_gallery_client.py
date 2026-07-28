@@ -119,6 +119,13 @@ class GithubGalleryClient:
         token_env = os.environ.get("GMCD_GALLERY_TOKEN", "").strip()
         self._token = token_config or token_env or None
 
+    def set_repo(self, repo: str) -> None:
+        """Select the repository used by subsequent gallery operations."""
+        normalized = str(repo).strip().strip("/")
+        if not re.fullmatch(r"[^/\s]+/[^/\s]+", normalized):
+            raise ValueError("GitHub repository must use the owner/repository format.")
+        self._repo = normalized
+
     # ----------------------------------------------------------------- Session
     def _create_session(self, *, auth: bool = False) -> requests.Session:
         """Create session."""

@@ -49,6 +49,36 @@ class PublishOutcome(str, Enum):
     CONFLICTED = "conflicted"
 
 
+class CampaignSyncLinkState(str, Enum):
+    """Result of checking a local synchronization identity against GitHub."""
+
+    NEW_LOCAL_UNPUBLISHED = "new_local_unpublished"
+    MATCHED_REMOTE = "matched_remote"
+    REMOTE_AHEAD = "remote_ahead"
+    REMOTE_UNREACHABLE = "remote_unreachable"
+    INVALID_CREDENTIALS = "invalid_credentials"
+    ORPHANED_LOCAL_METADATA = "orphaned_local_metadata"
+
+
+@dataclass(frozen=True)
+class CampaignSyncDiagnostic:
+    state: CampaignSyncLinkState
+    repository: str
+    campaign_id: str
+    local_revision: int
+    remote_revision: Optional[int]
+    error: str = ""
+
+    def details(self) -> str:
+        remote = "unavailable" if self.remote_revision is None else str(self.remote_revision)
+        return (
+            f"Repository: {self.repository}\n"
+            f"Campaign ID: {self.campaign_id}\n"
+            f"Local revision: {self.local_revision}\n"
+            f"Remote revision: {remote}"
+        )
+
+
 @dataclass(frozen=True)
 class CampaignPublishResult:
     outcome: PublishOutcome
@@ -129,6 +159,49 @@ class CampaignPublisher:
             campaigns.pop(str(root), None)
             self.installation_store.write(state)
         return existed
+
+    def diagnose_link(self, campaign_root: Path) -> CampaignSyncDiagnostic:
+        """Compare campaign-local metadata with the configured GitHub repository.
+
+        This method is deliberately read-only: in particular, an identity whose
+        releases disappeared is reported as orphaned and is never repaired by
+        silently changing its UUID or revision.
+        """
+        root = Path(campaign_root).resolve()
+        local = CampaignSyncMetadataStore(root).read()
+        if local is None:
+            raise CampaignNotLinkedError("This local campaign has no synchronization metadata.")
+        repository = str(getattr(self.gallery_client, "repo", "") or "(not configured)")
+        try:
+            remote = self.gallery_client.highest_revision(local.campaign_id)
+            remote_revision = self._revision(remote)
+        except Exception as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            state = (
+                CampaignSyncLinkState.INVALID_CREDENTIALS
+                if status in {401, 403}
+                else CampaignSyncLinkState.REMOTE_UNREACHABLE
+            )
+            return CampaignSyncDiagnostic(
+                state, repository, local.campaign_id, local.revision, None, str(exc)
+            )
+        if remote_revision == 0:
+            state = (
+                CampaignSyncLinkState.NEW_LOCAL_UNPUBLISHED
+                if local.revision == 1 and not local.published_at
+                else CampaignSyncLinkState.ORPHANED_LOCAL_METADATA
+            )
+        elif remote_revision == local.revision:
+            state = CampaignSyncLinkState.MATCHED_REMOTE
+        elif remote_revision > local.revision:
+            state = CampaignSyncLinkState.REMOTE_AHEAD
+        else:
+            # A remote history that ends before the local revision cannot prove
+            # that the local revision still exists, so treat it as orphaned.
+            state = CampaignSyncLinkState.ORPHANED_LOCAL_METADATA
+        return CampaignSyncDiagnostic(
+            state, repository, local.campaign_id, local.revision, remote_revision
+        )
 
     def publish(
         self,

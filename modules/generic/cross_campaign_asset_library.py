@@ -37,6 +37,8 @@ from modules.generic.github_gallery_client import (
 from modules.generic.campaign_sync.metadata_store import CampaignSyncMetadataStore
 from modules.generic.campaign_sync.publisher import (
     CampaignPublisher,
+    CampaignSyncDiagnostic,
+    CampaignSyncLinkState,
     PublishOutcome,
 )
 from modules.helpers.config_helper import ConfigHelper
@@ -677,13 +679,96 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         if not self.selected_campaign:
             messagebox.showwarning("No Source", "Select a source campaign first.")
             return
-        metadata = self.campaign_publisher.enable(
+        self.campaign_publisher.enable(
             self.selected_campaign.root, database_path=self.selected_campaign.db_path
         )
+        diagnostic = self.campaign_publisher.diagnose_link(self.selected_campaign.root)
+        if diagnostic.state is CampaignSyncLinkState.REMOTE_UNREACHABLE:
+            messagebox.showerror(
+                "Repository Unavailable",
+                f"The remote repository could not be queried.\n\n{diagnostic.details()}\n\n{diagnostic.error}",
+            )
+            return
+        if diagnostic.state is CampaignSyncLinkState.INVALID_CREDENTIALS:
+            messagebox.showerror(
+                "Invalid GitHub Credentials",
+                f"GitHub rejected the configured credentials.\n\n{diagnostic.details()}"
+                f"\n\n{diagnostic.error}",
+            )
+            return
+        if diagnostic.state is CampaignSyncLinkState.ORPHANED_LOCAL_METADATA:
+            self._resolve_orphaned_campaign_sync(diagnostic)
+            return
+        state_message = {
+            CampaignSyncLinkState.NEW_LOCAL_UNPUBLISHED:
+                "A new local link was created. It has not been published yet.",
+            CampaignSyncLinkState.MATCHED_REMOTE:
+                "The local link matches GitHub.",
+            CampaignSyncLinkState.REMOTE_AHEAD:
+                "The link is valid, and a newer revision is available on GitHub.",
+        }[diagnostic.state]
         messagebox.showinfo(
             "Synchronization Enabled",
-            f"Campaign ID: {metadata.campaign_id}\nInitial revision: {metadata.revision}",
+            f"{state_message}\n\n{diagnostic.details()}",
         )
+
+    def _resolve_orphaned_campaign_sync(
+        self, diagnostic: CampaignSyncDiagnostic
+    ) -> None:
+        """Offer only explicit, confirmed recovery paths for an orphaned link."""
+        prompt = (
+            "The local revision does not exist in the configured GitHub repository.\n\n"
+            f"{diagnostic.details()}\n\n"
+            "Choose an action:\n"
+            "1 - Select the correct GitHub repository\n"
+            "2 - Keep this local link without publishing\n"
+            "3 - Unlink and create a new campaign identity"
+        )
+        choice = simpledialog.askstring("Orphaned Synchronization Metadata", prompt, parent=self)
+        if choice is None:
+            return
+        choice = choice.strip()
+        if choice == "1":
+            repository = simpledialog.askstring(
+                "GitHub Repository", "Repository (owner/name):", parent=self
+            )
+            if not repository:
+                return
+            repository = repository.strip().strip("/")
+            if not messagebox.askyesno(
+                "Confirm Repository",
+                f"Query {repository} for Campaign ID\n{diagnostic.campaign_id}?",
+            ):
+                return
+            try:
+                self.gallery_client.set_repo(repository)
+            except ValueError as exc:
+                messagebox.showerror("Invalid Repository", str(exc))
+                return
+            ConfigHelper.set("Gallery", "github_repo", self.gallery_client.repo)
+            # Re-run the complete diagnostic; never alter local identity here.
+            self.enable_campaign_sync()
+        elif choice == "2":
+            if messagebox.askyesno(
+                "Keep Unpublished Link",
+                "Keep this Campaign ID and revision locally without publishing?",
+            ):
+                messagebox.showinfo(
+                    "Link Preserved", f"No metadata was changed.\n\n{diagnostic.details()}"
+                )
+        elif choice == "3":
+            if not messagebox.askyesno(
+                "Create New Campaign Identity",
+                "Permanently unlink this local copy and create a new Campaign ID? "
+                "The existing remote releases will not be changed.",
+            ):
+                return
+            campaign = self.selected_campaign
+            self.campaign_publisher.unlink(campaign.root)
+            self.campaign_publisher.enable(campaign.root, database_path=campaign.db_path)
+            self.enable_campaign_sync()
+        else:
+            messagebox.showwarning("Invalid Choice", "Enter 1, 2, or 3.")
 
     def publish_campaign_update(self):
         if not self.selected_campaign:
