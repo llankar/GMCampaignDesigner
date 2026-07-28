@@ -422,7 +422,17 @@ class MainWindow(ctk.CTk):
 
     def open_campaign_update_settings(self):
         """Open installation-local automatic campaign update preferences."""
-        CampaignUpdateSettingsDialog(self)
+        CampaignUpdateSettingsDialog(self, on_saved=self._apply_campaign_update_preferences)
+
+    def _apply_campaign_update_preferences(self, preferences):
+        """Apply saved publication preferences to the running background service."""
+        coordinator = self._auto_publish_coordinator
+        coordinator.configure(
+            automatic=preferences.automatic_publication,
+            offline=preferences.offline,
+            idle_delay=preferences.publication_idle_seconds,
+            maximum_interval=preferences.publication_maximum_seconds,
+        )
 
     def register_tour_widget(self, screen: str, key: str, widget):
         """Register a guided-tour target widget by stable key."""

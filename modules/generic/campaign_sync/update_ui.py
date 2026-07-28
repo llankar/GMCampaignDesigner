@@ -92,8 +92,9 @@ class CampaignUpdatePrompt(ctk.CTkToplevel):
 
 
 class CampaignUpdateSettingsDialog(ctk.CTkToplevel):
-    def __init__(self, master) -> None:
+    def __init__(self, master, *, on_saved: Optional[Callable[[CampaignUpdatePreferences], None]] = None) -> None:
         super().__init__(master)
+        self._on_saved = on_saved
         self.title("Campaign Update Settings")
         self.geometry("560x470")
         self.resizable(False, False)
@@ -139,8 +140,11 @@ class CampaignUpdateSettingsDialog(ctk.CTkToplevel):
         except ValueError:
             self.error.configure(text="Use positive whole numbers; maximum must be at least the idle delay.")
             return
-        CampaignUpdatePreferences(
+        preferences = CampaignUpdatePreferences(
             self.checks.get(), hours, self.download.get(), self.offline.get(),
             self.auto_publish.get(), idle, maximum,
-        ).save()
+        )
+        preferences.save()
+        if self._on_saved is not None:
+            self._on_saved(preferences)
         self.destroy()
