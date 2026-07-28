@@ -78,6 +78,15 @@ class AutoPublishCoordinator:
     def set_offline(self, value: bool) -> None:
         self.offline = bool(value)
 
+    def configure(self, *, automatic: bool, offline: bool,
+                  idle_delay: float, maximum_interval: float) -> None:
+        """Apply publication preferences without requiring an application restart."""
+        scheduler = PublicationScheduler(idle_delay, maximum_interval)
+        with self._lock:
+            self.automatic = bool(automatic)
+            self.offline = bool(offline)
+            self.scheduler = scheduler
+
     def credentials_changed(self) -> None:
         for entry in self.outbox.entries():
             if entry.failure_category in (FailureCategory.CREDENTIALS.value, FailureCategory.AUTHENTICATION.value):
