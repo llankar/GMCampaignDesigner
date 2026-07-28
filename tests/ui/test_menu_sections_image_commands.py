@@ -59,6 +59,8 @@ def test_menu_sections_expose_image_library_commands() -> None:
     )
 
     specs = build_menu_specs(app)
+    sync_menu = next(menu for menu in specs if menu.label == "Sync")
+    sync_labels = [item.label for group in sync_menu.groups for item in group.items]
     campaign_menu = next(menu for menu in specs if menu.label == "Campaign")
     table_surfaces = next(group for group in campaign_menu.groups if group.title == "Table Surfaces")
     table_labels = [item.label for item in table_surfaces.items]
@@ -69,6 +71,7 @@ def test_menu_sections_expose_image_library_commands() -> None:
     live_labels = [item.label for item in live_tools.items]
 
     assert "GM Table" in table_labels
+    assert sync_labels == ["Campaign Update Settings", "Cross-campaign Asset Library"]
     assert "Import Image Directories…" in labels
     assert "Open Image Library" in labels
     assert "Ambiance Control" in live_labels

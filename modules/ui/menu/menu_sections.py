@@ -1,33 +1,12 @@
 """Section definitions for menu."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from tkinter import messagebox
 from typing import Callable
 
 from modules.helpers.template_loader import list_manageable_entities
-
-
-@dataclass(slots=True)
-class MenuCommandSpec:
-    label: str
-    command: Callable[[], None] | None = None
-    shortcut: str = ""
-    icon_key: str | None = None
-    kind: str = "command"
-
-
-@dataclass(slots=True)
-class MenuGroupSpec:
-    title: str
-    helper: str
-    items: list[MenuCommandSpec] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class TopLevelMenuSpec:
-    label: str
-    groups: list[MenuGroupSpec] = field(default_factory=list)
+from modules.ui.menu.campaign_sync_menu import build_campaign_sync_menu
+from modules.ui.menu.menu_models import MenuCommandSpec, MenuGroupSpec, TopLevelMenuSpec
 
 
 def _command(label: str, command: Callable[[], None] | None, *, shortcut: str = "", icon_key: str | None = None) -> MenuCommandSpec:
@@ -90,7 +69,6 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                         _command("New Entity Type", app.open_new_entity_type_dialog, icon_key="new_entity_type"),
                         _command("Manage Systems", app.open_system_manager_dialog, icon_key="system_manager"),
                         _command("AI Settings", _optional_command(app, "open_ai_settings"), icon_key="system_manager"),
-                        _command("Cross-campaign Asset Library", app.open_cross_campaign_asset_library, icon_key="asset_library"),
                     ],
                 ),
                 MenuGroupSpec(
@@ -145,6 +123,7 @@ def build_menu_specs(app) -> list[TopLevelMenuSpec]:
                 ),
             ],
         ),
+        build_campaign_sync_menu(app),
         TopLevelMenuSpec(
             label="GM Tools",
             groups=[
