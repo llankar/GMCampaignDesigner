@@ -50,6 +50,39 @@ def test_main_window_schedules_campaign_overview_on_launch() -> None:
     raise AssertionError("MainWindow.__init__ no longer schedules the campaign overview at launch")
 
 
+def test_main_window_forces_campaign_update_check_on_launch() -> None:
+    """The launch check must not be suppressed by the recurring interval."""
+    init_method = _get_method("__init__")
+
+    for node in ast.walk(init_method):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "after"
+            and len(node.args) == 2
+        ):
+            continue
+        delay_arg, callback_arg = node.args
+        if not (
+            isinstance(delay_arg, ast.Constant)
+            and delay_arg.value == 1000
+            and isinstance(callback_arg, ast.Lambda)
+            and isinstance(callback_arg.body, ast.Call)
+            and isinstance(callback_arg.body.func, ast.Attribute)
+            and callback_arg.body.func.attr == "_queue_campaign_update_check"
+        ):
+            continue
+        if any(
+            keyword.arg == "force"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is True
+            for keyword in callback_arg.body.keywords
+        ):
+            return
+
+    raise AssertionError("MainWindow.__init__ no longer forces an update check at launch")
+
+
 def test_gm_screen_auto_open_alias_points_to_campaign_overview() -> None:
     """Verify that GM screen auto open alias points to campaign overview."""
     alias_method = _get_method("_auto_open_gm_screen_if_available")

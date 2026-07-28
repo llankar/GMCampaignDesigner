@@ -291,7 +291,10 @@ class MainWindow(ctk.CTk):
         self.after(400, self.open_audio_bar)
         self.after(600, lambda: self._queue_update_check(force=True))
         self.after(800, self._auto_open_campaign_overview)
-        self.after(1000, self._queue_campaign_update_check)
+        # Launch checks intentionally bypass the elapsed-time gate.  The
+        # configured interval still governs later automatic checks, while the
+        # enabled/offline preferences remain enforced by the checker.
+        self.after(1000, lambda: self._queue_campaign_update_check(force=True))
 
     def _on_campaign_data_saved(self, database_path=None) -> None:
         """Mark linked campaign content dirty after its database commit succeeds."""
