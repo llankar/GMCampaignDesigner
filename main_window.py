@@ -82,6 +82,7 @@ from modules.ui.ambiance.control_window import AmbianceControlWindow
 from modules.ui.ambiance.importer.dialog import AmbianceWallpaperImporterDialog
 from modules.ui.sidebar.accordion_sections import SidebarAccordion, SidebarItemSpec, SidebarSectionSpec
 from modules.ui.controllers import AIRunWindowController
+from modules.ui.windows.progress_dialog import ProgressDialogLifecycle
 from app.ui.help.guided_tour_entry import launch_guided_tour
 from app.ui.help.tour_widget_registry import TourWidgetRegistry
 from modules.events.ui.dock import CalendarDock
@@ -3602,6 +3603,7 @@ class MainWindow(ctk.CTk):
         progress_bar = ctk.CTkProgressBar(progress_win, mode="determinate")
         progress_bar.pack(fill="x", padx=20, pady=(0, 20))
         progress_bar.set(0.0)
+        lifecycle = ProgressDialogLifecycle(self, progress_win)
 
         def update(message: str, fraction: float) -> None:
             """Update the operation."""
@@ -3613,36 +3615,27 @@ class MainWindow(ctk.CTk):
                 except Exception:
                     progress_bar.set(0.0)
 
-            self.after(0, _apply)
-
-        def close_window():
-            """Close window."""
-            if progress_win.winfo_exists():
-                # Handle the branch where progress_win.winfo_exists().
-                try:
-                    progress_win.grab_release()
-                except Exception:
-                    pass
-                progress_win.destroy()
+            lifecycle.schedule_update(_apply)
 
         def handle_error(title: str, detail: str) -> None:
             """Handle handle error."""
-            close_window()
-            messagebox.showerror(title, detail)
+            lifecycle.close(lambda: messagebox.showerror(title, detail))
 
         success_callback = on_success
 
         def handle_success(result):
             """Handle success."""
-            close_window()
-            if success_callback:
-                success_callback(result)
-                return
-            detail = detail_builder(result) if detail_builder else None
-            message = success_message or "Operation completed."
-            if detail:
-                message = f"{message}\n\n{detail}"
-            messagebox.showinfo("Success", message)
+            def notify():
+                if success_callback:
+                    success_callback(result)
+                    return
+                detail = detail_builder(result) if detail_builder else None
+                message = success_message or "Operation completed."
+                if detail:
+                    message = f"{message}\n\n{detail}"
+                messagebox.showinfo("Success", message)
+
+            lifecycle.close(notify)
 
         def run_worker():
             """Run worker."""
