@@ -227,7 +227,7 @@ class CampaignPublisher:
         # Release and verification succeeded: only now advance installed state.
         CampaignSyncMetadataStore(root).write(metadata)
         CampaignChangeDetector(self.installation_store).persist_baseline(
-            root, digest, database_path=database
+            root, content_digest, database_path=database
         )
         return CampaignPublishResult(
             PublishOutcome.PUBLISHED, revision, local.campaign_id, digest, release
