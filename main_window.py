@@ -1124,7 +1124,7 @@ class MainWindow(ctk.CTk):
         container = getattr(self, "sidebar_sections_container", None)
         if container is None:
             return
-        default_title = "Campaign Workshop"
+        default_title = "Campaign Entities"
 
         # Group buttons
         data_system = [
@@ -1133,12 +1133,18 @@ class MainWindow(ctk.CTk):
             SidebarItemSpec("customize_fields", "Customize Fields", self.open_custom_fields_editor),
             SidebarItemSpec("new_entity_type", "New Entity Type", self.open_new_entity_type_dialog),
             SidebarItemSpec("system_manager", "AI Settings", self.open_ai_settings),
-            SidebarItemSpec("campaign_updates", "Campaign Update Settings", self.open_campaign_update_settings),
             SidebarItemSpec("auto_improve", "Auto-improvement (Codex CLI)", self.open_auto_improve_panel),
             SidebarItemSpec("system_manager", "Manage Campaign Systems", self.open_system_manager_dialog),
             SidebarItemSpec("db_export", "Create Campaign Backup", self.prompt_campaign_backup),
             SidebarItemSpec("db_import", "Restore Campaign Backup", self.prompt_campaign_restore),
-            SidebarItemSpec("asset_library", "Cross-campaign Asset Library", self.open_cross_campaign_asset_library),
+        ]
+        campaign_synchronization = [
+            SidebarItemSpec("campaign_updates", "Campaign Update Settings", self.open_campaign_update_settings),
+            SidebarItemSpec(
+                "asset_library",
+                "Cross-campaign Asset Library",
+                self.open_cross_campaign_asset_library,
+            ),
         ]
 
         entity_buttons = []
@@ -1188,7 +1194,12 @@ class MainWindow(ctk.CTk):
 
         specs = [
             SidebarSectionSpec("Data & System", data_system, item_count=len(data_system), has_unresolved=not has_campaign_data),
-            SidebarSectionSpec("Campaign Workshop", entity_buttons, item_count=len(entity_buttons), updated_recently=recent_update),
+            SidebarSectionSpec(
+                "Campaign Synchronization",
+                campaign_synchronization,
+                item_count=len(campaign_synchronization),
+            ),
+            SidebarSectionSpec("Campaign Entities", entity_buttons, item_count=len(entity_buttons), updated_recently=recent_update),
             SidebarSectionSpec("Relations & Graphs", relations, item_count=len(relations)),
             SidebarSectionSpec("Utilities", utilities, item_count=len(utilities), has_critical=not has_campaign_data),
         ]
