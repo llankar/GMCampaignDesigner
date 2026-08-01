@@ -3143,6 +3143,12 @@ class MainWindow(ctk.CTk):
 
         existing_window = self._focus_gm_table_window(table_id)
         if existing_window is not None:
+            if scenario_name:
+                view = getattr(existing_window, "_gm_table_view", None)
+                if view is not None:
+                    view.after_idle(
+                        lambda: view.open_or_focus_scenario_board(scenario_name)
+                    )
             return existing_window
 
         try:
@@ -3190,7 +3196,7 @@ class MainWindow(ctk.CTk):
             self._register_gm_table_window(table_id, window, view)
             view.after_idle(view.log_workspace_opened)
             if scenario_name:
-                view.after_idle(lambda: view.open_entity_panel("Scenarios", scenario_name))
+                view.after_idle(lambda: view.open_or_focus_scenario_board(scenario_name))
             return window
         except Exception:
             self._close_gm_table_window(table_id)

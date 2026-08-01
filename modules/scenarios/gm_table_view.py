@@ -1743,6 +1743,7 @@ class GMTableView(ctk.CTkFrame):
             host,
             wrappers=self.wrappers,
             open_entity_callback=self.open_entity_panel,
+            open_scenario_board_callback=self.open_or_focus_scenario_board,
         )
         widget.grid(row=0, column=0, sticky="nsew")
         return widget
@@ -1959,7 +1960,7 @@ class GMTableView(ctk.CTkFrame):
     @staticmethod
     def _uses_readable_entity_detail(entity_type: str | None) -> bool:
         """Return whether GM Table panels should show full text details."""
-        return entity_type == "Objects"
+        return entity_type not in {None, "Books", "Puzzles", "Scenarios"}
 
     def _build_puzzle_display_content(self, host, state: dict):
         """Build the puzzle display page."""
