@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from modules.image_assets.services.import_service import ImageAssetImportService
+from modules.image_assets.paths import normalize_asset_reference
+
+
+@pytest.fixture(autouse=True)
+def _active_campaign(tmp_path: Path, monkeypatch):
+    """Treat each test's temporary directory as the active campaign root."""
+    monkeypatch.setattr(
+        "modules.image_assets.services.import_service.ConfigHelper.get_campaign_dir",
+        lambda: str(tmp_path),
+    )
 
 
 class _FakeRepository:
@@ -17,7 +29,13 @@ class _FakeRepository:
     def upsert_by_hash_or_path(self, payload: dict) -> dict:
         existing = None
         for row in self.items:
-            if row.get("Path") == payload.get("Path"):
+            try:
+                paths_match = normalize_asset_reference(row.get("Path", "")) == payload.get("Path")
+            except ValueError:
+                paths_match = str(row.get("Path", "")).replace("\\", "/").endswith(
+                    str(payload.get("Path", ""))
+                )
+            if paths_match:
                 existing = row
                 break
         if existing is None:
@@ -167,3 +185,50 @@ def test_import_directories_can_leave_existing_paths_unchanged(
     assert repository.items[0]["Name"] == "Old Hero"
     assert repository.items[0]["Hash"] == "old-hash"
     assert repository.items[0]["Tags"] == ["custom"]
+
+
+def test_external_import_is_copied_and_only_relative_paths_are_persisted(tmp_path, monkeypatch):
+    campaign = tmp_path / "campaign"
+    campaign.mkdir()
+    external = tmp_path / "external" / "ships"
+    external.mkdir(parents=True)
+    (external / "xwing.png").write_bytes(b"xwing")
+    monkeypatch.setattr(
+        "modules.image_assets.services.import_service.ConfigHelper.get_campaign_dir",
+        lambda: str(campaign),
+    )
+    repository = _FakeRepository()
+    service = ImageAssetImportService(repository=repository)
+    monkeypatch.setattr(service, "_read_dimensions", lambda _path: (64, 64))
+
+    summary = service.import_directories([str(tmp_path / "external")], recursive=True, reindex_changed_only=True)
+
+    assert summary.imported_new == 1
+    row = repository.items[0]
+    assert row["Path"] == row["RelativePath"] == "assets/image_library/external/ships/xwing.png"
+    assert row["SourceRoot"] == "assets/image_library"
+    assert not Path(row["Path"]).is_absolute()
+    assert (campaign / row["Path"]).read_bytes() == b"xwing"
+
+
+def test_external_import_collision_does_not_overwrite_different_file(tmp_path, monkeypatch):
+    campaign = tmp_path / "campaign"
+    destination = campaign / "assets" / "image_library" / "external" / "ship.png"
+    destination.parent.mkdir(parents=True)
+    destination.write_bytes(b"old")
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "ship.png").write_bytes(b"new")
+    monkeypatch.setattr(
+        "modules.image_assets.services.import_service.ConfigHelper.get_campaign_dir",
+        lambda: str(campaign),
+    )
+    repository = _FakeRepository()
+    service = ImageAssetImportService(repository=repository)
+    monkeypatch.setattr(service, "_read_dimensions", lambda _path: (64, 64))
+
+    service.import_directories([str(external)], recursive=False, reindex_changed_only=True)
+
+    assert destination.read_bytes() == b"old"
+    assert (destination.parent / "ship_2.png").read_bytes() == b"new"
+    assert repository.items[0]["Path"] == "assets/image_library/external/ship_2.png"

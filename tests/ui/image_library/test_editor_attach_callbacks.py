@@ -56,7 +56,13 @@ def test_attach_portrait_from_library_stores_campaign_relative_path(monkeypatch,
         lambda _src: str(campaign_dir / "assets" / "portraits" / "npc_portrait.png"),
     )
 
-    editor.attach_portrait_from_library(ImageResult(path=str(source), name="portrait"))
+    editor.attach_portrait_from_library(
+        ImageResult(
+            path="assets/image_library/portraits/portrait.png",
+            resolved_path=str(source),
+            name="portrait",
+        )
+    )
 
     assert editor.captured_portrait_paths == ["assets/portraits/npc_portrait.png"]
     assert editor.field_widgets["Portrait"] == "assets/portraits/npc_portrait.png"
@@ -81,6 +87,12 @@ def test_attach_image_from_library_stores_campaign_relative_path(monkeypatch, tm
         lambda _src: str(campaign_dir / "assets" / "images" / "map_images" / "battlemap.png"),
     )
 
-    editor.attach_image_from_library(ImageResult(path=str(source), name="map"))
+    editor.attach_image_from_library(
+        ImageResult(
+            path="assets/image_library/maps/map.png",
+            resolved_path=str(source),
+            name="map",
+        )
+    )
 
     assert editor.field_widgets["Image"] == "assets/images/map_images/battlemap.png"

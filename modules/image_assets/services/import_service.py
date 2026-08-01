@@ -6,10 +6,13 @@ from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Iterable
+import shutil
 
 from PIL import Image, UnidentifiedImageError
 
 from modules.image_assets.repository import ImageAssetsRepository
+from modules.image_assets.paths import make_campaign_relative, normalize_asset_reference
+from modules.helpers.config_helper import ConfigHelper
 from modules.image_assets.services.import_options import ImageDirectoryImportOptions
 from modules.image_assets.search.indexing import (
     build_search_tokens,
@@ -90,12 +93,19 @@ class ImageAssetImportService:
             update_existing_files=update_existing_files,
         )
         normalized_roots = self._normalize_roots(paths)
+        campaign_root = Path(ConfigHelper.get_campaign_dir()).resolve()
         existing_items = self.repository.list_all()
-        existing_by_path = {
-            str(item.get("Path") or "").strip(): item
-            for item in existing_items
-            if str(item.get("Path") or "").strip()
-        }
+        existing_by_path: dict[str, dict] = {}
+        for item in existing_items:
+            raw_path = str(item.get("Path") or "").strip()
+            if not raw_path:
+                continue
+            try:
+                existing_by_path[normalize_asset_reference(raw_path, campaign_root)] = item
+            except ValueError:
+                # Temporary lookup support for an old external absolute value;
+                # the row is rewritten to the managed relative destination.
+                existing_by_path[str(Path(raw_path).expanduser().resolve())] = item
 
         roots_missing: list[str] = []
         scanned_files = 0
@@ -125,16 +135,22 @@ class ImageAssetImportService:
                 scanned_files += 1
                 discovered_candidates += 1
 
-                abs_path = str(file_path.resolve())
-                existing = existing_by_path.get(abs_path)
+                source_path = file_path.resolve()
+                try:
+                    stored_path = make_campaign_relative(source_path, campaign_root)
+                    managed_path = source_path
+                except ValueError:
+                    managed_path = self._copy_external_asset(source_path, root_path, campaign_root)
+                    stored_path = make_campaign_relative(managed_path, campaign_root)
+                existing = existing_by_path.get(stored_path) or existing_by_path.get(str(source_path))
 
                 try:
-                    file_size = file_path.stat().st_size
-                    content_hash = self._compute_sha256(file_path)
+                    file_size = managed_path.stat().st_size
+                    content_hash = self._compute_sha256(managed_path)
                 except OSError as exc:
                     errors.append(
                         AssetImportError(
-                            path=abs_path, reason=f"stat/hash failed: {exc}"
+                            path=str(source_path), reason=f"stat/hash failed: {exc}"
                         )
                     )
                     continue
@@ -162,11 +178,11 @@ class ImageAssetImportService:
                 height: int | None = None
                 if not unchanged:
                     try:
-                        width, height = self._read_dimensions(file_path)
+                        width, height = self._read_dimensions(managed_path)
                     except (OSError, UnidentifiedImageError) as exc:
                         errors.append(
                             AssetImportError(
-                                path=abs_path, reason=f"metadata read failed: {exc}"
+                                path=str(source_path), reason=f"metadata read failed: {exc}"
                             )
                         )
                         continue
@@ -186,11 +202,9 @@ class ImageAssetImportService:
                 )
                 searchable_blob = build_searchable_blob(
                     name=stem,
-                    path=abs_path,
-                    relative_path=self._compute_relative(
-                        file_path=file_path, root_path=root_path
-                    ),
-                    source_root=str(root_path.resolve()),
+                    path=stored_path,
+                    relative_path=stored_path,
+                    source_root="assets/image_library",
                     extension=file_path.suffix.lower().lstrip("."),
                     tags=tags,
                     name_normalized=name_normalized,
@@ -200,11 +214,9 @@ class ImageAssetImportService:
 
                 payload = {
                     "Name": stem,
-                    "Path": abs_path,
-                    "RelativePath": self._compute_relative(
-                        file_path=file_path, root_path=root_path
-                    ),
-                    "SourceRoot": str(root_path.resolve()),
+                    "Path": stored_path,
+                    "RelativePath": stored_path,
+                    "SourceRoot": "assets/image_library",
                     "SourceFolderName": file_path.parent.name,
                     "Extension": file_path.suffix.lower().lstrip("."),
                     "Width": width,
@@ -222,7 +234,7 @@ class ImageAssetImportService:
                     if existing
                     else self.repository.upsert_by_hash_or_path(payload)
                 )
-                existing_by_path[abs_path] = saved
+                existing_by_path[stored_path] = saved
                 seen_keys.add(dedupe_key)
 
                 if existing:
@@ -295,6 +307,36 @@ class ImageAssetImportService:
             return str(file_path.resolve().relative_to(root_path.resolve()))
         except ValueError:
             return file_path.name
+
+    @classmethod
+    def _copy_external_asset(cls, source: Path, source_root: Path, campaign_root: Path) -> Path:
+        """Copy an external file into the managed library without overwriting."""
+        folder = cls._safe_component(source_root.name or "imported")
+        try:
+            tail = source.relative_to(source_root.resolve())
+        except ValueError:
+            tail = Path(source.name)
+        destination = campaign_root / "assets" / "image_library" / folder / tail
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            if destination.stat().st_size == source.stat().st_size and cls._compute_sha256(destination) == cls._compute_sha256(source):
+                return destination
+            counter = 2
+            while True:
+                candidate = destination.with_name(f"{destination.stem}_{counter}{destination.suffix}")
+                if candidate.exists() and candidate.stat().st_size == source.stat().st_size and cls._compute_sha256(candidate) == cls._compute_sha256(source):
+                    return candidate
+                if not candidate.exists():
+                    destination = candidate
+                    break
+                counter += 1
+        shutil.copy2(source, destination)
+        return destination
+
+    @staticmethod
+    def _safe_component(value: str) -> str:
+        cleaned = "".join(char if char.isalnum() or char in "-_" else "_" for char in value).strip("_")
+        return cleaned or "imported"
 
     @staticmethod
     def _as_optional_int(value: object) -> int | None:

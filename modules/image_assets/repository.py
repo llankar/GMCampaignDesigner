@@ -7,6 +7,7 @@ import uuid
 from typing import Any, Iterable
 
 from modules.generic.generic_model_wrapper import GenericModelWrapper
+from modules.image_assets.paths import InvalidAssetReference, normalize_asset_reference
 
 
 class ImageAssetsRepository:
@@ -22,6 +23,7 @@ class ImageAssetsRepository:
 
     def upsert_by_hash_or_path(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create or update an asset using hash first, then path fallback."""
+        payload = self._normalize_payload(payload)
         existing = self._find_existing(
             hash_value=str(payload.get("Hash") or "").strip(),
             path=str(payload.get("Path") or "").strip(),
@@ -46,6 +48,7 @@ class ImageAssetsRepository:
 
     def replace_by_path(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Replace the existing row for a path, or create it when absent."""
+        payload = self._normalize_payload(payload)
         path = str(payload.get("Path") or "").strip()
         existing = self._find_existing_by_path(path) if path else None
 
@@ -68,12 +71,12 @@ class ImageAssetsRepository:
 
     def delete_stale_files(self, active_paths: Iterable[str]) -> int:
         """Delete rows that no longer map to known file paths."""
-        normalized = {str(path).strip() for path in active_paths if str(path).strip()}
+        normalized = {self._normalized_path(path) for path in active_paths if str(path).strip()}
         items = self.list_all()
         kept: list[dict[str, Any]] = []
         stale_count = 0
         for item in items:
-            row_path = str(item.get("Path") or "").strip()
+            row_path = self._normalized_path(item.get("Path"))
             if row_path and row_path in normalized:
                 kept.append(item)
             elif row_path:
@@ -118,13 +121,32 @@ class ImageAssetsRepository:
 
     def _find_existing_by_path(self, path: str) -> dict[str, Any] | None:
         """Find one row by exact path."""
-        normalized_path = str(path or "").strip()
+        normalized_path = self._normalized_path(path)
         if not normalized_path:
             return None
         for item in self.list_all():
-            if str(item.get("Path") or "").strip() == normalized_path:
+            if self._normalized_path(item.get("Path")) == normalized_path:
                 return item
         return None
+
+    @staticmethod
+    def _normalized_path(path: object) -> str:
+        try:
+            return normalize_asset_reference(str(path or ""))
+        except InvalidAssetReference:
+            return str(path or "").strip().replace("\\", "/")
+
+    @classmethod
+    def _normalize_payload(cls, payload: dict[str, Any]) -> dict[str, Any]:
+        normalized = dict(payload)
+        # Writes are deliberately strict.  The lenient helper above exists
+        # solely so legacy rows remain comparable until the migration runs.
+        path = normalize_asset_reference(str(payload.get("Path") or ""))
+        if path:
+            normalized["Path"] = path
+            normalized["RelativePath"] = path
+        normalized["SourceRoot"] = "assets/image_library"
+        return normalized
 
     @staticmethod
     def _apply_search(

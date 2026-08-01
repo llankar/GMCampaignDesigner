@@ -1773,15 +1773,11 @@ def _rewrite_record_paths(
                 replacement = replacements[value]
                 break
         if replacement:
-            relative_replacement = str(Path(replacement).as_posix())
+            from modules.image_assets.paths import normalize_asset_reference
+            relative_replacement = normalize_asset_reference(replacement, target_campaign_root)
             updated["RelativePath"] = relative_replacement
-            campaign_root = (
-                target_campaign_root.resolve()
-                if target_campaign_root
-                else _resolve_campaign_dir(None)
-            )
-            updated["Path"] = str((campaign_root / relative_replacement).resolve())
-            updated["SourceRoot"] = str(campaign_root)
+            updated["Path"] = relative_replacement
+            updated["SourceRoot"] = "assets/image_library"
 
     return updated
 

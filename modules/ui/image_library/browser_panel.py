@@ -13,6 +13,7 @@ from typing import Callable, Iterable
 import customtkinter as ctk
 
 from modules.ui.image_library.result_card import ImageResult, ImageResultCard
+from modules.image_assets.paths import resolve_asset_reference
 from modules.ui.image_library.thumbnail_cache import ThumbnailCache, ThumbnailPlaceholderFactory
 from modules.ui.image_library.toolbar import ImageLibraryToolbar, SORT_OPTIONS, ToolbarState
 from modules.ui.image_library.editor.image_editor_dialog import ImageEditorDialog
@@ -381,7 +382,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
             card = ImageResultCard(
                 self._items_frame,
                 item=item,
-                image=self._load_ctk_thumb(item.path, thumb_size),
+                image=self._load_ctk_thumb(item.resolved_path or item.path, thumb_size),
                 display_mode=display_mode,
                 on_open=self._open_callback,
                 on_view=self._view_callback,
@@ -409,10 +410,10 @@ class ImageBrowserPanel(ctk.CTkFrame):
     def _resolve_thumbnail_path(path: str) -> str:
         """Resolve image-library thumbnails the same way preview resolves portraits."""
         try:
-            resolved = resolve_portrait_path(path, ConfigHelper.get_campaign_dir())
+            resolved = str(resolve_asset_reference(path))
         except Exception:
             resolved = None
-        return resolved or str(Path(path).expanduser())
+        return resolved or ""
 
     def _clear_rendered_cards(self) -> None:
         """Remove currently rendered widgets and image references."""
@@ -451,7 +452,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
 
         ImageEditorDialog(
             self,
-            self._context_item.path,
+            self._context_item.resolved_path or str(resolve_asset_reference(self._context_item.path)),
             on_saved=_refresh_after_save,
             use_transient=False,
             modal=False,
@@ -472,9 +473,7 @@ class ImageBrowserPanel(ctk.CTkFrame):
         """Default view behavior matching app image preview flow."""
         if not item.path:
             return
-        resolved = item.path
-        if not os.path.isabs(resolved):
-            resolved = str(Path(resolved).expanduser())
+        resolved = item.resolved_path or str(resolve_asset_reference(item.path))
         show_portrait(resolved, title=item.name)
 
 

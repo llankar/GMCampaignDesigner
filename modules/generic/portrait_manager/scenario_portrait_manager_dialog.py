@@ -274,8 +274,10 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         return None
 
     def _attach_from_library(self, image_result):
+        from modules.image_assets.paths import resolve_asset_reference
         entity = self._entity()
-        source = str(getattr(image_result, "path", image_result))
+        reference = getattr(image_result, "path", image_result)
+        source = str(getattr(image_result, "resolved_path", "") or resolve_asset_reference(reference))
         if entity and Path(source).is_file():
             self._save_paths(self._paths() + [copy_portrait_to_campaign(source, entity.name)])
 

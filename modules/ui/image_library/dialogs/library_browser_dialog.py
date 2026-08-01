@@ -81,6 +81,7 @@ class ImageLibraryBrowserDialog(ctk.CTkToplevel):
                 modified_ts=0.0,
                 subtitle=row.relative_path or row.source_root,
                 source_folder_name=row.source_folder_name,
+                resolved_path=row.preview_path,
             )
             for row in rows
         ]
