@@ -39,12 +39,14 @@ class CampaignDashboardPanel(ctk.CTkFrame):
         *,
         wrappers: dict,
         open_entity_callback: Callable[[str, str], None],
+        open_scenario_board_callback: Callable[[str], None] | None = None,
         **kwargs,
     ):
         """Initialize the CampaignDashboardPanel instance."""
         super().__init__(master, fg_color=DASHBOARD_THEME.panel_bg, **kwargs)
         self.wrappers = wrappers or {}
         self.open_entity_callback = open_entity_callback
+        self.open_scenario_board_callback = open_scenario_board_callback
 
         self._campaign_catalog = load_campaign_entities(self.wrappers)
         self._campaign_options, self._option_to_campaign = build_campaign_option_index(self._campaign_catalog)
@@ -336,12 +338,19 @@ class CampaignDashboardPanel(ctk.CTkFrame):
                 arc_field = CampaignArcField(
                     block,
                     raw_value=field.get("value"),
-                    open_scenario_callback=lambda scenario_name: self.open_entity_callback("Scenarios", scenario_name),
+                    open_scenario_callback=self._open_scenario,
                 )
                 arc_field.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
             else:
                 self._render_read_only_field(block, field.get("value"), query)
             row += 1
+
+    def _open_scenario(self, scenario_name: str) -> None:
+        """Open an arc scenario in the host's preferred scenario view."""
+        if callable(self.open_scenario_board_callback):
+            self.open_scenario_board_callback(scenario_name)
+            return
+        self.open_entity_callback("Scenarios", scenario_name)
 
     def _render_session_prep_view(self, visible_fields: list[dict], query: str) -> None:
         """Render session prep view."""

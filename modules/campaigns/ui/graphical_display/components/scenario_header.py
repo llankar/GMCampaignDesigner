@@ -20,6 +20,7 @@ class ScenarioHeroStrip(ctk.CTkFrame):
         subtitle: str,
         count_chips: list[tuple[str, str]],
         on_edit: Callable[[], None],
+        on_open_gm_table: Callable[[], None] | None = None,
         on_open_gm_screen: Callable[[], None] | None = None,
         accent: str | None = None,
     ):
@@ -83,6 +84,18 @@ class ScenarioHeroStrip(ctk.CTkFrame):
         ).grid(row=0, column=0, padx=14, pady=(14, 8), sticky="ew")
         ctk.CTkButton(
             actions,
+            text="Open in GM Table",
+            command=on_open_gm_table,
+            state="normal" if on_open_gm_table else "disabled",
+            fg_color=DASHBOARD_THEME.button_fg,
+            hover_color=DASHBOARD_THEME.button_hover,
+            border_width=1,
+            border_color=DASHBOARD_THEME.card_border,
+            width=164,
+            height=38,
+        ).grid(row=1, column=0, padx=14, pady=(0, 8), sticky="ew")
+        ctk.CTkButton(
+            actions,
             text="Open in GM screen",
             command=on_open_gm_screen,
             state="normal" if on_open_gm_screen else "disabled",
@@ -92,7 +105,7 @@ class ScenarioHeroStrip(ctk.CTkFrame):
             border_color=DASHBOARD_THEME.card_border,
             width=164,
             height=38,
-        ).grid(row=1, column=0, padx=14, pady=(0, 14), sticky="ew")
+        ).grid(row=2, column=0, padx=14, pady=(0, 14), sticky="ew")
 
 
 class ScenarioIdentityPanel(ctk.CTkFrame):
@@ -106,6 +119,7 @@ class ScenarioIdentityPanel(ctk.CTkFrame):
         tags: list[str],
         progress_items: list[tuple[str, str]],
         on_edit: Callable[[], None],
+        on_open_gm_table: Callable[[], None] | None = None,
         on_open_gm_screen: Callable[[], None] | None = None,
     ):
         """Initialize the ScenarioIdentityPanel instance."""
@@ -163,6 +177,17 @@ class ScenarioIdentityPanel(ctk.CTkFrame):
         ).grid(row=0, column=0, padx=(0, 8))
         ctk.CTkButton(
             actions,
+            text="Open in GM Table",
+            command=on_open_gm_table,
+            state="normal" if on_open_gm_table else "disabled",
+            fg_color=DASHBOARD_THEME.button_fg,
+            hover_color=DASHBOARD_THEME.button_hover,
+            border_width=1,
+            border_color=DASHBOARD_THEME.card_border,
+            width=148,
+        ).grid(row=0, column=1, padx=(0, 8))
+        ctk.CTkButton(
+            actions,
             text="Open in GM screen",
             command=on_open_gm_screen,
             state="normal" if on_open_gm_screen else "disabled",
@@ -171,4 +196,4 @@ class ScenarioIdentityPanel(ctk.CTkFrame):
             border_width=1,
             border_color=DASHBOARD_THEME.card_border,
             width=148,
-        ).grid(row=0, column=1)
+        ).grid(row=0, column=2)

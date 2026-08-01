@@ -17,6 +17,7 @@ from modules.helpers import theme_manager
 from modules.campaigns.services.poster_export import build_poster_theme_from_tokens, render_campaign_poster
 from modules.scenarios.gm_layout_manager import GMScreenLayoutManager
 from modules.scenarios.gm_screen_view import GMScreenView
+from modules.scenarios.gm_table.navigation import open_scenario_in_main_gm_table
 
 from .components import (
     CampaignOverviewHero,
@@ -575,6 +576,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
 
         subtitle = f"{arc.name} • Scenario {self._selected_scenario_index + 1} of {len(arc.scenarios)}"
         gm_callback = (lambda n=scenario.title: self._open_scenario_gm_screen(n)) if scenario.record_exists else None
+        table_callback = (lambda n=scenario.title: self._open_scenario_gm_table(n)) if scenario.record_exists else None
 
         ScenarioHeroStrip(
             card,
@@ -587,6 +589,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
                 ("villains", str(scenario.linked_villains_count)),
             ],
             on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_table=table_callback,
             on_open_gm_screen=gm_callback,
         ).grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 10))
 
@@ -615,6 +618,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
                 ("status", scenario.status),
             ],
             on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_table=table_callback,
             on_open_gm_screen=gm_callback,
         ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
@@ -823,6 +827,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
         self._clear_container(left_column)
 
         gm_callback = (lambda n=scenario.title: self._open_scenario_gm_screen(n)) if scenario.record_exists else None
+        table_callback = (lambda n=scenario.title: self._open_scenario_gm_table(n)) if scenario.record_exists else None
         ScenarioHeroStrip(
             primary,
             title=scenario.title,
@@ -834,6 +839,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
                 ("villains", str(scenario.linked_villains_count)),
             ],
             on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_table=table_callback,
             on_open_gm_screen=gm_callback,
         ).grid(row=0, column=0, sticky="ew")
 
@@ -851,6 +857,7 @@ class CampaignGraphPanel(ctk.CTkFrame):
                 ("status", scenario.status),
             ],
             on_edit=lambda n=scenario.title: self._open_scenario(n),
+            on_open_gm_table=table_callback,
             on_open_gm_screen=gm_callback,
         ).grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
@@ -1131,6 +1138,15 @@ class CampaignGraphPanel(ctk.CTkFrame):
                 messagebox.showerror("GM screen", f"Unable to open the GM screen for '{scenario_name}':\n{exc}", parent=self.winfo_toplevel())
 
         open_scenario_in_embedded_gm_screen(self, scenario_name, fallback=_fallback)
+
+    def _open_scenario_gm_table(self, scenario_name: str) -> None:
+        """Open a scenario board on the primary GM Table."""
+        if not open_scenario_in_main_gm_table(self, scenario_name):
+            messagebox.showerror(
+                "GM Table",
+                "The main GM Table could not be opened from this window.",
+                parent=self.winfo_toplevel(),
+            )
 
     def _open_entity(self, entity_type: str, entity_name: str) -> None:
         """Open entity."""
