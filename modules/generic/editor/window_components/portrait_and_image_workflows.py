@@ -182,7 +182,8 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         )
     def _attach_portrait_from_image_library(self, image_result):
         """Handle portrait attach callback from internal image library."""
-        source_path = str(getattr(image_result, "path", ""))
+        from modules.image_assets.paths import resolve_asset_reference
+        source_path = str(getattr(image_result, "resolved_path", "") or resolve_asset_reference(getattr(image_result, "path", "")))
         if not self._validate_asset_source(source_path, asset_label="Portrait"):
             return
         make_primary = not self.portrait_paths
@@ -325,7 +326,8 @@ class GenericEditorWindowPortraitAndImageWorkflows:
         )
     def _attach_image_from_image_library(self, image_result):
         """Handle image attach callback from internal image library."""
-        source_path = str(getattr(image_result, "path", ""))
+        from modules.image_assets.paths import resolve_asset_reference
+        source_path = str(getattr(image_result, "resolved_path", "") or resolve_asset_reference(getattr(image_result, "path", "")))
         if not self._validate_asset_source(source_path, asset_label="Image"):
             return
         copied = self.copy_and_resize_image(source_path)
@@ -581,7 +583,9 @@ class GenericEditorWindowPortraitAndImageWorkflows:
 
     def attach_portrait_from_library(self, image_result):
         """Attach portrait selected from image library."""
-        source_path = str(getattr(image_result, "path", image_result))
+        from modules.image_assets.paths import resolve_asset_reference
+        reference = getattr(image_result, "path", image_result)
+        source_path = str(getattr(image_result, "resolved_path", "") or resolve_asset_reference(reference))
         if not self._validate_asset_source(source_path, asset_label="Portrait"):
             return
         copied = self.copy_and_resize_portrait(source_path)

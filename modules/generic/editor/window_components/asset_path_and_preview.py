@@ -1,6 +1,7 @@
 """Utilities for window components asset path and preview."""
 
 from modules.generic.editor.window_context import *
+from modules.image_assets.paths import resolve_asset_reference
 
 
 class GenericEditorWindowAssetPathAndPreview:
@@ -8,7 +9,7 @@ class GenericEditorWindowAssetPathAndPreview:
         """Ensure selected source path exists before copying."""
         if not src_path:
             return False
-        source = Path(src_path)
+        source = resolve_asset_reference(src_path) if not Path(src_path).is_absolute() else Path(src_path).resolve()
         if source.is_file():
             return True
         messagebox.showerror(
@@ -75,7 +76,7 @@ class GenericEditorWindowAssetPathAndPreview:
 
     def attach_image_from_library(self, image_result):
         """Attach image selected from image library."""
-        source_path = getattr(image_result, "path", image_result)
+        source_path = getattr(image_result, "resolved_path", "") or resolve_asset_reference(getattr(image_result, "path", image_result))
         self._attach_image_from_source(str(source_path))
     def _campaign_relative_path(self, path):
         """Internal helper for campaign relative path."""

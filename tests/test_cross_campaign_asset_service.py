@@ -212,8 +212,11 @@ def test_rewrite_record_paths_updates_image_library_fields(tmp_path):
     )
 
     assert updated["RelativePath"] == replacement
-    assert updated["Path"] == str((target_campaign_root / replacement).resolve())
-    assert updated["SourceRoot"] == str(target_campaign_root)
+    assert updated["Path"] == replacement
+    assert updated["SourceRoot"] == "assets/image_library"
+    assert not Path(updated["Path"]).is_absolute()
+    assert not Path(updated["RelativePath"]).is_absolute()
+    assert not Path(updated["SourceRoot"]).is_absolute()
 
 
 def test_export_bundle_full_campaign_includes_image_assets_even_without_selection(

@@ -17,6 +17,12 @@ class ImageResult:
     modified_ts: float = 0.0
     subtitle: str = ""
     source_folder_name: str = ""
+    resolved_path: str = ""
+
+    @property
+    def filesystem_path(self) -> str:
+        """Absolute transient path for filesystem access."""
+        return self.resolved_path
 
 
 class ImageResultCard(ctk.CTkFrame):

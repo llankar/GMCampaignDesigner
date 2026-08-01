@@ -917,6 +917,8 @@ class GMTableView(ctk.CTkFrame):
 
     def _add_image_to_fixed_overlay_from_library_result(self, image_result) -> None:
         """Create a fixed-overlay image item from an image-library selection."""
+        # Keep the canonical campaign-relative reference in workspace state;
+        # panel renderers resolve it only when accessing the filesystem.
         image_path = str(getattr(image_result, "path", "") or "").strip()
         if not image_path:
             messagebox.showerror("GM Table", "The selected image has no usable path.")

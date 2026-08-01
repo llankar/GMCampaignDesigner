@@ -94,3 +94,23 @@ def test_search_images_filters_by_source_folder_name() -> None:
 
     assert total == 1
     assert [row.asset_id for row in rows] == ["2"]
+
+
+def test_search_result_keeps_stored_reference_separate_from_resolved_preview(tmp_path, monkeypatch) -> None:
+    campaign = tmp_path / "campaign"
+    campaign.mkdir()
+    monkeypatch.setattr(
+        "modules.image_assets.paths.ConfigHelper.get_campaign_dir", lambda: str(campaign)
+    )
+    reference = "assets/image_library/objects/xwing.png"
+    service = ImageAssetSearchService(repository=_FakeRepository([{
+        "AssetId": "17", "Name": "X-Wing", "Path": reference,
+        "RelativePath": reference, "Extension": "png",
+    }]))
+
+    rows, total = service.search_images(limit=10)
+
+    assert total == 1
+    assert rows[0].path == reference
+    assert rows[0].relative_path == reference
+    assert rows[0].preview_path == str((campaign / reference).resolve())

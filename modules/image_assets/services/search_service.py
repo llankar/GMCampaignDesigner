@@ -8,6 +8,11 @@ from typing import Any, Literal
 
 from modules.image_assets.repository import ImageAssetsRepository
 from modules.image_assets.search.dto import ImageAssetSearchResultDTO
+from modules.image_assets.paths import (
+    InvalidAssetReference,
+    normalize_asset_reference,
+    resolve_asset_reference,
+)
 from modules.image_assets.search.indexing import (
     build_searchable_blob,
     normalize_extension,
@@ -251,11 +256,16 @@ class ImageAssetSearchService:
         if not searchable_blob:
             searchable_blob = self._compose_searchable_blob(item, tags=tags, search_tokens=search_tokens)
 
+        stored_value = str(item.get("RelativePath") or item.get("Path") or "")
+        try:
+            stored_path = normalize_asset_reference(stored_value)
+        except ValueError:
+            stored_path = stored_value.replace("\\", "/")
         return {
             "asset_id": str(item.get("AssetId") or ""),
             "name": str(item.get("Name") or ""),
-            "path": str(item.get("Path") or ""),
-            "relative_path": str(item.get("RelativePath") or ""),
+            "path": stored_path,
+            "relative_path": stored_path,
             "source_root": str(item.get("SourceRoot") or ""),
             "source_folder_name": str(item.get("SourceFolderName") or ""),
             "extension": str(item.get("Extension") or ""),
@@ -284,12 +294,18 @@ class ImageAssetSearchService:
 
     @staticmethod
     def _to_dto(row: dict[str, Any]) -> ImageAssetSearchResultDTO:
-        preview_path = str(row.get("path") or "")
+        stored_path = str(row.get("path") or "")
+        try:
+            preview_path = str(resolve_asset_reference(stored_path)) if stored_path else ""
+        except InvalidAssetReference:
+            # Preserve malformed legacy data for diagnostics, but never hand an
+            # unsafe database value to a filesystem consumer.
+            preview_path = ""
         return ImageAssetSearchResultDTO(
             asset_id=str(row.get("asset_id") or ""),
             name=str(row.get("name") or ""),
             preview_path=preview_path,
-            path=preview_path,
+            path=stored_path,
             relative_path=str(row.get("relative_path") or ""),
             source_root=str(row.get("source_root") or ""),
             source_folder_name=str(row.get("source_folder_name") or ""),

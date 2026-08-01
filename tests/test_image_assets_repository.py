@@ -32,7 +32,7 @@ def test_upsert_by_hash_or_path_updates_existing_record():
     created = repository.upsert_by_hash_or_path(
         {
             "Name": "Map",
-            "Path": "/tmp/map.png",
+            "Path": "assets\\image_library\\map.png",
             "Hash": "abc",
             "Extension": ".png",
         }
@@ -40,7 +40,7 @@ def test_upsert_by_hash_or_path_updates_existing_record():
     updated = repository.upsert_by_hash_or_path(
         {
             "Name": "Map v2",
-            "Path": "/tmp/map.png",
+            "Path": "assets/image_library/map.png",
             "Hash": "abc",
             "Extension": ".png",
         }
@@ -49,20 +49,23 @@ def test_upsert_by_hash_or_path_updates_existing_record():
     assert len(wrapper.items) == 1
     assert updated["AssetId"] == created["AssetId"]
     assert wrapper.items[0]["Name"] == "Map v2"
+    assert wrapper.items[0]["Path"] == "assets/image_library/map.png"
+    assert wrapper.items[0]["RelativePath"] == "assets/image_library/map.png"
+    assert wrapper.items[0]["SourceRoot"] == "assets/image_library"
 
 
 def test_delete_stale_files_keeps_only_active_paths():
     wrapper = _FakeWrapper()
     wrapper.items = [
-        {"AssetId": "1", "Path": "/a.png"},
-        {"AssetId": "2", "Path": "/b.png"},
+        {"AssetId": "1", "Path": "assets\\image_library\\a.png"},
+        {"AssetId": "2", "Path": "assets/image_library/b.png"},
     ]
     repository = ImageAssetsRepository(wrapper=wrapper)
 
-    removed = repository.delete_stale_files(["/a.png"])
+    removed = repository.delete_stale_files(["assets/image_library/a.png"])
 
     assert removed == 1
-    assert [item["Path"] for item in wrapper.items] == ["/a.png"]
+    assert [item["Path"] for item in wrapper.items] == ["assets\\image_library\\a.png"]
 
 
 def test_list_paginated_supports_search_and_paging():
@@ -100,13 +103,13 @@ def test_replace_by_path_updates_path_match_without_hash_collision():
     wrapper.items = [
         {
             "AssetId": "same-hash",
-            "Path": "/tmp/original.png",
+            "Path": "assets/image_library/original.png",
             "Hash": "abc",
             "Name": "Original",
         },
         {
             "AssetId": "target",
-            "Path": "/tmp/target.png",
+            "Path": "assets\\image_library\\target.png",
             "Hash": "old",
             "Name": "Target",
         },
@@ -115,7 +118,7 @@ def test_replace_by_path_updates_path_match_without_hash_collision():
 
     updated = repository.replace_by_path(
         {
-            "Path": "/tmp/target.png",
+            "Path": "assets/image_library/target.png",
             "Hash": "abc",
             "Name": "Target Replacement",
         }

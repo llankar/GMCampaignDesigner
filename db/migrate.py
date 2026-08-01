@@ -4,6 +4,7 @@
 import json
 import os
 import sqlite3
+import argparse
 from db import get_connection, initialize_db
 from modules.helpers.logging_helper import log_module_import
 
@@ -41,6 +42,17 @@ def migrate_table(json_file, table, columns):
     print(f"Migrated data from {json_file} to {table}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image-assets-db")
+    parser.add_argument("--campaign-root")
+    args, _unknown = parser.parse_known_args()
+    if args.image_assets_db:
+        if not args.campaign_root:
+            parser.error("--campaign-root is required with --image-assets-db")
+        from db.migrations.image_asset_relative_paths import migrate_image_asset_paths
+        report = migrate_image_asset_paths(args.image_assets_db, args.campaign_root)
+        print(json.dumps(report.__dict__, ensure_ascii=False, indent=2))
+        raise SystemExit(0)
     initialize_db()
     
     # Migrate NPCs (fields based on npcs_template.json)
