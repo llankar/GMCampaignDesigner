@@ -100,6 +100,13 @@ def test_build_scenario_board_data_prepares_reference_sheet_directives() -> None
     assert data.checkpoint == "Checkpoint → Refuge → Clinic → Train"
 
 
+def test_build_scenario_board_data_accepts_plural_objectives_field() -> None:
+    """The objectives band should support the plural template field name."""
+    data = build_scenario_board_data({"Objectives": "Rescue the archivist."})
+
+    assert data.objective == "Rescue the archivist."
+
+
 def test_scenario_board_rejects_non_positive_scene_state() -> None:
     """Persisted scene selection must continue to reject invalid indices."""
     from modules.scenarios.gm_table.scenario_board.page import ScenarioBoardPanel
