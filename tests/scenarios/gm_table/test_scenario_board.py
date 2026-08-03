@@ -107,6 +107,39 @@ def test_build_scenario_board_data_accepts_plural_objectives_field() -> None:
     assert data.objective == "Rescue the archivist."
 
 
+def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
+    """Wrapping must not bind to the label and continuously resize itself."""
+    from modules.scenarios.gm_table.scenario_board.entity_links import (
+        bind_full_width_wrap,
+    )
+
+    class _Parent:
+        def bind(self, event_name, callback, *, add):
+            self.binding = (event_name, callback, add)
+
+    class _Label:
+        def __init__(self):
+            self.master = _Parent()
+            self.wraplengths = []
+
+        def bind(self, *_args, **_kwargs):
+            raise AssertionError("the resizable label must not observe itself")
+
+        def configure(self, *, wraplength):
+            self.wraplengths.append(wraplength)
+
+    label = _Label()
+    bind_full_width_wrap(label, padding=14)
+
+    event_name, callback, add = label.master.binding
+    assert (event_name, add) == ("<Configure>", "+")
+    callback(SimpleNamespace(width=300))
+    callback(SimpleNamespace(width=300))
+    callback(SimpleNamespace(width=360))
+
+    assert label.wraplengths == [286, 346]
+
+
 def test_scenario_board_rejects_non_positive_scene_state() -> None:
     """Persisted scene selection must continue to reject invalid indices."""
     from modules.scenarios.gm_table.scenario_board.page import ScenarioBoardPanel

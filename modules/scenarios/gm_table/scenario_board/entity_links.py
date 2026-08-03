@@ -51,9 +51,24 @@ def add_entity_links(
 
 
 def bind_full_width_wrap(label: ctk.CTkLabel, *, padding: int = 14) -> None:
-    """Keep a label's wrapping width synchronized with its scene card."""
+    """Keep a label's wrapping width synchronized with its containing card.
+
+    Listening to the label itself creates a feedback loop: changing ``wraplength``
+    changes the label's requested size, which emits another ``<Configure>`` event.
+    On content-heavy boards that loop can keep Tk's event queue busy indefinitely.
+    The card width is the stable value we actually want, so listen to the parent and
+    skip duplicate values instead.
+    """
+
+    parent = label.master
+    last_wraplength: int | None = None
 
     def update_wrap(event) -> None:
-        label.configure(wraplength=max(120, event.width - padding))
+        nonlocal last_wraplength
+        wraplength = max(120, event.width - padding)
+        if wraplength == last_wraplength:
+            return
+        last_wraplength = wraplength
+        label.configure(wraplength=wraplength)
 
-    label.bind("<Configure>", update_wrap, add="+")
+    parent.bind("<Configure>", update_wrap, add="+")
