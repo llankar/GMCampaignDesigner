@@ -327,7 +327,9 @@ def build_scenario_board_data(
         status=_clean_text(item.get("Status")),
         summary=_clean_text(item.get("Summary")),
         secrets=_clean_text(item.get("Secrets")),
-        objective=first_text("Objective", "MainObjective", "Goal", "Goals"),
+        objective=first_text(
+            "Objectives", "Objective", "MainObjective", "Goal", "Goals"
+        ),
         pressure=first_text("Pressure", "Stakes", "Threat", "Complications"),
         checkpoint=first_text("Checkpoint", "Route", "Progression"),
         scenes=tuple(scenes),

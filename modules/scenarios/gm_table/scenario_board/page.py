@@ -11,6 +11,10 @@ from modules.scenarios.gm_table.scenario_board.bundle_service import (
     ScenarioBundle,
     resolve_scenario_bundle,
 )
+from modules.scenarios.gm_table.scenario_board.entity_links import (
+    add_entity_links,
+    bind_full_width_wrap,
+)
 from modules.scenarios.gm_table.scenario_board.models import (
     ScenarioBoardData,
     ScenarioBoardScene,
@@ -125,30 +129,51 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             board.grid_columnconfigure(column, weight=1, uniform="board")
         row = self._add_info_bands(board, 0)
         row = self._add_directives(board, row)
-        row = self._add_checkpoint(board, row)
         self._add_scene_grid(board, row)
 
     def _add_info_bands(self, parent, row: int) -> int:
         groups = (
-            ("PCS", self._data.linked_entities.get("PCs", ())),
-            ("MAJOR NPCS", self._data.linked_entities.get("NPCs", ())),
+            ("OBJECTIVES", (), self._data.objective or self._data.summary),
+            (
+                "MAJOR NPCS",
+                tuple(
+                    ("NPCs", name)
+                    for name in self._data.linked_entities.get("NPCs", ())
+                ),
+                "",
+            ),
             (
                 "ADVERSARIES",
                 (
-                    *self._data.linked_entities.get("Villains", ()),
-                    *self._data.linked_entities.get("Creatures", ()),
+                    *(
+                        ("Villains", name)
+                        for name in self._data.linked_entities.get("Villains", ())
+                    ),
+                    *(
+                        ("Creatures", name)
+                        for name in self._data.linked_entities.get("Creatures", ())
+                    ),
                 ),
+                "",
             ),
-            ("FACTIONS", self._data.linked_entities.get("Factions", ())),
             (
-                "PLACES / CLUES",
-                (
-                    *self._data.linked_entities.get("Places", ()),
-                    *self._data.linked_entities.get("Clues", ()),
+                "FACTIONS",
+                tuple(
+                    ("Factions", name)
+                    for name in self._data.linked_entities.get("Factions", ())
                 ),
+                "",
+            ),
+            (
+                "PLACES",
+                tuple(
+                    ("Places", name)
+                    for name in self._data.linked_entities.get("Places", ())
+                ),
+                "",
             ),
         )
-        for column, (title, values) in enumerate(groups):
+        for column, (title, entries, plain_text) in enumerate(groups):
             cell = ctk.CTkFrame(
                 parent,
                 fg_color=INFO_BAND_COLORS[column],
@@ -165,12 +190,18 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 text_color=SCENE_COLORS[column % 4],
                 font=ctk.CTkFont(size=10, weight="bold"),
             ).pack(pady=(7, 0))
-            ctk.CTkLabel(
-                cell,
-                text="\n".join(values) or "—",
-                text_color=BOARD_TEXT,
-                font=ctk.CTkFont(size=12, weight="bold"),
-            ).pack(padx=6, pady=(0, 7))
+            if plain_text:
+                objective = ctk.CTkLabel(
+                    cell,
+                    text=plain_text,
+                    justify="left",
+                    text_color=BOARD_TEXT,
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                )
+                objective.pack(fill="x", padx=7, pady=(2, 7))
+                bind_full_width_wrap(objective)
+            else:
+                add_entity_links(cell, entries, self._open_entity_callback)
         return row + 1
 
     def _add_directives(self, parent, row: int) -> int:
@@ -202,20 +233,6 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 padx=(0, 2),
             )
             start += span
-        return row + 1
-
-    def _add_checkpoint(self, parent, row: int) -> int:
-        route = self._data.checkpoint or "  →  ".join(
-            f"{scene.index}. {scene.title}" for scene in self._data.scenes
-        )
-        ctk.CTkLabel(
-            parent,
-            text=route or "No scenes defined",
-            fg_color=BOARD_SURFACE,
-            text_color=BOARD_TEXT,
-            font=ctk.CTkFont(size=11, weight="bold"),
-            height=28,
-        ).grid(row=row, column=0, columnspan=20, sticky="ew", pady=(0, 12))
         return row + 1
 
     def _add_scene_grid(self, parent, row: int) -> None:
@@ -254,9 +271,9 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             )
             button.pack(fill="x")
             self._scene_buttons[scene.index] = button
-            entities = self._scene_entity_text(scene)
+            self._add_scene_entity_links(card, scene)
             body = scene.intro_text or scene.body
-            lines = [entities, body]
+            lines = [body]
             for section in scene.sections:
                 section_text = "\n".join(
                     f"• {item}" for item in section.get("items") or ()
@@ -264,28 +281,27 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 lines.append(
                     f"{str(section.get('title') or '').upper()}\n{section_text}".strip()
                 )
-            ctk.CTkLabel(
+            body_label = ctk.CTkLabel(
                 card,
                 text="\n\n".join(line for line in lines if line),
                 anchor="nw",
                 justify="left",
-                wraplength=235,
                 text_color=BOARD_TEXT,
-                font=ctk.CTkFont(size=10),
-            ).pack(fill="both", expand=True, padx=7, pady=7)
+                font=ctk.CTkFont(size=14),
+            )
+            body_label.pack(fill="both", expand=True, padx=7, pady=7)
+            bind_full_width_wrap(body_label)
 
-    @staticmethod
-    def _scene_entity_text(scene: ScenarioBoardScene) -> str:
-        parts = []
-        for label, values in (
-            ("NPCS", scene.npcs),
-            ("ADVERSARIES", scene.villains),
-            ("PLACES", scene.places),
-            ("MAPS", scene.maps),
-        ):
-            if values:
-                parts.append(f"{label}: {', '.join(values)}")
-        return "\n".join(parts)
+    def _add_scene_entity_links(self, card, scene: ScenarioBoardScene) -> None:
+        entries = (
+            *(("NPCs", name) for name in scene.npcs),
+            *(("Villains", name) for name in scene.villains),
+            *(("Places", name) for name in scene.places),
+        )
+        if entries:
+            links = ctk.CTkFrame(card, fg_color="transparent", corner_radius=0)
+            links.pack(fill="x", padx=2, pady=(4, 0))
+            add_entity_links(links, entries, self._open_entity_callback, font_size=12)
 
     def _current_scene(self) -> ScenarioBoardScene | None:
         return next(
