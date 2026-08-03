@@ -84,6 +84,31 @@ def test_build_scenario_board_data_decodes_serialized_rich_text_payloads() -> No
     assert data.scenes[1].title == "Inline Scene"
     assert data.scenes[1].body == "Scene from JSON payload."
 
+
+def test_build_scenario_board_data_prepares_reference_sheet_directives() -> None:
+    """Dense board bands accept both current and legacy scenario field names."""
+    data = build_scenario_board_data(
+        {
+            "MainObjective": "Reach the flooded clinic.",
+            "Stakes": "The suspect escapes at dawn.",
+            "Route": "Checkpoint → Refuge → Clinic → Train",
+        }
+    )
+
+    assert data.objective == "Reach the flooded clinic."
+    assert data.pressure == "The suspect escapes at dawn."
+    assert data.checkpoint == "Checkpoint → Refuge → Clinic → Train"
+
+
+def test_scenario_board_rejects_non_positive_scene_state() -> None:
+    """Persisted scene selection must continue to reject invalid indices."""
+    from modules.scenarios.gm_table.scenario_board.page import ScenarioBoardPanel
+
+    assert ScenarioBoardPanel._coerce_scene_index(-1) is None
+    assert ScenarioBoardPanel._coerce_scene_index(0) is None
+    assert ScenarioBoardPanel._coerce_scene_index("2") == 2
+
+
 def test_scenario_board_has_dedicated_default_panel_size() -> None:
     """The scenario board should open as a large planning panel."""
     assert resolve_default_panel_size("scenario_board") == (900, 680)
