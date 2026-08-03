@@ -48,6 +48,9 @@ class ScenarioBoardData:
     status: str
     summary: str
     secrets: str
+    objective: str
+    pressure: str
+    checkpoint: str
     scenes: tuple[ScenarioBoardScene, ...]
     linked_entities: dict[str, tuple[str, ...]]
 
@@ -312,11 +315,21 @@ def build_scenario_board_data(
         entity_type: values for entity_type, values in linked_entities.items() if values
     }
 
+    def first_text(*keys: str) -> str:
+        for key in keys:
+            value = _clean_text(item.get(key))
+            if value:
+                return value
+        return ""
+
     return ScenarioBoardData(
         title=_clean_text(item.get("Title") or item.get("Name")) or "Untitled Scenario",
         status=_clean_text(item.get("Status")),
         summary=_clean_text(item.get("Summary")),
         secrets=_clean_text(item.get("Secrets")),
+        objective=first_text("Objective", "MainObjective", "Goal", "Goals"),
+        pressure=first_text("Pressure", "Stakes", "Threat", "Complications"),
+        checkpoint=first_text("Checkpoint", "Route", "Progression"),
         scenes=tuple(scenes),
         linked_entities=linked_entities,
     )
