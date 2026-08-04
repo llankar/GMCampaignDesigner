@@ -11,6 +11,10 @@ from modules.scenarios.gm_table.scenario_board.bundle_service import (
     ScenarioBundle,
     resolve_scenario_bundle,
 )
+from modules.scenarios.gm_table.scenario_board.content import (
+    ENTITY_ACTIONS,
+    build_info_bands,
+)
 from modules.scenarios.gm_table.scenario_board.entity_links import (
     add_entity_links,
     bind_full_width_wrap,
@@ -99,12 +103,14 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             scrollbar_button_color=TABLE_PALETTE["table_chip"],
         )
         actions.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        entity_buttons = tuple(
+            (label, lambda entity_type=entity_type: self._open_entities(entity_type))
+            for label, entity_type in ENTITY_ACTIONS
+        )
         buttons = (
             ("Launch Scenario Bundle", self._launch_current_bundle),
             ("Open Scene Map", self._open_current_scene_map),
-            ("Open NPCs", lambda: self._open_entities("NPCs")),
-            ("Open Villain", lambda: self._open_entities("Villains")),
-            ("Open Places", lambda: self._open_entities("Places")),
+            *entity_buttons,
             ("Open World Map", self._open_world_map),
             ("Mark Scene Done", self._mark_current_scene_done),
         )
@@ -135,47 +141,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         self._add_scene_grid(board, row)
 
     def _add_info_bands(self, parent, row: int) -> int:
-        groups = (
-            ("OBJECTIVES", (), self._data.objective or self._data.summary),
-            (
-                "MAJOR NPCS",
-                tuple(
-                    ("NPCs", name)
-                    for name in self._data.linked_entities.get("NPCs", ())
-                ),
-                "",
-            ),
-            (
-                "ADVERSARIES",
-                (
-                    *(
-                        ("Villains", name)
-                        for name in self._data.linked_entities.get("Villains", ())
-                    ),
-                    *(
-                        ("Creatures", name)
-                        for name in self._data.linked_entities.get("Creatures", ())
-                    ),
-                ),
-                "",
-            ),
-            (
-                "FACTIONS",
-                tuple(
-                    ("Factions", name)
-                    for name in self._data.linked_entities.get("Factions", ())
-                ),
-                "",
-            ),
-            (
-                "PLACES",
-                tuple(
-                    ("Places", name)
-                    for name in self._data.linked_entities.get("Places", ())
-                ),
-                "",
-            ),
-        )
+        groups = build_info_bands(self._data)
         for column, (title, entries, plain_text) in enumerate(groups):
             cell = ctk.CTkFrame(
                 parent,

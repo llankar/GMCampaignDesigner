@@ -107,6 +107,28 @@ def test_build_scenario_board_data_accepts_plural_objectives_field() -> None:
     assert data.objective == "Rescue the archivist."
 
 
+def test_scenario_board_info_band_displays_creatures_instead_of_adversaries() -> None:
+    """The creature reference band must not include villain links."""
+    from modules.scenarios.gm_table.scenario_board.content import (
+        ENTITY_ACTIONS,
+        build_info_bands,
+    )
+
+    data = build_scenario_board_data(
+        {"Villains": ["The Fox"], "Creatures": ["Cave Drake"]}
+    )
+
+    creature_band = build_info_bands(data)[2]
+
+    assert creature_band == (
+        "CREATURES",
+        (("Creatures", "Cave Drake"),),
+        "",
+    )
+    assert ("Open Creatures", "Creatures") in ENTITY_ACTIONS
+    assert all(entity_type != "Villains" for _label, entity_type in ENTITY_ACTIONS)
+
+
 def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
     """Wrapping must not bind to the label and continuously resize itself."""
     from modules.scenarios.gm_table.scenario_board.entity_links import (
