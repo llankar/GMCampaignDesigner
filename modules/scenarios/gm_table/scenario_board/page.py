@@ -13,6 +13,7 @@ from modules.scenarios.gm_table.scenario_board.bundle_service import (
 )
 from modules.scenarios.gm_table.scenario_board.content import (
     ENTITY_ACTIONS,
+    build_directives,
     build_info_bands,
 )
 from modules.scenarios.gm_table.scenario_board.entity_links import (
@@ -167,12 +168,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         return row + 1
 
     def _add_directives(self, parent, row: int) -> int:
-        directives = (
-            ("OBJECTIVE", self._data.objective or self._data.summary, "objective"),
-            ("SECRET", self._data.secrets, "secret"),
-            ("PRESSURE", self._data.pressure or self._data.status, "pressure"),
-        )
-        spans = (7, 7, 6)
+        directives = build_directives(self._data)
+        spans = (10, 10)
         start = 0
         for (title, value, accent), span in zip(directives, spans):
             text = f"{title}  {value or '—'}"

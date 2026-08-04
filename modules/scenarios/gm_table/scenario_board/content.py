@@ -5,6 +5,7 @@ from __future__ import annotations
 from modules.scenarios.gm_table.scenario_board.models import ScenarioBoardData
 
 InfoBand = tuple[str, tuple[tuple[str, str], ...], str]
+Directive = tuple[str, str, str]
 ENTITY_ACTIONS = (
     ("Open NPCs", "NPCs"),
     ("Open Creatures", "Creatures"),
@@ -42,4 +43,12 @@ def build_info_bands(data: ScenarioBoardData) -> tuple[InfoBand, ...]:
             tuple(("Places", name) for name in data.linked_entities.get("Places", ())),
             "",
         ),
+    )
+
+
+def build_directives(data: ScenarioBoardData) -> tuple[Directive, ...]:
+    """Return the non-duplicated scenario directives below the reference bands."""
+    return (
+        ("SECRET", data.secrets, "secret"),
+        ("PRESSURE", data.pressure or data.status, "pressure"),
     )
