@@ -19,7 +19,16 @@ def build_info_bands(data: ScenarioBoardData) -> tuple[InfoBand, ...]:
         ("OBJECTIVES", (), data.objective or data.summary),
         (
             "MAJOR NPCS",
-            tuple(("NPCs", name) for name in data.linked_entities.get("NPCs", ())),
+            (
+                *(
+                    ("NPCs", name)
+                    for name in data.linked_entities.get("NPCs", ())
+                ),
+                *(
+                    ("Villains", name)
+                    for name in data.linked_entities.get("Villains", ())
+                ),
+            ),
             "",
         ),
         (

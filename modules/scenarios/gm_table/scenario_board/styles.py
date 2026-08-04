@@ -28,6 +28,7 @@ class ScenarioBoardPalette:
     surface: str
     border: str
     text: str
+    villain_text: str
     muted: str
     control: str
     control_hover: str
@@ -66,6 +67,7 @@ def resolve_scenario_board_palette(theme: str | None = None) -> ScenarioBoardPal
         surface=surface,
         border=_mix(surface, accent, 0.52),
         text=text,
+        villain_text="#FF5C5C",
         muted=_mix(text, surface, 0.38),
         control=control,
         control_hover=control_hover,
