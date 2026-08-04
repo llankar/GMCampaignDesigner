@@ -33,6 +33,7 @@ class ScenarioBoardPalette:
     control_hover: str
     control_text: str
     info_bands: tuple[str, ...]
+    info_band_text_colors: tuple[str, ...]
     scene_colors: tuple[str, ...]
     scene_text_colors: tuple[str, ...]
     section_accents: dict[str, str]
@@ -70,6 +71,9 @@ def resolve_scenario_board_palette(theme: str | None = None) -> ScenarioBoardPal
         control_hover=control_hover,
         control_text=readable_text_color(control),
         info_bands=info_bands,
+        info_band_text_colors=tuple(
+            readable_text_color(color) for color in info_bands
+        ),
         scene_colors=scene_colors,
         scene_text_colors=tuple(readable_text_color(color) for color in scene_colors),
         section_accents={

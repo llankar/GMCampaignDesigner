@@ -147,8 +147,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             ctk.CTkLabel(
                 cell,
                 text=title,
-                text_color=self._palette.scene_colors[column % 4],
-                font=ctk.CTkFont(size=10, weight="bold"),
+                text_color=self._palette.info_band_text_colors[column],
+                font=ctk.CTkFont(size=11, weight="bold"),
             ).pack(pady=(7, 0))
             if plain_text:
                 objective = ctk.CTkLabel(

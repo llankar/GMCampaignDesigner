@@ -14,6 +14,7 @@ from modules.helpers import theme_manager
 from modules.scenarios.gm_table.scenario_board.styles import (
     resolve_scenario_board_palette,
 )
+from modules.scenarios.gm_table.panel_skins import readable_text_color
 from modules.scenarios.gm_table.workspace import resolve_default_panel_size
 from modules.scenarios.gm_table_view import GMTableView
 
@@ -213,6 +214,16 @@ def test_scenario_board_rejects_non_positive_scene_state() -> None:
 def test_scenario_board_has_dedicated_default_panel_size() -> None:
     """The scenario board should open as a large planning panel."""
     assert resolve_default_panel_size("scenario_board") == (900, 680)
+
+
+def test_info_band_titles_use_readable_text_for_each_background() -> None:
+    """Reference-band headings must remain legible across every app theme."""
+    for theme in ("default", "medieval", "sf"):
+        palette = resolve_scenario_board_palette(theme)
+
+        assert palette.info_band_text_colors == tuple(
+            readable_text_color(background) for background in palette.info_bands
+        )
 
 
 def test_handle_add_option_routes_scenario_board_to_scenario_picker() -> None:
