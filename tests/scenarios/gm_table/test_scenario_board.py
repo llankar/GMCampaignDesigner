@@ -112,6 +112,32 @@ def test_build_scenario_board_data_accepts_plural_objectives_field() -> None:
     assert data.objective == "Rescue the archivist."
 
 
+def test_scenario_board_displays_objective_only_in_reference_band() -> None:
+    """The compact directive row must not repeat the objective reference band."""
+    from modules.scenarios.gm_table.scenario_board.content import (
+        build_directives,
+        build_info_bands,
+    )
+
+    data = build_scenario_board_data(
+        {
+            "Objectives": "Rescue the archivist.",
+            "Secrets": "The archive is compromised.",
+            "Stakes": "The evidence will be destroyed.",
+        }
+    )
+
+    assert build_info_bands(data)[0] == (
+        "OBJECTIVES",
+        (),
+        "Rescue the archivist.",
+    )
+    assert build_directives(data) == (
+        ("SECRET", "The archive is compromised.", "secret"),
+        ("PRESSURE", "The evidence will be destroyed.", "pressure"),
+    )
+
+
 def test_scenario_board_info_band_displays_creatures_instead_of_adversaries() -> None:
     """The creature reference band must not include villain links."""
     from modules.scenarios.gm_table.scenario_board.content import (
