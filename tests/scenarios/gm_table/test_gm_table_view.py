@@ -334,7 +334,10 @@ def test_build_object_entity_content_uses_scrollable_full_detail(monkeypatch) ->
     assert captured["item"] is expected_item
     assert captured["master"] is scroll_host
     assert captured["callback"] is callback
-    assert captured["kwargs"] == {"spotlight_only": False}
+    assert captured["kwargs"] == {
+        "spotlight_only": False,
+        "show_spotlight": False,
+    }
     assert frame.pack_calls == [{"fill": "both", "expand": True}]
 
 
@@ -411,6 +414,45 @@ def test_build_entity_content_with_attachments_hides_portrait_spotlight(
     assert captured["callback"] is callback
     assert captured["kwargs"] == {"spotlight_only": False, "show_spotlight": False}
     assert captured["gallery_kwargs"] == {"attachments": [attachment]}
+
+
+def test_build_entity_content_keeps_spotlight_for_existing_portrait(
+    monkeypatch, tmp_path
+) -> None:
+    """GM Table should retain the portrait zone when its image can be resolved."""
+    captured = {}
+
+    class _DummyFrame:
+        def pack(self, **_kwargs):
+            return None
+
+    portrait = tmp_path / "portrait.png"
+    portrait.write_bytes(b"image fixture")
+    item = {"Name": "Ari", "Portrait": str(portrait)}
+    view = GMTableView.__new__(GMTableView)
+    view._load_entity_item = lambda _entity_type, _name: item
+    view.open_entity_panel = lambda *_args, **_kwargs: None
+
+    monkeypatch.setattr(
+        gm_table_view_module, "build_scroll_host", lambda _host: object()
+    )
+
+    def _fake_factory(_entity_type, _item, **kwargs):
+        captured.update(kwargs)
+        return _DummyFrame()
+
+    monkeypatch.setattr(
+        gm_table_view_module, "create_entity_detail_frame", _fake_factory
+    )
+
+    GMTableView._build_entity_content(
+        view,
+        object(),
+        {"entity_type": "NPCs", "entity_name": "Ari"},
+    )
+
+    assert captured["spotlight_only"] is False
+    assert captured["show_spotlight"] is True
 
 
 def test_context_menu_handler_resolution_is_safe_without_gm_screen_api() -> None:
