@@ -34,7 +34,9 @@ def add_entity_links(
             corner_radius=0,
             fg_color="transparent",
             hover_color=palette.control_hover,
-            text_color=palette.text,
+            text_color=(
+                palette.villain_text if entity_type == "Villains" else palette.text
+            ),
             font=ctk.CTkFont(size=font_size, underline=True),
             command=lambda kind=entity_type, value=name: (
                 callback(kind, value) if callable(callback) else None

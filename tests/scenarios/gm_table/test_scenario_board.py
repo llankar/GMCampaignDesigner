@@ -138,19 +138,29 @@ def test_scenario_board_displays_objective_only_in_reference_band() -> None:
     )
 
 
-def test_scenario_board_info_band_displays_creatures_instead_of_adversaries() -> None:
-    """The creature reference band must not include villain links."""
+def test_scenario_board_info_band_displays_villains_with_major_npcs() -> None:
+    """Villains belong with major NPCs without leaking into the creature band."""
     from modules.scenarios.gm_table.scenario_board.content import (
         ENTITY_ACTIONS,
         build_info_bands,
     )
 
     data = build_scenario_board_data(
-        {"Villains": ["The Fox"], "Creatures": ["Cave Drake"]}
+        {
+            "NPCs": ["Captain Vale"],
+            "Villains": ["The Fox"],
+            "Creatures": ["Cave Drake"],
+        }
     )
 
     creature_band = build_info_bands(data)[2]
+    major_npc_band = build_info_bands(data)[1]
 
+    assert major_npc_band == (
+        "MAJOR NPCS",
+        (("NPCs", "Captain Vale"), ("Villains", "The Fox")),
+        "",
+    )
     assert creature_band == (
         "CREATURES",
         (("Creatures", "Cave Drake"),),
@@ -193,13 +203,18 @@ def test_scenario_board_reference_content_uses_regular_weight(monkeypatch) -> No
 
     panel = object.__new__(page.ScenarioBoardPanel)
     panel._data = build_scenario_board_data(
-        {"Objectives": "Reach the throne.", "NPCs": ["Lysandra Malrec"]}
+        {
+            "Objectives": "Reach the throne.",
+            "NPCs": ["Lysandra Malrec"],
+            "Villains": ["The Red Queen"],
+        }
     )
     panel._palette = SimpleNamespace(
         info_bands=("#111111",) * 5,
         info_band_text_colors=("#FFFFFF",) * 5,
         border="#333333",
         text="#FFFFFF",
+        villain_text="#FF5C5C",
         control_hover="#222222",
     )
     panel._open_entity_callback = None
@@ -217,10 +232,16 @@ def test_scenario_board_reference_content_uses_regular_weight(monkeypatch) -> No
     npc = next(
         widget for widget in widgets if widget.options.get("text") == "Lysandra Malrec"
     )
+    villain = next(
+        widget for widget in widgets if widget.options.get("text") == "The Red Queen"
+    )
 
     assert heading.options["font"] == {"size": 11, "weight": "bold"}
     assert objective.options["font"] == {"size": 13}
     assert npc.options["font"] == {"size": 13, "underline": True}
+    assert npc.options["text_color"] == "#FFFFFF"
+    assert villain.options["font"] == {"size": 13, "underline": True}
+    assert villain.options["text_color"] == "#FF5C5C"
 
 
 def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
