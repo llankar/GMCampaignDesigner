@@ -1638,7 +1638,14 @@ def _replace_detail_frame(current_frame, updated_item, entity_type, open_entity_
     return replacement_frame
 
 @log_function
-def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity_callback=None):
+def create_scenario_detail_frame(
+    entity_type,
+    scenario_item,
+    master,
+    open_entity_callback=None,
+    *,
+    show_entity_name: bool = True,
+):
     """
     Build a scrollable detail view for a scenario with:
     1) A header zone (Title, Summary, Secrets)
@@ -1665,6 +1672,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
                 item,
                 parent,
                 open_entity_callback,
+                show_entity_name=show_entity_name,
             ),
         )
 
@@ -1787,6 +1795,7 @@ def create_scenario_detail_frame(entity_type, scenario_item, master, open_entity
         category=entity_type[:-1] if entity_type.endswith("s") else entity_type,
         summary=format_multiline_text(scenario_item.get("Summary", "")),
         meta_items=scenario_meta,
+        show_title=show_entity_name,
     )
     hero.pack(fill="x", padx=10, pady=(0, 12))
     # ——— BODY — prepare fields in the custom order ———
@@ -2245,6 +2254,7 @@ def create_entity_detail_frame(
     *,
     spotlight_only: bool = False,
     show_spotlight: bool = True,
+    show_entity_name: bool = True,
 ):
     """
     Routes Scenarios through our custom header/body and
@@ -2255,7 +2265,8 @@ def create_entity_detail_frame(
             entity_type,
             entity,
             master,
-            open_entity_callback
+            open_entity_callback,
+            show_entity_name=show_entity_name,
         )
 
     palette = get_detail_palette()
@@ -2276,6 +2287,7 @@ def create_entity_detail_frame(
                 open_entity_callback,
                 spotlight_only=spotlight_only,
                 show_spotlight=show_spotlight,
+                show_entity_name=show_entity_name,
             ),
         )
 
@@ -2400,6 +2412,7 @@ def create_entity_detail_frame(
             fallback_text=_spotlight_fallback(entity_type),
             accent_lines=spotlight_accent_lines,
             prominent=spotlight_primary,
+            show_title=show_entity_name,
         )
 
     if spotlight_only:
@@ -2407,19 +2420,23 @@ def create_entity_detail_frame(
 
     compact_header = ctk.CTkFrame(main_column, fg_color="transparent")
     compact_header.pack(fill="x", pady=(0, 14))
-    compact_title = ctk.CTkLabel(
-        compact_header,
-        text=f"{entity_label} · {category_label}",
-        font=ctk.CTkFont(size=17, weight="bold"),
-        text_color=palette["text"],
-        anchor="w",
-        justify="left",
-    )
-    compact_title.pack(fill="x", anchor="w")
+    if show_entity_name:
+        compact_title = ctk.CTkLabel(
+            compact_header,
+            text=f"{entity_label} · {category_label}",
+            font=ctk.CTkFont(size=17, weight="bold"),
+            text_color=palette["text"],
+            anchor="w",
+            justify="left",
+        )
+        compact_title.pack(fill="x", anchor="w")
 
     chip_row = ctk.CTkFrame(compact_header, fg_color="transparent")
     chip_row.pack(fill="x", pady=(8, 0))
-    create_chip(chip_row, str(entity_label), accent=True).pack(side="left", padx=(0, 8))
+    if show_entity_name:
+        create_chip(chip_row, str(entity_label), accent=True).pack(
+            side="left", padx=(0, 8)
+        )
 
     if primary_type:
         create_chip(chip_row, primary_type).pack(side="left", padx=(0, 8))

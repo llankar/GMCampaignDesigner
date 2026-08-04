@@ -1870,6 +1870,7 @@ class GMTableView(ctk.CTkFrame):
                 open_entity_callback=self.open_entity_panel,
                 spotlight_only=False,
                 show_spotlight=False,
+                show_entity_name=False,
             )
             detail_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
             return scrollable_host
@@ -1883,6 +1884,7 @@ class GMTableView(ctk.CTkFrame):
                 open_entity_callback=self.open_entity_panel,
                 spotlight_only=False,
                 show_spotlight=has_displayable_entity_image(item),
+                show_entity_name=False,
             )
             frame.pack(fill="both", expand=True)
             return frame
@@ -1893,6 +1895,7 @@ class GMTableView(ctk.CTkFrame):
             master=host,
             open_entity_callback=self.open_entity_panel,
             spotlight_only=True,
+            show_entity_name=False,
         )
         frame.grid(row=0, column=0, sticky="nsew")
         return frame

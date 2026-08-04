@@ -129,6 +129,7 @@ def create_hero_header(
     portrait_widget=None,
     portrait_builder=None,
     adaptive_wrap: bool = True,
+    show_title: bool = True,
 ):
     """Create hero header."""
     palette = get_detail_palette()
@@ -159,15 +160,17 @@ def create_hero_header(
     if meta_items:
         create_chip(badge_row, f"{len([item for item in meta_items if item])} signals").pack(side="left", padx=(8, 0))
 
-    title_label = ctk.CTkLabel(
-        text_col,
-        text=title,
-        font=ctk.CTkFont(size=28, weight="bold"),
-        text_color=palette["text"],
-        justify="left",
-        wraplength=820,
-    )
-    title_label.pack(anchor="w", fill="x", pady=(12, 8))
+    title_label = None
+    if show_title:
+        title_label = ctk.CTkLabel(
+            text_col,
+            text=title,
+            font=ctk.CTkFont(size=28, weight="bold"),
+            text_color=palette["text"],
+            justify="left",
+            wraplength=820,
+        )
+        title_label.pack(anchor="w", fill="x", pady=(12, 8))
 
     summary_label = None
     if summary:
@@ -179,7 +182,11 @@ def create_hero_header(
             justify="left",
             wraplength=760,
         )
-        summary_label.pack(anchor="w", fill="x")
+        summary_label.pack(
+            anchor="w",
+            fill="x",
+            pady=(12, 0) if not show_title else 0,
+        )
 
     if meta_items:
         # Continue with this path when meta items is set.
@@ -221,7 +228,8 @@ def create_hero_header(
             title_wrap = max(320, text_width - 8)
             summary_wrap = max(320, text_width - 8)
             try:
-                title_label.configure(wraplength=title_wrap)
+                if title_label is not None:
+                    title_label.configure(wraplength=title_wrap)
             except Exception:
                 pass
             if summary_label is not None:

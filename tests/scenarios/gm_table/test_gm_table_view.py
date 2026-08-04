@@ -278,7 +278,10 @@ def test_build_entity_content_calls_detail_factory(monkeypatch) -> None:
     assert captured["item"] is expected_item
     assert captured["master"] is host
     assert captured["callback"] is callback
-    assert captured["kwargs"] == {"spotlight_only": True}
+    assert captured["kwargs"] == {
+        "spotlight_only": True,
+        "show_entity_name": False,
+    }
     assert captured["grid"] == {"row": 0, "column": 0, "sticky": "nsew"}
 
 
@@ -337,6 +340,7 @@ def test_build_object_entity_content_uses_scrollable_full_detail(monkeypatch) ->
     assert captured["kwargs"] == {
         "spotlight_only": False,
         "show_spotlight": False,
+        "show_entity_name": False,
     }
     assert frame.pack_calls == [{"fill": "both", "expand": True}]
 
@@ -412,7 +416,11 @@ def test_build_entity_content_with_attachments_hides_portrait_spotlight(
     assert captured["item"] is expected_item
     assert captured["master"] is scroll_host
     assert captured["callback"] is callback
-    assert captured["kwargs"] == {"spotlight_only": False, "show_spotlight": False}
+    assert captured["kwargs"] == {
+        "spotlight_only": False,
+        "show_spotlight": False,
+        "show_entity_name": False,
+    }
     assert captured["gallery_kwargs"] == {"attachments": [attachment]}
 
 
@@ -453,6 +461,7 @@ def test_build_entity_content_keeps_spotlight_for_existing_portrait(
 
     assert captured["spotlight_only"] is False
     assert captured["show_spotlight"] is True
+    assert captured["show_entity_name"] is False
 
 
 def test_context_menu_handler_resolution_is_safe_without_gm_screen_api() -> None:
