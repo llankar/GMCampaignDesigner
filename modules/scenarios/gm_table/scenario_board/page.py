@@ -28,7 +28,9 @@ from modules.scenarios.gm_table.scenario_board.models import (
     ScenarioBoardScene,
     build_scenario_board_data,
 )
-from modules.scenarios.gm_table.scenario_board.styles import resolve_scenario_board_palette
+from modules.scenarios.gm_table.scenario_board.styles import (
+    resolve_scenario_board_palette,
+)
 
 OpenEntityCallback = Callable[[str, str], None]
 OpenMapCallback = Callable[[str | None], None]
@@ -157,7 +159,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                     text=plain_text,
                     justify="left",
                     text_color=self._palette.text,
-                    font=ctk.CTkFont(size=13, weight="bold"),
+                    font=ctk.CTkFont(size=13),
                 )
                 objective.pack(fill="x", padx=7, pady=(2, 7))
                 bind_full_width_wrap(objective)
@@ -197,7 +199,9 @@ class ScenarioBoardPanel(ctk.CTkFrame):
     def _add_scene_grid(self, parent, row: int) -> None:
         if not self._data.scenes:
             ctk.CTkLabel(
-                parent, text="No scenario content found.", text_color=self._palette.muted
+                parent,
+                text="No scenario content found.",
+                text_color=self._palette.muted,
             ).grid(row=row, column=0, columnspan=20, pady=20)
             return
         layout = build_scene_grid_layout(len(self._data.scenes))
