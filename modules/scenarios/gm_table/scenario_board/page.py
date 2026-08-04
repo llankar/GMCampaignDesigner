@@ -15,8 +15,11 @@ from modules.scenarios.gm_table.scenario_board.entity_links import (
     add_entity_links,
     bind_full_width_wrap,
 )
+from modules.scenarios.gm_table.scenario_board.layout import (
+    build_scene_grid_layout,
+    initial_scene_wraplength,
+)
 from modules.scenarios.gm_table.scenario_board.models import (
-    ScenarioBoardData,
     ScenarioBoardScene,
     build_scenario_board_data,
 )
@@ -241,8 +244,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 parent, text="No scenario content found.", text_color=BOARD_MUTED
             ).grid(row=row, column=0, columnspan=20, pady=20)
             return
-        for offset, scene in enumerate(self._data.scenes):
-            grid_row, column = row + offset // 4, (offset % 4) * 5
+        layout = build_scene_grid_layout(len(self._data.scenes))
+        for offset, (scene, cell) in enumerate(zip(self._data.scenes, layout)):
             card = ctk.CTkFrame(
                 parent,
                 fg_color=BOARD_SURFACE,
@@ -251,9 +254,9 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 border_color=SCENE_COLORS[offset % 4],
             )
             card.grid(
-                row=grid_row,
-                column=column,
-                columnspan=5,
+                row=row + cell.row,
+                column=cell.column,
+                columnspan=cell.columnspan,
                 sticky="nsew",
                 padx=(0, 3),
                 pady=(0, 6),
@@ -290,7 +293,10 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 font=ctk.CTkFont(size=14),
             )
             body_label.pack(fill="both", expand=True, padx=7, pady=7)
-            bind_full_width_wrap(body_label)
+            bind_full_width_wrap(
+                body_label,
+                initial_wraplength=initial_scene_wraplength(cell.columnspan),
+            )
 
     def _add_scene_entity_links(self, card, scene: ScenarioBoardScene) -> None:
         entries = (
