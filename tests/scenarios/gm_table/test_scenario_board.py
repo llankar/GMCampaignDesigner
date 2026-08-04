@@ -160,6 +160,69 @@ def test_scenario_board_info_band_displays_creatures_instead_of_adversaries() ->
     assert all(entity_type != "Villains" for _label, entity_type in ENTITY_ACTIONS)
 
 
+def test_scenario_board_reference_content_uses_regular_weight(monkeypatch) -> None:
+    """Reference headings are bold without making their content bold too."""
+    from modules.scenarios.gm_table.scenario_board import entity_links, page
+
+    widgets = []
+
+    class _Widget:
+        def __init__(self, master=None, **kwargs):
+            self.master = master
+            self.options = kwargs
+            widgets.append(self)
+
+        def grid(self, **_kwargs):
+            return None
+
+        def pack(self, **_kwargs):
+            return None
+
+        def bind(self, *_args, **_kwargs):
+            return None
+
+        def configure(self, **kwargs):
+            self.options.update(kwargs)
+
+    monkeypatch.setattr(page.ctk, "CTkFrame", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkLabel", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkFont", lambda **kwargs: kwargs)
+    monkeypatch.setattr(entity_links.ctk, "CTkButton", _Widget)
+    monkeypatch.setattr(entity_links.ctk, "CTkLabel", _Widget)
+    monkeypatch.setattr(entity_links.ctk, "CTkFont", lambda **kwargs: kwargs)
+
+    panel = object.__new__(page.ScenarioBoardPanel)
+    panel._data = build_scenario_board_data(
+        {"Objectives": "Reach the throne.", "NPCs": ["Lysandra Malrec"]}
+    )
+    panel._palette = SimpleNamespace(
+        info_bands=("#111111",) * 5,
+        info_band_text_colors=("#FFFFFF",) * 5,
+        border="#333333",
+        text="#FFFFFF",
+        control_hover="#222222",
+    )
+    panel._open_entity_callback = None
+
+    panel._add_info_bands(_Widget(), 0)
+
+    heading = next(
+        widget for widget in widgets if widget.options.get("text") == "OBJECTIVES"
+    )
+    objective = next(
+        widget
+        for widget in widgets
+        if widget.options.get("text") == "Reach the throne."
+    )
+    npc = next(
+        widget for widget in widgets if widget.options.get("text") == "Lysandra Malrec"
+    )
+
+    assert heading.options["font"] == {"size": 11, "weight": "bold"}
+    assert objective.options["font"] == {"size": 13}
+    assert npc.options["font"] == {"size": 13, "underline": True}
+
+
 def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
     """Wrapping must not bind to the label and continuously resize itself."""
     from modules.scenarios.gm_table.scenario_board.entity_links import (
