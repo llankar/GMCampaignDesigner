@@ -3,7 +3,7 @@
 import os
 import re
 import customtkinter as ctk
-from PIL import Image, ImageOps, ImageTk
+from PIL import Image, ImageTk
 from customtkinter import CTkImage, CTkLabel, CTkTextbox
 from modules.helpers.text_helpers import (
     deserialize_possible_json,
@@ -59,6 +59,7 @@ from modules.generic.detail_ui import (
     get_link_color,
     get_textbox_style,
 )
+from modules.generic.detail_ui.portrait_fitting import fit_portrait_to_frame
 from modules.generic.detail_ui.window_geometry import apply_fullscreen_top_left
 from modules.generic.entities.linking import resolve_entity_label, resolve_entity_slug
 from modules.generic.scene_indicator_payload import build_scene_indicator_payload
@@ -356,12 +357,7 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
         # Keep portrait widget resilient if this step fails.
         _portrait_debug(entity_type, entity, f"loading portrait image from '{resolved_portrait}'")
         img = Image.open(resolved_portrait).convert("RGBA")
-        framed_image = ImageOps.fit(
-            img,
-            size,
-            method=Image.Resampling.LANCZOS,
-            centering=(0.5, 0.5),
-        )
+        framed_image = fit_portrait_to_frame(img, size)
 
         portrait_shell = ctk.CTkFrame(parent, fg_color="transparent")
         portrait_shell.pack_propagate(False)
