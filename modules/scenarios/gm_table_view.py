@@ -38,6 +38,7 @@ from modules.scenarios.gm_table.attachments import (
     collect_entity_attachments,
     entity_has_attachments,
 )
+from modules.scenarios.gm_table.entity_media import has_displayable_entity_image
 from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
 from modules.scenarios.gm_table.scenario_board import ScenarioBoardPanel, ScenarioBundle
 from modules.scenarios.gm_table.container_window import GMTableContainerPage
@@ -1881,6 +1882,7 @@ class GMTableView(ctk.CTkFrame):
                 master=scrollable_host,
                 open_entity_callback=self.open_entity_panel,
                 spotlight_only=False,
+                show_spotlight=has_displayable_entity_image(item),
             )
             frame.pack(fill="both", expand=True)
             return frame
