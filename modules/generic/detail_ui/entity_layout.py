@@ -127,6 +127,7 @@ def create_spotlight_panel(
     fallback_text: str = "No portrait linked yet.",
     accent_lines: Iterable[str] | None = None,
     prominent: bool = False,
+    show_title: bool = True,
 ):
     """Create spotlight panel."""
     palette = get_detail_palette()
@@ -142,9 +143,11 @@ def create_spotlight_panel(
     )
     card.pack(fill="x", pady=(0, 14))
 
-    header = ctk.CTkFrame(card, fg_color="transparent")
-    header.pack(fill="x", padx=18, pady=(18, 10))
-    create_chip(header, title, accent=True).pack(anchor="w")
+    if show_title or subtitle:
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=18, pady=(18, 10))
+    if show_title:
+        create_chip(header, title, accent=True).pack(anchor="w")
     if subtitle:
         ctk.CTkLabel(
             header,
