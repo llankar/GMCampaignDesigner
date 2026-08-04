@@ -129,7 +129,9 @@ def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
             self.wraplengths.append(wraplength)
 
     label = _Label()
-    bind_full_width_wrap(label, padding=14)
+    bind_full_width_wrap(label, padding=14, initial_wraplength=240)
+
+    assert label.wraplengths == [240]
 
     event_name, callback, add = label.master.binding
     assert (event_name, add) == ("<Configure>", "+")
@@ -137,7 +139,40 @@ def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
     callback(SimpleNamespace(width=300))
     callback(SimpleNamespace(width=360))
 
-    assert label.wraplengths == [286, 346]
+    assert label.wraplengths == [240, 286, 346]
+
+
+def test_scene_grid_layout_fills_incomplete_final_rows() -> None:
+    """The last row must use the full board instead of narrow empty columns."""
+    from modules.scenarios.gm_table.scenario_board.layout import (
+        build_scene_grid_layout,
+    )
+
+    five_scenes = build_scene_grid_layout(5)
+    assert [(cell.row, cell.column, cell.columnspan) for cell in five_scenes] == [
+        (0, 0, 5),
+        (0, 5, 5),
+        (0, 10, 5),
+        (0, 15, 5),
+        (1, 0, 20),
+    ]
+
+    seven_scenes = build_scene_grid_layout(7)
+    assert [(cell.row, cell.column, cell.columnspan) for cell in seven_scenes[4:]] == [
+        (1, 0, 7),
+        (1, 7, 7),
+        (1, 14, 6),
+    ]
+
+
+def test_initial_scene_wraplength_scales_with_card_span() -> None:
+    """A card gets a deterministic wrap width before its first resize event."""
+    from modules.scenarios.gm_table.scenario_board.layout import (
+        initial_scene_wraplength,
+    )
+
+    assert initial_scene_wraplength(5) == 211
+    assert initial_scene_wraplength(20) == 886
 
 
 def test_scenario_board_rejects_non_positive_scene_state() -> None:

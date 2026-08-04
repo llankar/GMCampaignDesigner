@@ -50,7 +50,12 @@ def add_entity_links(
         ).pack(fill="x", padx=5, pady=(0, 5))
 
 
-def bind_full_width_wrap(label: ctk.CTkLabel, *, padding: int = 14) -> None:
+def bind_full_width_wrap(
+    label: ctk.CTkLabel,
+    *,
+    padding: int = 14,
+    initial_wraplength: int = 320,
+) -> None:
     """Keep a label's wrapping width synchronized with its containing card.
 
     Listening to the label itself creates a feedback loop: changing ``wraplength``
@@ -61,7 +66,8 @@ def bind_full_width_wrap(label: ctk.CTkLabel, *, padding: int = 14) -> None:
     """
 
     parent = label.master
-    last_wraplength: int | None = None
+    last_wraplength: int | None = max(120, initial_wraplength)
+    label.configure(wraplength=last_wraplength)
 
     def update_wrap(event) -> None:
         nonlocal last_wraplength
