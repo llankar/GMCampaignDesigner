@@ -27,17 +27,7 @@ from modules.scenarios.gm_table.scenario_board.models import (
     ScenarioBoardScene,
     build_scenario_board_data,
 )
-from modules.scenarios.gm_table.scenario_board.styles import (
-    BOARD_BACKGROUND,
-    BOARD_BORDER,
-    BOARD_MUTED,
-    BOARD_SURFACE,
-    BOARD_TEXT,
-    INFO_BAND_COLORS,
-    SCENE_COLORS,
-    SECTION_ACCENTS,
-)
-from modules.scenarios.gm_table.workspace import TABLE_PALETTE
+from modules.scenarios.gm_table.scenario_board.styles import resolve_scenario_board_palette
 
 OpenEntityCallback = Callable[[str, str], None]
 OpenMapCallback = Callable[[str | None], None]
@@ -63,7 +53,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         initial_state: dict[str, Any] | None = None,
         on_state_changed: StateChangedCallback | None = None,
     ) -> None:
-        super().__init__(master, fg_color=BOARD_BACKGROUND)
+        self._palette = resolve_scenario_board_palette()
+        super().__init__(master, fg_color=self._palette.background)
         self.scenario_name = str(scenario_name or "").strip()
         self._scenario_item = scenario_item if isinstance(scenario_item, dict) else {}
         self._open_entity_callback = open_entity_callback
@@ -99,8 +90,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             self,
             orientation="horizontal",
             height=48,
-            fg_color=BOARD_BACKGROUND,
-            scrollbar_button_color=TABLE_PALETTE["table_chip"],
+            fg_color=self._palette.background,
+            scrollbar_button_color=self._palette.control,
         )
         actions.grid(row=0, column=0, sticky="ew", pady=(0, 6))
         entity_buttons = tuple(
@@ -120,9 +111,9 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 text=text,
                 height=28,
                 width=120,
-                fg_color=TABLE_PALETTE["table_chip"],
-                hover_color="#283146",
-                text_color=BOARD_TEXT,
+                fg_color=self._palette.control,
+                hover_color=self._palette.control_hover,
+                text_color=self._palette.control_text,
                 corner_radius=4,
                 command=command,
             ).pack(side="left", padx=(0, 6))
@@ -130,8 +121,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
     def _build_board(self) -> None:
         board = ctk.CTkScrollableFrame(
             self,
-            fg_color=BOARD_BACKGROUND,
-            scrollbar_button_color=TABLE_PALETTE["table_chip"],
+            fg_color=self._palette.background,
+            scrollbar_button_color=self._palette.control,
         )
         board.grid(row=1, column=0, sticky="nsew")
         for column in range(20):
@@ -145,10 +136,10 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         for column, (title, entries, plain_text) in enumerate(groups):
             cell = ctk.CTkFrame(
                 parent,
-                fg_color=INFO_BAND_COLORS[column],
+                fg_color=self._palette.info_bands[column],
                 corner_radius=0,
                 border_width=1,
-                border_color=BOARD_BORDER,
+                border_color=self._palette.border,
             )
             cell.grid(
                 row=row, column=column * 4, columnspan=4, sticky="nsew", pady=(0, 8)
@@ -156,7 +147,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             ctk.CTkLabel(
                 cell,
                 text=title,
-                text_color=SCENE_COLORS[column % 4],
+                text_color=self._palette.scene_colors[column % 4],
                 font=ctk.CTkFont(size=10, weight="bold"),
             ).pack(pady=(7, 0))
             if plain_text:
@@ -164,13 +155,15 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                     cell,
                     text=plain_text,
                     justify="left",
-                    text_color=BOARD_TEXT,
+                    text_color=self._palette.text,
                     font=ctk.CTkFont(size=13, weight="bold"),
                 )
                 objective.pack(fill="x", padx=7, pady=(2, 7))
                 bind_full_width_wrap(objective)
             else:
-                add_entity_links(cell, entries, self._open_entity_callback)
+                add_entity_links(
+                    cell, entries, self._open_entity_callback, palette=self._palette
+                )
         return row + 1
 
     def _add_directives(self, parent, row: int) -> int:
@@ -189,8 +182,8 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 anchor="w",
                 justify="left",
                 wraplength=380,
-                fg_color=BOARD_SURFACE,
-                text_color=SECTION_ACCENTS[accent],
+                fg_color=self._palette.surface,
+                text_color=self._palette.section_accents[accent],
                 font=ctk.CTkFont(size=10, weight="bold"),
                 height=34,
             ).grid(
@@ -207,17 +200,17 @@ class ScenarioBoardPanel(ctk.CTkFrame):
     def _add_scene_grid(self, parent, row: int) -> None:
         if not self._data.scenes:
             ctk.CTkLabel(
-                parent, text="No scenario content found.", text_color=BOARD_MUTED
+                parent, text="No scenario content found.", text_color=self._palette.muted
             ).grid(row=row, column=0, columnspan=20, pady=20)
             return
         layout = build_scene_grid_layout(len(self._data.scenes))
         for offset, (scene, cell) in enumerate(zip(self._data.scenes, layout)):
             card = ctk.CTkFrame(
                 parent,
-                fg_color=BOARD_SURFACE,
+                fg_color=self._palette.surface,
                 corner_radius=0,
                 border_width=1,
-                border_color=SCENE_COLORS[offset % 4],
+                border_color=self._palette.scene_colors[offset % 4],
             )
             card.grid(
                 row=row + cell.row,
@@ -232,9 +225,10 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 text=f"{scene.index}. {scene.title.upper()}",
                 height=34,
                 corner_radius=0,
-                fg_color=SCENE_COLORS[offset % 4],
-                hover_color=SCENE_COLORS[offset % 4],
-                text_color="#09111d",
+                fg_color=self._palette.scene_colors[offset % 4],
+                # Keep the computed foreground/text contrast stable on hover.
+                hover_color=self._palette.scene_colors[offset % 4],
+                text_color=self._palette.scene_text_colors[offset % 4],
                 font=ctk.CTkFont(size=11, weight="bold"),
                 command=lambda idx=scene.index: self._set_current_scene(idx),
             )
@@ -255,7 +249,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
                 text="\n\n".join(line for line in lines if line),
                 anchor="nw",
                 justify="left",
-                text_color=BOARD_TEXT,
+                text_color=self._palette.text,
                 font=ctk.CTkFont(size=14),
             )
             body_label.pack(fill="both", expand=True, padx=7, pady=7)
@@ -273,7 +267,13 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         if entries:
             links = ctk.CTkFrame(card, fg_color="transparent", corner_radius=0)
             links.pack(fill="x", padx=2, pady=(4, 0))
-            add_entity_links(links, entries, self._open_entity_callback, font_size=12)
+            add_entity_links(
+                links,
+                entries,
+                self._open_entity_callback,
+                font_size=12,
+                palette=self._palette,
+            )
 
     def _current_scene(self) -> ScenarioBoardScene | None:
         return next(

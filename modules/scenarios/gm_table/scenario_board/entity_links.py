@@ -6,7 +6,7 @@ from collections.abc import Callable, Iterable
 
 import customtkinter as ctk
 
-from modules.scenarios.gm_table.scenario_board.styles import BOARD_TEXT
+from modules.scenarios.gm_table.scenario_board.styles import ScenarioBoardPalette
 
 OpenEntityCallback = Callable[[str, str], None]
 
@@ -17,6 +17,7 @@ def add_entity_links(
     callback: OpenEntityCallback | None,
     *,
     font_size: int = 13,
+    palette: ScenarioBoardPalette,
 ) -> None:
     """Pack entity names as compact links that open their GM Table panels."""
     found = False
@@ -32,8 +33,8 @@ def add_entity_links(
             border_width=0,
             corner_radius=0,
             fg_color="transparent",
-            hover_color="#31415a",
-            text_color=BOARD_TEXT,
+            hover_color=palette.control_hover,
+            text_color=palette.text,
             font=ctk.CTkFont(size=font_size, weight="bold", underline=True),
             command=lambda kind=entity_type, value=name: (
                 callback(kind, value) if callable(callback) else None
@@ -45,7 +46,7 @@ def add_entity_links(
         ctk.CTkLabel(
             parent,
             text="—",
-            text_color=BOARD_TEXT,
+            text_color=palette.text,
             font=ctk.CTkFont(size=font_size),
         ).pack(fill="x", padx=5, pady=(0, 5))
 

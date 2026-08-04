@@ -10,6 +10,10 @@ from modules.scenarios.gm_table.scenario_board import (
     resolve_scenario_bundle,
     split_scene_title,
 )
+from modules.helpers import theme_manager
+from modules.scenarios.gm_table.scenario_board.styles import (
+    resolve_scenario_board_palette,
+)
 from modules.scenarios.gm_table.workspace import resolve_default_panel_size
 from modules.scenarios.gm_table_view import GMTableView
 
@@ -354,3 +358,26 @@ def test_resolve_scenario_bundle_uses_scene_and_tolerant_wrapper_matches() -> No
     assert bundle.places == ("Grand Gallery",)
     assert bundle.maps == ("Gallery Map",)
     assert bundle.world_maps == ("Campaign World",)
+
+
+def test_scenario_board_palette_follows_application_themes() -> None:
+    """Board surfaces and controls should come from each application theme."""
+    palettes = {}
+    for theme in (
+        theme_manager.THEME_DEFAULT,
+        theme_manager.THEME_MEDIEVAL,
+        theme_manager.THEME_SF,
+    ):
+        tokens = theme_manager.get_tokens(theme)
+        palette = resolve_scenario_board_palette(theme)
+        palettes[theme] = palette
+
+        assert palette.background == tokens["panel_bg"]
+        assert palette.surface == tokens["panel_alt_bg"]
+        assert palette.control == tokens["accent_button_fg"]
+        assert palette.control_hover == tokens["accent_button_hover"]
+        assert len(palette.info_bands) == 5
+        assert len(palette.scene_colors) == 4
+
+    assert len({palette.background for palette in palettes.values()}) == 3
+    assert len({palette.scene_colors for palette in palettes.values()}) == 3
