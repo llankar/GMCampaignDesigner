@@ -481,6 +481,97 @@ def test_resolve_scenario_bundle_uses_scene_and_tolerant_wrapper_matches() -> No
     assert bundle.world_maps == ("Campaign World",)
 
 
+def test_open_scene_map_shows_only_linked_map_choices(monkeypatch) -> None:
+    """Open Scene Map should present only the current bundle's linked maps."""
+    from modules.scenarios.gm_table.scenario_board import page
+
+    opened = []
+    button_labels = []
+
+    class _Toplevel:
+        def __init__(self, _master):
+            self.destroyed = False
+
+        def title(self, _value):
+            pass
+
+        def geometry(self, _value):
+            pass
+
+        def transient(self, _value):
+            pass
+
+        def grab_set(self):
+            pass
+
+        def destroy(self):
+            self.destroyed = True
+
+    class _Widget:
+        def __init__(self, master=None, **kwargs):
+            self.master = master
+            self.options = kwargs
+            text = kwargs.get("text")
+            if text and text not in {"Choose a linked map to open:", "Cancel"}:
+                button_labels.append(text)
+
+        def pack(self, **_kwargs):
+            return None
+
+    monkeypatch.setattr(page.ctk, "CTkToplevel", _Toplevel)
+    monkeypatch.setattr(page.ctk, "CTkLabel", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkScrollableFrame", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkButton", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkFont", lambda **kwargs: kwargs)
+
+    panel = object.__new__(page.ScenarioBoardPanel)
+    panel._palette = SimpleNamespace(
+        text="#FFFFFF",
+        background="#111111",
+        control="#222222",
+        control_hover="#333333",
+        control_text="#EEEEEE",
+        surface="#444444",
+    )
+    panel._open_scene_map_callback = opened.append
+    panel.winfo_toplevel = lambda: None
+
+    panel._open_scene_map_picker(("Gallery Map", "Vault Map"))
+
+    assert button_labels == ["Gallery Map", "Vault Map"]
+    assert opened == []
+
+
+def test_open_current_scene_map_opens_single_map_without_picker() -> None:
+    """A single linked map should open directly without forcing a picker."""
+    from modules.scenarios.gm_table.scenario_board import page
+
+    opened = []
+    panel = object.__new__(page.ScenarioBoardPanel)
+    panel._open_scene_map_callback = opened.append
+    panel._current_bundle = lambda: SimpleNamespace(maps=(" Gallery Map ", "gallery map"))
+    panel._open_scene_map_picker = lambda _map_names: opened.append("picker")
+
+    panel._open_current_scene_map()
+
+    assert opened == ["Gallery Map"]
+
+
+def test_select_scene_map_opens_chosen_linked_map() -> None:
+    """Choosing from the linked-map picker should open that exact map."""
+    from modules.scenarios.gm_table.scenario_board import page
+
+    opened = []
+    selector = SimpleNamespace(destroyed=False)
+    selector.destroy = lambda: setattr(selector, "destroyed", True)
+    panel = object.__new__(page.ScenarioBoardPanel)
+    panel._open_scene_map_callback = opened.append
+
+    panel._select_scene_map(selector, "Vault Map")
+
+    assert selector.destroyed is True
+    assert opened == ["Vault Map"]
+
 def test_scenario_board_palette_follows_application_themes() -> None:
     """Board surfaces and controls should come from each application theme."""
     palettes = {}

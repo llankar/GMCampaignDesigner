@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
+from tkinter import messagebox
 
 import customtkinter as ctk
 
@@ -326,9 +327,78 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             self._launch_bundle_callback(self._current_bundle())
 
     def _open_current_scene_map(self) -> None:
-        bundle = self._current_bundle()
+        map_names = self._scene_map_names()
+        if not map_names:
+            messagebox.showinfo(
+                "Open Scene Map",
+                "No map is linked to the current scenario or selected scene.",
+                parent=self,
+            )
+            return
+        if len(map_names) == 1:
+            self._select_scene_map(None, map_names[0])
+            return
+        self._open_scene_map_picker(map_names)
+
+    def _scene_map_names(self) -> tuple[str, ...]:
+        """Return unique, display-ready map names for the current scene bundle."""
+        names: list[str] = []
+        seen: set[str] = set()
+        for map_name in self._current_bundle().maps:
+            clean_name = str(map_name or "").strip()
+            key = clean_name.casefold()
+            if clean_name and key not in seen:
+                names.append(clean_name)
+                seen.add(key)
+        return tuple(names)
+
+    def _open_scene_map_picker(self, map_names: tuple[str, ...]) -> None:
+        """Show only the selected scene/scenario map links before opening one."""
+        if not callable(self._open_scene_map_callback):
+            return
+        selector = ctk.CTkToplevel(self)
+        selector.title("Open Scene Map")
+        selector.geometry("360x420")
+        selector.transient(self.winfo_toplevel())
+        selector.grab_set()
+        ctk.CTkLabel(
+            selector,
+            text="Choose a linked map to open:",
+            text_color=self._palette.text,
+            font=ctk.CTkFont(size=13, weight="bold"),
+        ).pack(fill="x", padx=12, pady=(12, 6))
+        list_frame = ctk.CTkScrollableFrame(
+            selector,
+            fg_color=self._palette.background,
+            scrollbar_button_color=self._palette.control,
+        )
+        list_frame.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        for map_name in map_names:
+            ctk.CTkButton(
+                list_frame,
+                text=map_name,
+                anchor="w",
+                fg_color=self._palette.control,
+                hover_color=self._palette.control_hover,
+                text_color=self._palette.control_text,
+                command=lambda name=map_name: self._select_scene_map(selector, name),
+            ).pack(fill="x", pady=(0, 6))
+        ctk.CTkButton(
+            selector,
+            text="Cancel",
+            fg_color=self._palette.surface,
+            hover_color=self._palette.control_hover,
+            text_color=self._palette.text,
+            command=selector.destroy,
+        ).pack(pady=(0, 12))
+
+    def _select_scene_map(self, selector: object, map_name: str) -> None:
+        """Close the linked-map picker and open the chosen map."""
+        destroy = getattr(selector, "destroy", None)
+        if callable(destroy):
+            destroy()
         if callable(self._open_scene_map_callback):
-            self._open_scene_map_callback(bundle.maps[0] if bundle.maps else None)
+            self._open_scene_map_callback(map_name)
 
     def _open_world_map(self) -> None:
         bundle = self._current_bundle()
