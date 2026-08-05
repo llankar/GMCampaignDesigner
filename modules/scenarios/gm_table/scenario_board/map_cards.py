@@ -9,9 +9,23 @@ from typing import Any, Mapping, Sequence
 import customtkinter as ctk
 from PIL import Image, ImageDraw
 
+from modules.helpers.config_helper import ConfigHelper
+
 _THUMBNAIL_SIZE = (176, 104)
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
-_IMAGE_KEYS = ("Image", "image", "Path", "path", "File", "file")
+_IMAGE_KEYS = (
+    "Image",
+    "image",
+    "ImagePath",
+    "image_path",
+    "MapImage",
+    "MapPath",
+    "RelativePath",
+    "Path",
+    "path",
+    "File",
+    "file",
+)
 _NAME_KEYS = ("Name", "Title", "Map", "MapName", "name", "title")
 _INFO_KEYS = ("Type", "Category", "Tags", "Kind", "Scale", "Grid", "Description")
 
@@ -141,9 +155,7 @@ def _resolve_image_path(image_path: str) -> Path | None:
     if not raw:
         return None
     path = Path(raw)
-    candidates = (
-        [path] if path.is_absolute() else [_PROJECT_ROOT / path, Path.cwd() / path]
-    )
+    candidates = [path] if path.is_absolute() else _relative_image_candidates(path)
     for candidate in candidates:
         try:
             resolved = candidate.resolve()
@@ -152,6 +164,24 @@ def _resolve_image_path(image_path: str) -> Path | None:
         if resolved.exists() and resolved.is_file():
             return resolved
     return None
+
+
+def _relative_image_candidates(path: Path) -> list[Path]:
+    """Return likely locations for a campaign-relative map image path."""
+    candidates: list[Path] = []
+    for root in (_campaign_root(), _PROJECT_ROOT, Path.cwd()):
+        candidate = root / path
+        if candidate not in candidates:
+            candidates.append(candidate)
+    return candidates
+
+
+def _campaign_root() -> Path:
+    """Return the active campaign directory without failing thumbnail rendering."""
+    try:
+        return Path(ConfigHelper.get_campaign_dir())
+    except Exception:
+        return Path.cwd()
 
 
 def _cover_image(image: Image.Image, size: tuple[int, int]) -> Image.Image:
