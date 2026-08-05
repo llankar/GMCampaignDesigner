@@ -90,6 +90,17 @@ ENTITY_TYPES = (
 
 TITLE_KEY_ENTITY_TYPES = {"Scenarios", "Informations", "Books"}
 MAP_PANEL_KINDS = {"world_map", "map_tool"}
+MAXIMIZED_OPEN_PANEL_KINDS = {
+    "campaign_dashboard",
+    "character_graph",
+    "map_tool",
+    "object_shelf",
+    "scenario_board",
+    "scenario_graph",
+    "scene_flow",
+    "whiteboard",
+    "world_map",
+}
 
 FIXED_OVERLAY_ADD_OPTIONS = (
     "Image from Library",
@@ -846,7 +857,22 @@ class GMTableView(ctk.CTkFrame):
         )
         target_workspace = workspace or self.workspace
         target_workspace.add_panel(definition, geometry=geometry)
+        self._maximize_panel_on_open(target_workspace, definition.panel_id, kind)
         return definition.panel_id
+
+    def _maximize_panel_on_open(
+        self, workspace: GMTableWorkspace, panel_id: str, kind: str
+    ) -> None:
+        """Maximize GM Table tool panels that need a full workspace by default."""
+        if kind not in MAXIMIZED_OPEN_PANEL_KINDS:
+            return
+        try:
+            workspace.snap_panel(panel_id, "maximize")
+        except Exception as exc:
+            log_warning(
+                f"Unable to maximize GM Table panel '{panel_id}' on open: {exc}",
+                func_name="GMTableView._maximize_panel_on_open",
+            )
 
     def _create_panel_in_workspace(
         self,
