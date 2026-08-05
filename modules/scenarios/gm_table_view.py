@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import tkinter as tk
+from pathlib import Path
 from tkinter import filedialog, messagebox
 from uuid import uuid4
 
 import customtkinter as ctk
+from PIL import Image
 
 from modules.books.pdf_viewer_panel import PDFViewerFrame
 from modules.characters.character_graph_editor import CharacterGraphEditor
@@ -1085,7 +1087,18 @@ class GMTableView(ctk.CTkFrame):
             panel_id = str(records[-1]["panel_id"])
             self.workspace.bring_to_front(panel_id)
             payload = records[-1]["payload"]
-            if target_map and hasattr(payload, "open_map_by_name"):
+            if target_map and hasattr(payload, "fit_mode"):
+                payload.fit_mode = "Height"
+                payload._fit_initialized = False
+            if target_map and hasattr(payload, "open_map_by_name_when_ready"):
+                try:
+                    payload.open_map_by_name_when_ready(target_map, apply_fit=True)
+                except Exception as exc:
+                    log_exception(
+                        f"Unable to load map '{target_map}' in existing GM Table map tool panel: {exc}",
+                        func_name="GMTableView._focus_or_open_map_tool_panel",
+                    )
+            elif target_map and hasattr(payload, "open_map_by_name"):
                 try:
                     payload.open_map_by_name(target_map)
                 except Exception as exc:
@@ -1097,8 +1110,79 @@ class GMTableView(ctk.CTkFrame):
         return self._create_panel(
             "map_tool",
             "Map Tool",
-            self._panel_state(map_name=target_map),
+            self._panel_state(map_name=target_map, fit_mode="Height"),
+            geometry=self._map_tool_opening_geometry(target_map),
         )
+
+    def _map_tool_opening_geometry(self, map_name: str | None) -> dict | None:
+        """Size new MapTool panels so height-fit displays the whole map."""
+        image_size = self._map_image_size(map_name)
+        if image_size is None:
+            return None
+        image_width, image_height = image_size
+        if image_width <= 0 or image_height <= 0:
+            return None
+        default_width, default_height = resolve_default_panel_size("map_tool")
+        target_height = default_height
+        aspect_width = int(target_height * (image_width / image_height)) + 28
+        target_width = max(default_width, min(1400, aspect_width))
+        return {"width": target_width, "height": target_height}
+
+    def _map_image_size(self, map_name: str | None) -> tuple[int, int] | None:
+        """Return the backing image size for a campaign map name."""
+        target = self._normalize_entity_name(map_name)
+        if not target:
+            return None
+        try:
+            records = self.map_wrapper.load_items()
+        except Exception:
+            return None
+        for record in records if isinstance(records, list) else []:
+            if not isinstance(record, dict):
+                continue
+            aliases = {
+                self._normalize_entity_name(record.get(key))
+                for key in ("Name", "Title", "Map", "MapName")
+            }
+            if target not in aliases:
+                continue
+            path = self._resolve_campaign_media_path(self._first_map_image_value(record))
+            if path is None:
+                return None
+            try:
+                with Image.open(path) as image:
+                    return image.width, image.height
+            except Exception:
+                return None
+        return None
+
+    @staticmethod
+    def _first_map_image_value(record: dict) -> object:
+        """Return the first supported image path field from a map record."""
+        for key in ("Image", "image", "Path", "path", "File", "file"):
+            value = record.get(key)
+            if str(value or "").strip():
+                return value
+        return ""
+
+    @staticmethod
+    def _resolve_campaign_media_path(value: object) -> Path | None:
+        raw = str(value or "").strip()
+        if not raw:
+            return None
+        path = Path(raw)
+        project_root = Path(__file__).resolve().parents[2]
+        candidates = (
+            [path] if path.is_absolute() else [project_root / path, Path.cwd() / path]
+        )
+        for candidate in candidates:
+            try:
+                resolved = candidate.resolve()
+            except Exception:
+                resolved = candidate
+            if resolved.exists() and resolved.is_file():
+                return resolved
+        return None
 
     def open_or_focus_world_map(self, map_name: str | None = None) -> str | None:
         """Public Scenario Board helper for opening or focusing the world map panel."""
@@ -1772,8 +1856,20 @@ class GMTableView(ctk.CTkFrame):
             self._templates["Maps"],
             root_app=self._root_app or self,
         )
+        fit_mode = str(state.get("fit_mode") or "Height").title()
+        if fit_mode in {"Contain", "Width", "Height"}:
+            controller.fit_mode = fit_mode
+            controller._fit_initialized = False
         map_name = state.get("map_name")
-        if map_name and hasattr(controller, "open_map_by_name"):
+        if map_name and hasattr(controller, "open_map_by_name_when_ready"):
+            try:
+                controller.open_map_by_name_when_ready(map_name, apply_fit=True)
+            except Exception as exc:
+                log_exception(
+                    f"Unable to restore map tool map '{map_name}' in GM Table panel: {exc}",
+                    func_name="GMTableView._build_map_tool_content",
+                )
+        elif map_name and hasattr(controller, "open_map_by_name"):
             try:
                 controller.open_map_by_name(map_name)
             except Exception as exc:

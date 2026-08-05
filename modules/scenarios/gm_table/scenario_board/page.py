@@ -25,6 +25,10 @@ from modules.scenarios.gm_table.scenario_board.layout import (
     build_scene_grid_layout,
     initial_scene_wraplength,
 )
+from modules.scenarios.gm_table.scenario_board.map_cards import (
+    build_map_cards,
+    create_map_thumbnail,
+)
 from modules.scenarios.gm_table.scenario_board.models import (
     ScenarioBoardScene,
     build_scenario_board_data,
@@ -133,6 +137,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             board.grid_columnconfigure(column, weight=1, uniform="board")
         row = self._add_info_bands(board, 0)
         row = self._add_directives(board, row)
+        row = self._add_map_gallery(board, row)
         self._add_scene_grid(board, row)
 
     def _add_info_bands(self, parent, row: int) -> int:
@@ -196,6 +201,111 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             )
             start += span
         return row + 1
+
+    def _add_map_gallery(self, parent, row: int) -> int:
+        """Render linked scenario maps as clickable thumbnail cards."""
+        map_cards = build_map_cards(self._scene_map_names(), self._map_wrapper)
+        if not map_cards:
+            return row
+
+        section = ctk.CTkFrame(
+            parent,
+            fg_color=self._palette.surface,
+            corner_radius=0,
+            border_width=1,
+            border_color=self._palette.border,
+        )
+        section.grid(
+            row=row,
+            column=0,
+            columnspan=20,
+            sticky="ew",
+            padx=(0, 3),
+            pady=(0, 8),
+        )
+        header = ctk.CTkFrame(section, fg_color="transparent")
+        header.pack(fill="x", padx=8, pady=(7, 4))
+        ctk.CTkLabel(
+            header,
+            text="MAPS",
+            text_color=self._palette.control_text,
+            font=ctk.CTkFont(size=11, weight="bold"),
+        ).pack(side="left")
+        ctk.CTkLabel(
+            header,
+            text="Click a map to open it in MapTool",
+            text_color=self._palette.muted,
+            font=ctk.CTkFont(size=10),
+        ).pack(side="left", padx=(10, 0))
+
+        gallery = ctk.CTkScrollableFrame(
+            section,
+            orientation="horizontal",
+            height=186,
+            fg_color="transparent",
+            scrollbar_button_color=self._palette.control,
+        )
+        gallery.pack(fill="x", padx=6, pady=(0, 8))
+        self._map_card_images = getattr(self, "_map_card_images", [])
+        self._map_card_images.clear()
+        for card in map_cards:
+            self._add_map_card(gallery, card)
+        return row + 1
+
+    def _add_map_card(self, parent, card) -> None:
+        tile = ctk.CTkFrame(
+            parent,
+            width=192,
+            height=166,
+            fg_color=self._palette.background,
+            corner_radius=8,
+            border_width=1,
+            border_color=self._palette.control,
+        )
+        tile.pack(side="left", padx=(0, 8), pady=2)
+        tile.pack_propagate(False)
+        tile.configure(cursor="hand2")
+
+        thumbnail = create_map_thumbnail(card.image_path)
+        self._map_card_images.append(thumbnail)
+        image_label = ctk.CTkLabel(
+            tile, text="", image=thumbnail, width=176, height=104
+        )
+        image_label.pack(padx=8, pady=(8, 3))
+        image_label.configure(cursor="hand2")
+
+        title_label = ctk.CTkLabel(
+            tile,
+            text=card.name,
+            text_color=self._palette.text,
+            font=ctk.CTkFont(size=12, weight="bold"),
+            wraplength=176,
+            justify="left",
+            anchor="w",
+        )
+        title_label.pack(fill="x", padx=8)
+        title_label.configure(cursor="hand2")
+
+        info_parts = [
+            part for part in (card.subtitle, card.size_label, card.details) if part
+        ]
+        info_label = ctk.CTkLabel(
+            tile,
+            text=" · ".join(info_parts[:2]) or "MapTool ready",
+            text_color=self._palette.muted,
+            font=ctk.CTkFont(size=10),
+            wraplength=176,
+            justify="left",
+            anchor="w",
+        )
+        info_label.pack(fill="x", padx=8, pady=(1, 6))
+        info_label.configure(cursor="hand2")
+
+        def _open_map(_event=None, map_name=card.name):
+            self._select_scene_map(None, map_name)
+
+        for widget in (tile, image_label, title_label, info_label):
+            widget.bind("<Button-1>", _open_map)
 
     def _add_scene_grid(self, parent, row: int) -> None:
         if not self._data.scenes:

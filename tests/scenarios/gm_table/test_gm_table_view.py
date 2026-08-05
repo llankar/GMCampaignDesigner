@@ -767,6 +767,58 @@ def test_focus_or_open_map_tool_panel_reuses_existing_panel_for_active_scene() -
     assert opened == ["front:tool-panel", "Harbor"]
 
 
+def test_focus_or_open_map_tool_panel_leaves_existing_fit_when_no_target_map() -> None:
+    """Focusing MapTool without a selected map should not override the user's fit mode."""
+    payload = SimpleNamespace(fit_mode="Width", open_map_by_name=lambda _map: None)
+    workspace = SimpleNamespace(
+        get_active_panel_id=lambda **_kwargs: None,
+        get_panel_definition=lambda _panel_id: None,
+        get_panel_payload=lambda _panel_id: None,
+        list_panels=lambda **kwargs: (
+            [{"panel_id": "tool-panel", "payload": payload}]
+            if kwargs.get("kinds") == {"map_tool"}
+            else []
+        ),
+        bring_to_front=lambda _panel_id: None,
+    )
+    view = GMTableView.__new__(GMTableView)
+    view.scenario = {}
+    view.workspace = workspace
+
+    panel_id = GMTableView._focus_or_open_map_tool_panel(view)
+
+    assert panel_id == "tool-panel"
+    assert payload.fit_mode == "Width"
+
+
+def test_map_tool_opening_geometry_supports_path_image_field(tmp_path, monkeypatch) -> None:
+    """MapTool height-fit sizing should resolve the same path fields used by map cards."""
+    image_path = tmp_path / "wide-map.png"
+    image_path.write_bytes(b"fake image")
+
+    class _FakeImage:
+        width = 1200
+        height = 400
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(gm_table_view_module.Image, "open", lambda _path: _FakeImage())
+    view = GMTableView.__new__(GMTableView)
+    view.map_wrapper = SimpleNamespace(
+        load_items=lambda: [{"Name": "Wide Map", "Path": str(image_path)}]
+    )
+
+    _default_width, default_height = resolve_default_panel_size("map_tool")
+
+    assert GMTableView._map_tool_opening_geometry(view, "wide map") == {
+        "width": 1400,
+        "height": default_height,
+    }
+
 def test_resolve_tabletop_context_queries_panel_list_once_when_no_active_panel() -> (
     None
 ):
