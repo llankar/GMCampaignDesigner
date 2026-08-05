@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import modules.generic.entity_detail_factory as entity_detail_factory
 import modules.scenarios.gm_table_view as gm_table_view_module
 from modules.scenarios.gm_table.workspace import resolve_default_panel_size
-from modules.scenarios.gm_table_view import GMTableView
+from modules.scenarios.gm_table_view import GMTableView, MAXIMIZED_OPEN_PANEL_KINDS
 
 
 def test_resolve_default_panel_size_prefers_large_scenario_panels() -> None:
@@ -28,6 +28,51 @@ def test_resolve_default_panel_size_opens_objects_readably() -> None:
     assert object_size == (960, 700)
     assert object_size[0] > npc_size[0]
     assert object_size[1] > npc_size[1]
+
+
+class _PanelCallWorkspace:
+    """Minimal workspace test double that records panel creation and snapping."""
+
+    def __init__(self) -> None:
+        self.calls = []
+
+    def add_panel(self, definition, *, geometry=None):
+        self.calls.append(("add", definition.panel_id, definition.kind, geometry))
+
+    def snap_panel(self, panel_id, mode):
+        self.calls.append(("snap", panel_id, mode))
+
+
+def test_create_panel_maximizes_selected_gm_table_tool_panels_on_open() -> None:
+    """New selected GM Table tool panels should enter the maximized layout."""
+    for kind in sorted(MAXIMIZED_OPEN_PANEL_KINDS):
+        workspace = _PanelCallWorkspace()
+        view = GMTableView.__new__(GMTableView)
+        view.workspace = workspace
+
+        panel_id = GMTableView._create_panel(
+            view,
+            kind,
+            kind.replace("_", " ").title(),
+            {},
+            geometry={"width": 900, "height": 640},
+        )
+
+        assert workspace.calls == [
+            ("add", panel_id, kind, {"width": 900, "height": 640}),
+            ("snap", panel_id, "maximize"),
+        ]
+
+
+def test_create_panel_leaves_regular_gm_table_panels_floating() -> None:
+    """Non-tool panels should keep their regular floating placement."""
+    workspace = _PanelCallWorkspace()
+    view = GMTableView.__new__(GMTableView)
+    view.workspace = workspace
+
+    panel_id = GMTableView._create_panel(view, "note", "Note", {"text": ""})
+
+    assert workspace.calls == [("add", panel_id, "note", None)]
 
 
 def test_load_entity_item_accepts_title_or_name_case_insensitively() -> None:
