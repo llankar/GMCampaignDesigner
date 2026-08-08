@@ -74,7 +74,18 @@ def bind_full_width_wrap(
 
     def update_wrap(event) -> None:
         nonlocal last_wraplength
-        wraplength = max(120, event.width - padding)
+        # ``<Configure>`` reports physical pixels, while CustomTkinter's
+        # ``wraplength`` option expects logical (pre-scaling) pixels and applies
+        # the widget scaling itself.  Passing the physical width back unchanged
+        # therefore makes the rendered line wider than its card whenever display
+        # scaling is above 100%, and the right-hand words are clipped rather than
+        # wrapped.  Convert through the widget's scaling helper when available;
+        # the fallback keeps this utility usable with regular Tk/test doubles.
+        reverse_scaling = getattr(label, "_reverse_widget_scaling", None)
+        logical_width = (
+            reverse_scaling(event.width) if callable(reverse_scaling) else event.width
+        )
+        wraplength = max(120, round(logical_width) - padding)
         if wraplength == last_wraplength:
             return
         last_wraplength = wraplength

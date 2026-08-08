@@ -279,6 +279,36 @@ def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
     assert label.wraplengths == [240, 286, 346]
 
 
+def test_full_width_wrap_accounts_for_customtkinter_display_scaling() -> None:
+    """Physical configure widths must be converted before CTk scales them again."""
+    from modules.scenarios.gm_table.scenario_board.entity_links import (
+        bind_full_width_wrap,
+    )
+
+    class _Parent:
+        def bind(self, _event_name, callback, *, add):
+            assert add == "+"
+            self.callback = callback
+
+    class _ScaledLabel:
+        def __init__(self):
+            self.master = _Parent()
+            self.wraplengths = []
+
+        def _reverse_widget_scaling(self, value):
+            return value / 1.25
+
+        def configure(self, *, wraplength):
+            self.wraplengths.append(wraplength)
+
+    label = _ScaledLabel()
+    bind_full_width_wrap(label, padding=14, initial_wraplength=240)
+    label.master.callback(SimpleNamespace(width=500))
+
+    # 500 physical pixels are 400 CTk logical pixels at 125% scaling.
+    assert label.wraplengths == [240, 386]
+
+
 def test_scene_grid_layout_fills_incomplete_final_rows() -> None:
     """The last row must use the full board instead of narrow empty columns."""
     from modules.scenarios.gm_table.scenario_board.layout import (
