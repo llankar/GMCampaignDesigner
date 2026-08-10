@@ -17,6 +17,9 @@ from modules.scenarios.gm_table.scenario_board.content import (
     build_directives,
     build_info_bands,
 )
+from modules.scenarios.gm_table.scenario_board.character_graph_view import (
+    create_scenario_character_graph,
+)
 from modules.scenarios.gm_table.scenario_board.entity_links import (
     add_entity_links,
     bind_full_width_wrap,
@@ -137,8 +140,44 @@ class ScenarioBoardPanel(ctk.CTkFrame):
             board.grid_columnconfigure(column, weight=1, uniform="board")
         row = self._add_info_bands(board, 0)
         row = self._add_directives(board, row)
+        row = self._add_character_graph(board, row)
         row = self._add_map_gallery(board, row)
         self._add_scene_grid(board, row)
+
+    def _add_character_graph(self, parent, row: int) -> int:
+        """Embed the saved scenario relationship graph using the wizard renderer."""
+        if not self._data.character_graph.get("nodes"):
+            return row
+        section = ctk.CTkFrame(
+            parent,
+            height=430,
+            fg_color=self._palette.surface,
+            corner_radius=0,
+            border_width=1,
+            border_color=self._palette.border,
+        )
+        section.grid(
+            row=row,
+            column=0,
+            columnspan=20,
+            sticky="ew",
+            padx=(0, 3),
+            pady=(0, 8),
+        )
+        section.grid_propagate(False)
+        section.grid_rowconfigure(0, weight=1)
+        section.grid_columnconfigure(0, weight=1)
+        graph = create_scenario_character_graph(
+            section,
+            graph_data=self._data.character_graph,
+            wrappers=self._wrappers,
+        )
+        if graph is None:
+            section.destroy()
+            return row
+        graph.grid(row=0, column=0, sticky="nsew")
+        self._character_graph = graph
+        return row + 1
 
     def _add_info_bands(self, parent, row: int) -> int:
         groups = build_info_bands(self._data)
