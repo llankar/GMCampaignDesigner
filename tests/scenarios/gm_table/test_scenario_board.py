@@ -14,6 +14,9 @@ from modules.helpers import theme_manager
 from modules.scenarios.gm_table.scenario_board.styles import (
     resolve_scenario_board_palette,
 )
+from modules.scenarios.gm_table.scenario_board.character_graph_view import (
+    ScenarioBoardCharacterGraph,
+)
 from modules.scenarios.gm_table.panel_skins import readable_text_color
 from modules.scenarios.gm_table.workspace import resolve_default_panel_size
 from modules.scenarios.gm_table_view import GMTableView
@@ -63,6 +66,50 @@ def test_build_scenario_board_data_extracts_scenes_sections_and_links() -> None:
     assert data.scenes[0].sections[0]["items"] == ["Meet the fixer"]
     assert data.linked_entities["NPCs"] == ("Fixer", "Captain")
     assert data.linked_entities["Places"] == ("Docks",)
+
+
+def test_build_scenario_board_data_normalizes_saved_character_graph() -> None:
+    """Scenario Board exposes wizard graph data even when SQLite returns JSON."""
+    data = build_scenario_board_data(
+        {
+            "Title": "Night Run",
+            "ScenarioCharacterGraph": (
+                '{"nodes":[{"tag":"npc_fixer","entity_type":"npc",'
+                '"entity_name":"Fixer","x":120,"y":160}],"links":[]}'
+            ),
+        }
+    )
+
+    assert data.character_graph["nodes"][0]["entity_name"] == "Fixer"
+    assert data.character_graph["links"] == []
+    assert data.character_graph["shapes"] == []
+
+
+def test_build_scenario_board_data_discards_malformed_graph_entries() -> None:
+    """Malformed persisted graph values must not crash the graph renderer."""
+    data = build_scenario_board_data(
+        {
+            "ScenarioCharacterGraph": {
+                "nodes": [None, "not-a-node", {"entity_name": "Fixer"}],
+                "links": "not-a-list",
+                "shapes": [42],
+            }
+        }
+    )
+
+    assert data.character_graph == {
+        "nodes": [{"entity_name": "Fixer"}],
+        "links": [],
+        "shapes": [],
+    }
+
+
+def test_scenario_board_character_graph_blocks_editing_gestures() -> None:
+    """The embedded graph is inspectable without exposing record editing actions."""
+    graph = ScenarioBoardCharacterGraph.__new__(ScenarioBoardCharacterGraph)
+
+    assert graph.on_right_click(None) == "break"
+    assert graph.open_character_editor(None) == "break"
 
 
 def test_build_scenario_board_data_decodes_serialized_rich_text_payloads() -> None:

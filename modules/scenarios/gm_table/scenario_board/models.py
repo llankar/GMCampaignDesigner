@@ -53,6 +53,7 @@ class ScenarioBoardData:
     checkpoint: str
     scenes: tuple[ScenarioBoardScene, ...]
     linked_entities: dict[str, tuple[str, ...]]
+    character_graph: dict[str, Any]
 
 
 def _parse_serialized_payload(value: str) -> Any | None:
@@ -142,6 +143,32 @@ def normalize_list_field(value: Any) -> tuple[str, ...]:
         return tuple(items)
     text = _clean_text(value)
     return (text,) if text else ()
+
+
+def normalize_character_graph(value: Any) -> dict[str, Any]:
+    """Return a safe scenario character graph payload for display widgets."""
+    if isinstance(value, str):
+        value = _parse_serialized_payload(value)
+    if not isinstance(value, Mapping):
+        return {"nodes": [], "links": [], "shapes": []}
+
+    def mapping_list(key: str) -> list[dict[str, Any]]:
+        entries = value.get(key)
+        if not isinstance(entries, (list, tuple)):
+            return []
+        return [dict(entry) for entry in entries if isinstance(entry, Mapping)]
+
+    return {
+        "nodes": mapping_list("nodes"),
+        "links": mapping_list("links"),
+        "shapes": mapping_list("shapes"),
+        **({"tabs": mapping_list("tabs")} if isinstance(value.get("tabs"), list) else {}),
+        **(
+            {"active_tab_id": value["active_tab_id"]}
+            if value.get("active_tab_id")
+            else {}
+        ),
+    }
 
 
 def split_scene_title(scene_text: str, index: int) -> tuple[str, str]:
@@ -334,4 +361,5 @@ def build_scenario_board_data(
         checkpoint=first_text("Checkpoint", "Route", "Progression"),
         scenes=tuple(scenes),
         linked_entities=linked_entities,
+        character_graph=normalize_character_graph(item.get("ScenarioCharacterGraph")),
     )
