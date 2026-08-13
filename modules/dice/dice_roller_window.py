@@ -1,5 +1,10 @@
 ﻿"""3D dice roller window and rendered dice model definitions."""
 
+import os
+
+# This module uses Matplotlib only for colormaps, so keep it off GUI backends.
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import tkinter as tk
 import time
 import math

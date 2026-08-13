@@ -19,6 +19,7 @@ from modules.scenarios.gm_table.scenario_board.content import (
 )
 from modules.scenarios.gm_table.scenario_board.character_graph_view import (
     create_scenario_character_graph,
+    has_renderable_character_graph_links,
 )
 from modules.scenarios.gm_table.scenario_board.entity_links import (
     add_entity_links,
@@ -146,7 +147,7 @@ class ScenarioBoardPanel(ctk.CTkFrame):
 
     def _add_character_graph(self, parent, row: int) -> int:
         """Embed the saved scenario relationship graph using the wizard renderer."""
-        if not self._data.character_graph.get("nodes"):
+        if not has_renderable_character_graph_links(self._data.character_graph):
             return row
         section = ctk.CTkFrame(
             parent,

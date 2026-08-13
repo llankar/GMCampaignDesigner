@@ -1,6 +1,12 @@
 """Main application window and startup orchestration."""
 
 import os
+
+# Matplotlib is only used for colormaps in the Tkinter UI. Without an explicit
+# backend, environments with PySide6 can auto-select QtAgg and trip debugpy's
+# Qt event-loop integration before the app starts.
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import sys
 import json
 import sqlite3

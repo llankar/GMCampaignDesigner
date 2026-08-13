@@ -1288,40 +1288,9 @@ class CharacterGraphEditor(ctk.CTkFrame):
         """Update links positions for node."""
         for link in self.graph["links"]:
             if node_tag in (link.get("node1_tag"), link.get("node2_tag")):
-                # Handle the branch where node tag is in (link.get('node1_tag'), link.get('node2_tag')).
-                key = (link.get("node1_tag"), link.get("node2_tag"))
+                key = self._link_canvas_key(link)
                 canvas_ids = self.link_canvas_ids.get(key)
-                if canvas_ids:
-                    # Continue with this path when canvas ids is set.
-                    tag1 = link.get("node1_tag")
-                    tag2 = link.get("node2_tag")
-                    x1, y1 = self.node_positions.get(tag1, (0, 0))
-                    x2, y2 = self.node_positions.get(tag2, (0, 0))
-                    start_x, start_y = self._get_edge_point(tag1, x2, y2)
-                    end_x, end_y = self._get_edge_point(tag2, x1, y1)
-                    link_color, line_width = self._get_link_style(link)
-
-                    # Update line coordinates directly
-                    self.canvas.coords(canvas_ids["line"], start_x, start_y, end_x, end_y)
-                    self.canvas.itemconfig(canvas_ids["line"], fill=link_color, width=line_width)
-
-                    # Update text position
-                    mid_x, mid_y = (start_x + end_x) / 2, (start_y + end_y) / 2
-                    self.canvas.coords(canvas_ids["text"], mid_x, mid_y)
-
-                    # Delete old arrowheads
-                    for arrow_id in canvas_ids["arrows"]:
-                        self.canvas.delete(arrow_id)
-                    canvas_ids["arrows"] = []
-
-                    # Redraw arrowheads at new position
-                    arrow_mode = link.get("arrow_mode", "end")
-                    if arrow_mode in ("start", "both"):
-                        arrow_id = self.draw_arrowhead(tag1, x2, y2, link_color)
-                        canvas_ids["arrows"].append(arrow_id)
-                    if arrow_mode in ("end", "both"):
-                        arrow_id = self.draw_arrowhead(tag2, x1, y1, link_color)
-                        canvas_ids["arrows"].append(arrow_id)
+                self._update_link_canvas_items(link, canvas_ids)
 
     
     def update_links_for_node(self, node_tag):
@@ -1369,7 +1338,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
         tags = self.canvas.gettags(item[0])
         if "link" in tags or "link_text" in tags or "arrowhead" in tags:
             # Handle the branch where 'link' is in tags or 'link_text' is in tags or 'arrowhead' is in tags.
-            self.selected_link = self.get_link_by_position(x, y)
+            self.selected_link = self._get_link_by_canvas_tags(tags) or self.get_link_by_position(x, y)
             self.show_link_menu(int(x), int(y))
         elif any(self._is_node_tag(tag) for tag in tags):
             # Handle the branch where any((_is_node_tag(tag) for tag in tags)).
@@ -1453,10 +1422,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
             return
         updated_link = None
         for link in self.graph["links"]:
-            if (
-                link.get("node1_tag") == self.selected_link.get("node1_tag")
-                and link.get("node2_tag") == self.selected_link.get("node2_tag")
-            ):
+            if link is self.selected_link or self._link_matches(link, self.selected_link):
                 link["arrow_mode"] = new_mode
                 updated_link = link
                 break
@@ -1483,9 +1449,131 @@ class CharacterGraphEditor(ctk.CTkFrame):
         """Internal helper for link matches."""
         if not isinstance(link, dict) or not isinstance(other, dict):
             return False
+        if link is other:
+            return True
+        graph_links = (getattr(self, "graph", {}) or {}).get("links", [])
+        if any(candidate is other for candidate in graph_links):
+            return False
         link_nodes = {link.get("node1_tag"), link.get("node2_tag")}
         other_nodes = {other.get("node1_tag"), other.get("node2_tag")}
         return link_nodes == other_nodes and link.get("text") == other.get("text")
+
+    def _link_canvas_key(self, link):
+        """Return a runtime-unique key for one rendered link."""
+        if not isinstance(link, dict):
+            return None
+        return (
+            link.get("node1_tag"),
+            link.get("node2_tag"),
+            link.get("text") or "",
+            id(link),
+        )
+
+    def _link_canvas_item_tag(self, link):
+        """Return the canvas tag shared by all items for one rendered link."""
+        key = self._link_canvas_key(link)
+        if key is None:
+            return None
+        return f"link_item:{key[-1]}"
+
+    def _get_link_by_canvas_tags(self, tags):
+        """Return the graph link identified by a unique canvas item tag."""
+        link_item_tag = next(
+            (tag for tag in tags if isinstance(tag, str) and tag.startswith("link_item:")),
+            None,
+        )
+        if not link_item_tag:
+            return None
+        for link in self.graph.get("links", []):
+            if self._link_canvas_item_tag(link) == link_item_tag:
+                return link
+        return None
+
+    def _link_pair_key(self, link):
+        """Return an order-insensitive key for parallel link layout."""
+        tag1 = link.get("node1_tag") if isinstance(link, dict) else None
+        tag2 = link.get("node2_tag") if isinstance(link, dict) else None
+        if not tag1 or not tag2:
+            return tag1, tag2
+        return tuple(sorted((tag1, tag2)))
+
+    def _link_canvas_points(self, link):
+        """Return the visible line endpoints and node centers for a link."""
+        tag1 = link.get("node1_tag")
+        tag2 = link.get("node2_tag")
+        x1, y1 = self.node_positions.get(tag1, (0, 0))
+        x2, y2 = self.node_positions.get(tag2, (0, 0))
+        start_x, start_y = self._get_edge_point(tag1, x2, y2)
+        end_x, end_y = self._get_edge_point(tag2, x1, y1)
+        return start_x, start_y, end_x, end_y, x1, y1, x2, y2
+
+    def _link_label_position(self, start_x, start_y, end_x, end_y, label_offset=0):
+        """Return a label position relative to the current link midpoint."""
+        mid_x = (start_x + end_x) / 2
+        mid_y = (start_y + end_y) / 2
+        if not label_offset:
+            return mid_x, mid_y
+        dx = end_x - start_x
+        dy = end_y - start_y
+        length = math.hypot(dx, dy)
+        if length < 1e-6:
+            return mid_x, mid_y
+        return mid_x - (dy / length) * label_offset, mid_y + (dx / length) * label_offset
+
+    def _parallel_link_label_offsets(self, links):
+        """Return stable label offsets for links sharing the same node pair."""
+        pair_groups = {}
+        for link in links:
+            pair_groups.setdefault(self._link_pair_key(link), []).append(link)
+
+        spacing = max(18, int(22 * self.canvas_scale))
+        offsets = {}
+        for group in pair_groups.values():
+            if len(group) == 1:
+                offsets[self._link_canvas_key(group[0])] = 0
+                continue
+            center_index = (len(group) - 1) / 2
+            for index, link in enumerate(group):
+                offsets[self._link_canvas_key(link)] = (index - center_index) * spacing
+        return offsets
+
+    def _update_link_canvas_items(self, link, canvas_ids):
+        """Recalculate line, label, and arrowhead positions from current nodes."""
+        if not canvas_ids:
+            return
+        tag1 = link.get("node1_tag")
+        tag2 = link.get("node2_tag")
+        start_x, start_y, end_x, end_y, x1, y1, x2, y2 = self._link_canvas_points(link)
+        link_color, line_width = self._get_link_style(link)
+
+        line_id = canvas_ids.get("line")
+        if line_id:
+            self.canvas.coords(line_id, start_x, start_y, end_x, end_y)
+            self.canvas.itemconfig(line_id, fill=link_color, width=line_width)
+
+        text_id = canvas_ids.get("text")
+        if text_id:
+            label_x, label_y = self._link_label_position(
+                start_x,
+                start_y,
+                end_x,
+                end_y,
+                canvas_ids.get("label_offset", 0),
+            )
+            self.canvas.coords(text_id, label_x, label_y)
+
+        for arrow_id in canvas_ids.get("arrows", []):
+            self.canvas.delete(arrow_id)
+        canvas_ids["arrows"] = []
+
+        arrow_mode = link.get("arrow_mode", "end")
+        item_tag = canvas_ids.get("item_tag") or self._link_canvas_item_tag(link)
+        if arrow_mode in ("start", "both"):
+            arrow_id = self.draw_arrowhead(tag1, x2, y2, link_color, item_tag=item_tag)
+            canvas_ids["arrows"].append(arrow_id)
+        if arrow_mode in ("end", "both"):
+            arrow_id = self.draw_arrowhead(tag2, x1, y1, link_color, item_tag=item_tag)
+            canvas_ids["arrows"].append(arrow_id)
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: delete_node
@@ -1888,22 +1976,24 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # ─────────────────────────────────────────────────────────────────────────
     def draw_all_links(self, links):
         """Handle draw all links."""
+        self.canvas.delete("link")
+        self.canvas.delete("link_text")
+        self.link_canvas_ids.clear()
+        label_offsets = self._parallel_link_label_offsets(links)
         for link in links:
-            self.draw_one_link(link)
+            self.draw_one_link(link, label_offsets.get(self._link_canvas_key(link), 0))
         self.canvas.tag_lower("link")
 
     # ─────────────────────────────────────────────────────────────────────────
     # FUNCTION: draw_one_link
     # Draws a single link between two nodes, including its arrowheads (if any) and text.
     # ─────────────────────────────────────────────────────────────────────────
-    def draw_one_link(self, link):
+    def draw_one_link(self, link, label_offset=0):
         """Handle draw one link."""
         tag1 = link.get("node1_tag")
         tag2 = link.get("node2_tag")
-        x1, y1 = self.node_positions.get(tag1, (0, 0))
-        x2, y2 = self.node_positions.get(tag2, (0, 0))
-        start_x, start_y = self._get_edge_point(tag1, x2, y2)
-        end_x, end_y = self._get_edge_point(tag2, x1, y1)
+        start_x, start_y, end_x, end_y, x1, y1, x2, y2 = self._link_canvas_points(link)
+        item_tag = self._link_canvas_item_tag(link)
 
         link_color, line_width = self._get_link_style(link)
         line_id = self.canvas.create_line(
@@ -1913,34 +2003,42 @@ class CharacterGraphEditor(ctk.CTkFrame):
             end_y,
             fill=link_color,
             width=line_width,
-            tags=("link",),
+            tags=("link", item_tag),
         )
         arrow_mode = link.get("arrow_mode", "end")
 
         arrow_ids = []
         if arrow_mode in ("start", "both"):
-            arrow_ids.append(self.draw_arrowhead(tag1, x2, y2, link_color))
+            arrow_ids.append(self.draw_arrowhead(tag1, x2, y2, link_color, item_tag=item_tag))
         if arrow_mode in ("end", "both"):
-            arrow_ids.append(self.draw_arrowhead(tag2, x1, y1, link_color))
+            arrow_ids.append(self.draw_arrowhead(tag2, x1, y1, link_color, item_tag=item_tag))
 
-        mid_x, mid_y = (start_x + end_x) / 2, (start_y + end_y) / 2
+        label_x, label_y = self._link_label_position(
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            label_offset,
+        )
         scale = self.canvas_scale
         font_size = max(1, int(10 * scale))
 
         text_id = self.canvas.create_text(
-            mid_x, mid_y,
+            label_x, label_y,
             text=link["text"],
             fill="white",
             font=("Arial", font_size, "bold"),
-            tags=("link_text",)
+            tags=("link_text", item_tag)
         )
 
         # Store Canvas IDs clearly linked by node tags
-        key = (tag1, tag2)
+        key = self._link_canvas_key(link)
         self.link_canvas_ids[key] = {
             "line": line_id,
             "arrows": arrow_ids,
-            "text": text_id
+            "text": text_id,
+            "label_offset": label_offset,
+            "item_tag": item_tag,
         }
 
 
@@ -1973,7 +2071,7 @@ class CharacterGraphEditor(ctk.CTkFrame):
     # FUNCTION: draw_arrowhead
     # Draws a triangular arrowhead near a node, offset outside the node's bounding box.
     # ─────────────────────────────────────────────────────────────────────────
-    def draw_arrowhead(self, node_tag, target_x, target_y, color):
+    def draw_arrowhead(self, node_tag, target_x, target_y, color, item_tag=None):
         """Handle draw arrowhead."""
         arrow_length = 16
         arrow_width = 18
@@ -1989,13 +2087,14 @@ class CharacterGraphEditor(ctk.CTkFrame):
         right_y = base_y - (arrow_width / 2) * perp_y
 
         # RETURN the polygon ID so it can be deleted later
+        tags = ("link", "arrowhead", item_tag) if item_tag else ("link", "arrowhead")
         return self.canvas.create_polygon(
             arrow_apex_x, arrow_apex_y,
             left_x, left_y,
             right_x, right_y,
             fill=color,
             outline="",
-            tags=("link", "arrowhead")
+            tags=tags
     )
 
 

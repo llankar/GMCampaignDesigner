@@ -10,6 +10,9 @@
             "debugAdapterPython": "C:/Users/llank/AppData/Local/Programs/Python/Python312/python.exe",
             "debugLauncherPython": "C:/Users/llank/AppData/Local/Programs/Python/Python312/python.exe",
             "cwd": "${workspaceFolder}",
+            "env": {
+                "MPLBACKEND": "Agg"
+            },
             "console": "integratedTerminal"
         }
     ]
