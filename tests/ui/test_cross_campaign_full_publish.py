@@ -15,6 +15,7 @@ if "cryptography.fernet" not in sys.modules:
     sys.modules.setdefault("cryptography.fernet", fernet)
 
 from modules.generic.campaign_sync.publisher import PublishOutcome
+from modules.generic.campaign_sync.auto_publish.models import EventKind, SyncState, WorkerEvent
 import modules.generic.cross_campaign_asset_library as library
 
 
@@ -90,3 +91,50 @@ def test_full_publish_forwards_flag_and_reports_conflict_and_error(monkeypatch):
         assert str(exc) == "upload failed"
     else:
         raise AssertionError("publication error was swallowed")
+
+
+def test_full_publish_with_coordinator_reports_start_and_completion(monkeypatch):
+    window = _window()
+    metadata = SimpleNamespace(campaign_id="campaign-1", revision=4, published_at="yes")
+    window.campaign_publisher = SimpleNamespace(enable=lambda *_args, **_kwargs: metadata)
+    coordinator = SimpleNamespace(mark_dirty=lambda **_kwargs: None, publish_now=lambda _id: True)
+    window.master._auto_publish_coordinator = coordinator
+    monkeypatch.setattr(library.messagebox, "askyesno", lambda *args, **kwargs: True)
+    notices = []
+    monkeypatch.setattr(
+        library.messagebox, "showinfo", lambda *args, **kwargs: notices.append(args)
+    )
+
+    window.publish_full_campaign_to_github()
+    assert notices[-1][0] == "Publication Started"
+
+    window.handle_auto_publish_event(
+        WorkerEvent(
+            "job-1",
+            "campaign-1",
+            1,
+            EventKind.SUCCESS,
+            SyncState.SYNCHRONIZED,
+            "Revision 5 published",
+            terminal=True,
+        )
+    )
+    assert notices[-1] == ("Campaign Published", "Revision 5 published")
+
+
+def test_full_publish_reports_when_coordinator_rejects_dispatch(monkeypatch):
+    window = _window()
+    metadata = SimpleNamespace(campaign_id="campaign-1", revision=4, published_at="yes")
+    window.campaign_publisher = SimpleNamespace(enable=lambda *_args, **_kwargs: metadata)
+    window.master._auto_publish_coordinator = SimpleNamespace(
+        mark_dirty=lambda **_kwargs: None, publish_now=lambda _id: False
+    )
+    monkeypatch.setattr(library.messagebox, "askyesno", lambda *args, **kwargs: True)
+    errors = []
+    monkeypatch.setattr(
+        library.messagebox, "showerror", lambda *args, **kwargs: errors.append(args)
+    )
+
+    window.publish_full_campaign_to_github()
+
+    assert errors[-1][0] == "Publication Not Started"
