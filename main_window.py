@@ -3159,10 +3159,14 @@ class MainWindow(ctk.CTk):
 
         try:
             from modules.scenarios.gm_table_view import GMTableView
+            from modules.scenarios.gm_table.window_chrome import (
+                remove_native_window_decorations,
+            )
 
             window = ctk.CTkToplevel(self)
             window.title(f"GM Table - {table_name}")
             self._maximize_detached_window(window)
+            remove_native_window_decorations(window)
             self._focus_detached_window(window)
             try:
                 window.attributes("-topmost", True)
@@ -3192,6 +3196,7 @@ class MainWindow(ctk.CTk):
                 on_switch_table=lambda target_table_id: self.open_gm_table(
                     table_id=target_table_id
                 ),
+                on_close=_on_close,
                 root_app=self,
                 layout_store=layout_store,
             )

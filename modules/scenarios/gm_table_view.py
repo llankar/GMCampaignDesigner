@@ -136,6 +136,7 @@ class GMTableView(ctk.CTkFrame):
         table_id: str,
         table_name: str,
         on_switch_table=None,
+        on_close=None,
         root_app=None,
         layout_store: GMTableLayoutStore | None = None,
     ) -> None:
@@ -153,6 +154,7 @@ class GMTableView(ctk.CTkFrame):
         self._session_mid_var = tk.StringVar(value="1.0")
         self._session_end_var = tk.StringVar(value="2.0")
         self._on_switch_table = on_switch_table
+        self._on_close = on_close
         self._root_app = root_app
         self.layout_store = layout_store or GMTableLayoutStore()
         self._layout_settle_scheduler = LayoutSettleScheduler(self)
@@ -475,7 +477,27 @@ class GMTableView(ctk.CTkFrame):
             text_color=TABLE_PALETTE["text"],
             corner_radius=14,
             command=self.reset_table,
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkButton(
+            actions,
+            text="×",
+            width=34,
+            height=30,
+            fg_color=TABLE_PALETTE["danger"],
+            hover_color="#B91C1C",
+            text_color="#FFFFFF",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            corner_radius=14,
+            command=self._close_window,
         ).pack(side="left")
+
+    def _close_window(self) -> None:
+        """Close this table through its owner so window tracking stays accurate."""
+        if self._on_close is not None:
+            self._on_close()
+            return
+        self.winfo_toplevel().destroy()
 
     def _activate_desk_annotation_tool(self, tool: str) -> None:
         """Arm a desk annotation tool immediately using inline toolbar styling."""
