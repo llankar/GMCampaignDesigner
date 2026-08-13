@@ -193,6 +193,7 @@ class _FakeToplevel:
         self.protocol_callbacks = {}
         self.after_idle_callbacks = []
         self.destroy_calls = 0
+        self.overrideredirect_calls = []
         self._exists = True
 
     def winfo_exists(self):
@@ -231,6 +232,10 @@ class _FakeToplevel:
         """Handle attributes."""
         self.attributes_calls.append(args)
 
+    def overrideredirect(self, value):
+        """Record native window-decoration changes."""
+        self.overrideredirect_calls.append(value)
+
     def after_idle(self, callback):
         """Handle after idle."""
         self.after_idle_callbacks.append(callback)
@@ -267,6 +272,7 @@ class _FakeGMTableView:
         table_id,
         table_name,
         on_switch_table=None,
+        on_close=None,
         root_app,
         layout_store=None,
     ):
@@ -275,6 +281,7 @@ class _FakeGMTableView:
         self.table_id = table_id
         self.table_name = table_name
         self.on_switch_table = on_switch_table
+        self.on_close = on_close
         self.root_app = root_app
         self.layout_store = layout_store
         self.opened_entities = []
@@ -335,6 +342,7 @@ def test_open_gm_table_launches_detached_window_without_clearing_main_content(mo
     assert gm_window.title_text == "GM Table - Main"
     assert gm_window.geometry_calls[-1] == "1920x1080+0+0"
     assert gm_window.minsize_calls[-1] == (1600, 900)
+    assert gm_window.overrideredirect_calls == [True]
     assert gm_window.lift_calls == 1
     assert gm_window.focus_force_calls == 1
     assert gm_window.attributes_calls[0] == ("-topmost", True)
@@ -490,6 +498,8 @@ def test_gm_table_window_close_clears_tracked_references(monkeypatch):
 
     gm_window = MainWindow.open_gm_table(window, scenario_name="Storm Front")
     close_callback = gm_window.protocol_callbacks["WM_DELETE_WINDOW"]
+
+    assert window.current_gm_table.on_close is close_callback
 
     close_callback()
 
