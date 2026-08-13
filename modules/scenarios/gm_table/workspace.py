@@ -1467,7 +1467,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self._nav_hud.place(relx=1.0, x=-18, y=18, anchor="ne")
+        self._nav_hud.place(relx=0.0, x=18, y=18, anchor="nw")
         self._nav_status = ctk.CTkLabel(
             self._nav_hud,
             text="Desk 100%",
