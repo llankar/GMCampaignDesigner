@@ -41,6 +41,7 @@ from modules.generic.campaign_sync.publisher import (
     CampaignSyncLinkState,
     PublishOutcome,
 )
+from modules.generic.campaign_sync.auto_publish.models import EventKind, WorkerEvent
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.checkbox_dialog import CheckboxDialog
 from modules.helpers.logging_helper import log_exception, log_info, log_warning
@@ -86,6 +87,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.source_campaigns: List[CampaignDatabase] = []
         self.selected_campaign: CampaignDatabase | None = None
         self._preview_image = None
+        self._manual_publication_campaign_ids: set[str] = set()
 
         self._build_ui()
         self.refresh_campaign_list()
@@ -810,7 +812,24 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 expected_parent_revision=expected_parent,
                 force_full_checkpoint=force_full_checkpoint,
             )
-            coordinator.publish_now(metadata.campaign_id)
+            if not coordinator.publish_now(metadata.campaign_id):
+                messagebox.showerror(
+                    "Publication Not Started",
+                    "The campaign could not be queued for publication. It may already be "
+                    "publishing, or campaign synchronization may be in offline mode.",
+                    parent=self,
+                )
+                return
+            pending = getattr(self, "_manual_publication_campaign_ids", None)
+            if pending is None:
+                pending = self._manual_publication_campaign_ids = set()
+            pending.add(metadata.campaign_id)
+            messagebox.showinfo(
+                "Publication Started",
+                f"{campaign.name} revision {next_revision} is being published to GitHub in "
+                "the background. You will be notified when it finishes.",
+                parent=self,
+            )
             return
 
         title = f"{campaign.name} — Revision {next_revision}"
@@ -835,6 +854,25 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self._run_progress_task(
             "Publishing Campaign Update", worker, None, None, on_success=success, modal=False
         )
+
+    def handle_auto_publish_event(self, event: WorkerEvent) -> None:
+        """Report completion of a publication explicitly started from this window."""
+        pending = getattr(self, "_manual_publication_campaign_ids", set())
+        if event.campaign_id not in pending or not event.terminal:
+            return
+        pending.discard(event.campaign_id)
+        if event.kind is EventKind.SUCCESS:
+            messagebox.showinfo("Campaign Published", event.message, parent=self)
+            self._refresh_online_dialog()
+        elif event.kind is EventKind.CONFLICT:
+            messagebox.showwarning(
+                "Publication Conflict", event.message or "Remote revision conflict", parent=self
+            )
+        else:
+            messagebox.showerror(
+                "Publication Failed", event.message or "The campaign could not be published.",
+                parent=self,
+            )
 
     def check_campaign_updates(self):
         if not self.selected_campaign:
