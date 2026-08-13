@@ -14,6 +14,11 @@ from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
+from modules.scenarios.gm_table.layout.window_spacing import (
+    WINDOW_EDGE_PADDING,
+    WORKSPACE_CORNER_RADIUS,
+    WORKSPACE_SECTION_GAP,
+)
 from modules.scenarios.gm_table.panel_skins import (
     DESK_SPREAD_ACCENT_VARIANTS,
     resolve_panel_chrome,
@@ -1385,7 +1390,11 @@ class GMTableWorkspace(ctk.CTkFrame):
         on_reveal_requested: Callable[[str], None] | None = None,
         on_fixed_overlay_add_requested: Callable[[object], None] | None = None,
     ) -> None:
-        super().__init__(master, fg_color=TABLE_PALETTE["table_bg"], corner_radius=28)
+        super().__init__(
+            master,
+            fg_color=TABLE_PALETTE["table_bg"],
+            corner_radius=WORKSPACE_CORNER_RADIUS,
+        )
         self._build_panel = on_panel_build
         self._layout_changed_callback = on_layout_changed
         self._map_tool_window_provider = map_tool_window_provider
@@ -1425,11 +1434,17 @@ class GMTableWorkspace(ctk.CTkFrame):
         self.surface = ctk.CTkFrame(
             self,
             fg_color=TABLE_PALETTE["table_bg"],
-            corner_radius=24,
+            corner_radius=WORKSPACE_CORNER_RADIUS,
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self.surface.grid(row=0, column=0, sticky="nsew", padx=18, pady=(0, 10))
+        self.surface.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=WINDOW_EDGE_PADDING,
+            pady=(0, WORKSPACE_SECTION_GAP),
+        )
         self.surface.bind("<Configure>", self._on_surface_configure, add="+")
 
         self._desk_texture_canvas = tk.Canvas(
@@ -1533,11 +1548,17 @@ class GMTableWorkspace(ctk.CTkFrame):
         self.tray = ctk.CTkFrame(
             self,
             fg_color=TABLE_PALETTE["table_alt"],
-            corner_radius=20,
+            corner_radius=WORKSPACE_CORNER_RADIUS,
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        self.tray.grid(row=1, column=0, sticky="ew", padx=18, pady=(0, 18))
+        self.tray.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=WINDOW_EDGE_PADDING,
+            pady=(0, WINDOW_EDGE_PADDING),
+        )
         self.tray.grid_columnconfigure(1, weight=1)
 
         self.tray_label = ctk.CTkLabel(

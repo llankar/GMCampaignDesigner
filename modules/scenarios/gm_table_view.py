@@ -44,6 +44,10 @@ from modules.scenarios.gm_table.entity_media import has_displayable_entity_image
 from modules.scenarios.gm_table.handouts.page import GMTableHandoutsPage
 from modules.scenarios.gm_table.scenario_board import ScenarioBoardPanel, ScenarioBundle
 from modules.scenarios.gm_table.container_window import GMTableContainerPage
+from modules.scenarios.gm_table.layout.window_spacing import (
+    TOOLBAR_CORNER_RADIUS,
+    WINDOW_EDGE_PADDING,
+)
 from modules.scenarios.gm_table.pages import (
     GMTableAttachmentGallery,
     GMTableHostedPage,
@@ -299,7 +303,13 @@ class GMTableView(ctk.CTkFrame):
             on_reveal_requested=self._reveal_panel,
             on_fixed_overlay_add_requested=self._show_fixed_overlay_add_menu,
         )
-        self.workspace.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 18))
+        self.workspace.grid(
+            row=1,
+            column=0,
+            sticky="nsew",
+            padx=WINDOW_EDGE_PADDING,
+            pady=WINDOW_EDGE_PADDING,
+        )
 
         self.after_idle(self._restore_or_seed_layout)
 
@@ -315,11 +325,17 @@ class GMTableView(ctk.CTkFrame):
         bar = ctk.CTkFrame(
             self,
             fg_color=TABLE_PALETTE["table_alt"],
-            corner_radius=26,
+            corner_radius=TOOLBAR_CORNER_RADIUS,
             border_width=1,
             border_color=TABLE_PALETTE["table_line"],
         )
-        bar.grid(row=0, column=0, sticky="ew", padx=18, pady=10)
+        bar.grid(
+            row=0,
+            column=0,
+            sticky="ew",
+            padx=WINDOW_EDGE_PADDING,
+            pady=WINDOW_EDGE_PADDING,
+        )
         bar.grid_columnconfigure(0, weight=1)
 
         title_frame = ctk.CTkFrame(bar, fg_color="transparent")
