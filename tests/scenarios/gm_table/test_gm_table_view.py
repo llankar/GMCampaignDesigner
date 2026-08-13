@@ -6,8 +6,22 @@ from types import SimpleNamespace
 
 import modules.generic.entity_detail_factory as entity_detail_factory
 import modules.scenarios.gm_table_view as gm_table_view_module
+from modules.scenarios.gm_table.layout.window_spacing import (
+    TOOLBAR_CORNER_RADIUS,
+    WINDOW_EDGE_PADDING,
+    WORKSPACE_CORNER_RADIUS,
+    WORKSPACE_SECTION_GAP,
+)
 from modules.scenarios.gm_table.workspace import resolve_default_panel_size
 from modules.scenarios.gm_table_view import GMTableView, MAXIMIZED_OPEN_PANEL_KINDS
+
+
+def test_detached_table_content_uses_the_full_window_area() -> None:
+    """The toolbar and desk should not reserve unused outer window gutters."""
+    assert WINDOW_EDGE_PADDING == 0
+    assert TOOLBAR_CORNER_RADIUS == 0
+    assert WORKSPACE_SECTION_GAP == 0
+    assert WORKSPACE_CORNER_RADIUS == 0
 
 
 def test_resolve_default_panel_size_prefers_large_scenario_panels() -> None:
