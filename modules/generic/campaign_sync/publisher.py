@@ -212,6 +212,7 @@ class CampaignPublisher:
         description: str = "",
         change_summary: Optional[str] = None,
         progress_callback=None,
+        force_full_checkpoint: bool = False,
     ) -> CampaignPublishResult:
         root = Path(campaign_root).resolve()
         local = CampaignSyncMetadataStore(root).read()
@@ -252,7 +253,12 @@ class CampaignPublisher:
             except (KeyError, TypeError, ValueError):
                 baseline_inventory = ()
             current_inventory = build_inventory(root, database, database_snapshot_path=database_snapshot)
-            is_checkpoint = revision == 1 or revision % self.checkpoint_interval == 0 or not baseline_inventory
+            is_checkpoint = (
+                force_full_checkpoint
+                or revision == 1
+                or revision % self.checkpoint_interval == 0
+                or not baseline_inventory
+            )
             snapshot_mode = "full_campaign" if is_checkpoint else "campaign_delta"
             base_fingerprint = state.get("baseline_fingerprint") if snapshot_mode == "campaign_delta" else None
             metadata = CampaignSyncMetadata(

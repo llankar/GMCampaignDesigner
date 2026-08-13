@@ -56,6 +56,9 @@ class DurableOutbox:
                     next_attempt_at=previous.next_attempt_at,
                     failure_category=previous.failure_category,
                     failure_message=previous.failure_message,
+                    force_full_checkpoint=(
+                        previous.force_full_checkpoint or entry.force_full_checkpoint
+                    ),
                 )
             self._entries[entry.campaign_id] = entry
             self._persist()

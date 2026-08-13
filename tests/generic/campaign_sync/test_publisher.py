@@ -21,6 +21,7 @@ from modules.generic.campaign_sync.publisher import (
     PublishOutcome,
     StaleParentError,
 )
+from modules.generic.cross_campaign_asset_service import install_full_campaign_bundle
 
 
 class MockGallery:
@@ -91,6 +92,51 @@ def test_successful_sequential_publication(campaign, tmp_path):
     assert first.outcome is PublishOutcome.PUBLISHED and first.revision == 1
     assert second.outcome is PublishOutcome.PUBLISHED and second.revision == 2
     assert second.campaign_id == identity.campaign_id
+    with zipfile.ZipFile(io.BytesIO(second.release.archive_bytes)) as archive:
+        assert json.loads(archive.read("manifest.json"))["sync"]["snapshot_mode"] == "campaign_delta"
+
+
+def test_scheduled_checkpoint_is_full(campaign, tmp_path):
+    root, database = campaign
+    gallery = MockGallery()
+    publisher = _publisher(tmp_path, gallery, checkpoint_interval=2)
+    publisher.enable(root, database_path=database)
+    publisher.publish(root, database_path=database)
+
+    result = publisher.publish(root, database_path=database)
+
+    with zipfile.ZipFile(io.BytesIO(result.release.archive_bytes)) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["bundle_mode"] == "full_campaign"
+    assert manifest["sync"]["snapshot_mode"] == "full_campaign"
+
+
+def test_forced_checkpoint_at_incremental_revision_is_standalone(campaign, tmp_path):
+    root, database = campaign
+    (root / "gm_layouts.json").write_text('{"layout": "standalone"}', encoding="utf-8")
+    gallery = MockGallery()
+    publisher = _publisher(tmp_path, gallery, checkpoint_interval=10)
+    publisher.enable(root, database_path=database)
+    publisher.publish(root, database_path=database)
+
+    result = publisher.publish(
+        root, database_path=database, force_full_checkpoint=True
+    )
+
+    archive_path = tmp_path / "forced.zip"
+    archive_path.write_bytes(result.release.archive_bytes)
+    with zipfile.ZipFile(archive_path) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        names = set(archive.namelist())
+    assert manifest["bundle_mode"] == "full_campaign"
+    assert manifest["sync"]["snapshot_mode"] == "full_campaign"
+    assert manifest["database"]["relative_path"] in names
+    extra = next(item for item in manifest["extra_files"] if item["relative_path"] == "gm_layouts.json")
+    assert extra["bundle_path"] in names
+
+    installed = install_full_campaign_bundle(archive_path, tmp_path / "installed")
+    assert installed.db_path.is_file()
+    assert (installed.root / "gm_layouts.json").read_text(encoding="utf-8") == '{"layout": "standalone"}'
 
 
 def test_release_digest_authenticates_archive_and_bundle_retains_uuid(campaign, tmp_path):

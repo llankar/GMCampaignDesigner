@@ -215,7 +215,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         self.reload_btn.grid(row=0, column=4, padx=6, pady=6, sticky="ew")
         self.publish_btn = ctk.CTkButton(
             button_row,
-            text="Publish to GitHub…",
+            text="Publish selected assets to GitHub…",
             command=self.publish_selected_to_github,
         )
         self.publish_btn.grid(row=0, column=5, padx=6, pady=6, sticky="ew")
@@ -243,7 +243,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
 
         sync_row = ctk.CTkFrame(self)
         sync_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
-        for column_index in range(4):
+        for column_index in range(5):
             sync_row.grid_columnconfigure(column_index, weight=1)
         ctk.CTkButton(sync_row, text="Enable synchronization", command=self.enable_campaign_sync).grid(
             row=0, column=0, padx=6, pady=6, sticky="ew"
@@ -251,11 +251,17 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
         ctk.CTkButton(sync_row, text="Publish campaign update", command=self.publish_campaign_update).grid(
             row=0, column=1, padx=6, pady=6, sticky="ew"
         )
+        self.publish_full_campaign_btn = ctk.CTkButton(
+            sync_row,
+            text="Publish full campaign to GitHub…",
+            command=self.publish_full_campaign_to_github,
+        )
+        self.publish_full_campaign_btn.grid(row=0, column=2, padx=6, pady=6, sticky="ew")
         ctk.CTkButton(sync_row, text="Check for updates", command=self.check_campaign_updates).grid(
-            row=0, column=2, padx=6, pady=6, sticky="ew"
+            row=0, column=3, padx=6, pady=6, sticky="ew"
         )
         ctk.CTkButton(sync_row, text="Unlink this local copy", command=self.unlink_campaign_sync).grid(
-            row=0, column=3, padx=6, pady=6, sticky="ew"
+            row=0, column=4, padx=6, pady=6, sticky="ew"
         )
 
         self._update_publish_button_state()
@@ -771,6 +777,13 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             messagebox.showwarning("Invalid Choice", "Enter 1, 2, or 3.")
 
     def publish_campaign_update(self):
+        self._publish_campaign_update(force_full_checkpoint=False)
+
+    def publish_full_campaign_to_github(self):
+        """Publish the next synchronized revision as a standalone checkpoint."""
+        self._publish_campaign_update(force_full_checkpoint=True)
+
+    def _publish_campaign_update(self, *, force_full_checkpoint: bool):
         if not self.selected_campaign:
             messagebox.showwarning("No Source", "Select a source campaign first.")
             return
@@ -779,18 +792,28 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             return
         campaign = self.selected_campaign
         metadata = self.campaign_publisher.enable(campaign.root, database_path=campaign.db_path)
+        expected_parent = 0 if metadata.revision == 1 and not metadata.published_at else metadata.revision
+        next_revision = expected_parent + 1
+        if force_full_checkpoint and not messagebox.askyesno(
+            "Publish Full Campaign",
+            f"Publish {campaign.name} revision {next_revision} as a complete standalone "
+            "checkpoint?\n\nThe archive will contain the campaign database and files and "
+            "will not require earlier revisions to install.",
+            parent=self,
+        ):
+            return
         coordinator = getattr(self.master, "_auto_publish_coordinator", None)
         if coordinator is not None:
-            expected_parent = 0 if metadata.revision == 1 and not metadata.published_at else metadata.revision
             coordinator.mark_dirty(
                 campaign_id=metadata.campaign_id, campaign_name=campaign.name,
                 campaign_root=campaign.root, database_path=campaign.db_path,
                 expected_parent_revision=expected_parent,
+                force_full_checkpoint=force_full_checkpoint,
             )
             coordinator.publish_now(metadata.campaign_id)
             return
 
-        title = f"{campaign.name} — Revision {metadata.revision + 1}"
+        title = f"{campaign.name} — Revision {next_revision}"
         summary = f"Saved campaign changes for {campaign.name}."
 
         def worker(callback):
@@ -800,6 +823,7 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
                 title=title.strip() or campaign.name,
                 change_summary=summary.strip() or None,
                 progress_callback=callback,
+                force_full_checkpoint=force_full_checkpoint,
             )
 
         def success(result):
@@ -1359,6 +1383,10 @@ class CrossCampaignAssetLibraryWindow(ctk.CTkToplevel):
             pass
         try:
             self.publish_image_library_btn.configure(state=state)
+        except Exception:
+            pass
+        try:
+            self.publish_full_campaign_btn.configure(state=state)
         except Exception:
             pass
         try:
