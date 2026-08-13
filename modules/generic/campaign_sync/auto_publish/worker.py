@@ -45,6 +45,7 @@ class PublicationWorker:
                 job.campaign_root, database_path=job.database_path,
                 title=job.title, description=job.summary,
                 change_summary=job.summary, progress_callback=progress,
+                force_full_checkpoint=job.force_full_checkpoint,
             )
             if result.outcome is PublishOutcome.CONFLICTED:
                 emit(EventKind.CONFLICT, SyncState.CONFLICT,

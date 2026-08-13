@@ -41,7 +41,9 @@ class AutoPublishCoordinator:
         self._stopped = False
 
     def mark_dirty(self, *, campaign_id: str, campaign_name: str, campaign_root: Path,
-                   database_path: Path, expected_parent_revision: int, when: Optional[float] = None) -> None:
+                   database_path: Path, expected_parent_revision: int,
+                   force_full_checkpoint: bool = False,
+                   when: Optional[float] = None) -> None:
         """Record a *successfully saved* campaign mutation."""
         now = self.clock() if when is None else when
         with self._lock:
@@ -50,6 +52,7 @@ class AutoPublishCoordinator:
             self.outbox.upsert(OutboxEntry(
                 campaign_id, campaign_name, Path(campaign_root).resolve(), Path(database_path).resolve(),
                 expected_parent_revision, first, now,
+                force_full_checkpoint=force_full_checkpoint,
             ))
             if campaign_id in self._inflight:
                 self._dirty_during_flight.add(campaign_id)
@@ -114,13 +117,19 @@ class AutoPublishCoordinator:
     def _prepare_and_run(self, entry: OutboxEntry, force: bool) -> None:
         try:
             detected = self.detector.detect(entry.campaign_root, database_path=entry.database_path)
-            if detected.state is CampaignChangeState.CLEAN:
+            if detected.state is CampaignChangeState.CLEAN and not entry.force_full_checkpoint:
                 self.outbox.remove(entry.campaign_id)
                 self.events.put(WorkerEvent(str(uuid4()), entry.campaign_id, 1, EventKind.SUCCESS,
                                             SyncState.SYNCHRONIZED, "No changes to publish", 1.0,
                                             terminal=True))
                 return
-            if detected.state is not CampaignChangeState.LOCALLY_MODIFIED:
+            if (
+                detected.state is not CampaignChangeState.LOCALLY_MODIFIED
+                and not (
+                    entry.force_full_checkpoint
+                    and detected.state is CampaignChangeState.CLEAN
+                )
+            ):
                 raise RuntimeError(detected.error or "Campaign change state is unknown")
             revision = entry.expected_parent_revision + 1
             title = f"{entry.campaign_name} — Revision {revision}"
@@ -130,6 +139,7 @@ class AutoPublishCoordinator:
                 str(uuid4()), entry.campaign_id, entry.campaign_name, entry.campaign_root,
                 entry.database_path, entry.expected_parent_revision, entry.first_dirty_at,
                 entry.last_dirty_at, title, summary, detected.current_fingerprint,
+                entry.force_full_checkpoint,
             )
             self.worker.run(job)
         except BaseException as error:

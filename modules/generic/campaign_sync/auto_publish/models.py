@@ -44,6 +44,7 @@ class PublicationJob:
     title: str
     summary: str
     fingerprint: Optional[str] = None
+    force_full_checkpoint: bool = False
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,7 @@ class OutboxEntry:
     next_attempt_at: float = 0.0
     failure_category: Optional[str] = None
     failure_message: Optional[str] = None
+    force_full_checkpoint: bool = False
 
     def updated(self, **changes: Any) -> "OutboxEntry":
         return replace(self, **changes)
@@ -83,6 +85,7 @@ class OutboxEntry:
             next_attempt_at=max(0.0, float(value.get("next_attempt_at", 0))),
             failure_category=value.get("failure_category") or None,
             failure_message=value.get("failure_message") or None,
+            force_full_checkpoint=bool(value.get("force_full_checkpoint", False)),
         )
 
 
