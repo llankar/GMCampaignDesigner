@@ -7,6 +7,7 @@ import tkinter as tk
 from types import SimpleNamespace
 
 from modules.scenarios.gm_table.layout import fit_viewport_snap
+from modules.scenarios.gm_table.pointer_navigation import RightDragGesture
 from modules.scenarios.gm_table.workspace import (
     PANEL_GUTTER,
     PANEL_MARGIN,
@@ -1309,16 +1310,16 @@ def test_zoom_surface_updates_camera_when_pan_is_inactive() -> None:
     assert workspace._camera_zoom > 1.0
 
 
-def test_bind_surface_navigation_registers_middle_pan_on_workspace_toplevel() -> None:
-    """Middle-button pan should be scoped to this workspace via the containing toplevel."""
+def test_bind_surface_navigation_registers_pointer_pan_on_workspace_toplevel() -> None:
+    """Both navigation buttons should be scoped via the containing toplevel."""
     workspace = GMTableWorkspace.__new__(GMTableWorkspace)
     surface = _FakeWidgetNode()
     empty_state = _FakeWidgetNode(master=surface)
     toplevel = _FakeBindingTarget()
     workspace.surface = surface
     workspace._empty_state = empty_state
-    workspace._surface_pan_binding_target = None
-    workspace._surface_pan_binding_ids = {}
+    workspace._pointer_pan_binding_target = None
+    workspace._pointer_pan_binding_ids = {}
     workspace.winfo_toplevel = lambda: toplevel
 
     GMTableWorkspace._bind_surface_navigation(workspace)
@@ -1343,6 +1344,9 @@ def test_bind_surface_navigation_registers_middle_pan_on_workspace_toplevel() ->
         "<ButtonPress-2>",
         "<B2-Motion>",
         "<ButtonRelease-2>",
+        "<ButtonPress-3>",
+        "<B3-Motion>",
+        "<ButtonRelease-3>",
     }
 
     GMTableWorkspace._handle_workspace_destroy(
@@ -1353,7 +1357,104 @@ def test_bind_surface_navigation_registers_middle_pan_on_workspace_toplevel() ->
         "<ButtonPress-2>",
         "<B2-Motion>",
         "<ButtonRelease-2>",
+        "<ButtonPress-3>",
+        "<B3-Motion>",
+        "<ButtonRelease-3>",
     }
+
+
+def test_right_drag_gesture_requires_eight_pixels_of_travel() -> None:
+    """Small pointer jitter should not turn a right click into navigation."""
+    gesture = RightDragGesture()
+    gesture.begin(100, 100)
+
+    assert gesture.update(105, 105) is False
+    assert gesture.update(108, 100) is True
+    assert gesture.finish() is True
+
+
+def test_stationary_right_click_is_not_consumed() -> None:
+    """A right press/release without travel should remain available to context menus."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace.surface = _FakeWidgetNode()
+    workspace._empty_state = _FakeWidgetNode(master=workspace.surface)
+    workspace._camera_x = 40.0
+    workspace._camera_y = 24.0
+    workspace._pan_origin = None
+    workspace._panels = {}
+    workspace._right_drag_gesture = RightDragGesture()
+
+    press_result = GMTableWorkspace._start_surface_pan(
+        workspace,
+        SimpleNamespace(widget=workspace.surface, num=3, x_root=120, y_root=160),
+    )
+    release_result = GMTableWorkspace._stop_surface_pan(
+        workspace, SimpleNamespace(num=3)
+    )
+
+    assert press_result is None
+    assert release_result is None
+    assert workspace._pan_origin is None
+
+
+def test_right_drag_moves_camera_only_after_threshold_and_consumes_release() -> None:
+    """Surface-style right drag should pan only once its intentional movement is clear."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    _prepare_workspace(workspace, camera_x=100.0, camera_y=80.0)
+    workspace.surface = _FakeWidgetNode()
+    workspace.surface.winfo_width = lambda: 1400
+    workspace.surface.winfo_height = lambda: 900
+    workspace._empty_state = _FakeWidgetNode(master=workspace.surface)
+    workspace._panels = {}
+    workspace._pan_origin = None
+    workspace._right_drag_gesture = RightDragGesture()
+    workspace.clear_snap_preview = lambda: None
+    workspace.clamp_panels = lambda: None
+
+    GMTableWorkspace._start_surface_pan(
+        workspace,
+        SimpleNamespace(widget=workspace.surface, num=3, x_root=200, y_root=200),
+    )
+    small_motion = GMTableWorkspace._pan_surface_to(
+        workspace, SimpleNamespace(x_root=207, y_root=200)
+    )
+    camera_after_small_motion = (workspace._camera_x, workspace._camera_y)
+    drag_motion = GMTableWorkspace._pan_surface_to(
+        workspace, SimpleNamespace(x_root=212, y_root=200)
+    )
+    release = GMTableWorkspace._stop_surface_pan(workspace, SimpleNamespace(num=3))
+
+    assert small_motion is None
+    assert camera_after_small_motion == (100.0, 80.0)
+    assert workspace._camera_x == 88.0
+    assert workspace._camera_y == 80.0
+    assert drag_motion == "break"
+    assert release == "break"
+
+
+def test_navigation_buttons_do_not_pan_inside_map_tool() -> None:
+    """MapTool's interactive content should own both middle and right drags."""
+    workspace = GMTableWorkspace.__new__(GMTableWorkspace)
+    workspace.surface = _FakeWidgetNode()
+    nested = _FakeWidgetNode(master=workspace.surface)
+    workspace._empty_state = _FakeWidgetNode(master=workspace.surface)
+    workspace._pan_origin = None
+    workspace._right_drag_gesture = RightDragGesture()
+    workspace._drag_controller = SimpleNamespace(
+        allows_middle_drag_start=lambda _event: False
+    )
+
+    middle_result = GMTableWorkspace._start_surface_pan(
+        workspace, SimpleNamespace(widget=nested, num=2, x_root=30, y_root=40)
+    )
+    right_result = GMTableWorkspace._start_surface_pan(
+        workspace, SimpleNamespace(widget=nested, num=3, x_root=30, y_root=40)
+    )
+
+    assert middle_result == "break"
+    assert right_result is None
+    assert workspace._pan_origin is None
+    assert workspace._right_drag_gesture.press_position is None
 
 
 def test_zoom_changes_projection_but_keeps_widget_size_constant() -> None:
