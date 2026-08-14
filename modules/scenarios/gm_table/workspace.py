@@ -12,6 +12,7 @@ from modules.helpers import theme_manager
 from modules.helpers.logging_helper import log_warning
 from modules.scenarios.gm_table.desk_texture import InfiniteDeskTexture
 from modules.scenarios.gm_table.drag_controller import GMTableDragController
+from modules.scenarios.gm_table.pointer_navigation import RightDragGesture
 from modules.scenarios.gm_table.window_hit_testing import point_inside_map_tool
 from modules.scenarios.gm_table.layout import fit_content_minimum, fit_viewport_snap
 from modules.scenarios.gm_table.layout.window_spacing import (
@@ -1415,8 +1416,9 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._bookmarks: list[dict[str, object]] = []
         self._pan_origin: tuple[int, int, float, float] | None = None
         self._minimap_projection: dict[str, float] | None = None
-        self._surface_pan_binding_target = None
-        self._surface_pan_binding_ids: dict[str, str] = {}
+        self._pointer_pan_binding_target = None
+        self._pointer_pan_binding_ids: dict[str, str] = {}
+        self._right_drag_gesture = RightDragGesture()
         self._desk_annotation_tool: str | None = None
         self._desk_annotations: list[dict[str, object]] = []
         self._desk_draw_points: list[tuple[float, float]] = []
@@ -1815,7 +1817,7 @@ class GMTableWorkspace(ctk.CTkFrame):
             widget.bind("<Control-MouseWheel>", self._zoom_surface, add="+")
             widget.bind("<Button-1>", lambda _event: self.surface.focus_set(), add="+")
             widget.bind("<Home>", self._handle_home_shortcut, add="+")
-        self._bind_workspace_middle_pan()
+        self._bind_workspace_pointer_pan()
         try:
             self.surface.configure(cursor="fleur")
         except Exception:
@@ -1990,9 +1992,9 @@ class GMTableWorkspace(ctk.CTkFrame):
                 )
         canvas.tag_raise("desk_annotation")
 
-    def _bind_workspace_middle_pan(self) -> None:
-        """Bind middle-button camera pan to the containing window."""
-        self._unbind_workspace_middle_pan()
+    def _bind_workspace_pointer_pan(self) -> None:
+        """Bind desktop and Surface camera pan gestures to the containing window."""
+        self._unbind_workspace_pointer_pan()
         try:
             target = self.winfo_toplevel()
         except Exception:
@@ -2004,6 +2006,9 @@ class GMTableWorkspace(ctk.CTkFrame):
             ("<ButtonPress-2>", self._start_surface_pan),
             ("<B2-Motion>", self._pan_surface_to),
             ("<ButtonRelease-2>", self._stop_surface_pan),
+            ("<ButtonPress-3>", self._start_surface_pan),
+            ("<B3-Motion>", self._pan_surface_to),
+            ("<ButtonRelease-3>", self._stop_surface_pan),
         ):
             try:
                 binding_id = target.bind(sequence, handler, add="+")
@@ -2011,8 +2016,8 @@ class GMTableWorkspace(ctk.CTkFrame):
                 continue
             if binding_id:
                 binding_ids[sequence] = binding_id
-        self._surface_pan_binding_target = target
-        self._surface_pan_binding_ids = binding_ids
+        self._pointer_pan_binding_target = target
+        self._pointer_pan_binding_ids = binding_ids
 
     def _pointer_is_inside_map_tool(self, screen_x: int, screen_y: int) -> bool:
         """Return whether the screen pointer is inside an open MapTool panel."""
@@ -2029,24 +2034,24 @@ class GMTableWorkspace(ctk.CTkFrame):
             map_tool_window=map_tool_window,
         )
 
-    def _unbind_workspace_middle_pan(self) -> None:
-        """Remove any middle-button pan bindings registered on the window."""
-        target = getattr(self, "_surface_pan_binding_target", None)
-        binding_ids = dict(getattr(self, "_surface_pan_binding_ids", {}) or {})
+    def _unbind_workspace_pointer_pan(self) -> None:
+        """Remove any pointer pan bindings registered on the window."""
+        target = getattr(self, "_pointer_pan_binding_target", None)
+        binding_ids = dict(getattr(self, "_pointer_pan_binding_ids", {}) or {})
         for sequence, binding_id in binding_ids.items():
             try:
                 target.unbind(sequence, binding_id)
             except Exception:
                 pass
-        self._surface_pan_binding_target = None
-        self._surface_pan_binding_ids = {}
+        self._pointer_pan_binding_target = None
+        self._pointer_pan_binding_ids = {}
 
     def _handle_workspace_destroy(self, event=None) -> None:
         """Release toplevel pan bindings when the workspace is destroyed."""
         if event is not None and getattr(event, "widget", None) is not self:
             return
         self._stop_surface_pan()
-        self._unbind_workspace_middle_pan()
+        self._unbind_workspace_pointer_pan()
 
     def _widget_is_in_surface_subtree(self, widget) -> bool:
         """Return whether a widget belongs to this workspace surface."""
@@ -2277,20 +2282,32 @@ class GMTableWorkspace(ctk.CTkFrame):
     def _start_surface_pan(self, event) -> None:
         """Start panning the infinite desk."""
         widget = getattr(event, "widget", None)
-        is_middle_button = int(getattr(event, "num", 0) or 0) == 2
+        button = int(getattr(event, "num", 0) or 0)
+        is_navigation_button = button in {2, 3}
+        right_drag = getattr(self, "_right_drag_gesture", None)
+        if button == 3 and right_drag is not None:
+            # A fresh press must never inherit state from a release that the
+            # window did not receive (for example after focus moved away).
+            right_drag.finish()
         if widget is not self.surface and widget is not self._empty_state:
-            if not is_middle_button or not self._widget_is_in_surface_subtree(widget):
+            if not is_navigation_button or not self._widget_is_in_surface_subtree(widget):
                 return
-        if is_middle_button:
+        if is_navigation_button:
             drag_controller = getattr(self, "_drag_controller", None)
-            allows_middle_drag = (
+            allows_navigation_drag = (
                 drag_controller.allows_middle_drag_start(event)
                 if drag_controller is not None
                 else True
             )
-            if not allows_middle_drag:
+            if not allows_navigation_drag:
                 self._pan_origin = None
-                return "break"
+                return "break" if button == 2 else None
+            if button == 3:
+                if right_drag is None:
+                    right_drag = self._right_drag_gesture = RightDragGesture()
+                right_drag.begin(event.x_root, event.y_root)
+                self.surface.focus_set()
+                return None
             self._pin_snapped_panels_to_world()
         self.surface.focus_set()
         self._pan_origin = (
@@ -2302,6 +2319,19 @@ class GMTableWorkspace(ctk.CTkFrame):
 
     def _pan_surface_to(self, event) -> None:
         """Pan the camera with the active drag gesture."""
+        gesture = getattr(self, "_right_drag_gesture", None)
+        if gesture is not None and gesture.press_position is not None:
+            if not gesture.update(event.x_root, event.y_root):
+                return None
+            if self._pan_origin is None:
+                root_x, root_y = gesture.press_position
+                self._pin_snapped_panels_to_world()
+                self._pan_origin = (
+                    root_x,
+                    root_y,
+                    _coerce_float(getattr(self, "_camera_x", 0.0)),
+                    _coerce_float(getattr(self, "_camera_y", 0.0)),
+                )
         if self._pan_origin is None:
             return
         root_x, root_y, start_x, start_y = self._pan_origin
@@ -2310,10 +2340,19 @@ class GMTableWorkspace(ctk.CTkFrame):
             x=start_x - ((event.x_root - root_x) / zoom),
             y=start_y - ((event.y_root - root_y) / zoom),
         )
+        if gesture is not None and gesture.dragging:
+            return "break"
 
-    def _stop_surface_pan(self, _event=None) -> None:
+    def _stop_surface_pan(self, event=None) -> None:
         """Finish a camera pan gesture."""
         self._pan_origin = None
+        gesture = getattr(self, "_right_drag_gesture", None)
+        if gesture is not None and (
+            gesture.press_position is not None or gesture.dragging
+        ):
+            was_right_drag = gesture.finish()
+            if was_right_drag and int(getattr(event, "num", 3) or 3) == 3:
+                return "break"
 
     def _zoom_surface(self, event):
         """Zoom the desk around the cursor position."""
@@ -2649,7 +2688,7 @@ class GMTableWorkspace(ctk.CTkFrame):
         self._disposed = True
         self._layout_changed_callback = None
         self._stop_surface_pan()
-        self._unbind_workspace_middle_pan()
+        self._unbind_workspace_pointer_pan()
         self.clear_snap_preview()
         if self._save_job is not None:
             try:
