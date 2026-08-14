@@ -99,6 +99,12 @@ DEFAULT_PANEL_SIZES = {
     "sticky_note": (360, 300),
 }
 
+
+def resolve_panel_title_anchor(panel_kind: str) -> str:
+    """Return the header title alignment for a GM Table panel kind."""
+    return "e" if panel_kind == "scenario_board" else "w"
+
+
 PANEL_MARGIN = 12
 PANEL_GUTTER = 12
 PANEL_SNAP_THRESHOLD = 48
@@ -872,7 +878,7 @@ class GMTablePanel(ctk.CTkFrame):
             text=self.definition.title,
             text_color=skin.title_color,
             font=ctk.CTkFont(size=13, weight="bold"),
-            anchor="w",
+            anchor=resolve_panel_title_anchor(self.definition.kind),
         )
         padx_title = (12, 4) if not self._show_eyebrow else (0, 4)
         self.title_label.pack(side="left", padx=padx_title, pady=5, fill="x", expand=True)

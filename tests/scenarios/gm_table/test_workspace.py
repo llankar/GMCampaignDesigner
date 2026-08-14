@@ -20,7 +20,14 @@ from modules.scenarios.gm_table.workspace import (
     _resize_geometry,
     _resolve_snap_mode,
     _snap_geometry,
+    resolve_panel_title_anchor,
 )
+
+
+def test_scenario_board_header_title_is_right_aligned() -> None:
+    """Scenario titles should sit on the right without changing other panels."""
+    assert resolve_panel_title_anchor("scenario_board") == "e"
+    assert resolve_panel_title_anchor("scene_flow") == "w"
 
 
 class _FakePanel:
