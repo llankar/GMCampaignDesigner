@@ -221,23 +221,34 @@ class ScenarioBoardPanel(ctk.CTkFrame):
         start = 0
         for (title, value, accent), span in zip(directives, spans):
             text = f"{title}  {value or '—'}"
-            ctk.CTkLabel(
+            cell = ctk.CTkFrame(
                 parent,
-                text=text,
-                anchor="w",
-                justify="left",
-                wraplength=380,
                 fg_color=self._palette.surface,
-                text_color=self._palette.section_accents[accent],
-                font=ctk.CTkFont(size=10, weight="bold"),
-                height=34,
-            ).grid(
+                corner_radius=0,
+            )
+            cell.grid(
                 row=row,
                 column=start,
                 columnspan=span,
                 sticky="nsew",
                 pady=(0, 8),
                 padx=(0, 2),
+            )
+            directive = ctk.CTkLabel(
+                cell,
+                text=text,
+                anchor="w",
+                justify="left",
+                fg_color=self._palette.surface,
+                text_color=self._palette.section_accents[accent],
+                font=ctk.CTkFont(size=14, weight="bold"),
+                height=34,
+            )
+            directive.pack(fill="both", expand=True, padx=8, pady=4)
+            bind_full_width_wrap(
+                directive,
+                padding=16,
+                initial_wraplength=420,
             )
             start += span
         return row + 1

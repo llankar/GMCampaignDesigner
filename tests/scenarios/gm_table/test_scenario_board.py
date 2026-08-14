@@ -1411,6 +1411,67 @@ def test_scenario_board_reference_content_uses_regular_weight(monkeypatch) -> No
     assert villain.options["text_color"] == "#FF5C5C"
 
 
+def test_scenario_board_directives_fill_their_cells_with_readable_text(
+    monkeypatch,
+) -> None:
+    """Secret and pressure copy should wrap to the complete half-width cell."""
+    from modules.scenarios.gm_table.scenario_board import page
+
+    widgets = []
+    wrap_calls = []
+
+    class _Widget:
+        def __init__(self, master=None, **kwargs):
+            self.master = master
+            self.options = kwargs
+            self.pack_options = None
+            widgets.append(self)
+
+        def grid(self, **_kwargs):
+            return None
+
+        def pack(self, **kwargs):
+            self.pack_options = kwargs
+
+    monkeypatch.setattr(page.ctk, "CTkFrame", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkLabel", _Widget)
+    monkeypatch.setattr(page.ctk, "CTkFont", lambda **kwargs: kwargs)
+    monkeypatch.setattr(
+        page,
+        "bind_full_width_wrap",
+        lambda label, **kwargs: wrap_calls.append((label, kwargs)),
+    )
+
+    panel = object.__new__(page.ScenarioBoardPanel)
+    panel._data = build_scenario_board_data(
+        {"Secrets": "The patron is lying.", "Stakes": "The city will fall."}
+    )
+    panel._palette = SimpleNamespace(
+        surface="#111111",
+        section_accents={"secret": "#22AA66", "pressure": "#CC5533"},
+    )
+
+    panel._add_directives(_Widget(), 0)
+
+    labels = [widget for widget in widgets if widget.options.get("anchor") == "w"]
+    assert len(labels) == 2
+    assert all(label.options["font"] == {"size": 14, "weight": "bold"} for label in labels)
+    assert all(
+        label.pack_options == {
+            "fill": "both",
+            "expand": True,
+            "padx": 8,
+            "pady": 4,
+        }
+        for label in labels
+    )
+    assert [call[0] for call in wrap_calls] == labels
+    assert all(
+        options == {"padding": 16, "initial_wraplength": 420}
+        for _label, options in wrap_calls
+    )
+
+
 def test_full_width_wrap_uses_parent_width_without_configure_feedback() -> None:
     """Wrapping must not bind to the label and continuously resize itself."""
     from modules.scenarios.gm_table.scenario_board.entity_links import (
