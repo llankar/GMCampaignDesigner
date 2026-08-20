@@ -18,6 +18,12 @@ def _fit_frame(image: Image.Image, max_size: int) -> Image.Image:
     return frame
 
 
+def _decoded_frame_to_image(frame: object) -> Image.Image:
+    """Build a Pillow image after asking PyAV to retain the alpha channel."""
+    pixels = frame.to_ndarray(format="rgba")
+    return Image.fromarray(pixels, "RGBA")
+
+
 class VideoDecoder:
     """Own one PyAV container and provide frames, looping at end of stream."""
 
@@ -54,7 +60,7 @@ class VideoDecoder:
                     raise MediaDecodeError(f"Unable to loop video: {exc}") from exc
             except Exception as exc:
                 raise MediaDecodeError(f"Unable to decode video frame: {exc}") from exc
-            return _fit_frame(frame.to_image(), self.max_size)
+            return _fit_frame(_decoded_frame_to_image(frame), self.max_size)
 
     def close(self) -> None:
         with getattr(self, "_lock", threading.Lock()):
