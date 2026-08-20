@@ -13,6 +13,11 @@ from modules.maps.utils.text_items import TextFontCache
 
 log_module_import(__name__)
 
+
+def _resize_token_image(image: Image.Image, size: tuple[int, int]) -> Image.Image:
+    """Resize a token without changing its Pillow color mode."""
+    return image.resize(size, resample=Image.Resampling.LANCZOS)
+
 def open_fullscreen(self):
     """Open fullscreen."""
     monitors = get_monitors()
@@ -124,7 +129,7 @@ def _update_fullscreen_map(self):
                 nw = nh = max(1, int(size_px * self.zoom))
                 if nw <= 0 or nh <= 0:
                     continue
-                img_r = source.resize((nw, nh), resample=Image.LANCZOS)
+                img_r = _resize_token_image(source, (nw, nh))
             else:
                 if not pil:
                     continue
@@ -137,7 +142,7 @@ def _update_fullscreen_map(self):
                 if nw <= 0 or nh <= 0:
                     continue
 
-                img_r = pil.resize((nw, nh), resample=Image.LANCZOS)
+                img_r = _resize_token_image(pil, (nw, nh))
             fsimg = ImageTk.PhotoImage(img_r)
             item['fs_tk'] = fsimg # Store the PhotoImage to prevent garbage collection
 
@@ -355,4 +360,3 @@ def _update_fullscreen_map(self):
             self._update_web_display_map()
         except Exception:
             pass
-

@@ -2,7 +2,6 @@
 
 import threading
 import time
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -20,8 +19,14 @@ from modules.maps.media import (
 )
 from modules.maps.media import animation
 from modules.maps.media import replacement
+from modules.maps.controllers.display_map_controller import DisplayMapController
+from modules.maps.controllers import display_map_controller
+from modules.maps.views.fullscreen_view import _resize_token_image
 from modules.maps.views.web_display_view import _describe_remote_tokens
 from modules.maps.world_map_view import WorldMapPanel
+
+
+PILLOW_AVAILABLE = hasattr(Image, "new") and hasattr(Image, "frombytes")
 
 
 class FakeWidget:
@@ -83,6 +88,7 @@ class FakePlane(bytearray):
     pass
 
 
+@pytest.mark.skipif(not PILLOW_AVAILABLE, reason="Pillow is not installed")
 def test_video_decoder_requests_rgba_and_preserves_alpha_with_padded_rows():
     decoded_frame = FakeDecodedFrame()
     decoder = VideoDecoder.__new__(VideoDecoder)
@@ -98,6 +104,37 @@ def test_video_decoder_requests_rgba_and_preserves_alpha_with_padded_rows():
     assert image.size == (8, 4)
     assert image.getpixel((0, 0))[3] == 0
     assert image.getpixel((4, 3)) == (0, 255, 0, 255)
+
+
+@pytest.mark.skipif(not PILLOW_AVAILABLE, reason="Pillow is not installed")
+def test_display_token_frame_retains_non_opaque_alpha(monkeypatch):
+    captured = []
+    monkeypatch.setattr(display_map_controller.ImageTk, "PhotoImage", lambda image: captured.append(image) or image)
+    frame = Image.new("RGBA", (4, 4), (255, 0, 0, 80))
+    token = {"size": 4, "canvas_ids": ()}
+    owner = DisplayMapController.__new__(DisplayMapController)
+    owner.tokens = [token]
+    owner.token_size = 4
+    owner.zoom = 1
+    owner._fast_resample = Image.Resampling.NEAREST
+    owner.canvas = SimpleNamespace(itemconfig=lambda *_args, **_kwargs: None)
+    owner.fs_canvas = None
+
+    DisplayMapController._display_token_frame(owner, token, frame)
+
+    assert token["source_image"].getchannel("A").getextrema()[0] < 255
+    assert token["pil_image"].getchannel("A").getextrema()[0] < 255
+    assert captured[0].mode == "RGBA"
+
+
+@pytest.mark.skipif(not PILLOW_AVAILABLE, reason="Pillow is not installed")
+def test_fullscreen_token_resize_does_not_convert_rgba_to_rgb():
+    frame = Image.new("RGBA", (4, 4), (0, 255, 0, 64))
+
+    resized = _resize_token_image(frame, (9, 9))
+
+    assert resized.mode == "RGBA"
+    assert resized.getchannel("A").getextrema()[0] < 255
 
 
 def test_video_decoder_wraps_frame_conversion_errors():
