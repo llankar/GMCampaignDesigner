@@ -7,8 +7,17 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from modules.maps.media import IMAGE, VIDEO, MediaDecodeError, TokenAnimationManager, detect_media_type, load_thumbnail
+from modules.maps.media import (
+    IMAGE,
+    VIDEO,
+    MediaDecodeError,
+    TokenAnimationManager,
+    detect_media_type,
+    load_thumbnail,
+    replace_token_media,
+)
 from modules.maps.media import animation
+from modules.maps.media import replacement
 from modules.maps.views.web_display_view import _describe_remote_tokens
 from modules.maps.world_map_view import WorldMapPanel
 
@@ -162,3 +171,146 @@ def test_world_map_persistence_reload_keeps_only_media_metadata():
     restored = WorldMapPanel._deserialize_tokens(owner, entry)[0]
     assert restored["media_type"] == VIDEO
     assert restored["size"] == 96
+
+
+class ReplacementManager:
+    def __init__(self, *, register_result=True):
+        self.registered = []
+        self.unregistered = []
+        self.register_result = register_result
+
+    def register(self, token, path):
+        self.registered.append((token, path))
+        return self.register_result
+
+    def unregister(self, token):
+        self.unregistered.append(token)
+
+
+class ReplacementImage:
+    def __init__(self, size=(20, 30)):
+        self.size = size
+
+    def resize(self, size, _resampling):
+        return ReplacementImage(size)
+
+
+@pytest.mark.parametrize(
+    ("old_type", "new_suffix", "expected_type", "unregisters", "registers"),
+    [
+        (IMAGE, ".png", IMAGE, 0, 0),
+        (IMAGE, ".mp4", VIDEO, 0, 1),
+        (VIDEO, ".png", IMAGE, 1, 0),
+        (VIDEO, ".mp4", VIDEO, 1, 1),
+    ],
+)
+def test_replace_token_media_all_transitions_preserve_state(
+    tmp_path, monkeypatch, old_type, new_suffix, expected_type, unregisters, registers
+):
+    campaign = tmp_path / "campaign"
+    asset = campaign / "tokens" / f"replacement{new_suffix}"
+    asset.parent.mkdir(parents=True)
+    asset.write_bytes(b"media")
+    decoded = ReplacementImage()
+    monkeypatch.setattr(replacement.ConfigHelper, "get_campaign_dir", lambda: str(campaign))
+    monkeypatch.setattr(replacement, "load_thumbnail", lambda *_args: decoded)
+    manager = ReplacementManager()
+    persisted = []
+    refreshed = []
+    token = {
+        "type": "token", "image_path": "tokens/original.mp4", "media_type": old_type,
+        "position": (12, 34), "size": 72, "border_color": "blue", "hp": 8,
+        "player_visible": False, "facing_angle": 135, "entity_id": "Hero",
+        "canvas_ids": (11, 12), "source_image": object(), "pil_image": object(),
+    }
+    controller = SimpleNamespace(
+        token_size=48, tokens=[token], _token_animation_manager=manager,
+        _ensure_token_animation_manager=lambda: manager,
+        _display_token_frame=lambda item, frame: refreshed.append((item, frame)),
+        _persist_tokens=lambda: persisted.append(True), _web_server_thread=None,
+    )
+    retained = {key: token[key] for key in (
+        "position", "size", "border_color", "hp", "player_visible", "facing_angle",
+        "entity_id", "canvas_ids",
+    )}
+
+    result = replace_token_media(controller, token, str(asset))
+
+    assert result.success
+    assert token["image_path"] == f"tokens/replacement{new_suffix}"
+    assert token["media_type"] == expected_type
+    assert token["source_image"] is decoded
+    assert token["pil_image"].size == (72, 72)
+    assert {key: token[key] for key in retained} == retained
+    assert len(manager.unregistered) == unregisters
+    assert len(manager.registered) == registers
+    assert refreshed == [(token, decoded)]
+    assert persisted == [True]
+
+
+def test_replace_token_media_decode_failure_rolls_back_media_and_animation(tmp_path, monkeypatch):
+    selected = tmp_path / "broken.png"
+    selected.write_bytes(b"broken")
+    monkeypatch.setattr(
+        replacement, "load_thumbnail", lambda *_args: (_ for _ in ()).throw(MediaDecodeError("broken"))
+    )
+    manager = ReplacementManager()
+    old_source, old_pil = object(), object()
+    token = {
+        "type": "token", "image_path": "tokens/original.mp4", "media_type": VIDEO,
+        "size": 48, "source_image": old_source, "pil_image": old_pil,
+    }
+    controller = SimpleNamespace(token_size=48, _token_animation_manager=manager)
+
+    result = replace_token_media(controller, token, str(selected))
+
+    assert not result.success
+    assert token["image_path"] == "tokens/original.mp4"
+    assert token["media_type"] == VIDEO
+    assert token["source_image"] is old_source and token["pil_image"] is old_pil
+    assert manager.unregistered == [] and manager.registered == []
+
+
+def test_replace_token_media_registration_failure_restores_old_video(tmp_path, monkeypatch):
+    campaign = tmp_path / "campaign"
+    selected = campaign / "tokens" / "new.mp4"
+    old_path = campaign / "tokens" / "old.mp4"
+    selected.parent.mkdir(parents=True)
+    selected.write_bytes(b"new")
+    old_path.write_bytes(b"old")
+    monkeypatch.setattr(replacement.ConfigHelper, "get_campaign_dir", lambda: str(campaign))
+    monkeypatch.setattr(replacement, "load_thumbnail", lambda *_args: ReplacementImage())
+    manager = ReplacementManager(register_result=False)
+    old_source, old_pil = object(), object()
+    token = {
+        "type": "token", "image_path": "tokens/old.mp4", "media_type": VIDEO,
+        "size": 48, "source_image": old_source, "pil_image": old_pil,
+    }
+    controller = SimpleNamespace(
+        token_size=48, _token_animation_manager=manager,
+        _ensure_token_animation_manager=lambda: manager,
+    )
+
+    result = replace_token_media(controller, token, str(selected))
+
+    assert not result.success
+    assert token["image_path"] == "tokens/old.mp4"
+    assert token["media_type"] == VIDEO
+    assert token["source_image"] is old_source and token["pil_image"] is old_pil
+    assert manager.unregistered == [token, token]
+    assert manager.registered == [(token, str(selected)), (token, str(old_path))]
+
+
+def test_replace_token_media_rejects_unsupported_extension_without_decoding(tmp_path, monkeypatch):
+    selected = tmp_path / "token.svg"
+    selected.write_text("<svg/>", encoding="utf-8")
+    decoded = []
+    monkeypatch.setattr(replacement, "load_thumbnail", lambda *_args: decoded.append(True))
+    token = {"type": "token", "image_path": "old.png", "media_type": IMAGE}
+
+    result = replace_token_media(SimpleNamespace(), token, str(selected))
+
+    assert not result.success
+    assert "supported" in result.error
+    assert decoded == []
+    assert token == {"type": "token", "image_path": "old.png", "media_type": IMAGE}

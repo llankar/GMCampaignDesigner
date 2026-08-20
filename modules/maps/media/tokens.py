@@ -6,12 +6,18 @@ from .decoder import MediaDecodeError, load_thumbnail
 from .types import VIDEO, detect_media_type
 
 
-def prepare_token_media(token: dict, resolved_path: str, size: int) -> bool:
+def prepare_token_media(
+    token: dict,
+    resolved_path: str,
+    size: int,
+    *,
+    source_image: Image.Image | None = None,
+) -> bool:
     """Populate only in-memory PIL fields, returning whether media loaded."""
     media_type = detect_media_type(resolved_path, token.get("media_type"))
     token["media_type"] = media_type
     try:
-        source = load_thumbnail(resolved_path, media_type)
+        source = source_image if source_image is not None else load_thumbnail(resolved_path, media_type)
     except MediaDecodeError:
         return False
     token["source_image"] = source
