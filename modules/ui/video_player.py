@@ -23,6 +23,8 @@ from modules.helpers.logging_helper import (
 
 log_module_import(__name__)
 
+_active_player = None
+
 _RESAMPLING = getattr(Image, "Resampling", Image)
 _RESAMPLE_MODE = getattr(_RESAMPLING, "LANCZOS", Image.LANCZOS)
 
@@ -38,16 +40,17 @@ class _MonitorBounds:
 class _SecondScreenVideoPlayer:
     """Simple video player that renders frames inside a fullscreen CTk window."""
 
-    def __init__(self, video_path: str, title: str | None = None) -> None:
+    def __init__(self, video_path: str, title: str | None = None, *, loop: bool = True) -> None:
         """Initialize the _SecondScreenVideoPlayer instance."""
         if av is None:
             raise RuntimeError("PyAV is required to play video files.")
 
         self._container = self._open_container(video_path)
+        self._loop = loop
         self._stream = self._get_video_stream()
         self._frame_iterator = self._container.decode(self._stream)
         self._frame_delay = self._calculate_frame_delay()
-        self._after_id: str | None = None
+        self._after_ids: set[str] = set()
         self._stopped = False
 
         monitor = self._select_monitor()
@@ -60,13 +63,13 @@ class _SecondScreenVideoPlayer:
         self.window.protocol("WM_DELETE_WINDOW", self.close)
 
         # Kick off playback after the window has had a chance to layout.
-        self.window.after(0, self._render_next_frame)
+        self._schedule(0, self._render_next_frame)
 
     def _open_container(self, path: str):
         """Open container."""
         try:
             return av.open(path)
-        except av.AVError as exc:  # pragma: no cover - depends on runtime files
+        except Exception as exc:  # pragma: no cover - depends on runtime files
             raise RuntimeError(f"Unable to open video file: {exc}") from exc
 
     def _get_video_stream(self):
@@ -133,7 +136,7 @@ class _SecondScreenVideoPlayer:
         win.lift()
         try:
             win.attributes("-topmost", True)
-            win.after(200, lambda: win.attributes("-topmost", False))
+            self._schedule(200, lambda: win.attributes("-topmost", False), window=win)
         except Exception:  # pragma: no cover - platform dependent
             pass
         return win
@@ -145,15 +148,57 @@ class _SecondScreenVideoPlayer:
         try:
             frame = next(self._frame_iterator)
         except StopIteration:
+            if self._loop and self._restart_decoder():
+                self._schedule(0, self._render_next_frame)
+            else:
+                self.close()
+            return
+        except Exception as exc:  # Tk callbacks must not propagate decoder errors
+            self._show_playback_error(exc)
             self.close()
             return
-        except av.AVError as exc:  # pragma: no cover - depends on runtime file
-            self.close()
-            raise RuntimeError(f"Video playback error: {exc}") from exc
 
-        image = frame.to_image()
-        self._display_image(image)
-        self._after_id = self.window.after(self._frame_delay, self._render_next_frame)
+        try:
+            image = frame.to_image()
+            self._display_image(image)
+        except Exception as exc:
+            self._show_playback_error(exc)
+            self.close()
+            return
+        self._schedule(self._frame_delay, self._render_next_frame)
+
+    def _schedule(self, delay: int, callback, *, window=None) -> str:
+        """Schedule and track a callback so closing cancels all pending work."""
+        target = window or self.window
+        callback_id: str | None = None
+
+        def run():
+            if callback_id is not None:
+                self._after_ids.discard(callback_id)
+            if not self._stopped:
+                callback()
+
+        callback_id = target.after(delay, run)
+        self._after_ids.add(callback_id)
+        return callback_id
+
+    def _restart_decoder(self) -> bool:
+        """Rewind for the default muted, looping portrait reveal semantics."""
+        try:
+            self._container.seek(0, stream=self._stream, backward=True)
+            self._frame_iterator = self._container.decode(self._stream)
+            return True
+        except Exception as exc:
+            self._show_playback_error(exc)
+            return False
+
+    @staticmethod
+    def _show_playback_error(exc) -> None:
+        from tkinter import messagebox
+        try:
+            messagebox.showerror("Video Playback Error", f"Unable to continue video playback: {exc}")
+        except Exception:
+            pass
 
     def _display_image(self, image: Image.Image) -> None:
         """Internal helper for display image."""
@@ -162,7 +207,7 @@ class _SecondScreenVideoPlayer:
         width = max(1, self.window.winfo_width())
         height = max(1, self.window.winfo_height())
         if width <= 1 or height <= 1:
-            self.window.after(50, lambda img=image: self._display_image(img))
+            self._schedule(50, lambda img=image: self._display_image(img))
             return
 
         frame_ratio = image.width / image.height if image.height else 1.0
@@ -187,13 +232,12 @@ class _SecondScreenVideoPlayer:
         if self._stopped:
             return
         self._stopped = True
-        if self._after_id and self.window.winfo_exists():
-            # Handle the branch where after ID is set and window.winfo_exists().
+        for callback_id in tuple(self._after_ids):
             try:
-                self.window.after_cancel(self._after_id)
+                self.window.after_cancel(callback_id)
             except Exception:  # pragma: no cover - depends on event timing
                 pass
-            self._after_id = None
+        self._after_ids.clear()
         try:
             self._container.close()
         except Exception:  # pragma: no cover - cleanup best effort
@@ -202,8 +246,21 @@ class _SecondScreenVideoPlayer:
             self.window.destroy()
 
 
+def stop_active_video() -> None:
+    """Stop and release the decoder for the current video reveal, if any."""
+    global _active_player
+    player, _active_player = _active_player, None
+    if player is not None:
+        player.close()
+
+
 @log_function
-def play_video_on_second_screen(video_path: str, title: str | None = None) -> ctk.CTkToplevel:
+def play_video_on_second_screen(
+    video_path: str,
+    title: str | None = None,
+    *,
+    loop: bool = True,
+) -> ctk.CTkToplevel:
     """Play the provided video on the secondary monitor.
 
     Parameters
@@ -221,7 +278,10 @@ def play_video_on_second_screen(video_path: str, title: str | None = None) -> ct
     if av is None:
         raise RuntimeError("Video playback is unavailable because PyAV is not installed.")
 
-    player = _SecondScreenVideoPlayer(video_path, title=title)
+    global _active_player
+    stop_active_video()
+    player = _SecondScreenVideoPlayer(video_path, title=title, loop=loop)
+    _active_player = player
     # Keep a reference to prevent garbage collection from stopping playback.
     player.window._video_player_instance = player  # type: ignore[attr-defined]
     log_info(f"Playing video on second screen: {video_path}", func_name="play_video_on_second_screen")

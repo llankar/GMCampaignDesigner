@@ -24,6 +24,8 @@ from modules.generic.portrait_manager.swarmui_portrait_generator import (
     launch_swarmui,
     save_generated_portrait_candidate,
 )
+from modules.ui.entity_media.thumbnail import load_media_thumbnail
+from modules.ui.entity_media.types import portrait_filetypes
 
 class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
     """Manage portraits for all entities referenced by one scenario."""
@@ -151,8 +153,7 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         resolved = resolve_portrait_path(primary, ConfigHelper.get_campaign_dir()) if primary else None
         try:
             if resolved and Path(resolved).exists():
-                with Image.open(resolved) as source:
-                    image = source.resize((256, 256)).copy()
+                image = load_media_thumbnail(resolved, (256, 256))
                 self._preview_image = ctk.CTkImage(light_image=image, size=(256, 256))
                 self.preview_label.configure(image=self._preview_image, text="")
                 return
@@ -244,7 +245,7 @@ class ScenarioPortraitManagerDialog(ctk.CTkToplevel):
         entity = self._entity()
         if not entity:
             return
-        paths = filedialog.askopenfilenames(title="Select Portrait Image(s)", filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"), ("All Files", "*.*")])
+        paths = filedialog.askopenfilenames(title="Select Portrait Media", filetypes=portrait_filetypes())
         current = self._paths()
         for path in paths:
             if Path(path).is_file():

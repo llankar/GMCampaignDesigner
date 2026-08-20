@@ -15,6 +15,7 @@ from modules.helpers.swarmui_portrait_service import (
     launch_swarmui,
     save_generated_portrait_candidate,
 )
+from modules.ui.entity_media.types import portrait_filetypes
 
 
 class GenericEditorWindowPortraitAndImageWorkflows:
@@ -561,16 +562,8 @@ class GenericEditorWindowPortraitAndImageWorkflows:
     def select_portrait(self):
         """Select portrait."""
         file_paths = filedialog.askopenfilenames(
-            title="Select Portrait Image(s)",
-            filetypes=[
-                ("Image Files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp"),
-                ("PNG Files", "*.png"),
-                ("JPEG Files", "*.jpg;*.jpeg"),
-                ("GIF Files", "*.gif"),
-                ("Bitmap Files", "*.bmp"),
-                ("WebP Files", "*.webp"),
-                ("All Files", "*.*")
-            ]
+            title="Select Portrait Media",
+            filetypes=portrait_filetypes(),
         )
 
         if file_paths:

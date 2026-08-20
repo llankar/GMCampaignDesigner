@@ -5,7 +5,10 @@ from modules.generic.portrait_manager.entity_portrait_actions import (
     missing_portrait_indices,
     portrait_status,
     resolve_scenario_linked_entities,
+    copy_portrait_to_campaign,
+    set_entity_portraits,
 )
+from modules.helpers.portrait_helper import parse_portrait_value
 
 class DummyWrapper:
     def __init__(self, entity_type, items=None):
@@ -65,3 +68,22 @@ def test_missing_portrait_ordering(tmp_path, monkeypatch):
         ScenarioPortraitEntity("npcs", "C", {"Name": "C", "Portrait": "missing.png"}, wrapper),
     ]
     assert missing_portrait_indices(entities) == [0, 2]
+
+
+def test_video_copy_and_serialization_preserve_existing_portraits(tmp_path, monkeypatch):
+    campaign = tmp_path / "campaign"
+    source = tmp_path / "clip.M4V"
+    source.write_bytes(b"video")
+    monkeypatch.setattr("modules.helpers.config_helper.ConfigHelper.get_campaign_dir", lambda: str(campaign))
+    wrapper = DummyWrapper("npcs")
+    record = {"Name": "Alice", "Portrait": "first.png;second.webp"}
+    entity = ScenarioPortraitEntity("npcs", "Alice", record, wrapper)
+
+    copied = copy_portrait_to_campaign(str(source), entity.name)
+    set_entity_portraits(entity, parse_portrait_value(record["Portrait"]) + [copied])
+
+    values = parse_portrait_value(record["Portrait"])
+    assert values[:2] == ["first.png", "second.webp"]
+    assert values[2].startswith("assets/portraits/")
+    assert values[2].endswith(".m4v")
+    assert (campaign / values[2]).read_bytes() == b"video"

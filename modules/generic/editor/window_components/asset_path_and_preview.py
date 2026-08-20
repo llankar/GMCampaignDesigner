@@ -28,7 +28,8 @@ class GenericEditorWindowAssetPathAndPreview:
         try:
             # Keep image resilient if this step fails.
             if abs_path and abs_path.exists():
-                image = Image.open(abs_path).resize((256, 256))
+                from modules.ui.entity_media.thumbnail import load_media_thumbnail
+                image = load_media_thumbnail(abs_path, (256, 256))
                 self.image_image = ctk.CTkImage(light_image=image, size=(256, 256))
                 self.image_label.configure(image=self.image_image, text="")
             else:
@@ -195,7 +196,8 @@ class GenericEditorWindowAssetPathAndPreview:
         try:
             # Keep portrait preview resilient if this step fails.
             if abs_path and abs_path.exists():
-                image = Image.open(abs_path).resize((256, 256))
+                from modules.ui.entity_media.thumbnail import load_media_thumbnail
+                image = load_media_thumbnail(abs_path, (256, 256))
                 self.portrait_image = ctk.CTkImage(light_image=image, size=(256, 256))
                 self.portrait_label.configure(image=self.portrait_image, text="")
             else:

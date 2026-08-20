@@ -19,6 +19,7 @@ import tkinter.font as tkfont
 import tkinter as tk
 from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.ui.image_viewer import show_portrait
+from modules.ui.entity_media.thumbnail import load_media_thumbnail
 from modules.ui.tooltip import ToolTip
 from modules.generic.generic_editor_window import GenericEditorWindow
 from modules.helpers.config_helper import ConfigHelper
@@ -356,7 +357,7 @@ def _build_portrait_widget(parent, entity_type, entity, *, size):
     try:
         # Keep portrait widget resilient if this step fails.
         _portrait_debug(entity_type, entity, f"loading portrait image from '{resolved_portrait}'")
-        img = Image.open(resolved_portrait).convert("RGBA")
+        img = load_media_thumbnail(resolved_portrait, size)
         framed_image = fit_portrait_to_frame(img, size)
 
         portrait_shell = ctk.CTkFrame(parent, fg_color="transparent")
@@ -746,7 +747,7 @@ def insert_npc_table(parent, header, npc_names, open_entity_callback, show_heade
         portrait_path = primary_portrait(portrait_value)
         resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
-            img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
+            img = load_media_thumbnail(resolved_portrait, (56, 56))
             photo = CTkImage(light_image=img, size=(56, 56))
             def _portrait_builder(parent, image=photo):
                 """Internal helper for portrait builder."""
@@ -797,7 +798,7 @@ def insert_creature_table(parent, header, creature_names, open_entity_callback, 
         portrait_path = primary_portrait(portrait_value)
         resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
-            img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
+            img = load_media_thumbnail(resolved_portrait, (56, 56))
             photo = CTkImage(light_image=img, size=(56, 56))
             def _portrait_builder(parent, image=photo):
                 """Internal helper for portrait builder."""
@@ -849,7 +850,7 @@ def insert_villain_table(parent, header, villain_names, open_entity_callback, sh
         portrait_path = primary_portrait(portrait_value)
         resolved_portrait = resolve_portrait_path(portrait_value, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
-            img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
+            img = load_media_thumbnail(resolved_portrait, (56, 56))
             photo = CTkImage(light_image=img, size=(56, 56))
             def _portrait_builder(parent, image=photo):
                 """Internal helper for portrait builder."""
@@ -934,7 +935,7 @@ def insert_places_table(parent, header, place_names, open_entity_callback, show_
 
         resolved_portrait = resolve_portrait_path(portrait, ConfigHelper.get_campaign_dir())
         if resolved_portrait and os.path.exists(resolved_portrait):
-            img = Image.open(resolved_portrait).resize((56, 56), Image.Resampling.LANCZOS)
+            img = load_media_thumbnail(resolved_portrait, (56, 56))
             photo = CTkImage(light_image=img, size=(56, 56))
             cell = CTkLabel(portrait_shell, image=photo, text="")
             cell.image = photo

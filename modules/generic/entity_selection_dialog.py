@@ -3,12 +3,12 @@
 import customtkinter as ctk
 import os
 from tkinter import messagebox
-from PIL import Image
 from customtkinter import CTkLabel, CTkImage
 from modules.helpers.text_helpers import format_longtext
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
 from modules.helpers.logging_helper import log_module_import
+from modules.ui.entity_media.thumbnail import load_media_thumbnail
 
 log_module_import(__name__)
 
@@ -101,14 +101,13 @@ class EntitySelectionDialog(ctk.CTkToplevel):
             if resolved_portrait and os.path.exists(resolved_portrait):
                 # Handle the branch where resolved portrait is set and os.path.exists(resolved_portrait).
                 if resolved_portrait not in self.image_cache:
-                    img = Image.open(resolved_portrait)
-                    img.thumbnail(MAX_PORTRAIT_SIZE)
+                    img = load_media_thumbnail(resolved_portrait, MAX_PORTRAIT_SIZE)
                     ctk_img = CTkImage(light_image=img, dark_image=img, size=MAX_PORTRAIT_SIZE)
                     self.image_cache[resolved_portrait] = ctk_img
 
                 portrait_label = CTkLabel(self.table_frame, text="", image=self.image_cache[resolved_portrait])
             else:
-                portrait_label = ctk.CTkLabel(self.table_frame, text="[No Image]")
+                portrait_label = ctk.CTkLabel(self.table_frame, text="[No Media]")
 
             portrait_label.grid(row=row_index, column=col_index, padx=5, pady=2)
             portrait_label.bind("<Button-1>", lambda e, i=item: self.select_entity(i))
