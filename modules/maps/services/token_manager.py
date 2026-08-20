@@ -11,6 +11,8 @@ from modules.helpers.config_helper import ConfigHelper
 from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
 from modules.maps.utils.token_facing import normalize_facing_angle
 from modules.maps.measurement.templates import MEASUREMENT_ITEM_TYPE, serialize_measurement_item
+from modules.maps.media import detect_media_type, load_thumbnail
+from modules.maps.media.tokens import register_token_animation
 from modules.ui.image_viewer import show_portrait
 import tkinter.simpledialog as sd
 import tkinter as tk
@@ -321,7 +323,12 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         )
         return
 
-    source_img = Image.open(img_path).convert("RGBA")
+    media_type = detect_media_type(img_path)
+    try:
+        source_img = load_thumbnail(img_path, media_type)
+    except Exception as exc:
+        messagebox.showerror("Error", f"Token media could not be decoded:\n{exc}")
+        return
     logical_size = int(self.token_size)
     pil_img = source_img.resize((logical_size, logical_size), resample=Image.LANCZOS)
 
@@ -348,6 +355,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
         "entity_type":  entity_type,
         "entity_id":    entity_name,
         "image_path":   storage_path,
+        "media_type":  media_type,
         "size":         logical_size,
         "source_image": source_img,
         "pil_image":    pil_img,
@@ -370,6 +378,7 @@ def add_token(self, path, entity_type, entity_name, entity_record=None):
     }
 
     self.tokens.append(token)
+    register_token_animation(self, token, img_path)
     self._update_canvas_images()
     self._persist_tokens()
 
@@ -462,6 +471,7 @@ def _copy_token(self, event=None):
         "entity_type":  t["entity_type"],
         "entity_id":    t["entity_id"],
         "image_path":   t["image_path"],
+        "media_type":  detect_media_type(t.get("image_path", ""), t.get("media_type")),
         "size":         t.get("size", self.token_size),
         "border_color": t.get("border_color", "#0000ff"),
         "hp":           t.get("hp", 10),        # ← copy current HP
@@ -484,7 +494,11 @@ def _paste_token(self, event=None):
 
     # Re-create the PIL image at the original token size
     resolved_path = _resolve_campaign_path(c.get("image_path"))
-    source_img = Image.open(resolved_path).convert("RGBA")
+    media_type = detect_media_type(resolved_path, c.get("media_type"))
+    try:
+        source_img = load_thumbnail(resolved_path, media_type)
+    except Exception:
+        return
     storage_path = _campaign_relative_path(resolved_path)
     size = int(c["size"])
     pil_img = source_img.resize((size, size), Image.LANCZOS)
@@ -504,6 +518,7 @@ def _paste_token(self, event=None):
         "entity_type":  c["entity_type"],
         "entity_id":    c["entity_id"],
         "image_path":   storage_path,
+        "media_type":  media_type,
         "size":         size,
         "source_image": source_img,
         "border_color": c["border_color"],
@@ -521,6 +536,7 @@ def _paste_token(self, event=None):
 
     # Add it to your tokens list, then persist & re-draw everything
     self.tokens.append(token)
+    register_token_animation(self, token, resolved_path)
     self._persist_tokens()
     self._update_canvas_images()
 
@@ -587,6 +603,9 @@ def _change_token_border_color(self, token):
 
 def _delete_token(self, token):
     """Remove a token’s canvas items (image, border, name, HP UI, info widget, edit entries) and its data."""
+    manager = getattr(self, "_token_animation_manager", None)
+    if manager:
+        manager.unregister(token)
     # 1) Main token border & image
     for cid in token.get("canvas_ids", []):
         self.canvas.delete(cid)
@@ -722,6 +741,7 @@ def _persist_tokens(self):
                     "entity_type":    t.get("entity_type", ""),
                     "entity_id":      t.get("entity_id", ""),
                     "image_path":     storage_path,
+                    "media_type":    detect_media_type(storage_path, t.get("media_type")),
                     "size":           t.get("size", self.token_size),
                     "hp":             t.get("hp", 10),
                     "max_hp":         t.get("max_hp", 10),

@@ -18,6 +18,8 @@ from modules.helpers.logging_helper import log_module_import, log_debug, log_inf
 from modules.maps.marker_types import DEFAULT_MARKER_TYPE, normalize_marker_type
 from modules.maps.utils.token_facing import normalize_facing_angle
 from modules.maps.measurement.templates import MEASUREMENT_ITEM_TYPE, deserialize_measurement_item
+from modules.maps.media import detect_media_type, load_thumbnail
+from modules.maps.media.tokens import register_token_animation
 
 log_module_import(__name__)
 
@@ -187,6 +189,9 @@ def select_map(self):
 
 def _on_display_map(self, entity_type, map_name): # entity_type here is the map's default, not token's
     """Callback from selector: build editor UI and load the chosen map."""
+    animation_manager = getattr(self, "_token_animation_manager", None)
+    if animation_manager:
+        animation_manager.clear()
     # 1) Lookup the chosen map record
     previous_map_name = ""
     if isinstance(getattr(self, "current_map", None), dict):
@@ -498,6 +503,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
             # Handle the branch where item_type_from_rec == 'token'.
             portrait_path = (rec.get("image_path") or "").strip()
             path = _resolve_campaign_path(portrait_path) if portrait_path else ""
+            persisted_media_type = detect_media_type(portrait_path, rec.get("media_type"))
 
             if path and not os.path.exists(path):
                 # Handle the branch where path is set and not os.path.exists(path).
@@ -528,7 +534,8 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 if os.path.exists(path):
                     try:
                         # Keep on display map resilient if this step fails.
-                        source_image = Image.open(path).convert("RGBA")
+                        media_type = detect_media_type(path, rec.get("media_type"))
+                        source_image = load_thumbnail(path, media_type)
                         pil_image = source_image.resize((sz, sz), resample=Image.LANCZOS)
                         resolved_path = path
                     except Exception as e:
@@ -570,6 +577,7 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
                 "entity_type":  rec.get("entity_type"), # Must come from record for tokens
                 "entity_id":    rec.get("entity_id"),
                 "image_path":   storage_path,
+                "media_type":  persisted_media_type,
                 "source_image": source_image,
                 "pil_image":    pil_image,
                 "border_color": rec.get("border_color", "#0000ff"), # Default blue for tokens
@@ -729,5 +737,15 @@ def _on_display_map(self, entity_type, map_name): # entity_type here is the map'
 
     # 9) Finally draw everything onto the canvas
     self._update_canvas_images()
+    ensure_manager = getattr(self, "_ensure_token_animation_manager", None)
+    if callable(ensure_manager):
+        ensure_manager()
+        for current_item in self.tokens:
+            if current_item.get("type") == "token" and current_item.get("media_type") == "video":
+                register_token_animation(
+                    self,
+                    current_item,
+                    _resolve_campaign_path(current_item.get("image_path")),
+                )
     if getattr(self, '_web_server_thread', None):
         self._update_web_display_map()
