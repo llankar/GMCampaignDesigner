@@ -19,9 +19,24 @@ def _fit_frame(image: Image.Image, max_size: int) -> Image.Image:
 
 
 def _decoded_frame_to_image(frame: object) -> Image.Image:
-    """Build a Pillow image after asking PyAV to retain the alpha channel."""
-    pixels = frame.to_ndarray(format="rgba")
-    return Image.fromarray(pixels, "RGBA")
+    """Copy a decoded PyAV frame to Pillow without discarding transparency.
+
+    ``VideoFrame.to_image()`` always converts through RGB, while the previous
+    ndarray implementation also made this path depend on NumPy.  Reformatting
+    to packed RGBA and reading its plane directly preserves alpha and honours
+    FFmpeg's potentially padded row stride.
+    """
+    rgba = frame.reformat(format="rgba")
+    plane = rgba.planes[0]
+    return Image.frombytes(
+        "RGBA",
+        (rgba.width, rgba.height),
+        bytes(plane),
+        "raw",
+        "RGBA",
+        plane.line_size,
+        1,
+    )
 
 
 class VideoDecoder:
@@ -60,7 +75,10 @@ class VideoDecoder:
                     raise MediaDecodeError(f"Unable to loop video: {exc}") from exc
             except Exception as exc:
                 raise MediaDecodeError(f"Unable to decode video frame: {exc}") from exc
-            return _fit_frame(_decoded_frame_to_image(frame), self.max_size)
+            try:
+                return _fit_frame(_decoded_frame_to_image(frame), self.max_size)
+            except Exception as exc:
+                raise MediaDecodeError(f"Unable to convert video frame: {exc}") from exc
 
     def close(self) -> None:
         with getattr(self, "_lock", threading.Lock()):

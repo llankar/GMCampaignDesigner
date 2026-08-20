@@ -63,22 +63,30 @@ class FakeDecoder:
 
 
 class FakeDecodedFrame:
-    def __init__(self):
+    def __init__(self, *, fail=False):
         self.requested_format = None
+        self.fail = fail
 
-    def to_ndarray(self, *, format):
+    def reformat(self, *, format):
         self.requested_format = format
-        np = pytest.importorskip("numpy")
-        pixels = np.zeros((4, 8, 4), dtype=np.uint8)
-        pixels[:, :4] = (255, 0, 0, 0)
-        pixels[:, 4:] = (0, 255, 0, 255)
-        return pixels
+        if self.fail:
+            raise ValueError("unsupported frame")
+        # Include four bytes of padding after each row to verify that the
+        # decoder honours PyAV's plane stride rather than assuming tight rows.
+        row = bytes((255, 0, 0, 0)) * 4 + bytes((0, 255, 0, 255)) * 4
+        plane = FakePlane((row + b"PAD!") * 4)
+        plane.line_size = 36
+        return SimpleNamespace(width=8, height=4, planes=[plane])
 
 
-def test_video_decoder_requests_rgba_and_preserves_alpha_when_resizing():
+class FakePlane(bytearray):
+    pass
+
+
+def test_video_decoder_requests_rgba_and_preserves_alpha_with_padded_rows():
     decoded_frame = FakeDecodedFrame()
     decoder = VideoDecoder.__new__(VideoDecoder)
-    decoder.max_size = 4
+    decoder.max_size = 8
     decoder._lock = threading.Lock()
     decoder._closed = False
     decoder._frames = iter([decoded_frame])
@@ -87,9 +95,20 @@ def test_video_decoder_requests_rgba_and_preserves_alpha_when_resizing():
 
     assert decoded_frame.requested_format == "rgba"
     assert image.mode == "RGBA"
-    assert image.size == (4, 2)
+    assert image.size == (8, 4)
     assert image.getpixel((0, 0))[3] == 0
-    assert image.getpixel((3, 0)) == (0, 255, 0, 255)
+    assert image.getpixel((4, 3)) == (0, 255, 0, 255)
+
+
+def test_video_decoder_wraps_frame_conversion_errors():
+    decoder = VideoDecoder.__new__(VideoDecoder)
+    decoder.max_size = 4
+    decoder._lock = threading.Lock()
+    decoder._closed = False
+    decoder._frames = iter([FakeDecodedFrame(fail=True)])
+
+    with pytest.raises(MediaDecodeError, match="Unable to convert video frame"):
+        decoder.read_frame()
 
 
 def test_mp4_selection_and_persisted_hint_detection():
