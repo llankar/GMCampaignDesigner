@@ -18,6 +18,7 @@ from modules.helpers.logging_helper import (
     log_warning,
 )
 from modules.helpers.portrait_helper import resolve_portrait_path
+from modules.ui.entity_media.types import media_type
 
 log_module_import(__name__)
 
@@ -373,8 +374,8 @@ def _schedule_reveal_animation(
 
 
 @log_function
-def show_portrait(path, title=None, subtitle=None, animation=None):
-    """Display a dark full-screen reveal for an image."""
+def show_entity_media(path, title=None, subtitle=None, animation=None):
+    """Resolve and reveal supported entity media on the presentation display."""
     title = _clean_text(title)
     subtitle = _clean_text(subtitle)
     animation = normalize_reveal_animation(animation)
@@ -384,6 +385,22 @@ def show_portrait(path, title=None, subtitle=None, animation=None):
     if not resolved or not os.path.exists(resolved):
         log_warning(f"Portrait path missing or invalid: {path}", func_name="show_portrait")
         messagebox.showerror("Error", "No valid portrait available.")
+        return None
+
+    kind = media_type(resolved)
+    # Replacing any reveal must stop its scheduled decoding callbacks first.
+    from modules.ui.video_player import stop_active_video
+    stop_active_video()
+    if kind == "video":
+        from modules.ui.video_player import play_video_on_second_screen
+        try:
+            return play_video_on_second_screen(resolved, title=title)
+        except Exception as exc:
+            log_warning(f"Failed to play video {resolved}: {exc}", func_name="show_entity_media")
+            messagebox.showerror("Media Error", f"Unable to play video: {exc}")
+            return None
+    if kind != "image":
+        messagebox.showerror("Media Error", "This portrait media type is not supported.")
         return None
 
     try:
@@ -431,3 +448,8 @@ def show_portrait(path, title=None, subtitle=None, animation=None):
     content = _build_reveal_content(win, photo, title=title, subtitle=subtitle)
     _schedule_reveal_animation(win, content, animation=animation, image=image)
     return win
+
+
+def show_portrait(path, title=None, subtitle=None, animation=None):
+    """Compatibility wrapper for the media-aware entity reveal."""
+    return show_entity_media(path, title=title, subtitle=subtitle, animation=animation)

@@ -8,6 +8,7 @@ from modules.generic.editor.window_components.asset_path_and_preview import (
 from modules.generic.editor.window_components.portrait_and_image_workflows import (
     GenericEditorWindowPortraitAndImageWorkflows,
 )
+from modules.helpers.portrait_helper import parse_portrait_value, serialize_portrait_value
 
 
 class _LabelStub:
@@ -36,7 +37,7 @@ class _EditorHarness(
         else:
             self.portrait_paths.append(path)
         self.added_portraits.append(path)
-        self.field_widgets["Portrait"] = path
+        self.field_widgets["Portrait"] = serialize_portrait_value(self.portrait_paths)
 
 
 def test_select_image_persists_campaign_relative_path(monkeypatch, tmp_path: Path):
@@ -98,3 +99,42 @@ def test_select_portrait_missing_source_shows_error(monkeypatch, tmp_path: Path)
     assert seen_errors
     assert "introuvable" in seen_errors[0][0].lower()
     assert "Portrait" not in editor.field_widgets
+
+
+def test_select_portrait_accepts_video_and_preserves_existing_multiple_values(monkeypatch, tmp_path: Path):
+    campaign_dir = tmp_path / "campaign"
+    campaign_dir.mkdir()
+    video = tmp_path / "library" / "intro.WEBM"
+    video.parent.mkdir()
+    video.write_bytes(b"video")
+    editor = _EditorHarness()
+    editor.portrait_paths = ["assets/portraits/first.png", "assets/portraits/second.jpg"]
+    dialog_options = {}
+
+    monkeypatch.setattr(
+        "modules.generic.editor.window_components.asset_path_and_preview.ConfigHelper.get_campaign_dir",
+        lambda: str(campaign_dir),
+    )
+
+    def choose(**kwargs):
+        dialog_options.update(kwargs)
+        return [str(video)]
+
+    monkeypatch.setattr(
+        "modules.generic.editor.window_components.portrait_and_image_workflows.filedialog.askopenfilenames",
+        choose,
+    )
+    monkeypatch.setattr(
+        editor,
+        "copy_and_resize_portrait",
+        lambda _src: "assets/portraits/intro.webm",
+    )
+
+    editor.select_portrait()
+
+    assert "*.webm" in dialog_options["filetypes"][0][1]
+    assert parse_portrait_value(editor.field_widgets["Portrait"]) == [
+        "assets/portraits/first.png",
+        "assets/portraits/second.jpg",
+        "assets/portraits/intro.webm",
+    ]

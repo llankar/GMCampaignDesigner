@@ -4,7 +4,7 @@ import os
 import json
 import tkinter as tk
 import customtkinter as ctk
-from PIL import Image, ImageTk
+from PIL import ImageTk
 from modules.ui.image_viewer import _get_monitors
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.portrait_helper import primary_portrait, resolve_portrait_path
@@ -15,6 +15,7 @@ from modules.helpers.logging_helper import (
     log_warning,
     log_module_import,
 )
+from modules.ui.entity_media.thumbnail import load_media_thumbnail
 
 log_module_import(__name__)
 
@@ -55,13 +56,9 @@ def show_entity_on_second_screen(item, title, fields):
         if portrait_abs:
             try:
                 # Keep entity on second screen resilient if this step fails.
-                img = Image.open(portrait_abs)
                 max_w = min(sw - 120, 800)
                 max_h = min(sh // 3, 400)
-                ow, oh = img.size
-                scale = min(max_w / ow, max_h / oh, 1)
-                if scale < 1:
-                    img = img.resize((int(ow*scale), int(oh*scale)), Image.Resampling.LANCZOS)
+                img = load_media_thumbnail(portrait_abs, (max_w, max_h))
                 photo = ImageTk.PhotoImage(img)
                 portrait_label = tk.Label(root, image=photo, bg=bg)
                 portrait_label.image = photo

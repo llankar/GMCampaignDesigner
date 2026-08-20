@@ -44,6 +44,7 @@ from modules.ai.pipeline import execute_ai_chat
 from modules.generic.entities.linking import entity_label_map, resolve_entity_slug
 from modules.generic.entities.merge import EntityMergeError, merge_selected_entities
 from modules.generic.portrait_manager import ScenarioPortraitManagerDialog, resolve_scenario_linked_entities
+from modules.ui.entity_media.thumbnail import load_media_thumbnail
 
 log_module_import(__name__)
 
@@ -1666,9 +1667,7 @@ class GenericListView(ctk.CTkFrame):
         if resolved:
             try:
                 # Keep grid image resilient if this step fails.
-                with Image.open(resolved) as img:
-                    image_obj = img.copy()
-                image_obj.thumbnail((160, 160), RESAMPLE_MODE)
+                image_obj = load_media_thumbnail(resolved, (160, 160))
             except Exception:
                 image_obj = None
         if image_obj is None:
@@ -1876,8 +1875,7 @@ class GenericListView(ctk.CTkFrame):
             return None
         try:
             # Keep portrait menu image resilient if this step fails.
-            img = Image.open(resolved)
-            img.thumbnail(PORTRAIT_MENU_THUMB_SIZE, RESAMPLE_MODE)
+            img = load_media_thumbnail(resolved, PORTRAIT_MENU_THUMB_SIZE)
             photo = ImageTk.PhotoImage(img)
             self._portrait_menu_images.append(photo)
             return photo
