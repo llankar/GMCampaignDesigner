@@ -52,6 +52,7 @@ from modules.maps.media import (
 )
 from modules.maps.media.types import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from modules.maps.media.tokens import register_token_animation
+from modules.maps.menus.token_portrait_menu import add_token_portrait_menu
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
 from modules.maps.views.web_display_view import (
     close_web_display,
@@ -5154,6 +5155,10 @@ class DisplayMapController:
         if not selected:
             return
         self._last_token_media_directory = os.path.dirname(selected)
+        self._replace_token_media(token, selected)
+
+    def _replace_token_media(self, token: dict, selected: str) -> None:
+        """Apply selected media and report the existing replacement error."""
         result = replace_token_media(self, token, selected)
         if not result.success:
             messagebox.showerror(
@@ -5161,6 +5166,12 @@ class DisplayMapController:
                 f"Unable to replace the token media.\n\n{result.error}",
                 parent=getattr(self, "canvas", None),
             )
+
+    def _replace_token_portrait(self, token: dict, selected: str) -> None:
+        """Apply a resolved portrait selected from the token context menu."""
+        resolved = resolve_portrait_candidate(selected, ConfigHelper.get_campaign_dir())
+        if resolved:
+            self._replace_token_media(token, resolved)
 
     def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
         """Load portrait menu image."""
@@ -5217,9 +5228,13 @@ class DisplayMapController:
             command=lambda: self._resize_tokens(valid_tokens),
         )
         if count == 1:
-            menu.add_command(
-                label="Change Token Image…",
-                command=lambda: self._change_token_image(valid_tokens[0]),
+            token = valid_tokens[0]
+            add_token_portrait_menu(
+                menu,
+                self._get_token_portrait_paths(token),
+                campaign_dir=ConfigHelper.get_campaign_dir(),
+                load_image=self._load_portrait_menu_image,
+                on_select=lambda selected: self._replace_token_portrait(token, selected),
             )
         menu.add_command(
             label=f"Change Border Color{plural}",
