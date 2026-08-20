@@ -1,5 +1,6 @@
 """Regression coverage for animated map-token media."""
 
+import threading
 import time
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ from modules.maps.media import (
     VIDEO,
     MediaDecodeError,
     TokenAnimationManager,
+    VideoDecoder,
     detect_media_type,
     load_thumbnail,
     replace_token_media,
@@ -58,6 +60,36 @@ class FakeDecoder:
 
     def close(self):
         self.closed = True
+
+
+class FakeDecodedFrame:
+    def __init__(self):
+        self.requested_format = None
+
+    def to_ndarray(self, *, format):
+        self.requested_format = format
+        np = pytest.importorskip("numpy")
+        pixels = np.zeros((4, 8, 4), dtype=np.uint8)
+        pixels[:, :4] = (255, 0, 0, 0)
+        pixels[:, 4:] = (0, 255, 0, 255)
+        return pixels
+
+
+def test_video_decoder_requests_rgba_and_preserves_alpha_when_resizing():
+    decoded_frame = FakeDecodedFrame()
+    decoder = VideoDecoder.__new__(VideoDecoder)
+    decoder.max_size = 4
+    decoder._lock = threading.Lock()
+    decoder._closed = False
+    decoder._frames = iter([decoded_frame])
+
+    image = decoder.read_frame()
+
+    assert decoded_frame.requested_format == "rgba"
+    assert image.mode == "RGBA"
+    assert image.size == (4, 2)
+    assert image.getpixel((0, 0))[3] == 0
+    assert image.getpixel((3, 0)) == (0, 255, 0, 255)
 
 
 def test_mp4_selection_and_persisted_hint_detection():
