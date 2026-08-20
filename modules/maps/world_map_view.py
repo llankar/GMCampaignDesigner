@@ -53,6 +53,8 @@ from modules.maps.views.toolbar_view import (
     _update_fog_button_states,
 )
 from modules.maps.services.fog_manager import _set_fog
+from modules.maps.media import TokenAnimationManager, detect_media_type, load_thumbnail
+from modules.maps.media.tokens import register_token_animation
 from modules.maps.services.world_map_fog_service import (
     apply_world_map_fog_rectangle,
     clear_fog_rectangle_preview,
@@ -212,6 +214,7 @@ class WorldMapPanel(ctk.CTkFrame):
         init_world_map_fog(self)
 
         self._build_layout()
+        self._token_animation_manager = TokenAnimationManager(self.canvas, self._display_token_frame)
 
         self._chatbot_bindings.append(("<Control-Shift-c>", self.bind("<Control-Shift-c>", self.open_chatbot, add="+")))
         self._chatbot_bindings.append(("<Control-Shift-C>", self.bind("<Control-Shift-C>", self.open_chatbot, add="+")))
@@ -654,6 +657,7 @@ class WorldMapPanel(ctk.CTkFrame):
     def load_map(self, map_name: str, *, push_history: bool = True) -> None:
         """Load map."""
         log_info(f"Loading world map '{map_name}'", func_name="WorldMapWindow.load_map")
+        self._token_animation_manager.clear()
         entry = self._ensure_world_map_entry(map_name)
         if entry is None:
             log_warning(f"World map entry '{map_name}' could not be created", func_name="WorldMapWindow.load_map")
@@ -698,6 +702,11 @@ class WorldMapPanel(ctk.CTkFrame):
         load_world_map_fog(self)
         self.tokens = self._deserialize_tokens(entry)
         self._draw_scene()
+        for token in self.tokens:
+            media_path = token.get("portrait_path") or token.get("image_path")
+            if token.get("media_type") == "video" and media_path:
+                candidate = media_path if os.path.isabs(media_path) else os.path.join(ConfigHelper.get_campaign_dir(), media_path)
+                register_token_animation(self, token, candidate)
         self._clear_inspector()
 
     def navigate_back(self) -> None:
@@ -1005,6 +1014,9 @@ class WorldMapPanel(ctk.CTkFrame):
                     'size': value.get('size', 120),
                     'portrait_path': value.get('portrait_path'),
                     'image_path': value.get('image_path'),
+                    'media_type': detect_media_type(
+                        value.get('portrait_path') or value.get('image_path'), value.get('media_type')
+                    ),
                     'linked_map': value.get('linked_map'),
                     'color': value.get('color', _TOKEN_COLORS.get(entity_type, '#FFFFFF')),
                     'marker_type': normalize_marker_type(value.get('marker_type', DEFAULT_MARKER_TYPE)),
@@ -1040,6 +1052,9 @@ class WorldMapPanel(ctk.CTkFrame):
                     "size": token.get("size", 120),
                     "portrait_path": token.get("portrait_path"),
                     "image_path": token.get("image_path"),
+                    "media_type": detect_media_type(
+                        token.get("portrait_path") or token.get("image_path"), token.get("media_type")
+                    ),
                     "linked_map": token.get("linked_map"),
                     "color": token.get("color"),
                     "marker_type": normalize_marker_type(token.get("marker_type", DEFAULT_MARKER_TYPE)),
@@ -1478,6 +1493,18 @@ class WorldMapPanel(ctk.CTkFrame):
         pil_image = self._create_token_pil_image(token, size)
         return ImageTk.PhotoImage(pil_image)
 
+    def _display_token_frame(self, token: dict, frame: Image.Image) -> None:
+        """Replace one world-map token image without redrawing the scene."""
+        ids = token.get("canvas_ids") or ()
+        if token not in self.tokens or not ids:
+            return
+        size = max(48, int(token.get("size", 120) * (self.render_params or (1,))[0]))
+        rendered = frame.resize((size, size), Image.Resampling.LANCZOS)
+        rendered = self._with_marker_type_badge(rendered, token)
+        image = ImageTk.PhotoImage(rendered)
+        token["tk_image"] = image
+        self.canvas.itemconfig(ids[0], image=image)
+
     def _resolve_token_ctk_image(self, token: dict, size: int) -> ctk.CTkImage:
         """Resolve token ctk image."""
         pil_image = self._create_token_pil_image(token, size)
@@ -1502,7 +1529,7 @@ class WorldMapPanel(ctk.CTkFrame):
         if not os.path.exists(candidate):
             return None
         try:
-            image = Image.open(candidate).convert("RGBA")
+            image = load_thumbnail(candidate, detect_media_type(candidate))
             self.image_cache[path] = image
             return image
         except Exception as exc:
@@ -1610,6 +1637,7 @@ class WorldMapPanel(ctk.CTkFrame):
         if token not in self.tokens:
             self.selected_token = None
             return
+        self._token_animation_manager.unregister(token)
         self.tokens = [t for t in self.tokens if t is not token]
         self.selected_token = None
         self._draw_scene()
@@ -1875,6 +1903,7 @@ class WorldMapPanel(ctk.CTkFrame):
         """Delete token."""
         if token not in self.tokens:
             return
+        self._token_animation_manager.unregister(token)
         self.tokens = [t for t in self.tokens if t is not token]
         if self.selected_token is token:
             self.selected_token = None
@@ -2982,6 +3011,9 @@ class WorldMapPanel(ctk.CTkFrame):
                 except Exception:
                     pass
         self._chatbot_bindings = []
+        manager = getattr(self, "_token_animation_manager", None)
+        if manager:
+            manager.close()
         self.close_player_display()
         return
 

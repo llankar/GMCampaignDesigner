@@ -88,47 +88,80 @@
   }
 
   function renderTokens(status) {
-    tokenLayer.innerHTML = '';
     if (!status || !Array.isArray(status.tokens)) return;
+    const retained = new Set(status.tokens.map((token) => String(token.id)));
+    tokenLayer.querySelectorAll('.token').forEach((node) => {
+      if (!retained.has(node.dataset.tokenId || '')) node.remove();
+    });
     const rect = mapImg.getBoundingClientRect();
     const scaleX = status.render_size[0] ? status.render_size[0] / rect.width : 1;
     const scaleY = status.render_size[1] ? status.render_size[1] / rect.height : 1;
     status.tokens.forEach((token) => {
-      const el = document.createElement('div');
-      el.className = 'token';
-      const label = document.createElement('span');
-      label.textContent = token.label || 'PC';
-      label.style.color = '#0b1220';
-      label.style.position = 'relative';
-      label.style.zIndex = '2';
-      el.appendChild(label);
-      el.draggable = false;
+      const tokenId = String(token.id);
+      let el = Array.from(tokenLayer.querySelectorAll('.token'))
+        .find((node) => node.dataset.tokenId === tokenId);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'token';
+        el.dataset.tokenId = tokenId;
+        const label = document.createElement('span');
+        label.style.cssText = 'color:#0b1220;position:relative;z-index:2';
+        el.appendChild(label);
+        const arrow = document.createElement('div');
+        arrow.className = 'facingArrow';
+        el.appendChild(arrow);
+        const handle = document.createElement('div');
+        handle.className = 'facingHandle';
+        el.appendChild(handle);
+        el.draggable = false;
+        tokenLayer.appendChild(el);
+      }
+      const mediaUrl = token.media_url
+        ? token.media_url + (authToken ? `?token=${encodeURIComponent(authToken)}` : '')
+        : '';
+      const mediaKind = token.media_type === 'video' ? 'video' : 'img';
+      let media = el.querySelector('video, img');
+      if (mediaUrl && (!media || media.tagName.toLowerCase() !== mediaKind || el.dataset.mediaUrl !== mediaUrl)) {
+        if (media) media.remove();
+        media = document.createElement(mediaKind);
+        media.src = mediaUrl;
+        media.alt = token.label || 'Token';
+        media.draggable = false;
+        media.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px;pointer-events:none';
+        el.prepend(media);
+        el.dataset.mediaUrl = mediaUrl;
+        if (mediaKind === 'video') {
+          media.muted = media.defaultMuted = media.loop = media.autoplay = media.playsInline = true;
+          media.setAttribute('muted', '');
+          media.setAttribute('playsinline', '');
+          media.play().catch(() => {
+            document.addEventListener('pointerdown', () => media.play().catch(() => {}), { once: true });
+          });
+        }
+      }
+      const label = el.querySelector('span');
+      if (label) label.textContent = token.label || 'PC';
       const screenX = (token.screen_position?.[0] || 0) / scaleX;
       const screenY = (token.screen_position?.[1] || 0) / scaleY;
       const size = (token.screen_size || 48) / Math.max(scaleX, scaleY);
       el.style.transform = `translate(${screenX}px, ${screenY}px)`;
       el.style.width = `${size}px`;
       el.style.height = `${size}px`;
-      if (token.border_color) {
-        el.style.borderColor = token.border_color;
-        el.style.color = token.border_color;
-      }
+      el.style.borderColor = token.border_color || '#0ea5e9';
+      el.style.color = token.border_color || '#0ea5e9';
       const facingAngle = normalizeAngle(token.facing_angle);
-      const arrow = document.createElement('div');
-      arrow.className = 'facingArrow';
-      arrow.style.transform = `rotate(${facingAngle}deg)`;
-      el.appendChild(arrow);
-      const handle = document.createElement('div');
-      handle.className = 'facingHandle';
-      handle.style.transform = `rotate(${facingAngle}deg) translate(${size * 0.64}px, 0) rotate(${-facingAngle}deg)`;
-      handle.addEventListener('pointerdown', (ev) => startFacingDrag(ev, token, el));
-      el.appendChild(handle);
-      el.addEventListener('contextmenu', (ev) => showTokenMenu(ev, token));
-      el.addEventListener('pointerdown', (ev) => {
+      const arrow = el.querySelector('.facingArrow');
+      const handle = el.querySelector('.facingHandle');
+      if (arrow) arrow.style.transform = `rotate(${facingAngle}deg)`;
+      if (handle) {
+        handle.style.transform = `rotate(${facingAngle}deg) translate(${size * 0.64}px, 0) rotate(${-facingAngle}deg)`;
+        handle.onpointerdown = (ev) => startFacingDrag(ev, token, el);
+      }
+      el.oncontextmenu = (ev) => showTokenMenu(ev, token);
+      el.onpointerdown = (ev) => {
         if (ev.target === handle) return;
         startDrag(ev, token);
-      });
-      tokenLayer.appendChild(el);
+      };
     });
   }
 

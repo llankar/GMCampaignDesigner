@@ -296,6 +296,39 @@ def open_web_display(self, port=None):
             },
         )
 
+    @self._web_app.route('/media/token/<remote_id>')
+    def token_media(remote_id):
+        """Serve only media belonging to a visible token after authentication."""
+        provided = request.args.get("token") or request.headers.get("X-Map-Token")
+        if not controller._map_remote_access_guard.is_request_authorized(provided):
+            return ("Unauthorized", 401)
+        for token in getattr(controller, "tokens", ()):
+            if (
+                str(token.get("remote_id") or "") != remote_id
+                or not token.get("player_visible", True)
+                or str(token.get("entity_type") or "").upper() != "PC"
+            ):
+                continue
+            relative = str(token.get("image_path") or "")
+            candidate = Path(relative)
+            if not candidate.is_absolute():
+                candidate = Path(ConfigHelper.get_campaign_dir()) / candidate
+            try:
+                candidate = candidate.resolve(strict=True)
+            except (OSError, RuntimeError):
+                return ("Media not found", 404)
+            try:
+                campaign_dir = Path(ConfigHelper.get_campaign_dir()).resolve(strict=True)
+                candidate.relative_to(campaign_dir)
+            except (OSError, RuntimeError, ValueError):
+                # Persistent token data must never turn this endpoint into an
+                # authenticated arbitrary-file server.
+                return ("Media not found", 404)
+            if not candidate.is_file():
+                return ("Media not found", 404)
+            return send_from_directory(candidate.parent, candidate.name, conditional=True, max_age=3600)
+        return ("Media not found", 404)
+
     @self._web_app.route('/stream.mjpg')
     def stream_mjpeg():
         """Handle stream mjpeg."""
@@ -444,6 +477,8 @@ def _describe_remote_tokens(self, render_offset=None):
                 'screen_size': size_px * zoom,
                 'border_color': token.get('border_color', '#0ea5e9'),
                 'facing_angle': normalize_facing_angle(token.get('facing_angle', 0.0)),
+                'media_type': str(token.get('media_type') or 'image'),
+                'media_url': f"/media/token/{remote_id}",
             }
         )
     return tokens

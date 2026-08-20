@@ -44,6 +44,8 @@ from modules.maps.services.token_manager import (
     normalize_existing_token_paths,
     _extract_entity_defense_value,
 )  # Keep this if it's used by other token_manager functions not moved
+from modules.maps.media import TokenAnimationManager, detect_media_type, load_thumbnail
+from modules.maps.media.tokens import register_token_animation
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
 from modules.maps.views.web_display_view import (
     close_web_display,
@@ -437,6 +439,10 @@ class DisplayMapController:
     def close(self):
         """Cancel controller-owned deferred work before the host is torn down."""
         self._cancel_deferred_map_open()
+        manager = getattr(self, "_token_animation_manager", None)
+        if manager:
+            manager.close()
+            self._token_animation_manager = None
         canvas = getattr(self, "canvas", None)
         for attr_name in (
             "_marker_after_id",
@@ -445,6 +451,40 @@ class DisplayMapController:
             "_zoom_final_after_id",
         ):
             self._cancel_after_job(canvas, attr_name)
+
+    def _ensure_token_animation_manager(self):
+        """Create the single animation scheduler after the canvas exists."""
+        manager = getattr(self, "_token_animation_manager", None)
+        if manager is None and getattr(self, "canvas", None) is not None:
+            manager = TokenAnimationManager(self.canvas, self._display_token_frame)
+            self._token_animation_manager = manager
+        return manager
+
+    def _display_token_frame(self, token, frame):
+        """Replace just one token's canvas images on Tk's thread."""
+        if token not in self.tokens:
+            return
+        size = max(1, int(token.get("size", self.token_size)))
+        token["source_image"] = frame
+        token["pil_image"] = frame.resize((size, size), Image.Resampling.LANCZOS)
+        scaled = token["pil_image"].resize(
+            (max(1, int(size * self.zoom)), max(1, int(size * self.zoom))),
+            self._fast_resample,
+        )
+        photo = ImageTk.PhotoImage(scaled)
+        token["tk_image"] = photo
+        ids = token.get("canvas_ids") or ()
+        if len(ids) > 1:
+            self.canvas.itemconfig(ids[1], image=photo)
+        fs_ids = token.get("fs_canvas_ids") or ()
+        if getattr(self, "fs_canvas", None) and len(fs_ids) > 1 and token.get("player_visible", True):
+            try:
+                fs_photo = ImageTk.PhotoImage(scaled)
+                self.fs_canvas.itemconfig(fs_ids[1], image=fs_photo)
+            except tk.TclError:
+                pass
+            else:
+                token["fs_tk"] = fs_photo
 
     # ------------------------------------------------------------------
     # Fit-to-view behaviour
@@ -1021,6 +1061,9 @@ class DisplayMapController:
             messagebox.showwarning("Not Found", f"Map '{target}' not found.")
             return False
         self._cancel_deferred_map_open()
+        manager = getattr(self, "_token_animation_manager", None)
+        if manager:
+            manager.clear()
         self._on_display_map("maps", target)
         item_counts = {
             "tokens": sum(1 for entry in getattr(self, "tokens", []) if entry.get("type") == "token"),
@@ -5063,7 +5106,10 @@ class DisplayMapController:
             try:
                 # Keep token size resilient if this step fails.
                 if source_img is None and resolved_path:
-                    source_img = Image.open(resolved_path).convert("RGBA")
+                    source_img = load_thumbnail(
+                        resolved_path,
+                        detect_media_type(resolved_path, token.get("media_type")),
+                    )
                 if source_img is not None:
                     token["source_image"] = source_img
                     token["pil_image"] = source_img.resize((new_size, new_size), Image.LANCZOS)
@@ -5582,7 +5628,9 @@ class DisplayMapController:
                         if not resolved_path or not os.path.exists(resolved_path):
                             raise FileNotFoundError(resolved_path or image_path)
                         sz = new_item_data.get("size", self.token_size)
-                        source_img = Image.open(resolved_path).convert("RGBA")
+                        media_type = detect_media_type(resolved_path, new_item_data.get("media_type"))
+                        new_item_data["media_type"] = media_type
+                        source_img = load_thumbnail(resolved_path, media_type)
                         new_item_data["source_image"] = source_img
                         new_item_data["pil_image"] = source_img.resize((sz, sz), Image.LANCZOS)
                     except Exception as exc:
@@ -5631,6 +5679,9 @@ class DisplayMapController:
                 new_item_data.setdefault("is_filled", self.shape_is_filled)
 
             self.tokens.append(new_item_data)
+            if item_type == "token" and new_item_data.get("media_type") == "video":
+                self._ensure_token_animation_manager()
+                register_token_animation(self, new_item_data, _resolve_campaign_path(new_item_data.get("image_path")))
             pasted_items.append(new_item_data)
 
         if not pasted_items:
@@ -5643,6 +5694,9 @@ class DisplayMapController:
     def _delete_item(self, item_to_delete):
         """Delete item."""
         if not item_to_delete: return
+        manager = getattr(self, "_token_animation_manager", None)
+        if manager:
+            manager.unregister(item_to_delete)
         if item_to_delete.get("canvas_ids"):
             for cid in item_to_delete["canvas_ids"]:
                 if cid: self.canvas.delete(cid)
