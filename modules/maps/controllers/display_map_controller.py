@@ -44,7 +44,13 @@ from modules.maps.services.token_manager import (
     normalize_existing_token_paths,
     _extract_entity_defense_value,
 )  # Keep this if it's used by other token_manager functions not moved
-from modules.maps.media import TokenAnimationManager, detect_media_type, load_thumbnail
+from modules.maps.media import (
+    TokenAnimationManager,
+    detect_media_type,
+    load_thumbnail,
+    replace_token_media,
+)
+from modules.maps.media.types import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 from modules.maps.media.tokens import register_token_animation
 from modules.maps.views.fullscreen_view import open_fullscreen, _update_fullscreen_map
 from modules.maps.views.web_display_view import (
@@ -5126,6 +5132,36 @@ class DisplayMapController:
             return
         self._resize_tokens([token])
 
+    def _change_token_image(self, token):
+        """Select and transactionally replace the media for one token."""
+        campaign_dir = ConfigHelper.get_campaign_dir()
+        initial_dir = getattr(self, "_last_token_media_directory", "")
+        if not initial_dir or not os.path.isdir(initial_dir):
+            initial_dir = campaign_dir if os.path.isdir(campaign_dir) else os.path.expanduser("~")
+        image_patterns = " ".join(f"*{ext}" for ext in sorted(IMAGE_EXTENSIONS))
+        video_patterns = " ".join(f"*{ext}" for ext in sorted(VIDEO_EXTENSIONS))
+        selected = filedialog.askopenfilename(
+            parent=getattr(self, "canvas", None),
+            title="Change Token Image",
+            initialdir=initial_dir,
+            filetypes=[
+                ("Supported Media", f"{image_patterns} {video_patterns}"),
+                ("Image Files", image_patterns),
+                ("Video Files", video_patterns),
+                ("All Files", "*.*"),
+            ],
+        )
+        if not selected:
+            return
+        self._last_token_media_directory = os.path.dirname(selected)
+        result = replace_token_media(self, token, selected)
+        if not result.success:
+            messagebox.showerror(
+                "Change Token Image",
+                f"Unable to replace the token media.\n\n{result.error}",
+                parent=getattr(self, "canvas", None),
+            )
+
     def _load_portrait_menu_image(self, path: str) -> ImageTk.PhotoImage | None:
         """Load portrait menu image."""
         resolved = resolve_portrait_candidate(path, ConfigHelper.get_campaign_dir())
@@ -5180,6 +5216,11 @@ class DisplayMapController:
             label=f"Resize Token{plural}",
             command=lambda: self._resize_tokens(valid_tokens),
         )
+        if count == 1:
+            menu.add_command(
+                label="Change Token Image…",
+                command=lambda: self._change_token_image(valid_tokens[0]),
+            )
         menu.add_command(
             label=f"Change Border Color{plural}",
             command=lambda: self._prompt_change_token_border_color(valid_tokens),

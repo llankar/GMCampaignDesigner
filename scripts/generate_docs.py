@@ -2720,7 +2720,7 @@ def build_user_manual(shots, menu_data, py_files):
 
         "<li><b>Fog of war:</b> Paint additive or subtractive fog with brush shortcuts (<code>[</code>/<code>]</code>) and reset the mask with a single click.</li>"
 
-        "<li><b>Tokens & auras:</b> Add NPC, PC, or creature tokens, colour their borders, track HP overlays, and duplicate or delete entries through the context menu.</li>"
+        "<li><b>Tokens & auras:</b> Add NPC, PC, or creature tokens, colour their borders, track HP overlays, and duplicate or delete entries through the context menu. For a single token, choose <b>Change Token Image…</b> to replace its static image or video without changing its game state.</li>"
         "<li><b>Token facing:</b> Rotate token facing where the selected token and view support it.</li>"
 
         "<li><b>Drawing tools:</b> Switch between Token, Rectangle, and Oval modes to sketch zones, spell areas, or light auras with filled/outline styles; add editable text labels and tweak drawing colours.</li>"
