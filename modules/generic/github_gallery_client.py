@@ -15,6 +15,7 @@ from uuid import UUID
 import requests
 
 from modules.generic.campaign_sync.models import RemoteCampaignRevision
+from modules.generic.github_release_errors import raise_for_github_status
 from modules.helpers.config_helper import ConfigHelper
 from modules.helpers.logging_helper import log_exception, log_info, log_module_import, log_warning
 from modules.helpers.secret_helper import decrypt_secret
@@ -156,7 +157,7 @@ class GithubGalleryClient:
                 params=params,
                 timeout=self._timeout,
             )
-            response.raise_for_status()
+            raise_for_github_status(response, action="Unable to fetch GitHub releases")
             payload = response.json()
         except Exception:
             log_exception(
@@ -299,8 +300,11 @@ class GithubGalleryClient:
                 json=payload,
                 timeout=self._timeout,
             )
-            response.raise_for_status()
-            release = response.json()
+            if response.status_code == 422:
+                release = self._recover_empty_release(session, tag_name, metadata)
+            else:
+                raise_for_github_status(response, action="Unable to create the GitHub release")
+                release = response.json()
             upload_url = release.get("upload_url")
             if not upload_url:
                 raise RuntimeError("Release response missing upload_url")
@@ -316,7 +320,7 @@ class GithubGalleryClient:
                     headers=headers,
                     timeout=self._timeout,
                 )
-            upload_response.raise_for_status()
+            raise_for_github_status(upload_response, action="Unable to upload the campaign archive")
             asset = upload_response.json()
             release.setdefault("assets", []).append(asset)
             if progress_callback:
@@ -335,6 +339,47 @@ class GithubGalleryClient:
             raise
         finally:
             session.close()
+
+    def _recover_empty_release(
+        self,
+        session: requests.Session,
+        tag_name: str,
+        expected_metadata: Dict[str, object],
+    ) -> Dict[str, object]:
+        """Reuse a matching asset-less release left by an interrupted upload.
+
+        GitHub creates a release before accepting its ZIP asset.  If that upload
+        fails, retrying the campaign previously attempted to recreate the same
+        tag and GitHub returned HTTP 422.  Only an empty release with the exact
+        campaign synchronization identity is safe to resume.
+        """
+        response = session.get(
+            f"{self._api_base}/repos/{self._repo}/releases/tags/{quote(tag_name, safe='')}",
+            timeout=self._timeout,
+        )
+        raise_for_github_status(
+            response,
+            action="GitHub rejected the release and its existing tag could not be recovered",
+        )
+        release = response.json()
+        if not isinstance(release, dict):
+            raise RuntimeError("GitHub returned an invalid existing release response.")
+
+        existing_metadata = self._parse_metadata(release.get("body"))
+        expected_sync = expected_metadata.get("sync")
+        existing_sync = existing_metadata.get("sync")
+        if existing_sync != expected_sync:
+            raise RuntimeError(
+                f"GitHub tag '{tag_name}' already belongs to a different release."
+            )
+        if release.get("assets"):
+            raise RuntimeError(
+                f"GitHub release '{tag_name}' already contains an archive; refresh the "
+                "online gallery before publishing another revision."
+            )
+        if not release.get("upload_url"):
+            raise RuntimeError("Existing GitHub release is missing its upload URL.")
+        return release
 
     # --------------------------------------------------------------- Deletion
     def delete_bundle(
