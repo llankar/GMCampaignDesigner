@@ -18,6 +18,11 @@ class IdleWorker:
         self.events = Queue()
 
 
+class ImmediateExecutor:
+    def submit(self, function, *args):
+        function(*args)
+
+
 def test_configure_applies_saved_preferences_without_restart():
     coordinator = AutoPublishCoordinator(MemoryOutbox(), IdleWorker())
     try:
@@ -34,6 +39,47 @@ def test_configure_applies_saved_preferences_without_restart():
         assert coordinator.scheduler.maximum_interval == 90
     finally:
         coordinator.shutdown()
+
+
+def test_explicit_publication_bypasses_offline_background_preference():
+    jobs = []
+
+    class Outbox:
+        def __init__(self):
+            self.entry = OutboxEntry(
+                "campaign", "Campaign", Path("/campaign"),
+                Path("/campaign/campaign.db"), 7, 1.0, 2.0,
+            )
+
+        def get(self, campaign_id):
+            return self.entry if campaign_id == self.entry.campaign_id else None
+
+        def entries(self):
+            return [self.entry]
+
+    class Detector:
+        def detect(self, *_args, **_kwargs):
+            return CampaignChangeResult(
+                CampaignChangeState.LOCALLY_MODIFIED, "current-fingerprint"
+            )
+
+    class Worker(IdleWorker):
+        def run(self, job):
+            jobs.append(job)
+
+    coordinator = AutoPublishCoordinator(
+        Outbox(), Worker(), detector=Detector(), offline=True,
+        executor=ImmediateExecutor(),
+    )
+
+    # Offline mode must continue to suppress unattended publication while an
+    # explicit user action remains available.
+    coordinator.tick()
+    assert jobs == []
+
+    assert coordinator.publish_now("campaign") is True
+    assert len(jobs) == 1
+    assert jobs[0].campaign_id == "campaign"
 
 
 def test_worker_preserves_forced_full_checkpoint_option():
