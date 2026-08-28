@@ -58,6 +58,12 @@ class AutoPublishCoordinator:
                 self._dirty_during_flight.add(campaign_id)
 
     def publish_now(self, campaign_id: str) -> bool:
+        """Dispatch an explicit user request even when background sync is offline.
+
+        Offline mode disables unattended network activity.  A direct publication
+        action is an explicit opt-in to that network request and must therefore
+        not be rejected by the automatic-publication preference.
+        """
         return self._dispatch(campaign_id, force=True)
 
     def tick(self) -> None:
@@ -104,7 +110,7 @@ class AutoPublishCoordinator:
 
     def _dispatch(self, campaign_id: str, force: bool = False) -> bool:
         with self._lock:
-            if self._stopped or self.offline or campaign_id in self._inflight:
+            if self._stopped or (self.offline and not force) or campaign_id in self._inflight:
                 return False
             entry = self.outbox.get(campaign_id)
             if entry is None:
