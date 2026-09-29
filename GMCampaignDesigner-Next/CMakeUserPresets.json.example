@@ -1,0 +1,11 @@
+{
+  "version": 6,
+  "include": ["CMakePresets.json"],
+  "configurePresets": [
+    {
+      "name": "local-debug",
+      "inherits": "debug",
+      "environment": { "CMAKE_PREFIX_PATH": "$env{QT_ROOT}" }
+    }
+  ]
+}

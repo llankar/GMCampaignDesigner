@@ -1,0 +1,23 @@
+# CMake et compilateurs
+/build/
+/build-*/
+/CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+*.user
+
+# Éditeurs et système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets, données et campagnes locales
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.campaign
+*.campaign-backup
